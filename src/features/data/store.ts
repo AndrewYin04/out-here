@@ -23,6 +23,7 @@ export interface DataStore {
   stories: CoreStore['stories'];
   // profiles
   profile: CoreStore['profile'];
+  updateProfile: CoreStore['updateProfile'];
   profilePosts: CoreStore['profilePosts'];
   profilePhotos: CoreStore['profilePhotos'];
   profileFriends: CoreStore['profileFriends'];

@@ -95,6 +95,7 @@ export const SECTIONS: Record<SectionId, Section> = {
       ['suggestions', 'Suggestions'],
       ['all', 'All friends'],
       ['birthdays', 'Birthdays'],
+      ['lists', 'Custom lists'],
     ]),
   },
   groups: {
