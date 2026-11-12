@@ -6,7 +6,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { ImFreeButton, PlanSheet, usePlanSuggestions } from '@/features/outhere';
+import { ImFreeButton, MuseLabel, PlanSheet, useMuseFilter, usePlanAsk, usePlanSuggestions } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
@@ -67,6 +67,20 @@ export function OutHereView() {
     const friends = new Set(ctx?.friendIds ?? []);
     return live.filter((q) => q.memberIds.some((m) => friends.has(m)));
   }, [mode, live, ctx]);
+
+  // Muse filter: in Explore only the plans Muse kept show (plus the viewer's own and the open
+  // one); in Friends only the friends it kept. Off, or before Muse answers, everything shows.
+  const ask = usePlanAsk();
+  const filter = useMuseFilter(mode, ask);
+  const shown: Quest[] = useMemo(() => {
+    if (mode !== 'explore' || !filter.keep) return visible;
+    const keep = filter.keep;
+    return visible.filter((q) => keep.has(q.id) || q.memberIds.includes(persona.id) || q.id === selectedId);
+  }, [mode, visible, filter.keep, persona.id, selectedId]);
+  const friendKeep = mode === 'friends' ? filter.keep : null;
+  const allFriendPins = friendPins.data?.pins ?? [];
+  const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
+  const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // Friends mode: the faces of friends who joined each plan, shown on its pin.
   const friendFaces = useMemo(() => {
     if (mode !== 'friends' || !ctx) return null;
@@ -78,10 +92,10 @@ export function OutHereView() {
 
   const picks = useMemo(() => {
     if (!planPicks) return null;
-    const shown = new Set(visible.map((q) => q.id));
-    const ids = planPicks.questIds.filter((id) => shown.has(id));
+    const onMap = new Set(shown.map((q) => q.id));
+    const ids = planPicks.questIds.filter((id) => onMap.has(id));
     return ids.length > 0 ? ids : null;
-  }, [planPicks, visible]);
+  }, [planPicks, shown]);
   const fitTo = useMemo<LatLng[] | null>(() => {
     if (!planPicks || mode !== 'friends') return null;
     const want = new Set(planPicks.topFriendIds);
@@ -97,10 +111,10 @@ export function OutHereView() {
     <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
-        <FallbackList quests={visible} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
+        <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
       ) : (
         <MapCanvas
-          quests={visible}
+          quests={shown}
           selectedId={selectedId}
           viewerId={persona.id}
           origin={ctx?.origin ?? null}
@@ -116,8 +130,8 @@ export function OutHereView() {
         />
       )}
 
-      {/* Explore / Friends */}
-      <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
+      {/* Explore / Friends, and the Muse filter chip beside them */}
+      <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">
         <div role="group" aria-label="Map view" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
           {(['explore', 'friends'] as const).map((m) => (
             <button
@@ -135,14 +149,62 @@ export function OutHereView() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={filter.on}
+          data-testid="muse-filter-toggle"
+          title="Muse shows only what matches what you're looking for"
+          onClick={() => filter.setOn(!filter.on)}
+          className={cn(
+            'h-10 whitespace-nowrap rounded-pill px-3 text-[15px] font-semibold shadow-card transition-colors',
+            filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
+          )}
+        >
+          <span aria-hidden>✨</span> Muse filter
+        </button>
       </div>
+
+      {filter.on && (
+        <div className="pointer-events-none absolute inset-x-4 top-[60px] z-10 flex justify-center">
+          <p
+            role="status"
+            data-testid="muse-filter-status"
+            data-source={filter.source ?? (filter.loading ? 'loading' : 'error')}
+            className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-1.5 rounded-pill bg-fb-surface px-3 py-1 text-center text-[13px] text-fb-text-2 shadow-card"
+          >
+            {filter.loading ? (
+              <span>Muse is filtering…</span>
+            ) : filter.error ? (
+              <span>Muse filter is unavailable, showing everything</span>
+            ) : (
+              <>
+                {/* ✨ Muse only on live model output, as in PlanSheet; mock answers carry no label. */}
+                {filter.source === 'muse' && filter.live && <MuseLabel className="py-0" />}
+                <span>
+                  {filter.source === 'fallback'
+                    ? 'Muse is busy, showing a quick match'
+                    : shownCount === 0
+                      ? 'Nothing matches right now'
+                      : mode === 'explore'
+                        ? `Muse is showing ${shown.length} of ${visible.length} plans`
+                        : `Muse is showing ${shownFriends} of ${allFriendPins.length} friends`}
+                </span>
+              </>
+            )}
+            <span aria-hidden>·</span>
+            <button type="button" data-testid="muse-filter-show-all" onClick={() => filter.setOn(false)} className="font-semibold text-fb-blue hover:underline">
+              Show all
+            </button>
+          </p>
+        </div>
+      )}
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} />
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} />
           <PeopleButton map={map} />
           {visible.length > 0 && (
-            <p role="status" data-testid="friends-filter-chip" className="pointer-events-none absolute left-1/2 top-[60px] z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card">
+            <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
             </p>
           )}

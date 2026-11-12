@@ -8,7 +8,7 @@ const listeners = new Set<() => void>();
 export function setPlanOpen(next: boolean): void {
   if (open === next) return;
   open = next;
-  if (!next) setPlanSuggestions(null);
+  if (!next) { setPlanSuggestions(null); setPlanAsk(null); }
   for (const l of listeners) l();
 }
 
@@ -43,4 +43,25 @@ function subscribePicks(l: () => void) {
 
 export function usePlanSuggestions(): PlanPicks | null {
   return useSyncExternalStore(subscribePicks, () => picks, () => null);
+}
+
+// The ask the plan sheet last submitted ("hungry, 15 min"), so the Muse filter can use it.
+// Closing the sheet clears it.
+let ask: string | null = null;
+const askListeners = new Set<() => void>();
+
+export function setPlanAsk(next: string | null): void {
+  const v = next && next.trim() ? next.trim() : null;
+  if (v === ask) return;
+  ask = v;
+  for (const l of askListeners) l();
+}
+
+function subscribeAsk(l: () => void) {
+  askListeners.add(l);
+  return () => { askListeners.delete(l); };
+}
+
+export function usePlanAsk(): string | null {
+  return useSyncExternalStore(subscribeAsk, () => ask, () => null);
 }
