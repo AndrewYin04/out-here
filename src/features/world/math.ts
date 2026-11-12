@@ -107,11 +107,18 @@ export const MAX_ACCURACY_M = 60;
 /** Faster than a sprint between two fixes is a GPS jump, not you. */
 const MAX_SPEED_MPS = 9;
 
-/** Keep a new fix, or drop it as too inaccurate or as an impossible jump from the last kept one. */
-export function acceptFix(prev: GpsFix | null, next: GpsFix): boolean {
+/** After this many jumps in a row, the jump is real (a bike, a car, GPS back after a tunnel). */
+export const JUMPS_BEFORE_ACCEPT = 3;
+
+/**
+ * Keep a new fix, or drop it as too inaccurate or as an impossible jump from the last kept one.
+ * `jumpsInARow` counts the fixes just dropped as jumps; once it reaches JUMPS_BEFORE_ACCEPT the
+ * new position is accepted, so moving fast never freezes the avatar for good.
+ */
+export function acceptFix(prev: GpsFix | null, next: GpsFix, jumpsInARow = 0): boolean {
   if (!Number.isFinite(next.lat) || !Number.isFinite(next.lng)) return false;
   if (next.accuracy > MAX_ACCURACY_M) return false;
-  if (!prev) return true;
+  if (!prev || jumpsInARow >= JUMPS_BEFORE_ACCEPT) return true;
   const dt = Math.max(0.001, (next.at - prev.at) / 1000);
   const d = haversineMeters(prev, next);
   // Allow the combined accuracy as slack, so a better fix may correct a worse one.

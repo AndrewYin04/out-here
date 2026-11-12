@@ -84,6 +84,14 @@ describe('GPS fixes', () => {
     const jumped = { ...moveMeters(HQ, 900, 0), accuracy: 10, heading: null, speed: null, at: 10_000 };
     expect(acceptFix(start, jumped)).toBe(false);
   });
+  it('accepts a fast move once it repeats (a bike or a car), never a single glitch', () => {
+    const start = fix();
+    const far = { ...moveMeters(HQ, 400, 0), accuracy: 10, heading: null, speed: null, at: 10_000 };
+    expect(acceptFix(start, far, 0)).toBe(false);
+    expect(acceptFix(start, far, 2)).toBe(false);
+    expect(acceptFix(start, far, 3)).toBe(true);
+    expect(acceptFix(start, { ...far, accuracy: 200 }, 5)).toBe(false);
+  });
   it('uses the GPS course only while moving', () => {
     expect(fixHeading(fix({ heading: 90, speed: 1.5 }))).toBe(90);
     expect(fixHeading(fix({ heading: 90, speed: 0.1 }))).toBeNull();

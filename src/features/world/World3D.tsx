@@ -502,6 +502,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       data-source={source}
       data-zoom={map.getZoom().toFixed(1)}
       data-pitch={Math.round(map.getPitch())}
+      data-lat={pos.current.lat.toFixed(5)}
+      data-lng={pos.current.lng.toFixed(5)}
       className="pointer-events-none absolute inset-0 z-[5]"
     >
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}

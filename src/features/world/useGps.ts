@@ -3,7 +3,7 @@
 // updates walking times, and nothing here sends it to the server. Sharing a location with
 // friends stays the job of Find My (its own audience, precision, pause and expiry).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { acceptFix, fixHeading, normalizeDeg, type GpsFix } from './math';
+import { acceptFix, fixHeading, normalizeDeg, MAX_ACCURACY_M, type GpsFix } from './math';
 
 export type GpsStatus = 'off' | 'asking' | 'on' | 'weak' | 'denied' | 'unavailable';
 
@@ -25,19 +25,30 @@ export function useGps(enabled: boolean) {
     if (typeof navigator === 'undefined' || !navigator.geolocation) { setStatus('unavailable'); return; }
     setStatus('asking');
     let last: GpsFix | null = null;
+    let jumps = 0;
     const id = navigator.geolocation.watchPosition(
       (p) => {
         const fix: GpsFix = {
           lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy,
           heading: p.coords.heading, speed: p.coords.speed, at: p.timestamp || Date.now(),
         };
-        if (!acceptFix(last, fix)) { if (!last) setStatus('weak'); return; }
+        if (!acceptFix(last, fix, jumps)) {
+          if (!last) setStatus('weak');
+          else if (fix.accuracy <= MAX_ACCURACY_M) jumps += 1;
+          return;
+        }
+        jumps = 0;
         last = fix;
         const course = fixHeading(fix);
         reading.current = { fix, heading: course ?? reading.current.heading };
         setStatus('on');
       },
-      (err) => setStatus(err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable'),
+      // Only a denied permission ends GPS mode. "Position unavailable" and timeouts are common
+      // indoors and between fixes: show a weak signal until the next fix, keep watching.
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) setStatus('denied');
+        else if (!last) setStatus('weak');
+      },
       { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
     );
 
