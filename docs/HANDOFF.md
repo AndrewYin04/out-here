@@ -43,6 +43,8 @@ Two devices or two browser windows (each tab is its own persona): window A `…/
 
 ## Not done (team daytime list, in priority order)
 
+**Gap found in the morning review:** there is no single place to see the plans you joined. Today you see it per plan (the quest panel says "You're going") or through notifications. Add a **"Your plans"** list: a button on the Out Here map and the Going tab on `/events`, listing every plan the viewer joined (time, place, who is going, Leave). About one builder slice.
+
 From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan:
 1. **Demo reset button** (review B1): `resetStory(now)` + `POST /api/demo/reset` so the stage reset does not need the laptop.
 2. **Production**: in Vercel, turn off Deployment Protection (or share the link), then promote the verified preview to Production and give judges the production URL. Previews and Production both read the demo database right now (review D11 suggests previews read dev).
