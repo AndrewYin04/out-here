@@ -109,6 +109,9 @@ describe('E2: meta.source says who wrote the plan', () => {
     expect(out.meta.summarySource).toBe('muse');
     expect(out.plan.summary).toBe('Dumplings with Maya fit.');
     expect(runs.every((r) => r.ok)).toBe(true);
+    // "Muse's work" steps: free friends are first name + end time only
+    expect(out.meta.friendsFree.map((f) => f.firstName)).toContain('Maya');
+    expect(Object.keys(out.meta.friendsFree[0]).sort()).toEqual(['firstName', 'freeUntil']);
   });
 
   it('is "fallback" and logs a heuristic run when the model returns invented ids', async () => {
