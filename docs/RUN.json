@@ -1,0 +1,8 @@
+{
+  "runStart": "2026-11-12T02:05:00-08:00",
+  "freezeAt": "2026-11-13T07:00:00-08:00",
+  "handoffAt": "2026-11-13T08:00:00-08:00",
+  "deadline": "2026-11-13T10:30:00-08:00",
+  "deployedUrl": null,
+  "note": "Run has ~29h before freeze, so milestone targets below are rescaled from the plan's +h offsets."
+}
