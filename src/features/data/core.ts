@@ -921,5 +921,9 @@ export class CoreStore {
   async saveIntroProfile(row: IntroProfile): Promise<void> { await this.backend.upsert('introProfiles', [row]); }
   async insertIntro(row: Intro): Promise<void> { await this.backend.insert('intros', [row]); }
   async updateIntro(id: ID, patch: Partial<Intro>): Promise<void> { await this.backend.update('intros', { id }, patch); }
+  /** An 'intro' notification ("Muse has an intro for you"); the row links to /intros#<id>. */
+  async notifyIntro(recipientId: ID, actorId: ID, introId: ID, text: string): Promise<void> {
+    await this.notify(await this.view(), recipientId, 'intro', actorId, 'intro', introId, text);
+  }
   async removeIntros(ids: ID[]): Promise<void> { if (ids.length) await this.backend.remove('intros', { id: ids }); }
 }

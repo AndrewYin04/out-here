@@ -26,11 +26,12 @@ export function notificationLink(n: LinkInput): string {
     case 'quest': return `/out-here?quest=${id}`;
     case 'invite': return `/out-here?invite=${id}`;
     case 'thread': return `/messages?thread=${id}`;
+    case 'intro': return `/intros#${id}`;
     default: return NOTIFICATIONS_PATH;
   }
 }
 
 /** Every object type, for tests and exhaustiveness checks. */
 export const NOTIFICATION_OBJECT_TYPES: readonly NotificationObjectType[] = [
-  'post', 'comment', 'profile', 'group', 'event', 'quest', 'invite', 'thread',
+  'post', 'comment', 'profile', 'group', 'event', 'quest', 'invite', 'thread', 'intro',
 ];

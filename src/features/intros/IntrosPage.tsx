@@ -153,7 +153,7 @@ export function IntrosPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-[680px] space-y-4 px-0 py-4 sm:px-4">
+    <div className="mx-auto w-full max-w-[680px] space-y-4 px-0 pb-8 pt-4 sm:px-4 md:pb-4">
       <Card padded as="section" aria-label="About Muse Intros" className="space-y-2">
         <div className="flex items-center gap-2">
           <h1 className="text-[24px] font-bold text-fb-text">Intros from Muse</h1>

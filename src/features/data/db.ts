@@ -101,7 +101,7 @@ const TIME_KEYS = /(_at|^starts_at|^ends_at)$/;
 const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level']);
 const JSON_KEYS = new Set([
   'field_visibility', 'hours', 'intent', 'output',
-  'kinds', 'dating_prefs', 'trust_path', 'reasons', 'first_step', 'agent_log_a', 'agent_log_b',
+  'kinds', 'dating_prefs', 'trust_path', 'reasons', 'reasons_b', 'first_step', 'agent_log_a', 'agent_log_b',
 ]);
 
 /** Postgres row (snake_case) -> Db row (camelCase). */

@@ -99,6 +99,7 @@ export interface DataStore {
   insertIntro: CoreStore['insertIntro'];
   updateIntro: CoreStore['updateIntro'];
   removeIntros: CoreStore['removeIntros'];
+  notifyIntro: CoreStore['notifyIntro'];
 }
 
 const g = globalThis as unknown as { __outhereSupabaseStore?: { key: string; store: DataStore } };

@@ -23,6 +23,7 @@ function routeExists(href: string): boolean {
 const SERVER_HREFS: Record<string, string> = {
   post: '/posts/p1', comment: '/posts/p1', profile: '/profile/maya', group: '/groups/cheap-eats-south-bay',
   event: '/events/some-event', quest: '/out-here?quest=q1', invite: '/out-here?invite=i1', thread: '/messages/t1',
+  intro: '/intros#i1',
 };
 
 describe('notificationLink', () => {

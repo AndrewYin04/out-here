@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { profileId, type Intro, type TrustPath } from '@/shared';
 import { createMemoryStore, type DataStore } from '@/features/data/server';
 import { candidatesFor, passesBar, reachOf, trustPathOf, underWeeklyCap, WEEK_MS } from './rules';
-import { listIntros, requestIntro, resetIntros, respondIntro, runIntroRound } from './service';
+import { listIntros, relativeWhen, requestIntro, resetIntros, respondIntro, runIntroRound } from './service';
 
 const alex = profileId('alex');
 const jordan = profileId('jordan');
@@ -33,7 +33,7 @@ describe('quality bar', () => {
 
 describe('weekly cap', () => {
   const base: Omit<Intro, 'id' | 'source' | 'createdAt'> = {
-    kind: 'friendship', aId: alex, bId: jordan, trustPath: path, score: 90, reasons: [], summary: '', noteA: '', noteB: '',
+    kind: 'friendship', aId: alex, bId: jordan, trustPath: path, score: 90, reasons: [], reasonsB: [], summary: '', noteA: '', noteB: '',
     firstStep: { text: '', questId: null, placeId: null }, agentLogA: [], agentLogB: [], status: 'proposed',
     declinedBy: null, threadId: null, decidedAt: null,
   };
@@ -101,7 +101,14 @@ describe('mock Click round and double opt-in', () => {
     expect(c.reasons.length).toBeGreaterThanOrEqual(2);
     expect(c.reasons.join(' ')).toMatch(/local (bands|shows)/);
     expect(c.reasons.join(' ')).toMatch(/design/);
-    expect(c.myAgentLog.length).toBe(2);
+    // Interleaved: your agent, their agent (outcome only), your agent, their verdict.
+    expect(c.myAgentLog.map((t) => t.mine)).toEqual([true, false, true, false]);
+    expect(c.myAgentLog[1].text).toBe('sees a real fit, asked about timing');
+    expect(c.myAgentLog[2].text).toMatch(/^On timing:/);
+    expect(c.judgeLine).toBe('Muse judge: 91/100, above the 85 bar');
+    expect(c.mutuals.map((m) => m.firstName)).toEqual(['Maya']);
+    expect(c.step.href).toMatch(/^\/out-here\?quest=/);
+    expect(c.step.when).toMatch(/^(Starts in \d+ min|Today|Tomorrow|Happening now)/);
     expect(r.belowBar).toBeGreaterThanOrEqual(1);
     const { intros } = await listIntros(store, alex);
     expect(intros.map((i) => i.other.handle)).toEqual(['jordan']);
@@ -113,14 +120,24 @@ describe('mock Click round and double opt-in', () => {
     expect(r.capped).toBe(true);
   });
 
-  it('each side sees only its own agent log', async () => {
+  it('reasons address each viewer as "you" and never quote the other side\'s private settings', async () => {
     const a = (await listIntros(store, alex)).intros[0];
-    const j = (await listIntros(store, jordan)).intros[0];
-    expect(j.other.handle).toBe('alex');
-    expect(a.myAgentLog[0]).toMatch(/Alex's agent/);
-    expect(j.myAgentLog[0]).toMatch(/Jordan's agent/);
-    expect(a.myAgentLog.some((t) => t.includes("Jordan's agent here"))).toBe(false);
-    expect((await listIntros(store, tess)).intros).toHaveLength(0);
+    const ra = a.reasons.join(' | ');
+    expect(ra).not.toMatch(/Alex/);
+    expect(ra).not.toContain('gig nights');                     // jordan's private looking-for
+    expect(ra).not.toContain('product people about design work');
+    expect(ra).toContain("You're looking for people to go to local shows with");
+    expect(a.summary).toMatch(/^Your agents agree Jordan/);
+    expect(a.summary).toMatch(/worth going to the .* together/);
+  });
+
+  it('B hears nothing until A accepts', async () => {
+    expect((await listIntros(store, jordan)).intros).toHaveLength(0);
+    const id = (await listIntros(store, alex)).intros[0].id;
+    await expect(respondIntro(store, jordan, id, true)).rejects.toThrow();
+    const n = await store.notifications(alex);
+    expect(n.notifications.some((x) => x.type === 'intro' && x.href === `/intros#${id}`)).toBe(true);
+    expect((await store.notifications(jordan)).notifications.some((x) => x.type === 'intro')).toBe(false);
   });
 
   it('nothing opens until both accept; then a thread with the Muse note exists', async () => {
@@ -128,12 +145,26 @@ describe('mock Click round and double opt-in', () => {
     const first = await respondIntro(store, alex, id, true);
     expect(first.intro.state).toBe('waiting');
     expect(first.intro.threadId).toBeNull();
-    expect((await listIntros(store, jordan)).intros[0].state).toBe('new');
+    const j = (await listIntros(store, jordan)).intros[0];
+    expect(j.state).toBe('new');
+    expect(j.otherAccepted).toBe(true);
+    expect(j.other.handle).toBe('alex');
+    expect(j.myAgentLog.map((t) => t.mine)).toEqual([false, true, false, true]);
+    expect(j.myAgentLog[0].text).toBe('pitched what Alex is looking for');
+    expect(j.myAgentLog[1].text).toMatch(/Jordan's agent here/);
+    expect(j.myAgentLog.filter((t) => t.mine).every((t) => !t.text.includes("I'm Alex's agent"))).toBe(true);
+    const jr = j.reasons.join(' | ');
+    expect(jr).not.toMatch(/Jordan/);
+    expect(jr).not.toContain('product/design coffee chats');      // alex's private looking-for
+    expect((await listIntros(store, alex)).intros[0].myAgentLog.some((t) => t.text.includes("Jordan's agent here"))).toBe(false);
+    expect((await listIntros(store, tess)).intros).toHaveLength(0);
+    expect((await store.notifications(jordan)).notifications.some((x) => x.type === 'intro')).toBe(true);
     const second = await respondIntro(store, jordan, id, true);
     expect(second.intro.state).toBe('connected');
     const threadId = second.intro.threadId!;
     const msgs = await store.messages(alex, threadId);
     expect(msgs.at(-1)!.text.startsWith('✨ Muse: ')).toBe(true);
+    expect(msgs.at(-1)!.kind).toBe('muse');
     expect((await listIntros(store, alex)).intros[0].state).toBe('connected');
   });
 
@@ -147,9 +178,35 @@ describe('mock Click round and double opt-in', () => {
     await resetIntros(store, alex);
     const r = await runIntroRound(store, alex);
     expect(r.intro?.other.handle).toBe('jordan');
+    await respondIntro(store, alex, r.intro!.id, true);
     await respondIntro(store, jordan, r.intro!.id, false);
     const a = (await listIntros(store, alex)).intros[0];
     expect(a.state).toBe('closed');
     expect(a.closedText).toBe("Didn't work out this time");
+  });
+});
+
+describe('re-run on the same pair', () => {
+  it('a reused thread gets the Muse note once', async () => {
+    const store = createMemoryStore();
+    let threadId = '';
+    for (let n = 0; n < 2; n++) {
+      await resetIntros(store, alex);
+      const r = await runIntroRound(store, alex);
+      await respondIntro(store, alex, r.intro!.id, true);
+      threadId = (await respondIntro(store, jordan, r.intro!.id, true)).intro.threadId!;
+    }
+    const msgs = await store.messages(alex, threadId);
+    expect(msgs.filter((m) => m.kind === 'muse')).toHaveLength(1);
+  });
+});
+
+describe('relativeWhen', () => {
+  const t = Date.parse('2026-11-13T01:00:00Z'); // Thu 5:00 PM PT
+  it('reads like a person: soon, today, tomorrow; minutes rounded to 5', () => {
+    expect(relativeWhen('2026-11-13T01:23:00Z', t)).toBe('Starts in 25 min');
+    expect(relativeWhen('2026-11-13T02:41:00Z', t)).toBe('Today 6:40 PM');
+    expect(relativeWhen('2026-11-13T18:02:00Z', t)).toBe('Tomorrow 10:00 AM');
+    expect(relativeWhen('2026-11-13T00:50:00Z', t)).toBe('Happening now');
   });
 });

@@ -1,29 +1,67 @@
 // Muse Intros service: rounds, on-request intros, double opt-in, settings and per-side views.
 // Every function takes the viewer id from x-persona (the route passes it) and returns only what
-// that side may see: the other person's first name and photo, the shared trust path and
-// reasons, Muse's note to the viewer, and the viewer's own agent's turns. Nothing about the
-// other person's agent log, decision or settings leaves the server.
+// that side may see: the other person's first name and photo, the shared trust path, the reasons
+// and note written to the viewer, and the viewer's own agent's turns (the other agent's turns as
+// one-line outcomes). Like Boardy, A hears first; B sees the intro only after A says yes.
 import {
   INTRO_KINDS, now,
-  type ID, type Intro, type IntroCardView, type IntroKind, type IntroKindSetting, type IntroProfile,
+  type ID, type Intro, type IntroCardView, type IntroKind, type IntroKindSetting, type IntroProfile, type IntroStepView,
 } from '@/shared';
 import { badRequest, notFound, publish, type DataStore, type View } from '@/features/data/server';
 import { runClick } from './agents';
 import {
-  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, passesBar, trustLabels,
-  underWeeklyCap,
+  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, passesBar, SCORE_THRESHOLD,
+  trustLabels, underWeeklyCap,
 } from './rules';
 
 export const MUSE_PREFIX = '✨ Muse: ';
 /** Whole-round budget for live Muse calls (3 pairs run in parallel, 5 calls each). */
 const ROUND_BUDGET_MS = 40_000;
+const TZ = 'America/Los_Angeles';
 
-const isExpired = (i: Intro, nowMs: number) =>
-  (i.status === 'proposed' || i.status === 'a_accepted' || i.status === 'b_accepted') && nowMs - Date.parse(i.createdAt) > INTRO_TTL_MS;
+const isOpen = (i: Intro) => i.status === 'proposed' || i.status === 'a_accepted' || i.status === 'b_accepted';
+const isExpired = (i: Intro, nowMs: number) => isOpen(i) && nowMs - Date.parse(i.createdAt) > INTRO_TTL_MS;
+
+/** B hears about an intro only once A said yes; A's pass or an unanswered proposal stays invisible to B. */
+function visibleTo(i: Intro, viewerId: ID): boolean {
+  if (i.aId === viewerId) return true;
+  if (i.bId !== viewerId) return false;
+  if (i.status === 'proposed') return false;
+  if (i.status === 'declined' && i.declinedBy === i.aId) return false;
+  return true;
+}
+
+const dayKey = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ });
+
+/** "Starts in 25 min", "Today 5:45 PM", "Tomorrow 10:00 AM", "Sat 2:00 PM"; minutes rounded to 5. */
+export function relativeWhen(startsAt: string, nowMs: number): string {
+  const ms = Date.parse(startsAt);
+  const mins = Math.round((ms - nowMs) / 60_000);
+  if (mins <= 0) return 'Happening now';
+  if (mins < 60) return `Starts in ${Math.max(5, Math.round(mins / 5) * 5)} min`;
+  const rounded = Math.round(ms / 300_000) * 300_000;
+  const time = new Date(rounded).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
+  const day = dayKey(rounded);
+  if (day === dayKey(nowMs)) return `Today ${time}`;
+  if (day === dayKey(nowMs + 86_400_000)) return `Tomorrow ${time}`;
+  return `${new Date(rounded).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })} ${time}`;
+}
+
+function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
+  const q = i.firstStep.questId ? v.db.quests.find((x) => x.id === i.firstStep.questId) : undefined;
+  if (!q) return { label: i.firstStep.text, when: null, href: null, seatsLeft: null };
+  const live = (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs;
+  return {
+    label: `${q.emoji} ${q.title} at ${q.venueName}`,
+    when: live ? relativeWhen(q.startsAt, nowMs) : 'This plan has ended',
+    href: live ? `/out-here?quest=${encodeURIComponent(q.id)}` : null,
+    seatsLeft: live ? v.seatsLeft(q) : null,
+  };
+}
 
 export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()): IntroCardView | null {
+  if (!visibleTo(i, viewerId)) return null;
   const isA = i.aId === viewerId;
-  if (!isA && i.bId !== viewerId) return null;
   const other = v.profileById.get(isA ? i.bId : i.aId);
   if (!other) return null;
   let state: IntroCardView['state'] = 'new';
@@ -35,12 +73,24 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
   } else if (i.status === 'expired' || isExpired(i, nowMs)) {
     state = 'closed'; closedText = 'This intro expired';
   } else if ((i.status === 'a_accepted' && isA) || (i.status === 'b_accepted' && !isA)) state = 'waiting';
+  const mySide = isA ? 'a' : 'b';
+  const mutuals = i.trustPath.mutualIds.slice(0, 3).flatMap((id) => {
+    const p = v.profileById.get(id);
+    return p ? [{ id: p.id, firstName: firstName(p), avatarUrl: p.avatarUrl }] : [];
+  });
   return {
     id: i.id, kind: i.kind, score: i.score,
     other: { id: other.id, handle: other.handle, firstName: firstName(other), avatarUrl: other.avatarUrl },
     trustPath: trustLabels(v, i.trustPath),
-    summary: i.summary, reasons: i.reasons, note: isA ? i.noteA : i.noteB, firstStep: i.firstStep,
-    myAgentLog: (isA ? i.agentLogA : i.agentLogB).map((t) => t.text),
+    mutuals,
+    summary: isA ? i.noteA : i.noteB,
+    reasons: isA ? i.reasons : (i.reasonsB ?? []),
+    step: stepView(v, i, nowMs),
+    myAgentLog: (isA ? i.agentLogA : i.agentLogB).map((t) => (t.agent === mySide
+      ? { mine: true, text: t.text }
+      : { mine: false, text: t.outcome || 'replied' })),
+    judgeLine: `Muse judge: ${i.score}/100, ${i.score >= SCORE_THRESHOLD ? 'above' : 'below'} the ${SCORE_THRESHOLD} bar`,
+    otherAccepted: !isA && i.status === 'a_accepted',
     state, closedText,
     threadId: state === 'connected' ? i.threadId : null,
     createdAt: i.createdAt,
@@ -68,6 +118,9 @@ export type RoundResult = {
   message: string;
 };
 
+const introNotice = (otherName: string, trust: string | undefined) =>
+  `✨ Muse has an intro for you: meet ${otherName}.${trust ? ` ${trust}.` : ''}`;
+
 /** One vetting round for the viewer. auto rounds obey the weekly cap; requests do not. */
 async function round(
   store: DataStore, viewerId: ID, opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile },
@@ -94,8 +147,10 @@ async function round(
       return null;
     }
   }));
+  // Each person must get at least 2 concrete reasons written to them.
   const passing = vetted
-    .filter((x): x is NonNullable<typeof x> => !!x && passesBar(x.r.score, x.r.reasons, x.c.trust).ok)
+    .filter((x): x is NonNullable<typeof x> => !!x
+      && passesBar(x.r.score, x.r.reasonsA, x.c.trust).ok && passesBar(x.r.score, x.r.reasonsB, x.c.trust).ok)
     .sort((x, y) => y.r.score - x.r.score);
   const best = passing[0];
   const considered = vetted.filter(Boolean).length;
@@ -109,18 +164,21 @@ async function round(
   }
   const row: Intro = {
     id: crypto.randomUUID(), kind: best.c.kind, source: opts.source, aId: viewerId, bId: best.c.profile.id,
-    trustPath: best.c.trust, score: best.r.score, reasons: best.r.reasons.slice(0, 3), summary: best.r.summary,
+    trustPath: best.c.trust, score: best.r.score,
+    reasons: best.r.reasonsA.slice(0, 3), reasonsB: best.r.reasonsB.slice(0, 3), summary: best.r.summary,
     noteA: best.r.noteA, noteB: best.r.noteB, firstStep: best.r.firstStep,
     agentLogA: best.r.logA, agentLogB: best.r.logB,
     status: 'proposed', declinedBy: null, threadId: null, createdAt: now().toISOString(), decidedAt: null,
   };
   await store.insertIntro(row);
+  // Only A hears now. B is asked after A says yes.
+  await store.notifyIntro(viewerId, row.bId, row.id, introNotice(firstName(best.c.profile), trustLabels(view, row.trustPath)[0]));
   await publish(`user:${viewerId}`, { type: 'intro', id: row.id });
-  await publish(`user:${row.bId}`, { type: 'intro', id: row.id });
   const after = (await store.museContext()).view;
+  const others = considered - 1;
   return {
-    intro: cardFor(after, viewerId, row, nowMs), considered, belowBar: considered - 1, capped: false, paused: false,
-    message: `Muse found someone. ${considered - 1 > 0 ? `${considered - 1} other ${considered - 1 === 1 ? 'person was' : 'people were'} considered but not a strong enough match.` : ''}`.trim(),
+    intro: cardFor(after, viewerId, row, nowMs), considered, belowBar: others, capped: false, paused: false,
+    message: `Muse found someone. ${others > 0 ? `${others} other ${others === 1 ? 'person was' : 'people were'} considered but not a strong enough match.` : ''}`.trim(),
   };
 }
 
@@ -142,13 +200,13 @@ export async function requestIntro(store: DataStore, viewerId: ID, kind: IntroKi
 
 export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, accept: boolean): Promise<{ intro: IntroCardView }> {
   const { view } = await store.museContext();
-  const i = view.db.intros.find((x) => x.id === introId);
-  if (!i || (i.aId !== viewerId && i.bId !== viewerId)) throw notFound('intro_not_found');
-  const isA = i.aId === viewerId;
   const nowMs = now().getTime();
-  const open = (i.status === 'proposed' || i.status === 'a_accepted' || i.status === 'b_accepted') && !isExpired(i, nowMs);
-  if (!open) return { intro: cardFor(view, viewerId, i, nowMs)! };
+  const i = view.db.intros.find((x) => x.id === introId);
+  if (!i || !visibleTo(i, viewerId)) throw notFound('intro_not_found');
+  const isA = i.aId === viewerId;
+  if (!isOpen(i) || isExpired(i, nowMs)) return { intro: cardFor(view, viewerId, i, nowMs)! };
   const otherId = isA ? i.bId : i.aId;
+  const a = view.profileById.get(i.aId); const b = view.profileById.get(i.bId);
   if (!accept) {
     await store.updateIntro(i.id, { status: 'declined', declinedBy: viewerId, decidedAt: now().toISOString() });
     // Silent to the other side: no realtime message, no notification.
@@ -158,12 +216,20 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
     if (!otherAccepted) {
       await store.updateIntro(i.id, { status: isA ? 'a_accepted' : 'b_accepted' });
       await publish(`user:${viewerId}`, { type: 'intro', id: i.id });
+      if (isA) {
+        // Now B is asked, the way Boardy asks the second person once the first said yes.
+        await store.notifyIntro(i.bId, i.aId, i.id, introNotice(firstName(a), trustLabels(view, i.trustPath)[0]));
+        await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
+      }
     } else {
       const thread = await store.openThread(viewerId, [otherId]);
-      const a = view.profileById.get(i.aId); const b = view.profileById.get(i.bId);
-      const text = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}. ${i.summary} First step idea: ${i.firstStep.text}.`;
-      await store.sendMessage(viewerId, thread.id, text);
+      // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
+      const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
+      const already = view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
+      if (!already) await store.sendMessage(viewerId, thread.id, `${opener} ${i.summary} First step idea: ${i.firstStep.text}.`, 'muse');
       await store.updateIntro(i.id, { status: 'accepted', threadId: thread.id, decidedAt: now().toISOString() });
+      await store.notifyIntro(otherId, viewerId, i.id,
+        `✨ Muse: you and ${firstName(view.profileById.get(viewerId))} are connected. Muse started your chat.`);
       await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
       await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
     }

@@ -101,20 +101,48 @@ const hit = (keys: string[], text: string | null | undefined) => {
 };
 const article = (s: string) => (/^[aeiou]/i.test(s) ? 'an' : 'a');
 
-/** Where b's public profile or Intro settings match what a is looking for. */
-function evidence(b: Profile, bProfile: IntroProfile, keys: string[], kind: IntroKind): string | null {
-  const job = b.job ?? null;
-  const bLooking = kindsOn(bProfile).map((k) => bProfile.kinds[k].lookingFor).filter(Boolean);
-  const byJob = () => (job && hit(keys, job) ? `works as ${article(job)} ${job.charAt(0).toLowerCase()}${job.slice(1)}` : null);
-  const byLooking = () => { const l = bLooking.find((x) => hit(keys, x)); return l ? `wants ${l} too` : null; };
-  const byInterest = () => { const i = b.interests.find((x) => hit(keys, x)); return i ? `is into ${i}` : null; };
-  const byBio = () => (hit(keys, b.bio) ? `describes themselves as "${b.bio.slice(0, 80)}"` : null);
-  const order = kind === 'networking' ? [byJob, byLooking, byInterest, byBio] : [byLooking, byInterest, byJob, byBio];
+/**
+ * Where y's profile matches what someone is looking for. Public fields (interests, job, bio)
+ * come first. y's own Intro settings are the last resort and are never quoted to the other side.
+ */
+type Evidence = { you: string; they: (name: string) => string };
+function evidence(y: Profile, yP: IntroProfile, keys: string[], kind: IntroKind): Evidence | null {
+  const job = y.job ?? null;
+  const yLooking = kindsOn(yP).map((k) => yP.kinds[k].lookingFor).filter(Boolean);
+  const lowerJob = job ? `${article(job)} ${job.charAt(0).toLowerCase()}${job.slice(1)}` : '';
+  const byJob = (): Evidence | null => (job && hit(keys, job)
+    ? { you: `you work as ${lowerJob}`, they: (n) => `${n} works as ${lowerJob}` } : null);
+  const byInterest = (): Evidence | null => {
+    const i = y.interests.find((x) => hit(keys, x));
+    return i ? { you: `you're into ${i}`, they: (n) => `${n} is into ${i}` } : null;
+  };
+  const byBio = (): Evidence | null => {
+    const k = hit(keys, y.bio);
+    return k ? { you: `your bio mentions ${k}`, they: (n) => `${n}'s bio mentions ${k}` } : null;
+  };
+  const byLooking = (): Evidence | null => {
+    const l = yLooking.find((x) => hit(keys, x));
+    return l ? { you: `you're looking for ${l}`, they: (n) => `${n} is looking for something similar` } : null;
+  };
+  const order = kind === 'networking' ? [byJob, byInterest, byBio, byLooking] : [byInterest, byJob, byBio, byLooking];
   for (const f of order) { const e = f(); if (e) return e; }
   return null;
 }
 
-export type SharedFact = { text: string; keyword: string };
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * One concrete shared fact, written three ways: forA addresses A as "you", forB addresses B,
+ * and judge is the neutral server-side form. A person's own looking-for text is quoted only to
+ * them; the other side sees a public-level paraphrase.
+ */
+export type SharedFact = { keyword: string; forA: string; forB: string; judge: string; looker: 'a' | 'b' | null };
+
+/** Facts in the order one side reads them: shared interests, then what that side is looking for, then the rest. */
+export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
+  const rank = (f: SharedFact) => (f.looker === null ? 0 : f.looker === side ? 1 : 2);
+  return [...facts].sort((x, y) => rank(x) - rank(y)).map((f) => (side === 'a' ? f.forA : f.forB));
+}
 
 /**
  * Concrete shared facts between a and b, each citing real profile or Intro-settings text:
@@ -125,18 +153,32 @@ export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroPr
   const aP = aOverride ?? introProfileOf(v, a.id);
   const bP = introProfileOf(v, b.id);
   const bInterests = new Set(b.interests.map((i) => i.toLowerCase()));
-  for (const i of a.interests) if (bInterests.has(i.toLowerCase())) out.push({ text: `You both love ${i}`, keyword: i.toLowerCase() });
+  for (const i of a.interests) {
+    if (bInterests.has(i.toLowerCase())) {
+      const t = `You both love ${i}`;
+      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, judge: `Both love ${i}`, looker: null });
+    }
+  }
   // Evidence about y uses only the fields x is allowed to see (y always sees their own).
-  const pairs: [Profile, IntroProfile, Profile, IntroProfile][] = [
-    [a, aP, v.profileFor(a.id, b), bP], [b, bP, v.profileFor(b.id, a), aP],
+  const pairs: [Profile, IntroProfile, Profile, IntroProfile, boolean][] = [
+    [a, aP, v.profileFor(a.id, b), bP, true], [b, bP, v.profileFor(b.id, a), aP, false],
   ];
-  for (const [x, xP, y, yP] of pairs) {
+  for (const [x, xP, y, yP, xIsA] of pairs) {
     for (const k of kindsOn(xP)) {
       const looking = xP.kinds[k].lookingFor.trim();
       if (!looking) continue;
       const keys = keywords(looking);
       const e = evidence(y, yP, keys, k);
-      if (e) out.push({ text: `${firstName(x)} is looking for ${looking}; ${firstName(y)} ${e}`, keyword: hit(keys, looking) ?? keys[0] });
+      if (!e) continue;
+      const X = firstName(x); const Y = firstName(y);
+      const forX = `You're looking for ${looking}, and ${e.they(Y)}`;
+      const forY = `${cap(e.you)}, which is what ${X}'s agent was looking for`;
+      out.push({
+        keyword: hit(keys, looking) ?? keys[0],
+        forA: xIsA ? forX : forY, forB: xIsA ? forY : forX,
+        judge: `${X} is looking for ${looking}; ${e.they(Y)}`,
+        looker: xIsA ? 'a' : 'b',
+      });
     }
   }
   return out;

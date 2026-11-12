@@ -39,18 +39,44 @@ test.describe('Muse Intros', () => {
       await expect(alex.getByTestId('intro-card')).toHaveCount(1);
       for (const h of ['tess', 'ava', 'yuki']) await expect(alex.locator(`[data-testid="intro-card"][data-handle="${h}"]`)).toHaveCount(0);
 
-      // Only alex's own agent's turns.
+      // The main action is on the first screen, under the name.
+      await expect(card.getByRole('button', { name: 'Accept' })).toBeInViewport();
+      // Reasons talk to alex as "you" and never quote Jordan's private settings.
+      await expect(card.getByTestId('intro-reasons')).not.toContainText('Alex');
+      await expect(card.getByTestId('intro-reasons')).not.toContainText('gig nights');
+      await expect(card.getByTestId('first-step')).toContainText('Local-band show pregame');
+      await expect(card.getByRole('link', { name: 'See on map' })).toHaveAttribute('href', /^\/out-here\?quest=/);
+
+      // Both agents' turns, interleaved; Jordan's agent's words stay private (outcome only).
       await card.getByRole('button', { name: 'How your agents decided' }).click();
-      await expect(card.getByTestId('agent-log')).toContainText("Alex's agent");
-      await expect(card.getByTestId('agent-log')).not.toContainText("Jordan's agent here");
+      const log = card.getByTestId('agent-log');
+      await expect(log).toContainText("Alex's agent");
+      await expect(log.getByTestId('agent-turn-mine')).toHaveCount(2);
+      await expect(log.getByTestId('agent-turn-theirs')).toHaveCount(2);
+      await expect(log.getByTestId('agent-turn-theirs').first()).toContainText('asked about timing');
+      await expect(log).not.toContainText("Jordan's agent here");
+      await expect(log.getByTestId('judge-line')).toContainText('91/100, above the 85 bar');
+
+      // Jordan hears nothing before alex says yes.
+      const before = await (await request.get('/api/intros', { headers: as('jordan') })).json() as { intros: unknown[] };
+      expect(before.intros).toHaveLength(0);
 
       await card.getByRole('button', { name: 'Accept' }).click();
       await expect(card.getByTestId('intro-status')).toHaveText('Waiting for Jordan');
+
+      // Now Muse asks Jordan, with a notification that links to the card.
+      const notes = await (await request.get('/api/notifications', { headers: as('jordan') })).json() as { notifications: { type: string; href: string; text: string }[] };
+      const note = notes.notifications.find((n) => n.type === 'intro');
+      expect(note?.text).toContain('meet Alex');
+      expect(note?.href).toMatch(/^\/intros#/);
 
       const jordan = await openAs(browser, 'jordan', width);
       const jCard = jordan.locator('[data-testid="intro-card"][data-handle="alex"]');
       await expect(jCard).toBeVisible();
       await expect(jCard).toHaveAttribute('data-state', 'new');
+      await expect(jCard).toContainText('Alex already said yes');
+      await expect(jCard.getByTestId('intro-reasons')).not.toContainText('Jordan');
+      await expect(jCard.getByRole('button', { name: 'Accept' })).toBeInViewport();
       await jCard.getByRole('button', { name: 'Accept' }).click();
       await expect(jCard.getByTestId('intro-status')).toHaveText("You're connected");
       await expect(jCard.getByRole('link', { name: 'Open chat' })).toBeVisible();
@@ -61,9 +87,9 @@ test.describe('Muse Intros', () => {
       const threadId = decodeURIComponent(href!.split('thread=')[1]);
       const msgs = await request.get(`/api/threads/${threadId}/messages`, { headers: as('alex') });
       expect(msgs.ok()).toBe(true);
-      const body = await msgs.json() as { messages?: { text: string }[] } | { text: string }[];
+      const body = await msgs.json() as { messages?: { text: string; kind: string }[] } | { text: string; kind: string }[];
       const list = Array.isArray(body) ? body : body.messages ?? [];
-      expect(list.some((m) => m.text.startsWith('✨ Muse: '))).toBe(true);
+      expect(list.filter((m) => m.kind === 'muse' && m.text.startsWith('✨ Muse: '))).toHaveLength(1);
 
       // On-request dating intro: nobody clears the bar.
       const ask = alex.getByTestId('ask-muse');
@@ -74,6 +100,7 @@ test.describe('Muse Intros', () => {
       await expect(alex.getByTestId('intro-card')).toHaveCount(1);
 
       await alex.screenshot({ path: `test-results/intros-${width}.png`, fullPage: true });
+      await jordan.screenshot({ path: `test-results/intros-jordan-${width}.png` });
       await alex.context().close();
       await jordan.context().close();
     }
