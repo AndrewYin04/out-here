@@ -5,5 +5,5 @@
 export { ImFreeButton, PlanSheet, COMPOSER_PLACEHOLDER } from './PlanSheet';
 export { InviteInbox } from './InviteInbox';
 export { SuggestionCard, MuseLabel, SeatsBadge } from './SuggestionCard';
-export { setPlanOpen, usePlanOpen } from './plan-state';
+export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, type PlanPicks } from './plan-state';
 export { dropText, shownDrops, type DroppedView, type DropReasonCode } from './dropped';

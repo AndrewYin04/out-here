@@ -77,7 +77,13 @@ describe('store-backed plan context', () => {
     const out = await plan({ text: TEXT, userId: alex, now: NOW, context: ctx });
     const top = out.plan.suggestions[0]!;
     expect(top.reason).toContain('craving dumplings');
-    for (const s of out.plan.suggestions) expect(s.reason).not.toMatch(/\$\d|min walk|starts at/);
+    // a reason that names no interest falls back to a fact the card meta row does not show
+    // (budget headroom, free time left), never to "4 min walk, $7, starts in 9 min"
+    for (const s of out.plan.suggestions.slice(1)) {
+      expect(s.reason).not.toBe('');
+      expect(s.reason).not.toMatch(/min walk|starts at|starts in/);
+    }
+    expect(top.reason).not.toMatch(/\$\d|min walk|starts at/);
   });
 });
 

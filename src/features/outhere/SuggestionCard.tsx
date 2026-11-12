@@ -167,8 +167,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       </div>
 
       <div className="mt-2">
-        {showMuse && <MuseLabel />}
-        <p data-testid="suggestion-reason" className="mt-1 text-[15px] leading-5 text-fb-text">{s.reason}</p>
+        {showMuse && (s.reason || s.bridge) && <MuseLabel />}
+        {s.reason && <p data-testid="suggestion-reason" className="mt-1 text-[15px] leading-5 text-fb-text">{s.reason}</p>}
         {s.bridge && <p className="mt-1 text-[13px] text-fb-text-2">{s.bridge}</p>}
       </div>
 

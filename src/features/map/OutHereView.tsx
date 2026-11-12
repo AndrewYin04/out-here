@@ -5,10 +5,10 @@ import dynamic from 'next/dynamic';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, PeopleButton } from '@/features/map/friends';
-import { ImFreeButton, PlanSheet } from '@/features/outhere';
+import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
+import { ImFreeButton, PlanSheet, usePlanSuggestions } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, seedId, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
 import { QuestPanel } from './QuestPanel';
@@ -46,11 +46,19 @@ export function OutHereView() {
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
 
-  // ?quest=<id> deep link opens that quest's sheet.
+  // ?quest=<id> deep link opens that quest's sheet; ?mode=friends|explore sets the toggle.
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('quest');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('quest');
     if (id) setSelectedId(id);
+    const m = params.get('mode');
+    if (m === 'friends' || m === 'explore') setMode(m);
   }, []);
+
+  // The Muse plan on screen: its picked pins stand out, and the map frames them with the viewer
+  // and the top suggestion's friends (only friends whose Find My pin is on the map).
+  const planPicks = usePlanSuggestions();
+  const friendPins = useFriendPins();
 
   const ctx = ctxApi.data && ctxApi.data.viewer.id === persona.id ? ctxApi.data : null;
   const live = useMemo(() => (questsApi.data?.quests ?? []).filter((q) => q.status !== 'done' && new Date(q.endsAt) > now), [questsApi.data, now]);
@@ -67,6 +75,19 @@ export function OutHereView() {
     for (const q of visible) out[q.id] = q.memberIds.flatMap((m) => byId.get(m) ?? []);
     return out;
   }, [mode, ctx, visible]);
+
+  const picks = useMemo(() => {
+    if (!planPicks) return null;
+    const shown = new Set(visible.map((q) => q.id));
+    const ids = planPicks.questIds.filter((id) => shown.has(id));
+    return ids.length > 0 ? ids : null;
+  }, [planPicks, visible]);
+  const fitTo = useMemo<LatLng[] | null>(() => {
+    if (!planPicks || mode !== 'friends') return null;
+    const want = new Set(planPicks.topFriendIds);
+    const pts = (friendPins.data?.pins ?? []).filter((p) => want.has(p.friend.id)).map((p) => p.location);
+    return pts.length > 0 ? pts : null;
+  }, [planPicks, mode, friendPins.data]);
 
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
@@ -85,6 +106,8 @@ export function OutHereView() {
           origin={ctx?.origin ?? null}
           walkMinutes={ctx?.walkMinutes ?? null}
           friendFaces={friendFaces}
+          picks={picks}
+          fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
           onSelect={select}

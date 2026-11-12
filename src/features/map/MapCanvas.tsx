@@ -24,6 +24,8 @@ const BOX_W = 46;
 const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
+/** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
+const PHONE_RESULTS_SHEET = 0.5;
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
 const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
@@ -43,6 +45,10 @@ export type MapCanvasProps = {
   walkMinutes: Record<ID, number> | null;
   /** Friends mode: faces of the friends who joined each quest. */
   friendFaces: Record<ID, FriendFace[]> | null;
+  /** Quest ids of the Muse plan on screen: those pins get a blue ring and a "Muse pick" tag, others dim. */
+  picks: ID[] | null;
+  /** Extra points the plan framing includes (the top suggestion's friends, from their Find My pins). */
+  fitTo: LatLng[] | null;
   now: Date;
   testIdFor: (questId: string) => string;
   onSelect: (questId: string) => void;
@@ -53,7 +59,7 @@ export type MapCanvasProps = {
 
 type PinParts = {
   root: HTMLDivElement; button: HTMLButtonElement; circle: HTMLSpanElement; badge: HTMLSpanElement;
-  label: HTMLSpanElement; more: HTMLButtonElement; faces: HTMLSpanElement;
+  label: HTMLSpanElement; more: HTMLButtonElement; faces: HTMLSpanElement; pick: HTMLSpanElement;
 };
 type PinRefs = PinParts & { marker: Marker; seats: number; facesKey: string };
 
@@ -101,9 +107,16 @@ function buildPin(q: Quest, testId: string): PinParts {
   more.setAttribute('data-role', 'cluster');
   more.style.cssText = 'position:absolute;left:4px;top:-34px;min-width:24px;height:24px;padding:0 6px;border-radius:9999px;border:0;background:#fff;color:#080809;font:700 12px/24px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer;display:none;';
 
+  // "✨ Muse pick" tag, attached only while this quest is in the plan on screen.
+  const pick = document.createElement('span');
+  pick.setAttribute('data-testid', 'muse-pick');
+  pick.setAttribute('aria-hidden', 'true');
+  pick.textContent = '✨ Muse pick';
+  pick.style.cssText = 'position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 7px;background:#0866FF;color:#fff;font:700 11px/16px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;';
+
   button.append(circle, badge, label, faces);
   root.append(button, more);
-  return { root, button, circle, badge, label, more, faces };
+  return { root, button, circle, badge, label, more, faces, pick };
 }
 
 function paintFaces(p: PinRefs, faces: FriendFace[]) {
@@ -121,7 +134,8 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
   });
 }
 
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[]) {
+/** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
@@ -129,12 +143,19 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
   p.label.textContent = `${shortTitle(q.title)} · ${time}`;
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-  const ring = selected ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
+  const ring = selected || picked ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
-  p.circle.style.transform = selected ? 'scale(1.1)' : 'none';
-  p.root.style.zIndex = selected ? '3' : '1';
+  p.circle.style.transform = selected || picked ? 'scale(1.1)' : 'none';
+  p.root.style.zIndex = selected ? '4' : picked ? '3' : '1';
+  const dimmed = picked === false && !selected;
+  // MapLibre owns the marker root's opacity, so the pin button carries the dimming.
+  p.button.style.opacity = dimmed ? '0.4' : '1';
+  p.button.style.transition = 'opacity .2s';
+  p.root.toggleAttribute('data-dimmed', dimmed);
+  if (picked && !p.pick.isConnected) p.button.append(p.pick);
+  else if (!picked && p.pick.isConnected) p.pick.remove();
   paintFaces(p, faces);
 }
 
@@ -146,7 +167,7 @@ function pulse(el: HTMLElement) {
   );
 }
 
-export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
+export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pins = useRef(new Map<string, PinRefs>());
@@ -183,7 +204,9 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       const ref = pins.current.get(id)!;
       const lw = labelWidth(ref.label.textContent ?? '');
       const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
-      const fits = taken.length < maxLabels
+      // While a plan shows, dimmed pins drop their labels so the "✨ Muse pick" pills have room.
+      const fits = !ref.root.hasAttribute('data-dimmed')
+        && taken.length < maxLabels
         && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
         && !taken.some((t) => overlaps(t, lb));
       const show = fits || id === selectedRef.current;
@@ -277,6 +300,7 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     const map = mapRef.current;
     if (!map) return;
     const seen = new Set<string>();
+    const pickSet = picks ? new Set(picks) : null;
     for (const q of quests) {
       seen.add(q.id);
       const lngLat: [number, number] = [q.location.lng, q.location.lat];
@@ -293,15 +317,42 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref.badge); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? []);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }
     }
-    const rank = (q: Quest) => (q.id === selectedId ? 0 : viewerId && q.memberIds.includes(viewerId) ? 1 : 2);
+    const rank = (q: Quest) => (q.id === selectedId ? 0 : pickSet?.has(q.id) ? 1 : viewerId && q.memberIds.includes(viewerId) ? 2 : 3);
     order.current = [...quests].sort((a, b) => rank(a) - rank(b) || a.startsAt.localeCompare(b.startsAt)).map((q) => q.id);
     schedule();
-  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces]);
+  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces, picks]);
+
+  // A new Muse plan: frame the viewer, the picked plans and the top suggestion's friends,
+  // clear of the plan sheet (left panel on desktop, bottom sheet on phones).
+  const picksKey = picks ? picks.join(',') : '';
+  const hasQuests = quests.length > 0;
+  const fitKey = (fitTo ?? []).map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(';');
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !picksKey) return;
+    const ids = new Set(picksKey.split(','));
+    const b = new LngLatBounds();
+    let n = 0;
+    for (const q of quests) if (ids.has(q.id)) { b.extend([q.location.lng, q.location.lat]); n++; }
+    if (n === 0) return;
+    if (origin) b.extend([origin.lng, origin.lat]);
+    for (const p of fitTo ?? []) b.extend([p.lng, p.lat]);
+    const h = map.getContainer().clientHeight;
+    const padding = isDesktop()
+      ? { top: 90, bottom: 70, left: 460, right: 90 }
+      // With results the phone sheet drops to a peek of 50% of the map (PlanSheet); fit the
+      // picks, their pills and labels in the space above it, 24 px clear of the sheet edge.
+      : { top: 72, bottom: Math.max(0, Math.min(Math.round(h * PHONE_RESULTS_SHEET) + 24 + BOX_BOTTOM + LABEL_H, h - 72 - 90)), left: 48, right: 48 };
+    map.fitBounds(b, { padding, maxZoom: isDesktop() ? 16 : 15.5, duration: 600 });
+    schedule();
+    // quests/origin/fitTo are read at the moment a plan arrives; picksKey and fitKey trigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picksKey, fitKey, hasQuests]);
 
   // First framing, once the plans and the viewer's walking times are in. Desktop shows every
   // plan; phones show the viewer and the nearest few, so the first view is not a crowd of pins.
