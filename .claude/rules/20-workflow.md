@@ -34,7 +34,7 @@ Use them for parallel, well-scoped work — not for things you can do in a few t
 
 - **Builder** (general-purpose, `isolation: "worktree"`): one owner area, one milestone slice. Brief must include: the owner area paths it may touch, the exact contracts from `src/shared/` it implements against, acceptance criteria, the checks to run, and "commit on your branch, do not push, report the branch name, files changed, and anything you could not finish".
 - **Reviewer** (general-purpose, read-only by instruction): after each milestone, review the diff for bugs that would break the demo (race on join, wrong time math, leaking exact location, crashes on empty data). Returns findings only.
-- **Explorer** (Explore): look up library APIs/version compatibility (react-leaflet vs React version, Supabase realtime API, Next 15 route handler signatures).
+- **Explorer** (Explore): look up library APIs/version compatibility (MapLibre GL JS API, Supabase realtime API, Next 15 route handler signatures).
 - **Muse evaluator**: run the Muse fixtures against the real API, report failures, propose prompt fixes.
 - At most **3 builders at once**, each on a different owner area. The main agent never edits a file a running builder owns.
 - Never take a subagent's report as proof: check out its branch, run the checks, look at it in the browser, then merge.

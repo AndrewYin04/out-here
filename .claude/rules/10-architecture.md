@@ -3,7 +3,8 @@
 ## Stack (fixed — do not swap)
 - **Next.js 15 (App Router) + TypeScript (strict) + Tailwind CSS**, npm.
 - **Supabase**: Postgres, Realtime (seats, availability, invites), Storage (photos). `@supabase/supabase-js` v2.
-- **Leaflet + react-leaflet** (version compatible with the React version Next installs) with **CARTO Positron/Voyager** tiles (no API key). Leaflet must be client-only (`dynamic(..., { ssr: false })`).
+- **MapLibre GL JS** (`maplibre-gl`, no React wrapper) with the **OpenFreeMap Positron** style `https://tiles.openfreemap.org/styles/positron` (no API key). Attribution: "OpenFreeMap © OpenMapTiles Data from OpenStreetMap". The map is client-only (`dynamic(..., { ssr: false })`, map created in `useEffect`) and imports `maplibre-gl/dist/maplibre-gl.css`. Do not add Leaflet, react-leaflet, or CARTO.
+- Map order: first the overhead Menlo Park map with quest pins and live seat counts. Only after join works live on two devices (P0 checkpoint), add the tilted walking view with 3D buildings (`fill-extrusion` on the `building` source-layer, `render_height`).
 - **Muse** via one adapter (`src/features/muse/client.ts`). See `docs/muse-api.md`.
 - **Vitest** for pure logic, **Playwright** for the demo-flow smoke test.
 - Deploy: **Vercel** (GitHub integration builds every pushed branch).

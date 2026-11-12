@@ -19,7 +19,7 @@ If a feature doesn't make a step of this loop better, it is out of scope. Our ow
 Do not start a tier until every item in the tier above works end-to-end on the deployed build.
 
 **P0 — must work live in the demo**
-1. **Live map** (Leaflet) with **Friends** / **Explore** toggle. Explore = public quest pins with open-seat badges. Friends = friends' shared availability + quests friends joined.
+1. **Live map** (MapLibre + OpenFreeMap) with **Friends** / **Explore** toggle. Explore = public quest pins with open-seat badges. Friends = friends' shared availability + quests friends joined.
 2. **"I'm free" composer**: free text + optional time window ("hungry, 30 min, under $15").
 3. **Micro-hangouts / time-fit**: Muse only suggests plans that fit the window **including walking time** there.
 4. **Muse plan**: parse intent → candidate generation (code) → Muse ranks, explains in plain language, adds friend-bridge line, drafts invite → validation (code). Returns 2–3 suggestions.

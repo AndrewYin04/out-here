@@ -52,7 +52,7 @@ Each milestone ends with: all checks green → looked at it in the browser at 39
 - You meanwhile: seed content (personas, 15 quests, history, placeholder photos), apply migration + seed to Supabase if env present.
 
 **M2 — Map + Explore + "I'm free" (target +3:00)** _(builder map; you integrate)_
-- Map with CARTO tiles centered on DEMO_CENTER, quest pins with seat badges, Friends/Explore toggle, friend availability pins, quest bottom sheet (approx location until joined), join/leave, composer sheet → `/api/muse/plan` → suggestion cards with "✨ Muse" reason + bridge + travel minutes + "Invite Maya" / "Join".
+- Overhead map (`maplibre-gl` + OpenFreeMap Positron style, see 10-architecture) centered on DEMO_CENTER, quest pins with seat badges, Friends/Explore toggle, friend availability pins, quest bottom sheet (approx location until joined), join/leave, composer sheet → `/api/muse/plan` → suggestion cards with "✨ Muse" reason + bridge + travel minutes + "Invite Maya" / "Join".
 - Realtime: seat badge updates live across two browser windows. **Test this with two tabs as Alex and Maya.**
 
 **M3 — Invite loop + E2E (target +3:45)** _(you)_
@@ -65,6 +65,7 @@ Each milestone ends with: all checks green → looked at it in the browser at 39
 - "We're done" (host) → photo prompt for members (camera via `<input type="file" accept="image/*" capture="environment">`, plus "use sample photo" button for the stage demo) → upload to Storage → crew album with Muse caption.
 - Crew auto-created on complete. Memories tab: crews → album → **"Do this again"** → `/api/muse/regroup` proposes a time/place that fits everyone's windows + shared prefs → one tap sends invites.
 - Create-a-quest from vague text (`/api/muse/create-quest`) on the composer ("Start something").
+- Builder **map**, only after the P0 checkpoint passes: tilted walking view (pitch about 60) with 3D buildings, a `fill-extrusion` layer on the OpenFreeMap `building` source-layer using `render_height`. Cut this first if M4 runs late.
 
 **M5 — Engagement layer (target +6:15)** _(builder memories or you)_
 - Daily Quest card at the top of Memories (Muse-generated prompt, photo entry, verify via vision if `docs/muse-api.md` says images are supported, otherwise mark "submitted").
@@ -116,7 +117,7 @@ Rules: ≤ 3 builders at once, different areas. Merge only after you've run the 
 | `gh` not logged in / board unreadable | Keep working; log board-intended posts in `docs/PROGRESS.md` under **Board outbox**; retry each loop. Commits still go local if push fails. |
 | Push rejected | `git pull --rebase origin overnight` (never force). If it's auth, keep committing locally and `blocked`. |
 | Vercel not linked | Keep going locally; `blocked` once with "link repo in Vercel, add env vars". Handoff notes explain `npm run build && npm start`. |
-| react-leaflet/React version clash | Use an Explorer subagent to find the compatible version; worst case render Leaflet directly in a `useEffect` without react-leaflet. |
+| MapLibre fails on the server (`window is not defined`) or tiles don't load | Create the map inside `useEffect` in a client component loaded with `dynamic(..., { ssr: false })`. Check the style URL `https://tiles.openfreemap.org/styles/positron` in the browser. Do not switch map libraries. |
 | Playwright browsers not installed | `npx playwright install chromium` (inside repo cache). If it fails, rely on browser-pane manual checks and note it. |
 | Out of ideas on a bug after 30 min | Revert that area to last green, log Known issue, move on. A smaller working demo beats a bigger broken one. |
 
