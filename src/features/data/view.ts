@@ -1,7 +1,7 @@
 // Read-side helpers over one snapshot of the tables: indexes, visibility and view models.
 // Every view model that leaves the server is built here, so canSee is applied in one place.
 import {
-  canSee, audienceListId, fuzzLocation, now, REACTION_TYPES,
+  canSee, audienceListId, now, REACTION_TYPES,
   type Audience, type Comment, type ID, type Post, type Profile, type ProfileField, type Quest,
   type ReactionCounts, type ReactionType, type Group, type Event, type FriendList, type Crew,
   type Thread, type Message, type Notification, type GroupRole, type RsvpStatus,
@@ -137,10 +137,13 @@ export class View {
       || b.mutualFriendCount - a.mutualFriendCount || a.name.localeCompare(b.name));
   }
 
-  /** The profile with fields the viewer cannot see set to null and home fuzzed for others. */
+  /**
+   * The profile with fields the viewer cannot see set to null. Home is never sent for someone
+   * else (null at runtime; the shared Profile type still says LatLng, see the contract request).
+   */
   profileFor(viewerId: ID, p: Profile): Profile {
     if (viewerId === p.id) return p;
-    const out: Profile = { ...p, home: fuzzLocation(p.home, `home:${p.id}`) };
+    const out: Profile = { ...p, home: null as unknown as Profile['home'] };
     for (const f of PROFILE_FIELDS) {
       const audience = p.fieldVisibility[f] ?? 'public';
       if (!this.canSee(viewerId, p.id, audience)) (out as Record<ProfileField, unknown>)[f] = null;

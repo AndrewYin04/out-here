@@ -18,6 +18,7 @@ import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
+import { friendPins, hangInvite, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -890,5 +891,10 @@ export class CoreStore {
     const view = await this.view();
     return { db: view.db, view };
   }
-}
 
+  // ---------- Out Here: friend locations (logic in locations.ts) ----------
+  friendPins(viewerId: ID) { return friendPins(this, viewerId); }
+  myLocation(viewerId: ID) { return myLocation(this, viewerId); }
+  updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
+  hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
+}
