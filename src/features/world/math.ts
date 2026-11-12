@@ -146,3 +146,10 @@ export function fixHeading(fix: GpsFix): number | null {
 
 /** Farther than this from the demo area, the 3D view says the plans are elsewhere. */
 export const FAR_FROM_DEMO_M = 5000;
+
+/** How tall buildings are drawn at a zoom: mapped height from a distance, 25% right behind the
+ *  avatar (matches the map's own building layer in cityTheme.ts). */
+export function buildingFlatten(zoom: number): number {
+  const t = clamp01((zoom - 18) / (19.6 - 18));
+  return 1 - 0.75 * t;
+}

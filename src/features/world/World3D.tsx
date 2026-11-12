@@ -11,10 +11,11 @@ import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
-import { applyCityTheme, tileSourceId } from './cityTheme';
+import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
+import { buildHq, loadHq, type HqLabel } from './hq';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, type Area, type Street } from './trees';
 import {
-  ARRIVE_METERS, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
+  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
 import { useGps } from './useGps';
@@ -62,6 +63,13 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
 export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
+  /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
+  const [hqLabels, setHqLabels] = useState<HqLabel[]>([]);
+  const hqBox = useRef<number[][] | null>(null);
+  const hqFlatten = useRef<((f: number) => void) | null>(null);
+  const [tour, setTour] = useState<string | null>(null);
+  const tourToken = useRef(0);
+  const touring = useRef(false);
   const start = home ?? DEMO_CENTER;
   const pos = useRef<LatLng>(start);
   const heading = useRef(0);
@@ -187,9 +195,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.on('idle', add);
 
     // Dragging or rotating the map by hand looks around; "Back to me" follows again.
-    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; setFollow(false); } };
+    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); setFollow(false); } };
     // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
-    const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) entering.current = false; };
+    const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
     map.on('zoomstart', userZoom);
@@ -288,6 +296,76 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return blocked(along) ? p : along;
   }, []);
 
+  // ---- Meta HQ in detail (hq.ts): real footprints, floors, facades, rooftop park, mapped trees ----
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    let dispose: (() => void) | null = null;
+    void loadHq().then((data) => {
+      const layer = layerRef.current;
+      if (cancelled || !data || !layer) return;
+      const model = buildHq(data, layer.getOrigin());
+      layer.setStatic('hq', model.group);
+      dispose = model.dispose;
+      hqFlatten.current = model.setFlatten;
+      // The map's plain boxes for these buildings would poke through the models: hide them
+      // (OpenMapTiles building ids are the OSM way id × 10).
+      if (map.getLayer(BUILDINGS_ID)) map.setFilter(BUILDINGS_ID, ['!', ['in', ['id'], ['literal', model.wayIds.map((id) => id * 10)]]]);
+      const b = data.box;
+      hqBox.current = [[b.w, b.s], [b.e, b.s], [b.e, b.n], [b.w, b.n], [b.w, b.s]];
+      setHqLabels(model.labels);
+    });
+    return () => {
+      cancelled = true;
+      layerRef.current?.setStatic('hq', null);
+      hqFlatten.current = null;
+      dispose?.();
+      if (map.getLayer(BUILDINGS_ID)) map.setFilter(BUILDINGS_ID, null);
+      hqBox.current = null;
+    };
+  }, [map, ready]);
+
+  const stopTour = useCallback(() => {
+    if (!touring.current) return;
+    tourToken.current += 1;
+    touring.current = false;
+    setTour(null);
+    map.stop();
+  }, [map]);
+
+  /** Orbit the classic campus (MPK 10–18), then MPK 20's rooftop park, with captions. */
+  const startTour = useCallback(async () => {
+    const at = (re: RegExp) => hqLabels.filter((l) => re.test(l.name));
+    const center = (ls: HqLabel[]) => ls.length
+      ? { lng: ls.reduce((a, l) => a + l.pos.lng, 0) / ls.length, lat: ls.reduce((a, l) => a + l.pos.lat, 0) / ls.length }
+      : null;
+    const classic = center(at(/^MPK 1\d$/));
+    const mpk20 = center(at(/^MPK 20$/));
+    const stops = [
+      classic && { at: classic, zoom: 17.4, pitch: 58, caption: 'Classic campus at 1 Hacker Way: MPK 10–18 around Hacker Square' },
+      mpk20 && { at: mpk20, zoom: 17.1, pitch: 55, caption: 'MPK 20: Frank Gehry’s building with a 9-acre rooftop park' },
+    ].filter(Boolean) as { at: LatLng; zoom: number; pitch: number; caption: string }[];
+    if (stops.length === 0) return;
+    const token = ++tourToken.current;
+    touring.current = true;
+    entering.current = false;
+    setFollow(false);
+    const quick = reducedMotion();
+    const run = (start: () => void) => new Promise<void>((resolve) => { map.once('moveend', () => resolve()); start(); });
+    for (const st of stops) {
+      if (token !== tourToken.current) return;
+      setTour(st.caption);
+      await run(() => map.flyTo({ center: [st.at.lng, st.at.lat], zoom: st.zoom, pitch: st.pitch, bearing: map.getBearing(), duration: quick ? 0 : 2600, essential: true }));
+      if (token !== tourToken.current) return;
+      await run(() => map.rotateTo(map.getBearing() + 220, { duration: quick ? 0 : 13000, easing: (t) => t }));
+    }
+    if (token !== tourToken.current) return;
+    touring.current = false;
+    setTour(null);
+    entering.current = true;
+    setFollow(true);
+  }, [hqLabels, map, setFollow]);
+
   // ---- Trees: placed from the tiles around the avatar; again after moving 250 m or new tiles ----
   useEffect(() => {
     if (!ready) return;
@@ -325,7 +403,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const buildings = map.querySourceFeatures(source, { sourceLayer: 'building' }).flatMap((f) => polys(f));
       const water = map.querySourceFeatures(source, { sourceLayer: 'water' }).flatMap((f) => polys(f));
       // No trees on sports fields, playgrounds or in the water.
-      const blockers = [...buildings, ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water];
+      const blockers = [...buildings, ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water,
+        // Meta HQ has its real, mapped trees (hq.ts); no generated ones there.
+        ...(hqBox.current ? [[hqBox.current]] : [])];
       // You can't walk into a building or the bay. The demo walk starts on open ground.
       blockedRef.current = blockerTest([...buildings, ...water]);
       if (sourceRef.current === 'demo' && !moved.current) {
@@ -484,6 +564,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Camera: behind the avatar while following; the tilt always follows the zoom.
       // Any camera call stops MapLibre's gestures, so leave the camera alone while the user is
       // zooming (or panning, when not following), then ease the tilt to match the new zoom.
+      hqFlatten.current?.(buildingFlatten(zoom));
+      if (touring.current) return; // the HQ tour drives the camera
       const busy = map.isZooming() || (!followRef.current && map.isMoving());
       if (followRef.current && !busy) {
         let z = zoom;
@@ -608,11 +690,28 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         ))}
       </div>
 
+      {/* Building names at Meta HQ: while touring or looking from a distance. */}
+      {(tour || map.getZoom() <= 18.3) && (
+        <div className="absolute inset-0 overflow-hidden">
+          {hqLabels.map((l) => (
+            <div key={l.id} ref={(el) => layerRef.current?.bindAnchor(l.id, l.pos, l.altitude, el)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
+              <span data-testid="hq-label" className="block whitespace-nowrap rounded-pill bg-[#1C1E21]/85 px-2 py-0.5 text-[12px] font-bold text-white shadow-card">{l.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Bottom centre: walking countdown, arrival, "Walk there", GPS notes. */}
       <div className={cn(
         'absolute inset-x-0 flex flex-col items-center gap-2 px-4',
         selectedId ? 'bottom-[calc(58%+12px)] md:bottom-24' : 'bottom-24 max-md:bottom-[252px]',
       )}>
+        {tour && (
+          <div role="status" data-testid="hq-tour-caption" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-card bg-[#1C1E21]/90 px-3 py-2 text-[14px] font-semibold text-white shadow-popover">
+            <span>{tour}</span>
+            <button type="button" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="shrink-0 font-semibold text-[#8AB4FF] hover:underline">End tour</button>
+          </div>
+        )}
         {walk && walkMin != null && (
           <div role="status" data-testid="walk-countdown" className="pointer-events-auto flex items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-popover">
             <span aria-hidden>🚶</span>
@@ -639,10 +738,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         {gpsNote && <p role="status" data-testid="gps-note" className="rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text-2 shadow-card">{gpsNote}</p>}
       </div>
 
-      {/* Bottom right: location source and "Back to me". */}
+      {/* Bottom right: the HQ tour, "Back to me", and the location source. */}
       <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[136px]">
+        {hqLabels.length > 0 && !tour && (
+          <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
+            🏢 Tour Meta HQ
+          </button>
+        )}
         {!follow && (
-          <button type="button" data-testid="back-to-me" onClick={() => { entering.current = true; setFollow(true); }} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
+          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
             ◎ Back to me
           </button>
         )}

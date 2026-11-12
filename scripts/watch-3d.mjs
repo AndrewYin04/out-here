@@ -52,6 +52,18 @@ await step('Open the 3D view from the Map / 3D button', async () => {
   return `zoom ${await attr('data-zoom')}, tilt ${await attr('data-pitch')}°`;
 });
 
+await step('Tour Meta HQ: orbit the classic campus, then MPK 20’s rooftop park', async () => {
+  await page.getByTestId('hq-tour').click();
+  const caption = page.getByTestId('hq-tour-caption');
+  await caption.waitFor({ timeout: 5000 });
+  const first = await caption.textContent();
+  await page.waitForFunction(() => /MPK 20/.test(document.querySelector('[data-testid="hq-tour-caption"]')?.textContent ?? ''), null, { timeout: 40000 });
+  await page.waitForTimeout(7000);
+  await caption.getByRole('button', { name: 'End tour' }).click();
+  await page.waitForTimeout(3000);
+  return `${first?.split(':')[0]} → MPK 20`;
+});
+
 await step('Walk with the arrow keys', async () => {
   await page.mouse.click(1000, 600); // focus the page, not a text field
   await page.keyboard.down('ArrowUp'); await page.waitForTimeout(1600); await page.keyboard.up('ArrowUp');

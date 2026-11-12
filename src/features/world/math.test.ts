@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { haversineMeters } from '@/shared';
 import {
-  acceptFix, bearingDeg, characterScale, deltaDeg, fixHeading, lerpDeg, minutesLeft, moveMeters, normalizeDeg,
+  acceptFix, buildingFlatten, bearingDeg, characterScale, deltaDeg, fixHeading, lerpDeg, minutesLeft, moveMeters, normalizeDeg,
   offsetMeters, pitchForZoom, stepToward, CLOSE_PITCH, CLOSE_ZOOM, FLAT_ZOOM, STREET_PITCH, STREET_ZOOM, type GpsFix,
 } from './math';
 
@@ -103,5 +103,14 @@ describe('GPS fixes', () => {
     expect(fixHeading(fix({ heading: 90, speed: 1.5 }))).toBe(90);
     expect(fixHeading(fix({ heading: 90, speed: 0.1 }))).toBeNull();
     expect(fixHeading(fix({ heading: null }))).toBeNull();
+  });
+});
+
+describe('buildingFlatten', () => {
+  it('is full height zoomed out and a quarter right behind the avatar', () => {
+    expect(buildingFlatten(16)).toBe(1);
+    expect(buildingFlatten(18)).toBe(1);
+    expect(buildingFlatten(19.6)).toBeCloseTo(0.25);
+    expect(buildingFlatten(21)).toBeCloseTo(0.25);
   });
 });

@@ -57,6 +57,8 @@ export class WorldLayer implements CustomLayerInterface {
   private trunkMat = new THREE.MeshStandardMaterial({ color: '#8A6A4F', roughness: 0.9 });
   private canopyMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true });
   private trunks: THREE.InstancedMesh | null = null;
+  private statics = new Map<string, THREE.Object3D>();
+  private anchors = new Map<string, { pos: LatLng; altitude: number; el: HTMLElement }>();
   private canopies: THREE.InstancedMesh | null = null;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
@@ -120,6 +122,23 @@ export class WorldLayer implements CustomLayerInterface {
     if (a.label && a.label !== el) a.label.style.visibility = 'hidden';
     a.label = el;
     a.labelLift = liftMeters;
+  }
+
+  /** The point the local frame is measured from (east/north meters). */
+  getOrigin(): LatLng { return this.origin; }
+
+  /** Scenery built in the local frame (Meta HQ). Depth-tested against the map's buildings. */
+  setStatic(key: string, obj: THREE.Object3D | null) {
+    const old = this.statics.get(key);
+    if (old) { this.scene.remove(old); this.statics.delete(key); }
+    if (obj) { this.scene.add(obj); this.statics.set(key, obj); }
+  }
+
+  /** Keep `el` above a fixed point (`altitude` meters, real size), or stop when el is null. */
+  bindAnchor(id: string, pos: LatLng, altitude: number, el: HTMLElement | null) {
+    const old = this.anchors.get(id);
+    if (old && old.el !== el) old.el.style.visibility = 'hidden';
+    if (el) this.anchors.set(id, { pos, altitude, el }); else this.anchors.delete(id);
   }
 
   /** Low-poly trees (two instanced meshes, so hundreds cost two draw calls). Real size, not zoom-scaled. */
@@ -192,6 +211,7 @@ export class WorldLayer implements CustomLayerInterface {
     for (const id of [...this.actors.keys()]) this.removeActor(id);
     this.setBeacons([]);
     this.setTrees([]);
+    for (const key of [...this.statics.keys()]) this.setStatic(key, null);
     this.trunkGeo.dispose(); this.canopyGeo.dispose(); this.trunkMat.dispose(); this.canopyMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
@@ -213,6 +233,7 @@ export class WorldLayer implements CustomLayerInterface {
     const showChars = zoom >= this.minZoom;
     if (this.trunks) this.trunks.visible = showChars;
     if (this.canopies) this.canopies.visible = showChars;
+    for (const o of this.statics.values()) o.visible = zoom >= 14.5;
     const m = this.originMerc.meterInMercatorCoordinateUnits();
     const model = new THREE.Matrix4()
       .makeTranslation(this.originMerc.x, this.originMerc.y, this.originMerc.z ?? 0)
@@ -247,6 +268,16 @@ export class WorldLayer implements CustomLayerInterface {
           a.label.style.visibility = 'hidden';
         }
       }
+    }
+
+    for (const a of this.anchors.values()) {
+      const o = offsetMeters(this.origin, a.pos);
+      this.tmp.set(o.east, a.altitude, -o.north, 1).applyMatrix4(this.full);
+      if (this.tmp.w <= 0 || zoom < 14.5) { a.el.style.visibility = 'hidden'; continue; }
+      const x = ((this.tmp.x / this.tmp.w + 1) / 2) * w;
+      const py = ((1 - this.tmp.y / this.tmp.w) / 2) * h;
+      a.el.style.transform = `translate(${x.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -100%)`;
+      a.el.style.visibility = x > -100 && x < w + 100 && py > -50 && py < h + 50 ? 'visible' : 'hidden';
     }
 
     const pulse = 0.5 + Math.sin(this.elapsed * 3) * 0.5;
