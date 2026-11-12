@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, Eye, Globe, Lock, LogOut, UserCheck, Users } from 'lucide-react';
+import { ChevronDown, Eye, Globe, Lock, LogOut, Share2, UserCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
@@ -58,6 +58,38 @@ function JoinButton({ group, onChange }: { group: GroupView; onChange: (g: Group
         </MenuItem>
       )}
     </Popover>
+  );
+}
+
+function ShareButton({ group }: { group: GroupView }) {
+  const toast = useToast();
+  const share = async () => {
+    const url = `${window.location.origin}/groups/${group.slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.show('Link copied to clipboard');
+    } catch {
+      toast.show(`Copy this link: ${url}`);
+    }
+  };
+  return (
+    <Button variant="secondary" onClick={() => void share()} icon={<Share2 size={16} aria-hidden />} data-testid="share-group">
+      Share
+    </Button>
+  );
+}
+
+/** Friend members as a 32 px stack under the group name, like Facebook's group header. */
+function FriendStack({ slug }: { slug: string }) {
+  const { data } = useApi<{ members: PersonCard[]; friendCount: number }>(`/api/groups/${slug}/members`);
+  if (!data) return <div className="h-8" aria-hidden />;
+  const friends = data.members.filter((m) => m.isFriend);
+  const people = (friends.length > 0 ? friends : data.members).slice(0, 6).map((f) => ({ name: f.name, src: f.avatarUrl }));
+  if (people.length === 0) return <span />;
+  return (
+    <div data-testid="group-header-avatars">
+      <AvatarStack people={people} size={32} max={6} />
+    </div>
   );
 }
 
@@ -202,7 +234,14 @@ function HeaderSkeleton() {
   return (
     <SkeletonGroup label="group" className="mx-auto max-w-[1250px]">
       <Skeleton shape="block" className="h-[180px] w-full md:h-[350px] md:rounded-b-btn" />
-      <div className="flex flex-col gap-2 p-4"><Skeleton className="h-7 w-1/2" /><Skeleton className="h-4 w-1/4" /></div>
+      <div className="flex flex-col gap-2 p-4">
+        <Skeleton className="h-7 w-1/2" />
+        <Skeleton className="h-4 w-1/4" />
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Skeleton shape="block" className="h-8 w-40 rounded-full" />
+          <div className="flex gap-2"><Skeleton shape="block" className="h-9 w-24 rounded-btn" /><Skeleton shape="block" className="h-9 w-24 rounded-btn" /></div>
+        </div>
+      </div>
     </SkeletonGroup>
   );
 }
@@ -230,12 +269,18 @@ export function GroupPage({ slug, initialTab }: { slug: string; initialTab: Grou
       <div className="bg-fb-surface shadow-card">
         <div className="mx-auto max-w-[1250px]">
           <GroupCover group={group} className="aspect-[1250/463] max-h-[463px] w-full md:rounded-b-btn" />
-          <div className="flex flex-col gap-3 px-4 pb-3 pt-4 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-3 px-4 pb-3 pt-4">
             <div className="min-w-0">
               <h1 className="text-[24px] font-bold leading-7 text-fb-text md:text-[28px] md:leading-8">{group.name}</h1>
               <p className="mt-1 text-[15px] text-fb-text-2" data-testid="group-meta"><PrivacyLine group={group} /></p>
             </div>
-            <JoinButton group={group} onChange={setGroup} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <FriendStack slug={slug} />
+              <div className="flex items-center gap-2">
+                <JoinButton group={group} onChange={setGroup} />
+                <ShareButton group={group} />
+              </div>
+            </div>
           </div>
           <div className="mx-4 border-t border-fb-divider">
             <Tabs items={TABS} value={tab} onChange={changeTab} label="Group sections" className="h-[60px]" />

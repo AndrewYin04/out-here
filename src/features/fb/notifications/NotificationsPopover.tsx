@@ -2,44 +2,11 @@
 
 import { Bell, Check, MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useViewer } from '@/features/data';
+import { useState } from 'react';
 import { Badge, IconButton, MenuItem, Popover } from '@/features/ui';
-import type { NotificationView } from '@/shared/api';
 import { NOTIFICATIONS_PATH } from './links';
 import { FilterChips, NotificationList } from './NotificationList';
-import { useNotificationFeed } from './useNotificationFeed';
-
-const SEEN_KEY = (handle: string) => `outhere.notif-seen.${handle}`;
-
-function readSeen(handle: string): string | null {
-  try { return window.sessionStorage.getItem(SEEN_KEY(handle)); } catch { return null; }
-}
-function writeSeen(handle: string, at: string) {
-  try { window.sessionStorage.setItem(SEEN_KEY(handle), at); } catch { /* private mode */ }
-}
-
-/**
- * The badge counts unread notifications that arrived after the panel was last opened, so
- * opening the panel clears it (as on Facebook) while rows keep their unread dots.
- */
-function useSeenMarker(handle: string, list: NotificationView[] | null) {
-  const [seenAt, setSeenAt] = useState<string | null>(null);
-  useEffect(() => { setSeenAt(readSeen(handle)); }, [handle]);
-  const markSeen = useCallback(() => {
-    if (!list) return;
-    const newest = list.reduce((m, n) => (n.createdAt > m ? n.createdAt : m), seenAt ?? '');
-    if (!newest) return;
-    writeSeen(handle, newest);
-    setSeenAt(newest);
-  }, [handle, list, seenAt]);
-  const count = useMemo(
-    () => (list ?? []).filter((n) => !n.readAt && (!seenAt || n.createdAt > seenAt)).length,
-    [list, seenAt],
-  );
-  return { count, markSeen };
-}
+import { useNotificationBadge } from './useNotificationBadge';
 
 export function NotificationsMenu({ markRead }: { markRead: (ids?: string[]) => Promise<void> }) {
   return (
@@ -63,14 +30,8 @@ export function NotificationsMenu({ markRead }: { markRead: (ids?: string[]) => 
 
 /** Top-bar bell: live unread badge and a 360 px notifications panel. */
 export function NotificationsPopover() {
-  const pathname = usePathname() ?? '/';
-  const { handle } = useViewer();
-  const feed = useNotificationFeed();
+  const { feed, count, markSeen, onPage } = useNotificationBadge();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const { count, markSeen } = useSeenMarker(handle, feed.notifications);
-  const onPage = pathname === NOTIFICATIONS_PATH;
-
-  useEffect(() => { if (onPage) markSeen(); }, [onPage, markSeen]);
 
   return (
     <Popover

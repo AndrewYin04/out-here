@@ -32,6 +32,8 @@ test('Cheap Eats Hangouts tab shows Dumpling Den with 2 left', async ({ page }) 
   await page.goto('/groups/cheap-eats-south-bay?as=alex');
   await expect(page.getByRole('heading', { level: 1, name: 'Cheap Eats South Bay' })).toBeVisible();
   await expect(page.getByTestId('group-meta')).toContainText(/Public group · \d+ members/);
+  await expect(page.getByTestId('group-header-avatars')).toBeVisible();
+  await expect(page.getByTestId('share-group')).toBeVisible();
   await page.getByRole('tab', { name: 'Hangouts' }).click();
   await expect(page).toHaveURL(/tab=hangouts/);
   const dumplings = hangout(page, 'Dumpling Den');
@@ -137,9 +139,22 @@ test('every notification row links to a page that loads', async ({ page }) => {
 test('phone: bottom bar Notifications opens the list', async ({ page }, info) => {
   test.skip(info.project.name !== 'phone', 'phone only');
   await page.goto('/groups?as=alex');
-  await page.getByRole('navigation').getByRole('link', { name: /Notifications/ }).last().click();
+  const tab = page.getByTestId('mtab-notifications');
+  await expect(tab.getByTestId('count-badge')).toHaveText(/\d+/);
+  await tab.click();
   await expect(page).toHaveURL(/\/notifications/);
   await expect(page.getByTestId('notification-row').first()).toBeVisible();
+  // Opening the list clears the bottom-bar badge, as on Facebook.
+  await expect(tab.getByTestId('count-badge')).toHaveCount(0);
+});
+
+test('group header: Share copies the group link', async ({ page, context }, info) => {
+  test.skip(info.project.name !== 'desktop', 'clipboard permission is set on the desktop project');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/groups/cheap-eats-south-bay?as=alex');
+  await page.getByTestId('share-group').click();
+  await expect(page.getByText('Link copied to clipboard')).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/groups\/cheap-eats-south-bay$/);
 });
 
 test('desktop: two personas — join a hangout, seats and the host bell update live', async ({ browser }, info) => {
@@ -158,10 +173,18 @@ test('desktop: two personas — join a hangout, seats and the host bell update l
   await bell.click();
   await expect(bell.getByTestId('count-badge')).toHaveCount(0);
 
+  // Sam's phone opens Notifications once, so its bottom-bar badge also starts from zero.
+  const samPhone = await personaPage(browser, 'sam', '/notifications', true);
+  await expect(samPhone.getByTestId('notification-row').first()).toBeVisible();
+  await samPhone.getByTestId('mtab-groups').click();
+  const phoneTab = samPhone.getByTestId('mtab-notifications');
+  await expect(phoneTab.getByTestId('count-badge')).toHaveCount(0);
+
   await jordanRow.getByRole('button', { name: 'Join' }).click();
   await expect(jordanRow.getByRole('button', { name: 'Leave' })).toBeVisible();
   await expect(samRow.getByTestId('seats-badge')).toHaveText(`${before - 1} left`, { timeout: 5000 });
   await expect(bell.getByTestId('count-badge')).toHaveText(/1/, { timeout: 5000 });
+  await expect(phoneTab.getByTestId('count-badge')).toHaveText(/1/, { timeout: 5000 });
 
   await bell.click();
   const row = sam.getByTestId('notifications-panel').getByTestId('notification-row').first();
@@ -172,6 +195,7 @@ test('desktop: two personas — join a hangout, seats and the host bell update l
   await jordanRow.getByRole('button', { name: 'Leave' }).click();
   await expect(samRow.getByTestId('seats-badge')).toHaveText(`${before} left`, { timeout: 5000 });
   await sam.context().close();
+  await samPhone.context().close();
   await jordan.context().close();
 });
 
