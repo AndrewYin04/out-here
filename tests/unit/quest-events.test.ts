@@ -125,6 +125,13 @@ describe('creating plans', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
+  it('seeded plans never count toward the cap (Sam hosts several and can still post)', async () => {
+    const sam = profileId('sam');
+    const v = await store.view();
+    expect(v.db.quests.filter((q) => q.hostId === sam).length).toBeGreaterThanOrEqual(EVENTS_PER_DAY);
+    await expect(store.createQuest(sam, { ...base(), visibility: 'community' })).resolves.toMatchObject({ hostId: sam });
+  });
+
   it(`caps posting at ${EVENTS_PER_DAY} plans a day (429)`, async () => {
     for (let i = 0; i < EVENTS_PER_DAY; i++) await store.createQuest(maya, { ...base(), title: `plan ${i}`, visibility: 'community' });
     await expect(store.createQuest(maya, { ...base(), visibility: 'community' })).rejects.toMatchObject({ status: 429 });

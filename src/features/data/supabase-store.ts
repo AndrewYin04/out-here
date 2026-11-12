@@ -26,6 +26,15 @@ function fail(table: string, error: DbError): void {
   throw new HttpError(502, `database error on ${table}: ${error.message}`);
 }
 
+/** Tables from migration 0003 (plan check-ins and reports); see loadTable. */
+const OPTIONAL_TABLES = new Set<TableKey>(['questCheckins', 'questReports']);
+const warned = new Set<string>();
+function warnMissing(table: string) {
+  if (warned.has(table)) return;
+  warned.add(table);
+  console.warn(`[supabase] table ${table} is missing; reading it as empty. Run the latest migration (npm run db:migrate:dev / :demo).`);
+}
+
 export class SupabaseBackend implements Backend {
   readonly kind = 'supabase' as const;
   private client: SupabaseClient;
@@ -56,6 +65,12 @@ export class SupabaseBackend implements Backend {
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
     const first = await page(0, true);
+    // Tables added by a later migration read as empty until that migration is applied, so a
+    // deploy that lands before `db:migrate` still serves every page (writes to them fail).
+    if (first.error && OPTIONAL_TABLES.has(key) && /Could not find the table|does not exist|PGRST205|42P01/.test(`${first.error.code ?? ''} ${first.error.message ?? ''}`)) {
+      warnMissing(table);
+      return [];
+    }
     fail(table, first.error);
     const rows: Record<string, unknown>[] = [...((first.data ?? []) as Record<string, unknown>[])];
     const total = first.count ?? rows.length;

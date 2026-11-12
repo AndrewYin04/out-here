@@ -1,7 +1,8 @@
 'use client';
 // Quest details over the map: a bottom sheet below 768 px, a left side panel on desktop.
 // Non-modal, so the map, its attribution and the other Out Here controls stay usable.
-import { Clock, Flag, Footprints, MapPin, Users, Wallet, X } from 'lucide-react';
+import { ChevronRight, Clock, Footprints, MapPin, Users, Wallet, X } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, useApi, type QuestDetail } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, useToast } from '@/features/ui';
@@ -9,6 +10,7 @@ import type { PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
 import { friendsGoingLine, priceLabel, startsLabel, walkLabel } from './format';
 import { MapAttribution } from './MapAttribution';
+import { Bubble, Poster, ReportButton, StatLine, VisibilityChip } from './event/parts';
 
 export type QuestPanelProps = {
   questId: string;
@@ -94,6 +96,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               <p className="mt-0.5 flex items-center gap-1 text-fb-meta text-fb-text-2">
                 <MapPin size={14} aria-hidden /> {q.venueName}
               </p>
+              <VisibilityChip quest={q} groupName={shown?.group?.name} className="mt-1" />
             </>
           ) : (
             <>
@@ -118,6 +121,15 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
         )}
         {q && shown && (
           <>
+            {(q.posterUrl || q.bubbleText) && (
+              <div className="mb-3 flex items-start gap-3">
+                <Poster quest={q} className="h-24 w-20 shrink-0 rounded-card" />
+                <Bubble text={q.bubbleText} className="mt-1" />
+              </div>
+            )}
+            {shown.isLive && (
+              <StatLine memberCount={shown.memberCount} seatsLeft={shown.seatsLeft} isLive hereCount={shown.hereCount} className="mb-2" />
+            )}
             {museReason && (
               <p data-testid="quest-muse-reason" className="mb-2 rounded-card bg-fb-blue-tint px-3 py-2 text-fb-meta text-fb-text">
                 <span className="font-semibold text-fb-blue">{museReason.label}</span>
@@ -154,8 +166,11 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
 
             <div className="mt-4">
               <h3 className="text-[17px] font-bold">
-                Going <span className="font-normal text-fb-text-2">· {people.length}</span>
+                Going <span className="font-normal text-fb-text-2">· {shown.memberCount ?? people.length}</span>
               </h3>
+              {shown.canSeeGuests === false && (
+                <p className="text-fb-meta text-fb-text-2" data-testid="quest-guests-hidden">Guests are visible to the host&apos;s friends and people who join.</p>
+              )}
               {friendLine && <p className="text-fb-meta text-fb-text-2" data-testid="quest-friends-going">{friendLine}</p>}
               <ul className="mt-2 space-y-2" data-testid="quest-going">
                 {people.map((p) => (
@@ -172,6 +187,14 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
             {!isMember && (
               <p className="mt-3 text-fb-meta text-fb-text-2">Pin shows the area. The exact spot is shared after you join.</p>
             )}
+            <Link
+              href={`/out-here/plan/${q.id}`}
+              data-testid="quest-open-page"
+              className="mt-3 flex items-center justify-between rounded-btn bg-fb-input px-3 py-2 text-fb-body font-semibold text-fb-text hover:bg-fb-secondary-btn"
+            >
+              <span>Open plan page{shown.postCount ? ` · ${shown.postCount} ${shown.postCount === 1 ? 'post' : 'posts'}` : ''}</span>
+              <ChevronRight size={18} aria-hidden />
+            </Link>
           </>
         )}
       </div>
@@ -189,13 +212,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               {shown.seatsLeft === 0 ? 'Full' : 'Join'}
             </Button>
           )}
-          <button
-            type="button"
-            onClick={() => toast.show('Thanks. We’ll review this plan.')}
-            className="mx-auto mt-2 flex items-center gap-1 text-fb-meta text-fb-text-2 hover:underline"
-          >
-            <Flag size={12} aria-hidden /> Report
-          </button>
+          {!isHost && <ReportButton questId={questId} onReported={() => { onChanged(); onClose(); }} className="mx-auto mt-2" />}
         </div>
       )}
     </section>

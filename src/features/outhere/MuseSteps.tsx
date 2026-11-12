@@ -13,21 +13,24 @@ function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 }
 
-/** While the plan request runs: generic step names appear one by one. No results are claimed. */
-export function MuseStepsLoading() {
+/**
+ * While a Muse request runs: generic step names appear one by one. No results are claimed.
+ * `steps` defaults to the plan's steps; other Muse helpers pass their own.
+ */
+export function MuseStepsLoading({ steps = LOADING_STEPS, className }: { steps?: readonly string[]; className?: string } = {}) {
   const [shown, setShown] = useState(1);
   useEffect(() => {
     const id = window.setInterval(() => {
-      setShown((n) => (n >= LOADING_STEPS.length ? n : n + 1));
+      setShown((n) => (n >= steps.length ? n : n + 1));
     }, LOADING_STEP_MS);
     return () => window.clearInterval(id);
-  }, []);
+  }, [steps.length]);
 
   return (
-    <div data-testid="muse-steps-loading" className="mb-2 rounded-card bg-fb-surface p-3 shadow-card">
+    <div data-testid="muse-steps-loading" className={cn('mb-2 rounded-card bg-fb-surface p-3 shadow-card', className)}>
       <p className="mb-1.5 text-[15px] font-semibold text-fb-text">✨ Muse is working</p>
       <ul className="flex flex-col gap-1">
-        {LOADING_STEPS.slice(0, shown).map((label, i) => {
+        {steps.slice(0, shown).map((label, i) => {
           const current = i === shown - 1;
           return (
             <li key={label} className={cn('flex items-center gap-2 text-[13px]', current ? 'text-fb-text' : 'text-fb-text-2')}>

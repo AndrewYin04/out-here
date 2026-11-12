@@ -108,7 +108,7 @@ export function buildSeedWorld(now: Date): SeedWorld {
       startsAt: starts.toISOString(), endsAt: addMin(starts, q.durationMin).toISOString(),
       capacity: q.capacity, memberIds: members.map(profileId), priceMax: q.priceMax, tags: q.tags,
       status: members.length >= q.capacity ? 'full' : 'open',
-      createdAt: addMin(demoNow, -(60 + qi * 7)).toISOString(),
+      createdAt: addMin(demoNow, -(25 * 60 + qi * 7)).toISOString(),
       groupId: q.groupSlug && groupMembers.has(q.groupSlug) ? seedId('group', q.groupSlug) : null,
       placeId: seedId('place', place.name),
       ...questVisibilityFields(q.groupSlug && groupMembers.has(q.groupSlug) ? q.visibility ?? 'community' : 'community'),

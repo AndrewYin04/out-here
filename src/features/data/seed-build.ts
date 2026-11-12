@@ -290,7 +290,8 @@ export function buildSeed(
       capacity: q.capacity, price_max: q.priceMax, tags: q.tags,
       status: members.length >= q.capacity ? 'full' : 'open',
       is_public: visibility === 'community', visibility, poster_url: null, bubble_text: q.bubbleText ?? null,
-      created_at: iso(addMin(demoNow, -(60 + qi * 7))),
+      // Over a day old, so seeded plans never count toward a host's daily posting cap (EVENTS_PER_DAY).
+      created_at: iso(addMin(demoNow, -(25 * 60 + qi * 7))),
     });
     members.forEach((m, i) => t.quest_members.push({
       quest_id: id, user_id: pid(m), joined_at: iso(addMin(demoNow, -(50 - i * 5 + qi))), via_friend_id: null,
