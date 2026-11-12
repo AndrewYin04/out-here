@@ -12,6 +12,9 @@ next-env.d.ts
 .env.local
 .env.*.local
 .env.production
+*.env
+reference/
+.verify/
 
 # tooling
 .vercel/
