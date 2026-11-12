@@ -53,7 +53,7 @@ From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan
 1. **Demo reset button** (review B1): `resetStory(now)` + `POST /api/demo/reset` so the stage reset does not need the laptop.
 2. **Production**: in Vercel, turn off Deployment Protection (or share the link), then promote the verified preview to Production and give judges the production URL. Previews and Production both read the demo database right now (review D11 suggests previews read dev).
 3. **Muse Intros** (Boardy-style warm intros; full spec in the plan, "Muse Intros"; review B3 fixes the Alex-Jordan story).
-4. **Messenger** (`/messages` inbox and docked chats; invites as messages).
+4. **Messenger.** `/messages` is still the shell's loading skeleton, while the top-bar Messenger icon shows a red unread badge (7), so clicking it looks broken to a judge. The data and routes exist (20 seeded threads, `/api/threads`, `/api/threads/[id]/messages` list and send, `thread:<id>` realtime); only the screen is missing: inbox (avatar, name, last message, time, unread dot), open a chat, send with live delivery to the other persona's tab, docked chat windows from Contacts, and Out Here invites shown as messages with Accept/Decline. About one builder slice. Until then, consider hiding the badge or showing a "coming soon" state.
 5. Memories capture ("We're done" → photo prompt → album; review B7: any member can complete). The /memories page and Muse regroup exist; capturing a new photo after a live hangout does not.
 6. 3D walking view, Events detail, Search, Marketplace, Reels, Daily Quest, streaks, Wrapped (cut first).
 7. `docs/POLISH.md`: 59 minor UI findings from the review agents.
