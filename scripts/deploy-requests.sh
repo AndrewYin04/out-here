@@ -48,7 +48,8 @@ case "${1:-}" in
     trap 'git -C "$ROOT" worktree remove --force "$wt" >/dev/null 2>&1 || true' EXIT
     mkdir -p "$wt/.vercel" && cp "$ROOT/.vercel/project.json" "$wt/.vercel/"
     sha="$(git -C "$wt" rev-parse --short HEAD)"
-    if url="$(cd "$wt" && vercel deploy --yes 2>/dev/null | tail -n 1)" && [[ "$url" == https://* ]]; then
+    # Non-TTY `vercel deploy` (CLI 65.x) prints a JSON object on stdout; the URL is .deployment.url.
+    if url="$(cd "$wt" && vercel deploy --yes 2>/dev/null | jq -r '.deployment.url // empty')" && [[ "$url" == https://* ]]; then
       msg="✅ Deployed \`$branch\` @ \`$sha\` (preview): $url"
     else
       msg="❌ Deploy of \`$branch\` @ \`$sha\` failed. Andrew: run \`vercel deploy --yes\` on that branch to see the build log."
