@@ -56,3 +56,17 @@ export function fuzzLocation(exact: LatLng, seed: string): LatLng {
   const p = offsetPoint(exact, meters, bearing);
   return { lat: Number(p.lat.toFixed(6)), lng: Number(p.lng.toFixed(6)) };
 }
+
+/**
+ * Approximate location for a shared friend location: the centre of the ~`cellM` grid cell that
+ * contains `exact`. Every point in a cell maps to the same centre, so it never jumps between
+ * requests and never reveals where in the cell the person is.
+ */
+export function snapToGrid(exact: LatLng, cellM: number): LatLng {
+  const latStep = cellM / 111_320;
+  const row = Math.floor(exact.lat / latStep);
+  const lat = (row + 0.5) * latStep;
+  const lngStep = cellM / (111_320 * Math.cos(toRad(lat)));
+  const lng = (Math.floor(exact.lng / lngStep) + 0.5) * lngStep;
+  return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
+}

@@ -3,7 +3,7 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -50,6 +50,7 @@ export type Db = {
   notifications: Notification[];
   listings: Listing[];
   reels: Reel[];
+  locationShares: LocationShare[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -63,7 +64,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   dailyQuests: 'daily_quests', dailyEntries: 'daily_entries', events: 'events', eventRsvps: 'event_rsvps',
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
-  listings: 'listings', reels: 'reels',
+  listings: 'listings', reels: 'reels', locationShares: 'location_shares',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -75,7 +76,7 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   memories: ['id'], dailyQuests: ['date'], dailyEntries: ['date', 'userId'], events: ['id'],
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
-  notifications: ['id'], listings: ['id'], reels: ['id'],
+  notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'],
 };
 
 export function emptyDb(): Db {
@@ -107,6 +108,12 @@ export function fromRow<T extends TableKey>(table: T, row: Record<string, unknow
   if (table === 'availability' || table === 'places' || table === 'events' || table === 'listings') {
     out.location = latLng('lat', 'lng');
   }
+  if (table === 'locationShares') {
+    out.location = latLng('lat', 'lng');
+    const s = (k: string) => (typeof r[k] === 'string' ? (r[k] as string) : null);
+    out.bubble = { emoji: s('emoji'), thought: s('thought'), doing: s('doing'), wantsTo: s('wants_to') };
+    delete r.emoji; delete r.thought; delete r.doing; delete r.wants_to;
+  }
   if (table === 'profiles') delete r.created_at;
   for (const [k, v] of Object.entries(r)) {
     let val = v;
@@ -136,7 +143,12 @@ export function toRow(table: TableKey, obj: Record<string, unknown>): Record<str
   };
   if (table === 'profiles') split('home', 'home_lat', 'home_lng');
   if (table === 'quests') split('approxLocation', 'approx_lat', 'approx_lng');
-  if (['quests', 'availability', 'places', 'events', 'listings'].includes(table)) split('location', 'lat', 'lng');
+  if (['quests', 'availability', 'places', 'events', 'listings', 'locationShares'].includes(table)) split('location', 'lat', 'lng');
+  if (table === 'locationShares' && 'bubble' in o) {
+    const bub = o.bubble as { emoji: string | null; thought: string | null; doing: string | null; wantsTo: string | null } | null;
+    out.emoji = bub?.emoji ?? null; out.thought = bub?.thought ?? null; out.doing = bub?.doing ?? null; out.wants_to = bub?.wantsTo ?? null;
+    delete o.bubble;
+  }
   for (const [k, v] of Object.entries(o)) out[snake(k)] = v;
   return out;
 }

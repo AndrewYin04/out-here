@@ -9,6 +9,7 @@ import { mulberry32, profileId, seedId, shuffled } from '../../shared/seed/ids';
 import {
   DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
 } from '../../shared/seed/story';
+import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -117,7 +118,7 @@ export const TABLE_ORDER = [
   'profiles', 'places', 'groups', 'group_members', 'friendships', 'friend_lists', 'friend_list_members',
   'quests', 'quest_members', 'availability', 'invites', 'crews', 'crew_members', 'memories',
   'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
-  'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels',
+  'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
 ] as const;
 
 const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
@@ -503,6 +504,23 @@ export function buildSeed(
       condition: l.condition, category: l.category, description: l.description, image_url: l.image ?? null,
       lat: home.lat, lng: home.lng, status: 'available',
       created_at: iso(addMin(refDate, -Math.round(l.hoursAgo * 60))),
+    });
+  }
+
+  // friend locations (Find My): times relative to demoNow, shares expire 4 h after seeding
+  for (const s of SEED_LOCATION_SHARES) {
+    if (!has(s.handle)) { warnings.push(`location share: unknown handle "${s.handle}" skipped`); continue; }
+    let at: { lat: number; lng: number };
+    if ('place' in s.at) {
+      const place = requirePlace(s.at.place);
+      at = s.at.offsetM ? offsetPoint(place, s.at.offsetM, s.at.bearingDeg ?? 0) : { lat: place.lat, lng: place.lng };
+    } else at = s.at;
+    t.location_shares.push({
+      user_id: pid(s.handle), lat: Number(at.lat.toFixed(6)), lng: Number(at.lng.toFixed(6)),
+      place_label: s.placeLabel, precision: s.precision, audience: s.audience ?? 'friends', paused: s.paused ?? false,
+      emoji: s.bubble.emoji, thought: s.bubble.thought, doing: s.bubble.doing, wants_to: s.bubble.wantsTo,
+      updated_at: iso(addMin(demoNow, -s.updatedMinAgo)),
+      expires_at: iso(addMin(demoNow, s.expiresInMin ?? SHARE_TTL_MIN)),
     });
   }
 

@@ -87,6 +87,12 @@ export interface DataStore {
   uploadFile: CoreStore['uploadFile'];
   /** Raw tables + view helpers for server-side Muse candidate generation. Never send to the browser. */
   museContext: CoreStore['museContext'];
+  // friend locations (Find My)
+  friendPins: CoreStore['friendPins'];
+  myLocation: CoreStore['myLocation'];
+  updateMyLocation: CoreStore['updateMyLocation'];
+  hangInvite: CoreStore['hangInvite'];
+  hangSuggestion: CoreStore['hangSuggestion'];
 }
 
 const g = globalThis as unknown as { __outhereSupabaseStore?: { key: string; store: DataStore } };
