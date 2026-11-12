@@ -6,6 +6,7 @@ Read this first. Everything below was built overnight by Claude Code on branch `
 
 - **Preview (latest, 76f0286):** https://out-here-53rpnemqr-andrews-projects-76721bc6.vercel.app (pages, APIs and the Muse plan smoke-tested at 06:55 PT; the full two-tab demo was walked in Chrome on the previous preview 3df9384)
   - It sits behind Vercel login. Until someone turns off Deployment Protection, open it while logged in to Vercel, or ask Andrew for a share link (Vercel dashboard, Share). Share links are credentials: never commit or post them.
+- **All TODOs:** tracker issue #33 (https://github.com/AndrewYin04/out-here/issues/33), one issue per TODO (#12-#32). Claim on the TODO's own issue; only Andrew's agent edits the tracker body.
 - **Board (talk to the agent):** https://github.com/AndrewYin04/out-here/issues/1
 - **Deploy requests:** issue #4 (comment `DEPLOY <branch>`), see `docs/DEPLOYS.md`.
 - **Draft PR:** `overnight` → `main` (the team merges).
@@ -52,6 +53,14 @@ Two devices or two browser windows (each tab is its own persona): window A `…/
 - **Muse as a companion character.** A small Muse agent floats next to your avatar on the map. When you ask it something ("I'm free", a question about a plan), it floats in front of your avatar and "talks to you": its answer appears as speech from the character, then it returns to your side.
 - **Partiful-style event page.** Tapping into an event or plan opens a Partiful-like page: cover, host, time and place, the guest list (going, maybe, invited, friends first), and an activity feed where guests comment, react and post updates. See partiful.com for the interface to match.
 - **Announcements delivered by Muse.** When you host a hangout, you can record a short voice or video message and broadcast it to the people you choose, or let Muse choose who it fits. Animation: your agent heads out across the map to "deliver" it, and each recipient sees a Muse agent arrive on their screen to tell them about the event and play your recording, with Join and Not now.
+
+**More ideas from Andrew (Thu afternoon), not started:**
+- **Make Muse's reasoning obvious in the UI.** AI Integration is 30% of the score, so a judge should see what Muse did without tapping: which inputs it read (your text, friends' windows and bubbles, walk time, budget), what it ruled out and why, and why it picked each plan.
+- **Real-time Marketplace.** A seller marks "home now", and the listing shows live on the map so buyers can pull up and look at the item within that window.
+- **Lean into what's happening right now.** Put short-term events first: things starting in the next hour, nearby, with open seats.
+- **The landing page is the 3D "Pokémon Go" view.** The app opens on the avatar view; zooming out turns it into the 2D overhead map.
+
+All TODOs are tracked as GitHub issues: tracker #33.
 
 **Gap found in the morning review:** there is no single place to see the plans you joined. Today you see it per plan (the quest panel says "You're going") or through notifications. Add a **"Your plans"** list: a button on the Out Here map and the Going tab on `/events`, listing every plan the viewer joined (time, place, who is going, Leave). About one builder slice.
 
