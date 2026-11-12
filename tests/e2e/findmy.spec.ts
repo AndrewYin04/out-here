@@ -17,7 +17,8 @@ async function pinsFor(request: APIRequestContext, handle: string): Promise<Pin[
 async function openMap(page: Page, handle: string, width: number, path = '/out-here/friends') {
   await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
   await page.goto(`${path}?as=${handle}`);
-  await expect(page.getByTestId('findmy-map')).toBeVisible();
+  // /out-here/friends redirects to /out-here?mode=friends, which opens the map in Friends mode.
+  await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
   await expect(page.locator('[data-testid="friend-pin"]').first()).toBeVisible({ timeout: 15_000 });
 }
 
@@ -66,7 +67,7 @@ for (const width of [390, 1440]) {
       await expect(card).toContainText('Boulder Bay Gym');
       await expect(card).toContainText('min walk');
       await expect(card).toContainText('find a climbing buddy');
-      // Profile and Messenger are skeletons on this base, so the card does not link to them yet
+      // Messenger cannot open a thread from ?to= yet, so the card hides Message
       await expect(card.getByRole('link', { name: 'Message' })).toHaveCount(0);
       await page.screenshot({ path: `test-results/findmy-card-${width}.png` });
       await card.getByRole('button', { name: 'Want to hang?' }).click();

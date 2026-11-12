@@ -46,10 +46,12 @@ export function OutHereView() {
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
 
-  // ?quest=<id> deep link opens that quest's sheet.
+  // ?quest=<id> deep link opens that quest's sheet; ?mode=friends opens the Friends map.
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('quest');
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('quest');
     if (id) setSelectedId(id);
+    if (params.get('mode') === 'friends') setMode('friends');
   }, []);
 
   const ctx = ctxApi.data && ctxApi.data.viewer.id === persona.id ? ctxApi.data : null;
