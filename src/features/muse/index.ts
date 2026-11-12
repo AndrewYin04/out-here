@@ -1,7 +1,7 @@
 // Barrel for the muse area. Server-side only: importing values from here pulls in the
 // `openai` client and node:crypto. Client components should `import type` from here only.
 export {
-  MuseError, MUSE_TIMEOUT_MS, extractJSON, hashInput, isMockMode, modelFor, museJSON, onRun, setMuseTransport,
+  MIN_ATTEMPT_MS, MuseError, MuseTimeoutError, MUSE_TIMEOUT_MS, extractJSON, reportFallback, hashInput, isMockMode, modelFor, museJSON, onRun, setMuseTransport,
 } from './client';
 export type {
   MuseEffort, MuseJSONOptions, MuseMessage, MuseModelRole, MuseResult, MuseRunRecord, MuseTransport, MuseUsage,
@@ -22,8 +22,9 @@ export type {
 } from './candidates';
 export { MAX_SUGGESTIONS, rankAndExplain } from './rank';
 export type { RankResult } from './rank';
-export { leakedNames, validate } from './validate';
-export { plan } from './plan';
-export type { PlanInput, PlanMeta, PlanOutput, PlanTimings } from './plan';
+export { checkSummary, leakedNames, validate } from './validate';
+export type { SummaryCheck, ValidationIssue } from './validate';
+export { PARSE_BUDGET_MS, PLAN_BUDGET_MS, RANK_BUDGET_MS, plan } from './plan';
+export type { PlanInput, PlanMeta, PlanOutput, PlanSource, PlanTimings } from './plan';
 export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
 export type { TimeExpression } from './time';

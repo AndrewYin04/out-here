@@ -7,7 +7,7 @@ import { getPlanContextProvider, type PlanContext, type PlanContextProvider } fr
 import { NOT_UNDERSTOOD_SUMMARY, summaryText } from './explain';
 import { parseIntent } from './intent';
 import { rankAndExplain } from './rank';
-import { validate, type ValidationIssue } from './validate';
+import { checkSummary, validate, type ValidationIssue } from './validate';
 
 export type PlanInput = {
   text: string;
@@ -23,12 +23,27 @@ export type PlanInput = {
 
 export type PlanTimings = { contextMs: number; parseMs: number; candidatesMs: number; rankMs: number; validateMs: number; totalMs: number };
 
+/**
+ * Who produced this plan. UI rule: show the "✨ Muse" label only when source is "muse".
+ * - "muse": live mode, and every model step that ran answered (parse, and rank when called).
+ * - "fallback": live mode, but parse or rank failed or timed out and code answered.
+ * - "mock": MUSE_MOCK=1 or no key; summaries also start with "[mock] ".
+ */
+export type PlanSource = 'muse' | 'fallback' | 'mock';
+
 export type PlanMeta = {
+  source: PlanSource;
+  /** "muse" when the summary text is the model's, "code" when code wrote or replaced it. */
+  summarySource: 'muse' | 'code';
   mode: 'mock' | 'live';
   understood: boolean;
   models: { parse: string; rank: string };
   rankFallback: boolean;
   rankError: string | null;
+  parseError: string | null;
+  /** Why the model's summary was replaced, if it was. */
+  summaryIssue: string | null;
+  budgetMs: number;
   candidateCount: number;
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
@@ -38,6 +53,18 @@ export type PlanMeta = {
 export type PlanOutput = { plan: MusePlan; meta: PlanMeta };
 
 const MOCK_PREFIX = '[mock] ';
+
+/** Whole-pipeline budget; MUSE_PLAN_BUDGET_MS overrides it. */
+export const PLAN_BUDGET_MS = 9_000;
+/** Parse cap: the measured Ember call took 1.2 s (docs/muse-api.md). */
+export const PARSE_BUDGET_MS = 3_000;
+/** Rank gets the time left, capped here. */
+export const RANK_BUDGET_MS = 6_000;
+
+function planBudget(): number {
+  const v = Number(process.env.MUSE_PLAN_BUDGET_MS);
+  return Number.isFinite(v) && v > 0 ? v : PLAN_BUDGET_MS;
+}
 
 export async function plan(input: PlanInput): Promise<PlanOutput> {
   const t0 = Date.now();
@@ -49,17 +76,27 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     now,
   });
   const t1 = Date.now();
+  const budgetMs = planBudget();
+  const deadline = t0 + budgetMs;
 
-  const parsed = await parseIntent(input.text, now, ctx.viewer);
+  const parsed = await parseIntent(input.text, now, ctx.viewer, {
+    deadline: Math.min(deadline, Date.now() + PARSE_BUDGET_MS),
+  });
+  const parseFellBack = !mock && parsed.model === 'heuristic';
   const t2 = Date.now();
   const label = (s: string) => (mock ? `${MOCK_PREFIX}${s}` : s);
 
   const base = (rest: Partial<PlanMeta>, t: Partial<PlanTimings>): PlanMeta => ({
+    source: mock ? 'mock' : parseFellBack || rest.rankFallback ? 'fallback' : 'muse',
+    summarySource: 'code',
     mode: mock ? 'mock' : 'live',
     understood: parsed.understood,
     models: { parse: parsed.model, rank: 'none' },
     rankFallback: false,
     rankError: null,
+    parseError: parsed.error,
+    summaryIssue: null,
+    budgetMs,
     candidateCount: 0,
     dropped: [],
     issues: [],
@@ -91,18 +128,31 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     };
   }
 
-  const ranked = await rankAndExplain(parsed.intent, result, { viewer: ctx.viewer, now, text: input.text });
+  const ranked = await rankAndExplain(parsed.intent, result, {
+    viewer: ctx.viewer, now, text: input.text,
+    deadline: Math.min(deadline, Date.now() + RANK_BUDGET_MS),
+    // parse already failed, so Muse is likely down or slow: do not wait on it a second time
+    skipModel: parseFellBack ? `skipped: parse fell back (${parsed.error ?? 'unknown'})` : undefined,
+  });
   const t4 = Date.now();
   const checked = validate(ranked.suggestions, result.candidates, ctx);
   const t5 = Date.now();
 
-  const summary = checked.suggestions.length > 0
-    ? ranked.summary
-    : summaryText([], parsed.intent, result.friendsFree.map((f) => f.firstName));
+  const friendsFreeNames = result.friendsFree.map((f) => f.firstName);
+  const droppedPick = checked.issues.some((i) => !i.issue.startsWith('dropped friend id'));
+  const modelSummary = ranked.model === 'heuristic' || mock ? null : ranked.summary;
+  const sum = droppedPick && modelSummary !== null
+    ? { summary: summaryText(checked.suggestions, parsed.intent, friendsFreeNames), source: 'code' as const, issue: 'validate dropped a pick' }
+    : modelSummary === null
+      ? { summary: checked.suggestions.length > 0 ? ranked.summary : summaryText([], parsed.intent, friendsFreeNames), source: 'code' as const, issue: null }
+      : checkSummary(modelSummary, checked.suggestions, { ...ctx, text: input.text, budgetMax: parsed.intent.budgetMax },
+        () => summaryText(checked.suggestions, parsed.intent, friendsFreeNames));
   return {
-    plan: { intent: parsed.intent, suggestions: checked.suggestions, summary: label(summary) },
+    plan: { intent: parsed.intent, suggestions: checked.suggestions, summary: label(sum.summary) },
     meta: base(
       {
+        summarySource: sum.source,
+        summaryIssue: sum.issue,
         models: { parse: parsed.model, rank: ranked.model },
         rankFallback: ranked.fallback,
         rankError: ranked.error,

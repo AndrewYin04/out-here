@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { formatDemoTime, type MuseIntent, type PlanSuggestion } from '../../shared';
 import type { CandidateResult, PlanCandidate } from './candidates';
-import { isMockMode, museJSON } from './client';
+import { isMockMode, museJSON, reportFallback } from './client';
 import { firstName, type PlanContext } from './context';
 import {
   heuristicSuggestion, priceText, rankHeuristic, summaryText, windowText,
@@ -152,7 +152,15 @@ export function picksToSuggestions(out: RankOutput, maps: IdMaps): PlanSuggestio
 export async function rankAndExplain(
   intent: MuseIntent,
   result: CandidateResult,
-  ctx: Pick<PlanContext, 'viewer' | 'now'> & { text: string; route?: string },
+  ctx: Pick<PlanContext, 'viewer' | 'now'> & {
+    text: string;
+    route?: string;
+    /** Absolute deadline (epoch ms) for the model call. */
+    deadline?: number;
+    timeoutMs?: number;
+    /** Live mode only: answer with the heuristic without calling the model, and say why. */
+    skipModel?: string;
+  },
 ): Promise<RankResult> {
   const started = Date.now();
   const ranked = rankHeuristic(result.candidates, intent, ctx.now);
@@ -168,10 +176,16 @@ export async function rankAndExplain(
       latencyMs: Date.now() - started, fallback: !mock, error: null,
     };
   };
+  const route = ctx.route ?? 'muse/plan';
+  const fallBack = (error: string): RankResult => {
+    reportFallback({ route, step: 'plan', error, userId: ctx.viewer.id });
+    return { ...heuristic(), error };
+  };
   if (shortlist.length === 0) {
     const r = heuristic();
     return { ...r, fallback: false, model: mock ? 'mock' : 'none' };
   }
+  if (!mock && ctx.skipModel) return fallBack(ctx.skipModel);
 
   try {
     const res = await museJSON({
@@ -191,19 +205,21 @@ export async function rankAndExplain(
       model: 'smart',
       effort: 'minimal',
       mock: () => heuristicOutput(shortlist, intent, maps, friendsFreeNames),
-      route: ctx.route ?? 'muse/plan',
+      route,
       userId: ctx.viewer.id,
+      deadline: ctx.deadline,
+      timeoutMs: ctx.timeoutMs,
     });
     const suggestions = picksToSuggestions(res.data, maps);
     if (suggestions.length === 0) {
-      return { ...heuristic(), error: 'model returned no valid candidate ids' };
+      return fallBack('model returned no valid candidate ids');
     }
     return {
       suggestions, summary: res.data.summary.trim(), model: res.model,
       latencyMs: Date.now() - started, fallback: false, error: null,
     };
   } catch (err) {
-    return { ...heuristic(), error: String((err as Error)?.message ?? err).slice(0, 200) };
+    return fallBack(String((err as Error)?.message ?? err).slice(0, 200));
   }
 }
 

@@ -3,7 +3,7 @@
 // RawIntent with regexes, so both paths share resolveWindow.
 import { z } from 'zod';
 import type { MuseIntent, Profile } from '../../shared';
-import { museJSON } from './client';
+import { museJSON, reportFallback } from './client';
 import { parsePrompt } from './prompts/parse';
 import { localLabel, resolveWindow, type TimeExpression } from './time';
 
@@ -18,13 +18,17 @@ export const RawIntentZ = z.object({
   startsInMinutes: z.number().min(0).nullable(),
   startClock: clockZ,
   endClock: clockZ,
-  partOfDay: z.enum(PARTS).nullable(),
+  // Free string on the wire (no enum in the strict schema); unknown values read as null.
+  partOfDay: z.string().nullable().transform((v): (typeof PARTS)[number] | null => {
+    const t = v?.trim().toLowerCase() ?? '';
+    return (PARTS as readonly string[]).includes(t) ? (t as (typeof PARTS)[number]) : null;
+  }),
   maxWalkMinutes: z.number().min(0).nullable(),
   wantsFriends: z.boolean(),
   openToNewPeople: z.boolean(),
   vibe: z.string().nullable(),
 });
-export type RawIntent = z.infer<typeof RawIntentZ>;
+export type RawIntent = z.output<typeof RawIntentZ>;
 
 const num = { type: ['number', 'null'] };
 const str = { type: ['string', 'null'] };
@@ -39,7 +43,8 @@ export const RAW_INTENT_JSON_SCHEMA: Record<string, unknown> = {
     startsInMinutes: num,
     startClock: str,
     endClock: str,
-    partOfDay: { type: ['string', 'null'], enum: [...PARTS, null] },
+    // No enum here: enum-with-null under strict mode is unverified on Muse (docs/muse-api.md).
+    partOfDay: str,
     maxWalkMinutes: num,
     wantsFriends: { type: 'boolean' },
     openToNewPeople: { type: 'boolean' },
@@ -51,7 +56,15 @@ export const RAW_INTENT_JSON_SCHEMA: Record<string, unknown> = {
   ],
 };
 
-export type ParsedIntent = { intent: MuseIntent; understood: boolean; model: string; latencyMs: number };
+export type ParsedIntent = {
+  intent: MuseIntent;
+  understood: boolean;
+  /** Model id, "mock", or "heuristic" when the live call failed and code parsed the text. */
+  model: string;
+  latencyMs: number;
+  /** Why the live call failed (only when model is "heuristic"). */
+  error: string | null;
+};
 
 /** RawIntent -> MuseIntent with the window resolved against `now`. */
 export function toMuseIntent(raw: RawIntent, now: Date): MuseIntent {
@@ -80,24 +93,27 @@ export async function parseIntent(
   text: string,
   now: Date,
   viewer: Pick<Profile, 'id' | 'interests'> | null,
-  opts: { route?: string } = {},
+  opts: { route?: string; deadline?: number; timeoutMs?: number } = {},
 ): Promise<ParsedIntent> {
   const started = Date.now();
   let res: { data: RawIntent; model: string; latencyMs: number };
+  let error: string | null = null;
   try {
     res = await callParse(text, now, viewer, opts);
-  } catch {
-    // live model failed twice: the heuristic parse keeps the plan working
+  } catch (err) {
+    // live model failed: the heuristic parse keeps the plan working, and the fallback is reported
+    error = String((err as Error)?.message ?? err).slice(0, 200);
+    reportFallback({ route: opts.route ?? 'muse/plan', step: 'intent', error, userId: viewer?.id ?? null });
     res = { data: mockParse(text, now), model: 'heuristic', latencyMs: Date.now() - started };
   }
-  return { intent: toMuseIntent(res.data, now), understood: res.data.understood, model: res.model, latencyMs: res.latencyMs };
+  return { intent: toMuseIntent(res.data, now), understood: res.data.understood, model: res.model, latencyMs: res.latencyMs, error };
 }
 
 function callParse(
   text: string,
   now: Date,
   viewer: Pick<Profile, 'id' | 'interests'> | null,
-  opts: { route?: string },
+  opts: { route?: string; deadline?: number; timeoutMs?: number },
 ) {
   return museJSON({
     schemaName: 'intent',
@@ -109,6 +125,8 @@ function callParse(
     mock: () => mockParse(text, now),
     route: opts.route ?? 'muse/plan',
     userId: viewer?.id ?? null,
+    deadline: opts.deadline,
+    timeoutMs: opts.timeoutMs,
   });
 }
 

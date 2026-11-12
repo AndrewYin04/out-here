@@ -4,6 +4,8 @@
 //   npm run eval:muse:plan -- --only demo-hungry-40
 //   node --import tsx scripts/eval-muse.mjs --allow-mock   wiring check without a key
 // Dev responses are cached in .cache/muse by input hash; pass --fresh to skip the cache.
+// In live mode a case also FAILS when any step fell back to code (meta.source "fallback",
+// models.parse or models.rank "heuristic"): a silent fallback must never count as a pass.
 // Writes .verify/eval-muse-plan.json (gitignored). Never prints keys or prompts.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -30,6 +32,7 @@ if (!allowMock) {
 const { plan, isMockMode } = await import('../src/features/muse/index.ts');
 const { checkPlanFixture, planFixtures, questKey } = await import('../src/features/muse/fixtures/check.ts');
 
+const live = !isMockMode();
 const now = new Date(planFixtures.now);
 const cases = planFixtures.cases.filter((c) => !only || c.id === only);
 if (cases.length === 0) {
@@ -46,6 +49,12 @@ for (const f of cases) {
   try {
     out = await plan({ text: f.text, userId: f.viewer, now });
     failures = checkPlanFixture(f, out, now);
+    if (live) {
+      const m = out.meta;
+      if (m.source !== 'muse') failures.push(`source is ${m.source}, expected muse`);
+      if (m.models.parse === 'heuristic') failures.push(`parse fell back: ${m.parseError ?? 'unknown'}`);
+      if (m.models.rank === 'heuristic' || m.rankFallback) failures.push(`rank fell back: ${m.rankError ?? 'unknown'}`);
+    }
   } catch (err) {
     failures = [`threw: ${String(err?.message ?? err).slice(0, 160)}`];
   }
@@ -53,14 +62,16 @@ for (const f of cases) {
   const picks = out ? out.plan.suggestions.map((s) => questKey(s.questId) ?? '?').join(', ') || '(none)' : '(error)';
   const t = out?.meta.timings;
   const timing = t ? `parse ${t.parseMs}ms rank ${t.rankMs}ms total ${t.totalMs}ms` : `${ms}ms`;
-  const flags = out ? [out.meta.models.parse, out.meta.models.rank, out.meta.rankFallback ? 'FALLBACK' : null].filter(Boolean).join(' / ') : '';
+  const flags = out ? [out.meta.source, out.meta.models.parse, out.meta.models.rank, `summary:${out.meta.summarySource}`, out.meta.summaryIssue].filter(Boolean).join(' / ') : '';
   console.log(`${failures.length ? 'FAIL' : 'PASS'}  ${f.id.padEnd(26)} ${timing.padEnd(40)} -> ${picks}  [${flags}]`);
   for (const x of failures) console.log(`        - ${x}`);
   if (out && failures.length) console.log(`        summary: ${out.plan.summary.slice(0, 160)}`);
   results.push({
     id: f.id, text: f.text, pass: failures.length === 0, failures, picks,
     timings: t ?? null, models: out?.meta.models ?? null, rankFallback: out?.meta.rankFallback ?? null,
-    rankError: out?.meta.rankError ?? null, summary: out?.plan.summary ?? null,
+    rankError: out?.meta.rankError ?? null, parseError: out?.meta.parseError ?? null,
+    source: out?.meta.source ?? null, summarySource: out?.meta.summarySource ?? null,
+    summaryIssue: out?.meta.summaryIssue ?? null, summary: out?.plan.summary ?? null,
   });
 }
 

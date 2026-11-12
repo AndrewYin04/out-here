@@ -44,7 +44,13 @@ export type MuseJSONOptions<T> = {
   mock: () => T;
   route?: string;
   userId?: string | null;
+  /** Per-attempt cap (default MUSE_TIMEOUT_MS). */
   timeoutMs?: number;
+  /**
+   * Absolute deadline (epoch ms) for the whole call, retries included. Each attempt gets
+   * min(timeoutMs, time left); no attempt starts with less than MIN_ATTEMPT_MS left.
+   */
+  deadline?: number;
 };
 
 /** Raw chat call, replaceable in tests. Returns the message text and usage. */
@@ -55,6 +61,8 @@ export type MuseTransport = (req: {
   jsonSchema: Record<string, unknown>;
   effort: MuseEffort;
   timeoutMs: number;
+  /** Aborted when the attempt times out; transports should pass it to fetch. */
+  signal: AbortSignal;
 }) => Promise<{ content: string | null; usage: MuseUsage }>;
 
 export class MuseError extends Error {
@@ -65,6 +73,16 @@ export class MuseError extends Error {
 }
 
 export const MUSE_TIMEOUT_MS = 12_000;
+/** An attempt is not started with less time than this left before the deadline. */
+export const MIN_ATTEMPT_MS = 400;
+
+/** Thrown when an attempt runs out of time. Not retried: the deadline is shared. */
+export class MuseTimeoutError extends MuseError {
+  constructor(ms: number) {
+    super(`Muse timed out after ${ms} ms`);
+    this.name = 'MuseTimeoutError';
+  }
+}
 
 // ---------- mode and models ----------
 
@@ -103,6 +121,38 @@ function emit(run: MuseRunRecord): void {
   }
 }
 
+/**
+ * Records that a pipeline step answered with code instead of Muse while in live mode.
+ * Goes through the same onRun logger (model "heuristic", ok false) and always prints one
+ * console.warn line, so a demo running on fallbacks is visible in the server log.
+ */
+export function reportFallback(info: { route: string; step: string; error: string | null; userId?: string | null }): void {
+  const error = `fallback(${info.step}): ${info.error ?? 'unknown'}`.slice(0, 240);
+  if (process.env.MUSE_QUIET !== '1') console.warn(`[muse] FALLBACK ${info.route} ${info.step}: ${info.error ?? 'unknown'}`);
+  emit({
+    route: info.route, schemaName: info.step, model: 'heuristic', userId: info.userId ?? null, latencyMs: 0,
+    inputHash: '', output: null, promptTokens: null, completionTokens: null, ok: false, error,
+    mock: false, cached: false, createdAt: new Date().toISOString(),
+  });
+}
+
+/** Runs one transport attempt with a hard timer, so a transport that ignores the timeout cannot hang the plan. */
+async function attemptWithTimeout<T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const ctrl = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => { ctrl.abort(); reject(new MuseTimeoutError(ms)); }, ms);
+  });
+  try {
+    return await Promise.race([run(ctrl.signal), timeout]);
+  } catch (err) {
+    if (ctrl.signal.aborted) throw new MuseTimeoutError(ms);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ---------- transport ----------
 
 let client: OpenAI | null = null;
@@ -127,7 +177,7 @@ const openAITransport: MuseTransport = async (req) => {
         json_schema: { name: req.schemaName, strict: true, schema: req.jsonSchema },
       },
     },
-    { timeout: req.timeoutMs },
+    { timeout: req.timeoutMs, signal: req.signal },
   );
   return {
     content: res.choices[0]?.message?.content ?? null,
@@ -247,14 +297,19 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
       let reply = attempt === 0 ? await cacheRead(inputHash) : null;
       cached = reply !== null;
       if (!reply) {
-        const res = await transport({
+        const cap = opts.timeoutMs ?? MUSE_TIMEOUT_MS;
+        const left = opts.deadline === undefined ? cap : opts.deadline - Date.now();
+        if (left < MIN_ATTEMPT_MS) throw new MuseTimeoutError(Math.max(0, Date.now() - started));
+        const timeoutMs = Math.min(cap, left);
+        const res = await attemptWithTimeout(timeoutMs, (signal) => transport({
           model,
           messages: opts.messages,
           schemaName: opts.schemaName,
           jsonSchema: opts.jsonSchema,
           effort,
-          timeoutMs: opts.timeoutMs ?? MUSE_TIMEOUT_MS,
-        });
+          timeoutMs,
+          signal,
+        }));
         if (!res.content) throw new MuseError('empty reply');
         reply = { content: res.content, usage: res.usage };
       }
@@ -269,15 +324,19 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     } catch (err) {
       lastError = err;
       const status = statusOf(err);
-      const retryable =
+      const retryable = !(err instanceof MuseTimeoutError) && (
         err instanceof MuseError || err instanceof SyntaxError || status === 429 || status === 504 ||
-        (err as Error)?.message === 'reply is not JSON';
+        (err as Error)?.message === 'reply is not JSON');
       if (!retryable || attempt === 1) break;
-      if (status === 429 || status === 504) await sleep(800);
+      if (status === 429 || status === 504) {
+        if (opts.deadline !== undefined && opts.deadline - Date.now() < 800 + MIN_ATTEMPT_MS) break;
+        await sleep(800);
+      }
     }
   }
   const latencyMs = Date.now() - started;
   const error = safeError(lastError);
   emit({ ...base, latencyMs, output: null, ...usage, ok: false, error, cached, createdAt: new Date().toISOString() });
+  if (lastError instanceof MuseTimeoutError) throw lastError;
   throw new MuseError(error, statusOf(lastError));
 }

@@ -23,6 +23,10 @@ test.describe("POST /api/muse/plan", () => {
     expect(titles).not.toContain("Ramen run");
     expect(titles).not.toContain("Conveyor sushi lunch");
     if (body.meta.mode === "mock") expect(body.summary.startsWith("[mock] ")).toBe(true);
+    // the UI shows the Muse label only when source is "muse"
+    expect(["muse", "fallback", "mock"]).toContain(body.meta.source);
+    expect(res.headers()["x-muse-source"]).toBe(body.meta.source);
+    if (body.meta.mode === "mock") expect(body.meta.source).toBe("mock");
   });
 
   test("nonsense input returns an empty plan, not an error", async ({ request }) => {

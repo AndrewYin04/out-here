@@ -6,6 +6,8 @@ import { UnknownUserError, plan } from '@/features/muse';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// The pipeline caps itself at PLAN_BUDGET_MS (9 s); this is the platform ceiling above it.
+export const maxDuration = 20;
 
 const BodyZ = z.object({
   userId: z.string().min(1).max(64).optional(),
@@ -37,7 +39,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json(
       { ...out.plan, meta: out.meta },
-      { headers: { 'x-muse-total-ms': String(out.meta.timings.totalMs), 'x-muse-mode': out.meta.mode } },
+      { headers: { 'x-muse-total-ms': String(out.meta.timings.totalMs), 'x-muse-mode': out.meta.mode, 'x-muse-source': out.meta.source } },
     );
   } catch (err) {
     if (err instanceof UnknownUserError) return NextResponse.json({ error: err.message }, { status: 404 });
