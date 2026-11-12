@@ -41,22 +41,29 @@ Two devices or two browser windows (each tab is its own persona): window A `…/
 4. **2:45-3:30, live.** On B (Maya), the invite appears at once. Accept. Both maps flip the pin to **Full**; Alex's card says "Maya's in… leave by … for the 9 min walk".
 5. **3:30-5:00, why AI, why Facebook, safety.** Muse parses messy intent, matches against friends' real free time and bubbles, checks walking time, budget and seats in code, and only then explains; it cannot invent plans (it ranks only real candidates). Facebook already has the friends, Groups and Events; Out Here connects them in the moment. Safety: location sharing is opt-in by audience with approximate mode and pause; plans are at public venues; the browser never reads the database directly.
 
+## Track 4 — Your Plans and Memories
+
+The `feat/your-plans-memories` branch extends the overnight MVP. The preview above still points to the overnight deploy.
+
+- **Your plans** opens **Events → Going** at `/events?tab=going`. It lists the active persona's joined hangouts, attendees, meetup time and place, and estimated departure time from the demo origin. The list refreshes when an RSVP changes or a hangout is completed.
+- **Walking view handoff.** `GET /api/quests/mine` returns `{ plans: YourPlan[] }` with each joined quest's ID, member-visible destination, people, and estimated walk time. The walking team can change **Walk there** in `src/features/memories/YourPlans.tsx` to its first-person route for that quest ID. Today it opens walking directions in Google Maps.
+- **Capture.** Any attendee can tap **We’re done** once the hangout starts. Attendees then have **Add a photo** on the past plan. Select or take a photo, optionally ask Muse for a caption based on the meetup details, and save it to the crew album. **Get this group together again** remains in the album. Repeated completion reuses the same crew.
+- **Deploy setup.** Run `node scripts/db-migrate.mjs dev` against the development database before testing hosted capture. Use the `demo` target when preparing the shared demo database. Migration `0003_crew_photos.sql` provisions the private `crew-photos` bucket. New uploads are served through a crew-membership check. Use fictional photos and personas on the shared hackathon preview, since the persona switcher is demo identity.
+- **Rehearse.** Use Alex and Maya in separate sessions. Join the same plan and open **Your plans** on both. Use a started or ended fixture for capture. Have Maya complete and upload, and open the crew album as Alex. The future dumpling meetup stays in **Upcoming** until it starts. `tests/e2e/your-plans.spec.ts` creates its own started hangout and exercises this flow with mock Muse and a synthetic photo.
+
 ## Not done (team daytime list, in priority order)
 
 **New ideas from Andrew (Thu morning), not started:**
 - **"Click": agents that vet a match for you.** Like Boardy, but each person's own Muse agent represents them, and two agents talk to each other first about whether their people would be a good fit (interests, goals, what each is looking for, timing, dealbreakers). Only when both agents agree is an intro proposed to the two humans, who then each accept (double opt-in). The agent-to-agent conversation is the visible AI work: show a short "why your agents think you'd click" summary, and keep the transcript private to each side. Builds on the Muse Intros spec in MVP-BUILD-PLAN-itr-1.md (reach, trust path, score threshold, frequency cap).
 - **First-person "Pokémon Go" map view.** A character avatar for the viewer standing on the map, in a tilted 3D street-level view, that walks toward plans shown as landmark "stadiums" (quest venues as visible 3D markers you can see from a distance, with seat counts). Tapping a stadium opens the quest; walking (or tapping a direction) moves the avatar along the route, with the walk minutes counting down. Extends the planned 3D walking view (MapLibre pitch ~60 plus fill-extrusion buildings); never uses real GPS without consent, and the demo moves the avatar along a simulated route.
 
-**Gap found in the morning review:** there is no single place to see the plans you joined. Today you see it per plan (the quest panel says "You're going") or through notifications. Add a **"Your plans"** list: a button on the Out Here map and the Going tab on `/events`, listing every plan the viewer joined (time, place, who is going, Leave). About one builder slice.
-
 From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan:
 1. **Demo reset button** (review B1): `resetStory(now)` + `POST /api/demo/reset` so the stage reset does not need the laptop.
 2. **Production**: in Vercel, turn off Deployment Protection (or share the link), then promote the verified preview to Production and give judges the production URL. Previews and Production both read the demo database right now (review D11 suggests previews read dev).
 3. **Muse Intros** (Boardy-style warm intros; full spec in the plan, "Muse Intros"; review B3 fixes the Alex-Jordan story).
 4. **Messenger.** `/messages` is still the shell's loading skeleton, while the top-bar Messenger icon shows a red unread badge (7), so clicking it looks broken to a judge. The data and routes exist (20 seeded threads, `/api/threads`, `/api/threads/[id]/messages` list and send, `thread:<id>` realtime); only the screen is missing: inbox (avatar, name, last message, time, unread dot), open a chat, send with live delivery to the other persona's tab, docked chat windows from Contacts, and Out Here invites shown as messages with Accept/Decline. About one builder slice. Until then, consider hiding the badge or showing a "coming soon" state.
-5. Memories capture ("We're done" → photo prompt → album; review B7: any member can complete). The /memories page and Muse regroup exist; capturing a new photo after a live hangout does not.
-6. 3D walking view, Events detail, Search, Marketplace, Reels, Daily Quest, streaks, Wrapped (cut first).
-7. `docs/POLISH.md`: 59 minor UI findings from the review agents.
+5. 3D walking view, Events detail, Search, Marketplace, Reels, Daily Quest, streaks, Wrapped (cut first).
+6. `docs/POLISH.md`: 59 minor UI findings from the review agents.
 
 ## Known issues
 

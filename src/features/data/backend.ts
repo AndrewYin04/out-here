@@ -21,8 +21,9 @@ export interface Backend {
   joinQuest(questId: ID, userId: ID, withFriendId: ID | null): Promise<number>;
   /** leave_quest semantics: reopens a full quest; no-op for non-members. Returns seats left. */
   leaveQuest(questId: ID, userId: ID): Promise<number>;
-  /** Stores a file and returns a URL the browser can load. */
-  uploadFile(bucket: 'uploads' | 'memories', path: string, bytes: Uint8Array, contentType: string): Promise<string>;
+  /** Stores a file. Public buckets return a browser URL; private photos return their key. */
+  uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string>;
+  downloadCrewPhoto(id: ID): Promise<Blob>;
 }
 
 export function rowMatches(row: Record<string, unknown>, match: Record<string, unknown>): boolean {
