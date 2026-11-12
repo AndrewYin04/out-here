@@ -1,29 +1,60 @@
 'use client';
 // A friend's Find My card: name, place, distance and walking time, the 3-part status bubble,
-// and View profile / Message / Want to hang?.
-import { MapPin, MessageCircle, Send, UserRound, Hand } from 'lucide-react';
+// and Want to hang?. The hang composer shows what the invite proposes (a quest or place picked
+// from the friend's bubble, free window and walking time) before it is sent.
+import { Clock, Footprints, Hand, MapPin, MessageCircle, Send, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { apiPost } from '@/features/data';
-import { Avatar, Button, LinkButton, Sheet, useToast } from '@/features/ui';
+import { apiFetch, apiPost } from '@/features/data';
+import type { HangSuggestion } from '@/features/data/locations';
+import { Avatar, Button, LinkButton, Sheet, Skeleton, useToast } from '@/features/ui';
 import { formatDemoTime } from '@/shared/demo';
 import type { FriendPin } from '@/shared/types';
-import { distanceLine, firstName, updatedAgo } from './useFindMy';
+import { distanceLine, firstName, floatingPanel, updatedAgo } from './useFindMy';
 
 export type FriendCardProps = { pin: FriendPin | null; onClose: () => void };
+
+/**
+ * View profile and Message land on /profile/<handle> and /messages?to=<handle>. Both pages are
+ * loading skeletons on this base, so the buttons stay hidden until those slices are merged.
+ * The integrator flips this to true then.
+ */
+export const CARD_LINKS_READY = false;
 
 export function FriendCard({ pin, onClose }: FriendCardProps) {
   const toast = useToast();
   const [composing, setComposing] = useState(false);
   const [message, setMessage] = useState('');
+  const [edited, setEdited] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<HangSuggestion | null | undefined>(undefined);
   const friendId = pin?.friend.id ?? null;
 
   useEffect(() => {
     setComposing(false);
     setError(null);
-    setMessage(pin ? `Want to hang? I'm nearby for a bit.` : '');
-  }, [friendId]); // eslint-disable-line react-hooks/exhaustive-deps
+    setEdited(false);
+    setSuggestion(undefined);
+    setMessage('');
+  }, [friendId]);
+
+  // Fetch what the invite would propose when the composer opens.
+  useEffect(() => {
+    if (!composing || !friendId) return;
+    let live = true;
+    apiFetch<{ suggestion: HangSuggestion | null }>(`/api/locations/hang?toId=${encodeURIComponent(friendId)}`)
+      .then((r) => {
+        if (!live) return;
+        setSuggestion(r.suggestion);
+        setMessage((m) => (edited && m ? m : r.suggestion?.draft ?? 'Want to hang? I\'m nearby for a bit.'));
+      })
+      .catch(() => {
+        if (!live) return;
+        setSuggestion(null);
+        setMessage((m) => m || 'Want to hang? I\'m nearby for a bit.');
+      });
+    return () => { live = false; };
+  }, [composing, friendId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!pin) return null;
   const f = pin.friend;
@@ -34,7 +65,12 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
     setSending(true);
     setError(null);
     try {
-      const res = await apiPost<{ suggestion: string }>('/api/locations/hang', { toId: pin.friend.id, message });
+      const res = await apiPost<{ suggestion: string }>('/api/locations/hang', {
+        toId: pin.friend.id,
+        message,
+        questId: suggestion?.questId ?? null,
+        placeId: suggestion?.placeId ?? null,
+      });
       toast.show(`Invite sent to ${name}: ${res.suggestion}`);
       setComposing(false);
       onClose();
@@ -47,7 +83,7 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
 
   const b = pin.bubble;
   return (
-    <Sheet open onClose={onClose} title={f.name}>
+    <Sheet open onClose={onClose} title={f.name} className={floatingPanel('right')}>
       <div data-testid="friend-card" className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <span className="rounded-full p-[3px] ring-[3px] ring-fb-green">
@@ -68,8 +104,8 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
         {(b.thought || b.doing || b.wantsTo) && (
           <div className="rounded-card bg-fb-bg px-3 py-2.5" data-testid="friend-bubble">
             {b.thought && (
-              <p className="text-[17px] font-semibold leading-[22px] text-fb-text">
-                {b.emoji ? `${b.emoji} ` : ''}{b.thought}
+              <p className="flex items-center gap-1.5 text-[17px] font-semibold leading-[22px] text-fb-text">
+                {b.emoji && <span className="text-[20px] leading-none" aria-hidden>{b.emoji}</span>}{b.thought}
               </p>
             )}
             {b.doing && <p className="mt-1 text-[15px] text-fb-text"><span className="text-fb-text-2">Right now: </span>{b.doing}</p>}
@@ -83,36 +119,71 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
           </p>
         )}
 
-        <div className="flex flex-col gap-2">
-          <Button variant="primary" block icon={<Hand size={16} aria-hidden />} onClick={() => setComposing(true)} aria-expanded={composing}>
-            Want to hang?
-          </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <LinkButton href={`/profile/${f.handle}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
-              View profile
-            </LinkButton>
-            <LinkButton href={`/messages?to=${f.handle}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
-              Message
-            </LinkButton>
+        {!composing && (
+          <div className="flex flex-col gap-2">
+            <Button variant="primary" block icon={<Hand size={16} aria-hidden />} onClick={() => setComposing(true)} aria-expanded={composing}>
+              Want to hang?
+            </Button>
+            {CARD_LINKS_READY && (
+              <div className="grid grid-cols-2 gap-2">
+                <LinkButton href={`/profile/${f.handle}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
+                  View profile
+                </LinkButton>
+                <LinkButton href={`/messages?to=${f.handle}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
+                  Message
+                </LinkButton>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {composing && (
-          <div className="flex flex-col gap-2" data-testid="hang-composer">
-            <label htmlFor="hang-message" className="text-[15px] font-semibold">Want to hang with {name}?</label>
+          <div className="flex flex-col gap-3" data-testid="hang-composer">
+            <h3 className="text-[17px] font-semibold">Want to hang with {name}?</h3>
+            {suggestion === undefined && (
+              <div className="flex items-center gap-3 rounded-card border border-fb-divider-soft p-3" aria-label="Finding a plan">
+                <Skeleton shape="circle" width={40} height={40} />
+                <div className="flex-1 space-y-2"><Skeleton width="70%" /><Skeleton width="50%" className="h-2.5" /></div>
+              </div>
+            )}
+            {suggestion && (
+              <div className="flex gap-3 rounded-card border border-fb-divider-soft p-3" data-testid="hang-suggestion">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px] leading-none" aria-hidden>
+                  {suggestion.emoji}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold leading-5 text-fb-text">{suggestion.title}</p>
+                  {suggestion.kind === 'quest' && <p className="text-[13px] text-fb-text-2">{suggestion.venueName}</p>}
+                  <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-fb-text-2">
+                    {suggestion.startsAt && (
+                      <span className="inline-flex items-center gap-1"><Clock size={13} aria-hidden />{formatDemoTime(suggestion.startsAt)}</span>
+                    )}
+                    <span className="inline-flex items-center gap-1"><Footprints size={13} aria-hidden />{suggestion.walkMinutes} min walk</span>
+                    {suggestion.seatsLeft !== null && (
+                      <span className="font-semibold text-fb-blue">{suggestion.seatsLeft} {suggestion.seatsLeft === 1 ? 'seat' : 'seats'} left</span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-[13px] text-fb-text" data-testid="hang-reason">{suggestion.reason.split(' · ')[0]}</p>
+                </div>
+              </div>
+            )}
+            <label htmlFor="hang-message" className="sr-only">Message to {name}</label>
             <textarea
               id="hang-message"
               value={message}
               maxLength={500}
-              rows={2}
-              onChange={(e) => setMessage(e.target.value)}
+              rows={3}
+              disabled={suggestion === undefined}
+              onChange={(e) => { setEdited(true); setMessage(e.target.value); }}
               className="w-full resize-none rounded-btn bg-fb-input px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-fb-blue"
             />
-            <p className="text-[13px] text-fb-text-2">The invite suggests an open quest or a place near {name}.</p>
             {error && <p role="alert" className="text-[13px] text-fb-red">{error}</p>}
-            <Button variant="primary" block disabled={sending} onClick={send} icon={<Send size={16} aria-hidden />}>
-              {sending ? 'Sending…' : 'Send invite'}
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" onClick={() => setComposing(false)}>Cancel</Button>
+              <Button variant="primary" disabled={sending || suggestion === undefined} onClick={send} icon={<Send size={16} aria-hidden />}>
+                {sending ? 'Sending…' : 'Send invite'}
+              </Button>
+            </div>
           </div>
         )}
       </div>

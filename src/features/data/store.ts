@@ -92,6 +92,7 @@ export interface DataStore {
   myLocation: CoreStore['myLocation'];
   updateMyLocation: CoreStore['updateMyLocation'];
   hangInvite: CoreStore['hangInvite'];
+  hangSuggestion: CoreStore['hangSuggestion'];
 }
 
 const g = globalThis as unknown as { __outhereSupabaseStore?: { key: string; store: DataStore } };

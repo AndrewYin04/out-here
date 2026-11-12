@@ -8,14 +8,12 @@ import { useViewer } from '@/features/data';
 import { Avatar, Button, EmptyState, Sheet, Skeleton } from '@/features/ui';
 import type { FriendPin } from '@/shared/types';
 import { SharingSheet, audienceLabel } from './SharingSheet';
-import { distanceLine, updatedAgo, useFriendPins, useMyShare } from './useFindMy';
+import { distanceLine, floatingPanel, panelPadding, updatedAgo, useFriendPins, useMyShare } from './useFindMy';
 
-export function flyToPin(map: MapLibreMap | null | undefined, pin: FriendPin) {
-  if (map) {
-    const zoom = pin.walkingMinutes === null ? 11 : pin.precision === 'approximate' ? 14 : 16;
-    map.flyTo({ center: [pin.location.lng, pin.location.lat], zoom, essential: true });
-  }
-  window.dispatchEvent(new CustomEvent('findmy:open', { detail: pin.friend.id }));
+/** Opens the friend's card; FriendsLayer flies the map to them, clear of the card. */
+export function flyToPin(_map: MapLibreMap | null | undefined, pin: FriendPin) {
+  const zoom = pin.walkingMinutes === null ? 11 : pin.precision === 'approximate' ? 14 : 16;
+  window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id: pin.friend.id, zoom } }));
 }
 
 export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: () => void; map?: MapLibreMap | null }) {
@@ -27,7 +25,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
   const share = mine?.share ?? null;
   return (
     <>
-      <Sheet open={open && !editing} onClose={onClose} title="People" side="left">
+      <Sheet open={open && !editing} onClose={() => { onClose(); map?.easeTo({ padding: panelPadding(null), duration: 300 }); }} title="People" side="left" className={floatingPanel('left')}>
         <div className="flex items-center gap-3 rounded-card py-2" data-testid="my-sharing-row">
           <Avatar src={viewer.avatarUrl} name={viewer.name} size={48} decorative />
           <div className="min-w-0 flex-1">
@@ -38,7 +36,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
                 : 'Not sharing your location'}
             </p>
             {share?.bubble.thought && (
-              <p className="truncate text-[13px] text-fb-text">{share.bubble.emoji ? `${share.bubble.emoji} ` : ''}{share.bubble.thought}</p>
+              <p className="truncate text-[13px] text-fb-text">{share.bubble.emoji && <span className="mr-1 text-[15px] leading-none" aria-hidden>{share.bubble.emoji}</span>}{share.bubble.thought}</p>
             )}
           </div>
           <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
@@ -70,7 +68,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{p.friend.name}</span>
                   {p.bubble.thought && (
-                    <span className="block truncate text-[13px] text-fb-text">{p.bubble.emoji ? `${p.bubble.emoji} ` : ''}{p.bubble.thought}</span>
+                    <span className="block truncate text-[13px] text-fb-text">{p.bubble.emoji && <span className="mr-1 text-[15px] leading-none" aria-hidden>{p.bubble.emoji}</span>}{p.bubble.thought}</span>
                   )}
                   <span className="block truncate text-[13px] text-fb-text-2">{p.placeLabel ?? 'Nearby'} · {updatedAgo(p.updatedAt)}</span>
                 </span>
@@ -94,7 +92,11 @@ export function PeopleButton({ map }: { map?: MapLibreMap | null }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          // keep pins clear of the desktop People panel
+          if (map && window.matchMedia('(min-width: 768px)').matches) map.easeTo({ padding: panelPadding('left'), duration: 300 });
+        }}
         className="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]"
       >
         <Users size={18} aria-hidden />

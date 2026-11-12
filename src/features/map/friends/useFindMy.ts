@@ -37,3 +37,20 @@ export function distanceLine(pin: Pick<FriendPin, 'distanceKm' | 'walkingMinutes
 }
 
 export const firstName = (name: string) => name.split(' ')[0] ?? name;
+
+/** Width of a desktop side panel (400 px) plus its 16 px inset. */
+export const PANEL_PX = 416;
+
+export const isDesktop = () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+
+/** Map padding that keeps pins clear of an open panel: a side column on desktop, the bottom sheet on mobile. */
+export function panelPadding(side: 'left' | 'right' | null): { top: number; bottom: number; left: number; right: number } {
+  const zero = { top: 0, bottom: 0, left: 0, right: 0 };
+  if (!side) return zero;
+  if (isDesktop()) return { ...zero, [side]: PANEL_PX };
+  return { ...zero, bottom: Math.round(window.innerHeight * 0.45) };
+}
+
+/** Desktop: a floating card 16 px in from the map edges with a 12 px radius, sized to its content. */
+export const floatingPanel = (side: 'left' | 'right') =>
+  `md:top-4! md:bottom-auto! md:max-h-[calc(100%-32px)]! md:rounded-[12px]! ${side === 'left' ? 'md:left-4!' : 'md:right-4!'}`;

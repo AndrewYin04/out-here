@@ -14,9 +14,9 @@ async function pinsFor(request: APIRequestContext, handle: string): Promise<Pin[
   return ((await res.json()) as { pins: Pin[] }).pins;
 }
 
-async function openMap(page: Page, handle: string, width: number) {
+async function openMap(page: Page, handle: string, width: number, path = '/out-here/friends') {
   await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
-  await page.goto(`/out-here/friends?as=${handle}`);
+  await page.goto(`${path}?as=${handle}`);
   await expect(page.getByTestId('findmy-map')).toBeVisible();
   await expect(page.locator('[data-testid="friend-pin"]').first()).toBeVisible({ timeout: 15_000 });
 }
@@ -55,7 +55,7 @@ for (const width of [390, 1440]) {
     test('friend pins, card, Want to hang?, and the People list', async ({ page }) => {
       await openMap(page, 'alex', width);
       const kai = page.locator('[data-testid="friend-pin"][data-handle="kai"]');
-      await expect(kai).toContainText('chalked up');
+      await expect(kai).toHaveAttribute('aria-label', /chalked up/);
       await expect(page.locator('[data-testid="friend-pin"][data-handle="jordan"]')).toHaveCount(0);
       await expect(page.getByTestId('my-pin')).toBeVisible();
       await page.screenshot({ path: `test-results/findmy-map-${width}.png` });
@@ -66,11 +66,12 @@ for (const width of [390, 1440]) {
       await expect(card).toContainText('Boulder Bay Gym');
       await expect(card).toContainText('min walk');
       await expect(card).toContainText('find a climbing buddy');
-      await expect(card.getByRole('link', { name: 'View profile' })).toHaveAttribute('href', '/profile/kai');
-      await expect(card.getByRole('link', { name: 'Message' })).toHaveAttribute('href', '/messages?to=kai');
+      // Profile and Messenger are skeletons on this base, so the card does not link to them yet
+      await expect(card.getByRole('link', { name: 'Message' })).toHaveCount(0);
       await page.screenshot({ path: `test-results/findmy-card-${width}.png` });
       await card.getByRole('button', { name: 'Want to hang?' }).click();
-      await page.getByLabel('Want to hang with Kai?').fill('Climb then food?');
+      await expect(page.getByTestId('hang-suggestion')).toBeVisible();
+      await page.getByLabel('Message to Kai').fill('Climb then food?');
       await page.getByRole('button', { name: 'Send invite' }).click();
       await expect(page.getByText(/Invite sent to Kai/)).toBeVisible();
       await expect(card).toHaveCount(0);
@@ -85,6 +86,47 @@ for (const width of [390, 1440]) {
       await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
       await expect(page.getByTestId('friend-card')).toContainText('New York, NY');
       await expect(page.getByTestId('friend-card')).toContainText('km away');
+    });
+
+    test('the Out Here tab opens the Friends map, and chips never overlap', async ({ page }) => {
+      await openMap(page, 'alex', width, '/out-here');
+      await page.waitForTimeout(1500);
+      const boxes = await page.locator('[data-testid="friend-chip"]').evaluateAll((els) =>
+        els.map((e) => (e.parentElement as HTMLElement).getBoundingClientRect()).map((r) => ({ x0: r.left, y0: r.top, x1: r.right, y1: r.bottom })));
+      const me = await page.getByTestId('my-pin').boundingBox();
+      for (let i = 0; i < boxes.length; i++) {
+        const a = boxes[i];
+        expect(a.x0).toBeGreaterThanOrEqual(0);
+        expect(a.x1).toBeLessThanOrEqual(width);
+        if (me) expect(a.x0 < me.x + me.width && me.x < a.x1 && a.y0 < me.y + me.height && me.y < a.y1).toBe(false);
+        for (let j = i + 1; j < boxes.length; j++) {
+          const b = boxes[j];
+          expect(a.x0 < b.x1 - 1 && b.x0 < a.x1 - 1 && a.y0 < b.y1 - 1 && b.y0 < a.y1 - 1).toBe(false);
+        }
+      }
+      await page.screenshot({ path: `test-results/findmy-outhere-${width}.png` });
+    });
+
+    test('Want to hang? with Maya proposes Dumpling Den from her bubble before sending', async ({ page }) => {
+      await openMap(page, 'alex', width);
+      await page.getByRole('button', { name: /^People/ }).click();
+      await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      const card = page.getByTestId('friend-card');
+      await expect(card).toContainText('craving dumplings');
+      if (width > 800) {
+        const box = await page.getByRole('dialog').boundingBox();
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width - 12);
+        expect(box!.height).toBeLessThan(900 - 56 - 32);
+      }
+      await card.getByRole('button', { name: 'Want to hang?' }).click();
+      const s = page.getByTestId('hang-suggestion');
+      await expect(s).toContainText('Dumpling Den');
+      await expect(s).toContainText('seats left');
+      await expect(page.getByTestId('hang-reason')).toContainText("Maya's craving dumplings");
+      await expect(page.getByLabel('Message to Maya')).toHaveValue(/Dumpling Den/);
+      await page.screenshot({ path: `test-results/findmy-hang-${width}.png` });
+      await page.getByRole('button', { name: 'Send invite' }).click();
+      await expect(page.getByText(/Invite sent to Maya: 🥟/)).toBeVisible();
     });
 
     test('sharing settings open from the map', async ({ page }) => {
@@ -110,14 +152,14 @@ test.describe('two personas, live', () => {
     try {
       await openMap(a, 'alex', 1440);
       const mayaPin = a.locator('[data-testid="friend-pin"][data-handle="maya"]');
-      await expect(mayaPin).toContainText('craving dumplings');
+      await expect(mayaPin).toHaveAttribute('aria-label', /craving dumplings/);
 
       await openMap(b, 'maya', 1440);
       await b.getByRole('button', { name: 'Your status' }).click();
       await b.getByLabel("What's on your mind?").fill('ramen instead?');
       await b.getByRole('button', { name: 'Save' }).click();
       await expect(b.getByText('Your status is updated')).toBeVisible();
-      await expect(mayaPin).toContainText('ramen instead?', { timeout: 2_000 });
+      await expect(mayaPin).toHaveAttribute('aria-label', /ramen instead?/, { timeout: 2_000 });
 
       await b.getByRole('button', { name: 'Your status' }).click();
       await b.getByText('Only me', { exact: true }).click();

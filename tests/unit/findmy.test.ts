@@ -3,6 +3,7 @@ import { haversineMeters, profileId, seedId, setNow, snapToGrid } from '@/shared
 import { createMemoryStore } from '@/features/data/memory-store';
 import { subscribe, type RealtimeMessage } from '@/features/data/realtime-server';
 import type { CoreStore } from '@/features/data/core';
+import { placeChips, type ChipItem } from '@/features/map/friends/chips';
 
 const id = (h: string) => profileId(h);
 let store: CoreStore;
@@ -105,5 +106,44 @@ describe('Find My: editing my share', () => {
     expect(invite.toId).toBe(id('maya'));
     expect(suggestion.length).toBeGreaterThan(3);
     await expect(store.hangInvite(id('alex'), { toId: id('jordan'), message: 'hi' })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('Want to hang? proposes Dumpling Den for Maya from her bubble, and the invite matches the preview', async () => {
+    const s = await store.hangSuggestion(id('alex'), id('maya'));
+    expect(s?.kind).toBe('quest');
+    expect(s?.venueName).toBe('Dumpling Den');
+    expect(s?.reason).toContain("Maya's craving dumplings");
+    expect(s?.draft).toContain('Dumpling Den');
+    const { invite, suggestion } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
+    expect(invite.questId).toBe(s!.questId);
+    expect(suggestion).toContain('Dumplings');
+    // a hidden friend gets no suggestion
+    expect(await store.hangSuggestion(id('alex'), id('olivia'))).toBeNull();
+  });
+});
+
+describe('Find My: chip placement', () => {
+  const item = (h: string, x: number, y: number, km: number, thought = 'craving dumplings'): ChipItem => ({
+    pin: { friend: { id: h } as ChipItem['pin']['friend'], bubble: { emoji: '🥟', thought, doing: null, wantsTo: null }, distanceKm: km, updatedAt: NOW.toISOString() },
+    x, y,
+  });
+  const view = { w: 390, h: 700 };
+
+  it("keeps the nearer friend's full chip and shrinks or hides a colliding one", () => {
+    const m = placeChips([item('far', 205, 300, 2), item('near', 200, 300, 1)], null, view, false);
+    expect(m.get('near')).toBe('full');
+    expect(m.get('far')).not.toBe('full');
+  });
+
+  it("never covers the viewer's own pin or runs off the edge", () => {
+    // chip of a pin right below "You" would sit on the viewer's avatar
+    const m = placeChips([item('a', 200, 350, 0.3), item('edge', 360, 200, 0.5, 'new playlist on repeat all day')], { x: 200, y: 304 }, view, false);
+    expect(m.get('a')).toBe('none');
+    expect(m.get('edge')).toBe('emoji');
+  });
+
+  it('shows emoji only when asked (phones zoomed out)', () => {
+    const m = placeChips([item('a', 100, 300, 1)], null, view, true);
+    expect(m.get('a')).toBe('emoji');
   });
 });

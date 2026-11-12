@@ -22,8 +22,6 @@ import type { View } from './view';
 export const APPROX_CELL_M = 800;
 /** Walking time is shown up to this many minutes; farther friends show distance only. */
 export const MAX_SHOWN_WALK_MIN = 120;
-/** "Want to hang?" suggests an open quest within this distance of the friend, else the nearest place. */
-const HANG_QUEST_RADIUS_M = 1500;
 
 // Labels for approximate shares: the nearest of these within 30 km, else the region name.
 const AREAS: { label: string; at: LatLng }[] = [
@@ -203,12 +201,117 @@ export async function updateMyLocation(store: CoreStore, viewerId: ID, patch: Lo
 
 export type HangBody = { toId: ID; questId?: ID | null; placeId?: ID | null; message: string };
 
+/** What "Want to hang?" proposes for one friend, shown on the card before the invite is sent. */
+export type HangSuggestion = {
+  kind: 'quest' | 'place';
+  questId: ID | null; placeId: ID | null;
+  title: string; emoji: string; venueName: string;
+  startsAt: string | null; seatsLeft: number | null; walkMinutes: number;
+  /** Built from the friend's bubble and the data: "Maya's craving dumplings · 2 seats left · 9 min walk". */
+  reason: string;
+  /** Prefilled invite message. */
+  draft: string;
+};
+
+/** A hang must be reachable on foot by both people within this many minutes. */
+const HANG_MAX_WALK_MIN = 25;
+/** Only quests starting within this many minutes are suggested. */
+const HANG_MAX_START_MIN = 120;
+const STOP = new Set([
+  'the', 'and', 'for', 'with', 'want', 'wants', 'try', 'new', 'some', 'about', 'after', 'before', 'till', 'until',
+  'work', 'break', 'again', 'still', 'just', 'need', 'someone', 'anyone', 'going', 'more', 'like', 'into', 'this',
+  'that', 'from', 'lunch', 'min', 'hour', 'today', 'tonight',
+]);
+
+/** Lowercase word stems of 3+ letters, plural "s" dropped ("dumplings" -> "dumpling"). */
+export function stems(text: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const w of (text ?? '').toLowerCase().split(/[^a-z]+/)) {
+    if (w.length < 3 || STOP.has(w)) continue;
+    out.add(w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w);
+  }
+  return out;
+}
+
+/** How many words of the bubble ("craving dumplings", "try Dumpling Den") the quest also has. */
+function bubbleHits(bubble: StatusBubble, words: Set<string>): number {
+  const want = new Set([...stems(bubble.thought), ...stems(bubble.wantsTo), ...stems(bubble.doing)]);
+  let hits = 0;
+  for (const w of want) if (words.has(w)) hits += 1;
+  return hits;
+}
+
+const minutesUntil = (iso: string, atMs: number) => Math.round((new Date(iso).getTime() - atMs) / 60_000);
+const seatsText = (n: number) => `${n} ${n === 1 ? 'seat' : 'seats'} left`;
+
+/**
+ * Picks the hang for `toId`: an open public quest both people can walk to within 25 min that starts
+ * within 2 hours, ranked by how many words of the friend's bubble it matches, then by whether the
+ * friend can get there before their shared free window ends, then by the viewer's walking time.
+ * Falls back to the place nearest the friend.
+ */
+export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): Promise<HangSuggestion | null> {
+  const v = await store.view();
+  const to = v.profileById.get(toId) ?? v.profileByHandle.get(toId);
+  if (!to) throw notFound('person_not_found');
+  const at = now();
+  const atIso = at.toISOString();
+  const shares = v.db.locationShares ?? [];
+  const share = shares.find((s) => s.userId === to.id);
+  if (!share || !canSeeShare(v, viewerId, share, atIso)) return null;
+  const mine = shares.find((s) => s.userId === viewerId);
+  const origin = mine?.location ?? DEMO_CENTER;
+  const friendAt = visibleLocation(share, origin).location;
+  const name = to.name.split(' ')[0] ?? to.name;
+  const freeUntil = v.db.availability
+    .filter((a) => a.userId === to.id && a.endsAt > atIso && v.canSee(viewerId, a.userId, a.audience))
+    .map((a) => a.endsAt).sort()[0] ?? null;
+  const b = share.bubble;
+
+  const ranked = v.db.quests
+    .filter((q) => q.isPublic && v.isActiveQuest(q) && v.seatsLeft(q) > 0)
+    .map((q) => {
+      const words = new Set([...stems(q.title), ...stems(q.venueName), ...stems(q.category), ...q.tags.flatMap((t) => [...stems(t)])]);
+      const myWalk = walkingMinutes(origin, q.approxLocation);
+      const theirWalk = walkingMinutes(friendAt, q.approxLocation);
+      const arriveMs = Math.max(new Date(q.startsAt).getTime(), at.getTime() + theirWalk * 60_000);
+      const fitsWindow = !freeUntil || arriveMs < new Date(freeUntil).getTime();
+      return { q, hits: bubbleHits(b, words), myWalk, theirWalk, fitsWindow };
+    })
+    .filter((x) => x.myWalk <= HANG_MAX_WALK_MIN && x.theirWalk <= HANG_MAX_WALK_MIN
+      && minutesUntil(x.q.startsAt, at.getTime()) <= HANG_MAX_START_MIN)
+    .sort((x, y) => y.hits - x.hits || Number(y.fitsWindow) - Number(x.fitsWindow) || x.myWalk - y.myWalk);
+  const pick = ranked[0];
+  const said = b.thought ? `${name}'s ${b.thought}` : b.wantsTo ? `${name} wants to ${b.wantsTo}` : `${name} is nearby`;
+  if (pick) {
+    const q = pick.q;
+    const seats = v.seatsLeft(q);
+    const startsIn = minutesUntil(q.startsAt, at.getTime());
+    const when = startsIn > 0 ? `in ${startsIn} min` : 'now';
+    const why = pick.hits > 0 && b.thought ? ` You said you're ${b.thought}.` : '';
+    return {
+      kind: 'quest', questId: q.id, placeId: null, title: q.title, emoji: q.emoji, venueName: q.venueName,
+      startsAt: q.startsAt, seatsLeft: seats, walkMinutes: pick.myWalk,
+      reason: `${said} · ${seatsText(seats)} · ${pick.myWalk} min walk`,
+      draft: `${q.venueName} ${when}?${why} ${seatsText(seats)}, I'll grab one.`,
+    };
+  }
+  const place = [...v.db.places].sort((a, c) => haversineMeters(friendAt, a.location) - haversineMeters(friendAt, c.location))[0];
+  if (!place) return null;
+  const walk = walkingMinutes(origin, place.location);
+  return {
+    kind: 'place', questId: null, placeId: place.id, title: `Meet at ${place.name}`, emoji: '📍', venueName: place.name,
+    startsAt: null, seatsLeft: null, walkMinutes: walk,
+    reason: `${said} · ${place.name} is near them · ${walk} min walk for you`,
+    draft: `Want to meet at ${place.name}? I can be there in ${walk} min.`,
+  };
+}
+
 /** "Want to hang?": an invite to a friend for a quest or place near them (picked when not given). */
 export async function hangInvite(store: CoreStore, viewerId: ID, body: HangBody) {
   const v = await store.view();
   const to = v.profileById.get(body.toId) ?? v.profileByHandle.get(body.toId);
   if (!to) throw notFound('person_not_found');
-  const at = now().toISOString();
   let questId: ID | null = body.questId ?? null;
   let title: string | null = null;
   if (questId) {
@@ -220,20 +323,8 @@ export async function hangInvite(store: CoreStore, viewerId: ID, body: HangBody)
     if (!p) throw notFound('place_not_found');
     title = `Meet at ${p.name}`;
   } else {
-    const share = (v.db.locationShares ?? []).find((s) => s.userId === to.id);
-    const near = share && canSeeShare(v, viewerId, share, at) ? visibleLocation(share, DEMO_CENTER).location : null;
-    if (near) {
-      const quest = v.db.quests
-        .filter((q) => q.isPublic && v.isActiveQuest(q) && v.seatsLeft(q) > 0)
-        .map((q) => ({ q, d: haversineMeters(near, q.approxLocation) }))
-        .filter((x) => x.d <= HANG_QUEST_RADIUS_M)
-        .sort((a, b) => a.d - b.d)[0];
-      if (quest) { questId = quest.q.id; title = `${quest.q.emoji} ${quest.q.title}`; }
-      else {
-        const place = [...v.db.places].sort((a, b) => haversineMeters(near, a.location) - haversineMeters(near, b.location))[0];
-        if (place) title = `Meet at ${place.name}`;
-      }
-    }
+    const s = await hangSuggestion(store, viewerId, to.id);
+    if (s) { questId = s.questId; title = s.kind === 'quest' ? `${s.emoji} ${s.title}` : s.title; }
   }
   const suggestionTitle = title ?? 'Want to hang?';
   const invite = await store.createInvite(viewerId, {

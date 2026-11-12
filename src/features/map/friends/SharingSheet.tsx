@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiFetchError, apiFetch, useApi } from '@/features/data';
 import { Button, Sheet, useToast } from '@/features/ui';
 import type { Audience, FriendList, LocationPrecision } from '@/shared/types';
-import { useMyShare } from './useFindMy';
+import { floatingPanel, useMyShare } from './useFindMy';
 
 export function audienceLabel(a: Audience, lists: FriendList[] = []): string {
   if (a === 'friends') return 'Friends';
@@ -84,6 +84,7 @@ export function SharingSheet({ open, onClose }: { open: boolean; onClose: () => 
       onClose={onClose}
       title="Your status and sharing"
       side="left"
+      className={floatingPanel('left')}
       footer={(
         <div className="flex flex-col gap-2">
           {error && <p role="alert" className="text-[13px] text-fb-red">{error}</p>}
