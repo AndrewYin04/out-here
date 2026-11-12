@@ -4,7 +4,7 @@
 //   GET /api/crews, GET /api/muse/regroup (member cards + crew thread), GET /api/memories?crewId,
 //   GET /api/quests/:id (venue, time, price cap, members; exact location for members only).
 import type { Crew, Memory } from '@/shared';
-import { apiFetch } from '@/features/data';
+import { apiFetch, currentPersona } from '@/features/data';
 import { buildJourney, journeyQuestIds, type Journey, type QuestDetailLite } from './journey';
 import type { CrewMeta } from './useRegroup';
 
@@ -14,17 +14,25 @@ export class CrewNotFoundError extends Error {
   constructor() { super('This memory is not available.'); }
 }
 
+// Skip any cached snapshot so a photo just captured shows up (same header as main's page).
+const FRESH: RequestInit = { headers: { 'x-outhere-fresh': '1' } };
+
+/** Uploaded crew photos are served by /api/memories/:id/photo, which needs the persona in the URL. */
+export function photoSrc(m: Memory, handle: string): string {
+  return m.photoUrl === `/api/memories/${m.id}/photo` ? `${m.photoUrl}?as=${encodeURIComponent(handle)}` : m.photoUrl;
+}
+
 async function crewsAndMeta() {
   const [{ crews }, { crews: metas, viewerId }] = await Promise.all([
-    apiFetch<{ crews: Crew[] }>('/api/crews'),
-    apiFetch<{ viewerId: string; crews: CrewMeta[] }>('/api/muse/regroup'),
+    apiFetch<{ crews: Crew[] }>('/api/crews', FRESH),
+    apiFetch<{ viewerId: string; crews: CrewMeta[] }>('/api/muse/regroup', FRESH),
   ]);
   return { crews, metas, viewerId };
 }
 
 const crewMemories = (crewId: string) =>
-  apiFetch<{ memories: Memory[] }>(`/api/memories?crewId=${encodeURIComponent(crewId)}`)
-    .then((r) => r.memories)
+  apiFetch<{ memories: Memory[] }>(`/api/memories?crewId=${encodeURIComponent(crewId)}`, FRESH)
+    .then((r) => r.memories.map((m) => ({ ...m, photoUrl: photoSrc(m, currentPersona()) })))
     .catch(() => [] as Memory[]);
 
 /** The viewer's crews with their album photos (the Memories library). */

@@ -7,6 +7,7 @@ export { MemoryMapPreview } from './MemoryMapPreview';
 export { buildJourney, toMapPoints } from './journey';
 export type { Journey, JourneyStop } from './journey';
 export type { LngLat, MemoryCameraMode, MemoryMapComponent, MemoryMapPoint, MemoryMapProps } from './mapContract';
+export { YourPlans } from './YourPlans';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';

@@ -1,10 +1,12 @@
 'use client';
 
 // /memories: the Memories library. One card per crew (a past Out Here hangout): cover photo,
-// date, who was there, the album, an entry into the journey, and Muse regroup.
+// date, who was there, the album, an entry into the journey, and Muse regroup. Refreshes live
+// when a crew photo is captured (user:<id> 'memory' events); /memories#crew-<id> scrolls to a crew.
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ChevronRight, Images, Map as MapIcon } from 'lucide-react';
+import { useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Card, EmptyState, LinkButton, Skeleton } from '@/features/ui';
 import { loadCrewRows, type CrewRow } from './data';
@@ -14,19 +16,33 @@ import { useRegroup } from './useRegroup';
 
 export function MemoriesPage() {
   const handle = usePersonaHandle();
+  // Remount per persona so one persona's crews never flash under another.
+  return <MemoriesView key={handle ?? 'loading'} handle={handle} />;
+}
+
+function MemoriesView({ handle }: { handle: string | null }) {
+  const { viewer } = useViewer();
   const [crews, setCrews] = useState<CrewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  useChannel([`user:${viewer.id}`], (_channel, payload) => {
+    if (payload.type === 'memory' || payload.resync) setRefresh((value) => value + 1);
+  });
 
   useEffect(() => {
     if (!handle) return;
     let alive = true;
-    setCrews(null);
     setError(null);
     loadCrewRows()
       .then((rows) => { if (alive) setCrews(rows); })
       .catch((e) => { if (alive) setError(e instanceof Error ? e.message : 'Could not load memories'); });
     return () => { alive = false; };
-  }, [handle]);
+  }, [handle, refresh]);
+
+  useEffect(() => {
+    const target = window.location.hash.slice(1);
+    if (crews && target.startsWith('crew-')) document.getElementById(target)?.scrollIntoView({ block: 'start' });
+  }, [crews]);
 
   return (
     <div className="mx-auto w-full max-w-[680px] px-0 pb-6 md:px-4 md:pt-4">
@@ -50,7 +66,7 @@ export function MemoriesPage() {
           />
         </Card>
       )}
-      {crews && crews.length > 0 && (
+      {handle && crews && crews.length > 0 && (
         <div className="flex flex-col gap-3">
           {crews.map((c) => <CrewCard key={c.id} crew={c} />)}
         </div>
@@ -68,7 +84,7 @@ function CrewCard({ crew }: { crew: CrewRow }) {
   const others = members.filter((m) => m.id !== crew.viewerId).map((m) => m.name.split(' ')[0]);
 
   return (
-    <Card as="section" className="overflow-hidden" aria-label={crew.name} data-testid="crew-card">
+    <Card as="section" id={`crew-${crew.id}`} className="scroll-mt-16 overflow-hidden" aria-label={crew.name} data-testid="crew-card">
       {cover && (
         <Link href={href} className="group relative block bg-fb-bg focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-fb-blue" aria-label={`Explore ${crew.name}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
