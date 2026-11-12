@@ -8,7 +8,7 @@ import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanOpen, usePlanOpen } from './plan-state';
+import { setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
@@ -58,10 +58,10 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [open]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null);
+    setResult(null); setPlanSuggestions(null);
     setStatus('idle');
   }, [viewer.id]);
-  useEffect(() => () => inFlight.current?.abort(), []);
+  useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
@@ -79,14 +79,14 @@ export function PlanSheet({ className }: { className?: string }) {
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
-      setResult(r);
+      setResult(r); setPlanSuggestions(r.plan.suggestions);
       setStatus('done');
       // Only the ask whose results are shown becomes the viewer's availability.
       void shareAvailability(t, r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
-      setStatus('error');
+      setStatus('error'); setPlanSuggestions(null);
     }
   };
 

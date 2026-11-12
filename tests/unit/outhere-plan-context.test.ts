@@ -77,7 +77,9 @@ describe('store-backed plan context', () => {
     const out = await plan({ text: TEXT, userId: alex, now: NOW, context: ctx });
     const top = out.plan.suggestions[0]!;
     expect(top.reason).toContain('craving dumplings');
-    for (const s of out.plan.suggestions) expect(s.reason).not.toMatch(/\$\d|min walk|starts at/);
+    // a reason that names no interest falls back to the card facts ("4 min walk, $7, starts in 9 min")
+    for (const s of out.plan.suggestions.slice(1)) if (!/^\d+ min walk, /.test(s.reason)) expect(s.reason).not.toMatch(/\$\d|min walk|starts at/);
+    expect(top.reason).not.toMatch(/\$\d|min walk|starts at/);
   });
 });
 

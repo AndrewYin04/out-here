@@ -6,6 +6,7 @@ import type { PlanCandidate } from './candidates';
 import type { PlanContext } from './context';
 import { bridgeText, inviteText, reasonText } from './explain';
 import { MAX_SUGGESTIONS } from './rank';
+import { concreteReason } from './prompts/reason-facts';
 import { wallClock, windowMinutes } from './time';
 
 export type ValidateContext = Pick<PlanContext, 'quests' | 'friends' | 'location' | 'viewer' | 'knownPeople'>;
@@ -218,7 +219,7 @@ export function validate(
       return fallback();
     };
     const modelReason = s.reason?.trim();
-    const reason = (modelReason && checked('reason', modelReason, () => null)) || reasonText(c, keptFriends);
+    const reason = concreteReason((modelReason && checked('reason', modelReason, () => null)) || reasonText(c, keptFriends), c, claims?.now ?? new Date());
     const modelBridge = s.bridge?.trim();
     const bridge = modelBridge ? checked('bridge', modelBridge, () => bridgeText(c, keptFriends)) : null;
     const modelInvite = s.inviteDraft?.trim();
