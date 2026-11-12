@@ -65,6 +65,21 @@ export function nextClock(now: Date, clock: { hour: number; minute: number }): D
   return d;
 }
 
+/**
+ * A start clock ("after 5") always means today. A morning hour that already passed reads as
+ * the evening hour when that is still ahead ("after 5" at 4 PM -> 5 PM). A start that has
+ * passed either way stays today, and resolveWindow clamps it to now: "after 5" said at
+ * 5:30 PM means "from now", never tomorrow.
+ */
+export function startClockToday(now: Date, clock: { hour: number; minute: number }): Date {
+  const d = clockToday(now, clock.hour, clock.minute);
+  if (d.getTime() <= now.getTime() && clock.hour < 12) {
+    const pm = clockToday(now, clock.hour + 12, clock.minute);
+    if (pm.getTime() > now.getTime()) return pm;
+  }
+  return d;
+}
+
 export type PartOfDay = 'now' | 'afternoon' | 'evening' | 'tonight';
 
 /** What the user said about time, as the parse step reports it. Every field may be null. */
@@ -90,7 +105,7 @@ export function resolveWindow(t: TimeExpression, now: Date): { windowStart: stri
   let start = nowMs;
   if (t.startsInMinutes !== null && t.startsInMinutes > 0) start = nowMs + t.startsInMinutes * 60_000;
   const sc = parseClock(t.startClock);
-  if (sc) start = Math.max(nowMs, nextClock(now, sc).getTime());
+  if (sc) start = Math.max(nowMs, startClockToday(now, sc).getTime());
   if (t.partOfDay === 'evening' || t.partOfDay === 'tonight') {
     start = Math.max(start, clockToday(now, 17, 0).getTime());
   } else if (t.partOfDay === 'afternoon') {

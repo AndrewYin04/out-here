@@ -60,7 +60,7 @@ export type PlanCandidate = {
 };
 
 export type DropReason =
-  | 'not_open' | 'already_member' | 'full' | 'private' | 'activity' | 'budget' | 'walk' | 'window' | 'late'
+  | 'not_open' | 'already_member' | 'full' | 'activity' | 'budget' | 'walk' | 'window' | 'late'
   | 'small_group';
 export type DroppedQuest = { questId: ID; title: string; reason: DropReason };
 
@@ -163,6 +163,16 @@ export function friendsFreeInWindow(input: Pick<CandidateInput, 'intent' | 'frie
   return out;
 }
 
+/**
+ * Can the viewer see this quest at all? Public quests, quests they host or joined, and
+ * private quests a friend is in. Same rule the data layer applies; Muse re-applies it so a
+ * provider that returns too much still leaks nothing.
+ */
+export function questVisibleTo(q: Quest, viewerId: ID, friendIds: ReadonlySet<ID>): boolean {
+  if (q.isPublic || q.hostId === viewerId || q.memberIds.includes(viewerId)) return true;
+  return q.memberIds.some((id) => friendIds.has(id));
+}
+
 // ---------- main ----------
 
 export function buildCandidates(input: CandidateInput): CandidateResult {
@@ -185,6 +195,9 @@ export function buildCandidates(input: CandidateInput): CandidateResult {
   const drop = (q: Quest, reason: DropReason) => dropped.push({ questId: q.id, title: q.title, reason });
 
   for (const q of quests) {
+    // a quest the viewer may not see is skipped silently: it must never reach `dropped`,
+    // which is returned to the browser
+    if (!questVisibleTo(q, viewer.id, friendIds)) continue;
     if (q.status !== 'open') { drop(q, 'not_open'); continue; }
     if (q.memberIds.includes(viewer.id)) { drop(q, 'already_member'); continue; }
     const seatsLeft = q.capacity - q.memberIds.length;
@@ -195,7 +208,6 @@ export function buildCandidates(input: CandidateInput): CandidateResult {
         const f = input.friends.find((x) => x.profile.id === id)!;
         return { friendId: id, firstName: firstName(f.profile) };
       });
-    if (!q.isPublic && friendMembers.length === 0) { drop(q, 'private'); continue; }
     if (friendMembers.length === 0 && q.capacity < 3) { drop(q, 'small_group'); continue; }
 
     const matchedActivities = named.filter((a) => activityMatches(a, q) === true);

@@ -1,7 +1,7 @@
 // The Muse plan pipeline: parse (model) -> candidates (code) -> rank + explain (model) ->
 // validate (code). Returns the MusePlan plus per-step timing for logs and the UI.
 import type { MusePlan } from '../../shared';
-import { buildCandidates, type DroppedQuest } from './candidates';
+import { buildCandidates, questVisibleTo, type DroppedQuest } from './candidates';
 import { isMockMode } from './client';
 import { getPlanContextProvider, type PlanContext, type PlanContextProvider } from './context';
 import { NOT_UNDERSTOOD_SUMMARY, summaryText } from './explain';
@@ -70,11 +70,15 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
   const t0 = Date.now();
   const now = input.now ?? new Date();
   const mock = isMockMode();
-  const ctx = input.context ?? await (input.provider ?? await getPlanContextProvider()).getPlanContext({
+  const rawCtx = input.context ?? await (input.provider ?? await getPlanContextProvider()).getPlanContext({
     userId: input.userId ?? null,
     location: input.location ?? null,
     now,
   });
+  // Re-apply quest visibility here, so nothing downstream (candidates, meta.dropped, claim
+  // checks and their issue strings) ever sees a quest this viewer may not see.
+  const friendIdSet = new Set(rawCtx.friends.map((f) => f.profile.id));
+  const ctx: PlanContext = { ...rawCtx, quests: rawCtx.quests.filter((q) => questVisibleTo(q, rawCtx.viewer.id, friendIdSet)) };
   const t1 = Date.now();
   const budgetMs = planBudget();
   const deadline = t0 + budgetMs;
@@ -135,18 +139,20 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     skipModel: parseFellBack ? `skipped: parse fell back (${parsed.error ?? 'unknown'})` : undefined,
   });
   const t4 = Date.now();
-  const checked = validate(ranked.suggestions, result.candidates, ctx);
+  const claims = { intent: parsed.intent, text: input.text, now };
+  const checked = validate(ranked.suggestions, result.candidates, ctx, claims);
   const t5 = Date.now();
 
   const friendsFreeNames = result.friendsFree.map((f) => f.firstName);
-  const droppedPick = checked.issues.some((i) => !i.issue.startsWith('dropped friend id'));
+  // a pick the model chose was removed: its summary likely talks about it
+  const droppedPick = checked.issues.some((i) => !i.field && !i.issue.startsWith('dropped friend id'));
   const modelSummary = ranked.model === 'heuristic' || mock ? null : ranked.summary;
   const sum = droppedPick && modelSummary !== null
     ? { summary: summaryText(checked.suggestions, parsed.intent, friendsFreeNames), source: 'code' as const, issue: 'validate dropped a pick' }
     : modelSummary === null
       ? { summary: checked.suggestions.length > 0 ? ranked.summary : summaryText([], parsed.intent, friendsFreeNames), source: 'code' as const, issue: null }
       : checkSummary(modelSummary, checked.suggestions, { ...ctx, text: input.text, budgetMax: parsed.intent.budgetMax },
-        () => summaryText(checked.suggestions, parsed.intent, friendsFreeNames));
+        () => summaryText(checked.suggestions, parsed.intent, friendsFreeNames), { ...claims, candidates: result.candidates });
   return {
     plan: { intent: parsed.intent, suggestions: checked.suggestions, summary: label(sum.summary) },
     meta: base(

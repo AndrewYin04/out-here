@@ -15,15 +15,15 @@ export type { SeedWorld } from './seed-context';
 export { mockParse, parseIntent, toMuseIntent } from './intent';
 export type { ParsedIntent, RawIntent } from './intent';
 export {
-  activityMatches, buildCandidates, friendsFreeInWindow, interestsMatchingQuest, isFoodCompatible, walkCap,
+  activityMatches, buildCandidates, friendsFreeInWindow, interestsMatchingQuest, isFoodCompatible, questVisibleTo, walkCap,
 } from './candidates';
 export type {
   CandidateInput, CandidateResult, DropReason, DroppedQuest, FriendFree, FriendOverlap, PlanCandidate,
 } from './candidates';
 export { MAX_SUGGESTIONS, rankAndExplain } from './rank';
 export type { RankResult } from './rank';
-export { checkSummary, leakedNames, validate } from './validate';
-export type { SummaryCheck, ValidationIssue } from './validate';
+export { checkSummary, claimFacts, claimIssue, leakedNames, validate } from './validate';
+export type { ClaimContext, ClaimFacts, SummaryCheck, ValidationIssue } from './validate';
 export { PARSE_BUDGET_MS, PLAN_BUDGET_MS, RANK_BUDGET_MS, plan } from './plan';
 export type { PlanInput, PlanMeta, PlanOutput, PlanSource, PlanTimings } from './plan';
 export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
