@@ -13,3 +13,5 @@ The rules for every agent and subagent working in this repo live in `.claude/rul
 The overnight run follows `docs/MASTER_PROMPT.md`. Current state lives in `docs/PLAN.md` and `docs/PROGRESS.md` — read them after any restart or context summary.
 
 The Muse API reference lives in `docs/muse-api.md`. Never guess Muse endpoints, model IDs or parameters — use only what that file says, and if it's still a placeholder, use mock mode and post a `blocked` on the board.
+
+Deploys run only from Andrew's laptop: teammates request one by commenting `DEPLOY <branch>` on pinned issue #4. Details: `docs/DEPLOYS.md`.

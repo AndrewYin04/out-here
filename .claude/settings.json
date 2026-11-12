@@ -36,6 +36,8 @@
       "Bash(./scripts/board.sh:*)",
       "Bash(scripts/preflight.sh:*)",
       "Bash(./scripts/preflight.sh:*)",
+      "Bash(bash scripts/deploy-requests.sh:*)",
+      "Bash(scripts/deploy-requests.sh:*)",
       "Bash(jq:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",

@@ -30,3 +30,8 @@ blob-report/
 # os
 .DS_Store
 *.log
+
+.vercel
+.env*
+!.env.example
+.claude/worktrees/
