@@ -17,7 +17,14 @@ import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type
 import { FriendCard } from './FriendCard';
 import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMyShare, PANEL_PX } from './useFindMy';
 
-export type FriendsLayerProps = { map: MapLibreMap | null; viewer: Profile | null };
+export type FriendsLayerProps = {
+  map: MapLibreMap | null;
+  viewer: Profile | null;
+  /** Muse filter: show only these friends' pins. Omitted or null shows every friend. */
+  keepIds?: ReadonlySet<string> | null;
+  /** Muse filter: the reason row for a kept friend's card. */
+  reasonFor?: ((friendId: string) => { label: string; text: string } | null) | null;
+};
 
 type MapLib = typeof import('maplibre-gl');
 
@@ -94,13 +101,16 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
 
 type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
 
-export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
+export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: FriendsLayerProps) {
   const lib = useMapLib();
   const tick = useViewTick(map);
   const { data } = useFriendPins();
   const { data: mine } = useMyShare();
   const [openId, setOpenId] = useState<string | null>(null);
-  const pins = useMemo(() => data?.pins ?? [], [data]);
+  const pins = useMemo(() => {
+    const all = data?.pins ?? [];
+    return keepIds ? all.filter((p) => keepIds.has(p.friend.id)) : all;
+  }, [data, keepIds]);
   const openPin = pins.find((p) => p.friend.id === openId) ?? null;
   const me = mine?.share;
 
@@ -236,7 +246,7 @@ export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
           </button>
         </MapMarker>
       ))}
-      <FriendCard pin={openPin} onClose={closeCard} />
+      <FriendCard pin={openPin} onClose={closeCard} museReason={openPin && reasonFor ? reasonFor(openPin.friend.id) : null} />
     </>
   );
 }

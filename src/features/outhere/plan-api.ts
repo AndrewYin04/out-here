@@ -8,6 +8,11 @@ export type PlanResponse = MusePlan & {
   meta: {
     mode: 'mock' | 'live'; source: 'muse' | 'fallback' | 'mock'; contextSource: 'store' | 'seed';
     dropped: DroppedView[]; origin?: LatLng;
+    // What Muse did, for the "Muse's work" steps. Optional so an older response still renders.
+    understood?: boolean; candidateCount?: number;
+    friendsFree?: { firstName: string; freeUntil: string }[];
+    models?: { parse: string; rank: string }; rankFallback?: boolean;
+    timings?: { totalMs: number };
   };
 };
 /** "mock" = offline heuristic text, "fallback" = code answered after a live model step failed. */

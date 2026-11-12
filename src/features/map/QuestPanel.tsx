@@ -18,6 +18,8 @@ export type QuestPanelProps = {
   onClose: () => void;
   /** Called after a join or leave so the map and walking times refetch. */
   onChanged: () => void;
+  /** Muse filter on: why this plan was kept ("✨ Muse" and the reason), shown at the top. */
+  museReason?: { label: string; text: string } | null;
 };
 
 function friendsFirst(members: PersonCard[], hostId: string | undefined, viewerId: string): PersonCard[] {
@@ -25,7 +27,7 @@ function friendsFirst(members: PersonCard[], hostId: string | undefined, viewerI
   return [...members].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 }
 
-export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onChanged }: QuestPanelProps) {
+export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onChanged, museReason = null }: QuestPanelProps) {
   const { data, error, loading, refetch } = useApi<QuestDetail>(`/api/quests/${questId}`, [`quest:${questId}`]);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -116,6 +118,13 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
         )}
         {q && shown && (
           <>
+            {museReason && (
+              <p data-testid="quest-muse-reason" className="mb-2 rounded-card bg-fb-blue-tint px-3 py-2 text-fb-meta text-fb-text">
+                <span className="font-semibold text-fb-blue">{museReason.label}</span>
+                <span className="text-fb-text-2"> · </span>
+                {museReason.text}
+              </p>
+            )}
             <ul className="space-y-2 py-1 text-fb-body">
               <li className="flex items-center gap-2">
                 <Clock size={18} className="text-fb-text-2" aria-hidden />

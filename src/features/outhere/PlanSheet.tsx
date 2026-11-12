@@ -6,9 +6,11 @@ import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
+import { museSteps } from './muse-steps';
+import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
@@ -67,7 +69,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [open]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -85,6 +87,7 @@ export function PlanSheet({ className }: { className?: string }) {
     setError(null);
     setWhyOpen(false);
     setAsked(t);
+    setPlanAsk(t);
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
@@ -109,6 +112,7 @@ export function PlanSheet({ className }: { className?: string }) {
   const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
+  const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
 
   return (
     <>
@@ -172,8 +176,8 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'loading' && (
               <div data-testid="plan-loading" aria-live="polite">
-                <p className="mb-3 px-1 text-[15px] font-semibold text-fb-text">✨ Muse is checking who&apos;s free…</p>
-                {[0, 1].map((i) => (
+                <MuseStepsLoading />
+                {[0].map((i) => (
                   <div key={i} className="mb-2 rounded-card bg-fb-surface p-3 shadow-card">
                     <div className="flex gap-3">
                       <Skeleton shape="circle" width={40} height={40} />
@@ -190,6 +194,7 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
+                {steps.length > 0 && <MuseStepsDone steps={steps} showMuse={showMuse} />}
                 {summary && (
                   <div data-testid="plan-summary" className="mb-3 px-1">
                     {showMuse && <MuseLabel className="mb-1" />}
