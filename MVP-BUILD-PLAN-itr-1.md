@@ -517,11 +517,27 @@ Confirm the setting names exist in this version.
      fails closed.
 3. **`.claude/hooks/log-failures.mjs`** (`StopFailure`, `PermissionDenied`). It
    appends to `.verify/failures.jsonl`. The handoff lists every row.
-4. **Subagents in `.claude/agents/`**, all with no Edit or Write tools:
-   - `e2e-verifier`: runs `npm run test:e2e` plus one exploratory two-persona flow
-     against `out-here-dev`. It is told to refute "this works" and to answer
-     "refuted" when unsure.
-   - `reviewer`: the kit's reviewer brief.
+4. **Review subagents in `.claude/agents/`.** None has Edit or Write tools, so none can
+   fix what it reviews. Each returns findings as JSON:
+   `{id, severity: blocker|major|minor, file, repro, fix}`.
+   - `e2e-verifier`:
+     - Runs `npm run test:e2e` plus one exploratory two-persona flow it invents,
+       against `out-here-dev`.
+     - It is told to refute "this works" and to answer "refuted" when unsure.
+     - Every finding includes the exact steps that failed.
+   - `reviewer`: the kit's reviewer brief, run on the slice's diff. It covers crashes
+     on empty data, join races, time math, location leaks, secrets in client code,
+     dead buttons, and `window.alert`.
+   - `ui-critic`:
+     - Takes Playwright screenshots of the slice's screens at 390 and 1440 px
+       (`.verify/shots/`).
+     - Compares them with `docs/FB_SPEC.md` and `reference/fb/`.
+     - Returns the 5 most visible differences from real Facebook.
+   - `judge`:
+     - Scores the preview URL against the four Devpost criteria, 1 to 10 each, with
+       the weights from section 1.
+     - Names the 3 changes that would raise the weighted score most.
+     - It runs once per milestone.
 
 ### S6. Seed pipeline check
 
@@ -600,10 +616,28 @@ cut from the bottom of the current milestone, never from Out Here P0.
 
 - `.claude/rules/*` and the kit's work loop, board protocol, blocker playbook, and
   quality bar still apply.
-- A milestone is done only when the `e2e-verifier` did not refute it. Never take a
-  builder's report as proof: run its branch yourself.
-- Verifiers are limited to one `e2e-verifier` per milestone and one `reviewer` pass in
-  M5.
+**Self-review loop (every builder slice, before merge)**
+
+1. The builder finishes. The main session runs the checks on the builder's branch
+   itself, since a builder's report is never proof.
+2. Run `e2e-verifier`, `reviewer`, and, for UI slices, `ui-critic` on that branch in
+   parallel in one Workflow.
+3. Turn every blocker and major finding into a fix task for the same builder,
+   re-briefed with the findings. Reproduce each bug before fixing it (AGENTS.md rule 3).
+4. Repeat steps 2 and 3 until a round returns no blocker or major, with **at most 3
+   rounds**.
+   - After round 3, merge what passes.
+   - Revert what does not, and log it under Known issues.
+5. Minor findings go to a `docs/POLISH.md` queue. M5 and spare time work through it.
+
+**Milestone loop (end of every milestone)**
+
+- Run `judge` on the preview URL. Its top 3 changes become the first tasks of the next
+  milestone, unless they conflict with Out Here P0.
+- Each `judge` score goes in `docs/PROGRESS.md`, so the morning handoff shows whether
+  the scores went up.
+- Cap the review agents at 3 at once, the same as builders, so review never starves
+  the build.
 - All tests run against `out-here-dev`. `out-here-demo` changes only through
   `npm run seed:demo`.
 - No `window.alert`, `confirm`, or `prompt` anywhere in the app. They hang Claude in
