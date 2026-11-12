@@ -1,0 +1,976 @@
+{
+  "places": [
+    {
+      "name": "Dumpling Den",
+      "category": "food",
+      "address": "Willow Rd near Hamilton Ave",
+      "lat": 37.480575,
+      "lng": -122.15134,
+      "priceLevel": 1,
+      "typicalCostUsd": 12,
+      "description": "Hand-folded pork and veggie dumplings, counter seating.",
+      "hours": {
+        "mon": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:30",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Noodle Theory",
+      "category": "food",
+      "address": "Willow Rd near Newbridge St",
+      "lat": 37.473204,
+      "lng": -122.160742,
+      "priceLevel": 2,
+      "typicalCostUsd": 14,
+      "description": "Ramen shop with a short tonkotsu and miso menu.",
+      "hours": {
+        "mon": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "11:00",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Kaiten Bay",
+      "category": "food",
+      "address": "Hamilton Ave, Belle Haven",
+      "lat": 37.481811,
+      "lng": -122.155506,
+      "priceLevel": 3,
+      "typicalCostUsd": 26,
+      "description": "Conveyor-belt sushi; plates add up fast.",
+      "hours": {
+        "mon": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "tue": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "wed": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "thu": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "fri": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "sat": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ],
+        "sun": [
+          [
+            "11:00",
+            "21:30"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Bobalicious Corner",
+      "category": "cafe",
+      "address": "Hacker Way at Bayfront Expy",
+      "lat": 37.482587,
+      "lng": -122.148669,
+      "priceLevel": 1,
+      "typicalCostUsd": 7,
+      "description": "Boba, fruit teas, and big tables people sketch at.",
+      "hours": {
+        "mon": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Hacker Way Courts",
+      "category": "sports",
+      "address": "Hacker Way, east lot",
+      "lat": 37.485293,
+      "lng": -122.143459,
+      "priceLevel": 1,
+      "typicalCostUsd": 0,
+      "description": "Two sand volleyball courts and a half-court.",
+      "hours": {
+        "mon": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Willow Thrift Co.",
+      "category": "thrift",
+      "address": "Willow Rd near Ivy Dr",
+      "lat": 37.477474,
+      "lng": -122.158551,
+      "priceLevel": 1,
+      "typicalCostUsd": 15,
+      "description": "Racks of vintage tees, denim, and $5 bins.",
+      "hours": {
+        "mon": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "tue": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "wed": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "thu": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "fri": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "18:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "18:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Bayfront Park Overlook",
+      "category": "park",
+      "address": "Bayfront Park, Marsh Rd entrance",
+      "lat": 37.491219,
+      "lng": -122.161933,
+      "priceLevel": 1,
+      "typicalCostUsd": 0,
+      "description": "Hilltop bench with a view across the bay at sunset.",
+      "hours": {
+        "mon": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "tue": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "wed": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "thu": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "fri": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "sat": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ],
+        "sun": [
+          [
+            "06:00",
+            "21:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Belle Haven Library Study Room",
+      "category": "library",
+      "address": "Ivy Dr, Belle Haven",
+      "lat": 37.477364,
+      "lng": -122.15201,
+      "priceLevel": 1,
+      "typicalCostUsd": 0,
+      "description": "Free reservable study room with big tables and outlets.",
+      "hours": {
+        "mon": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "tue": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "wed": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "thu": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "fri": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "17:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "17:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "The Signal Room",
+      "category": "music_venue",
+      "address": "Willow Rd near O'Brien Dr",
+      "lat": 37.477478,
+      "lng": -122.160696,
+      "priceLevel": 2,
+      "typicalCostUsd": 15,
+      "description": "Small all-ages room for local bands, plus a patio.",
+      "hours": {
+        "mon": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "tue": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "wed": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "thu": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "fri": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "sat": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ],
+        "sun": [
+          [
+            "17:00",
+            "23:59"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Gallery 1600",
+      "category": "art",
+      "address": "Chilco St",
+      "lat": 37.481777,
+      "lng": -122.141321,
+      "priceLevel": 1,
+      "typicalCostUsd": 0,
+      "description": "Community gallery with rotating local artists.",
+      "hours": {
+        "mon": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "tue": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "wed": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "thu": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "fri": [
+          [
+            "11:00",
+            "19:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "20:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Boulder Bay Gym",
+      "category": "climbing",
+      "address": "O'Brien Dr",
+      "lat": 37.476133,
+      "lng": -122.141467,
+      "priceLevel": 2,
+      "typicalCostUsd": 22,
+      "description": "Bouldering gym with an intro wall and day passes.",
+      "hours": {
+        "mon": [
+          [
+            "06:00",
+            "23:00"
+          ]
+        ],
+        "tue": [
+          [
+            "06:00",
+            "23:00"
+          ]
+        ],
+        "wed": [
+          [
+            "06:00",
+            "23:00"
+          ]
+        ],
+        "thu": [
+          [
+            "06:00",
+            "23:00"
+          ]
+        ],
+        "fri": [
+          [
+            "06:00",
+            "23:00"
+          ]
+        ],
+        "sat": [
+          [
+            "08:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "08:00",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Pho Saigon Willow",
+      "category": "food",
+      "address": "Willow Rd near Bay Rd",
+      "lat": 37.476433,
+      "lng": -122.158117,
+      "priceLevel": 1,
+      "typicalCostUsd": 13,
+      "description": "Big bowls of pho and banh mi, fast service.",
+      "hours": {
+        "mon": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "tue": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "wed": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "thu": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "fri": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "21:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Taco Trucks on Willow Rd",
+      "category": "food",
+      "address": "Willow Rd lot near Ivy Dr",
+      "lat": 37.477811,
+      "lng": -122.154984,
+      "priceLevel": 1,
+      "typicalCostUsd": 10,
+      "description": "Three trucks that park side by side every day.",
+      "hours": {
+        "mon": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "tue": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "wed": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "thu": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "fri": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "sat": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ],
+        "sun": [
+          [
+            "11:00",
+            "23:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Pixel Arcade",
+      "category": "games",
+      "address": "Newbridge St",
+      "lat": 37.474515,
+      "lng": -122.149963,
+      "priceLevel": 1,
+      "typicalCostUsd": 10,
+      "description": "Retro cabinets, console stations, Smash setups.",
+      "hours": {
+        "mon": [
+          [
+            "14:00",
+            "23:59"
+          ]
+        ],
+        "tue": [
+          [
+            "14:00",
+            "23:59"
+          ]
+        ],
+        "wed": [
+          [
+            "14:00",
+            "23:59"
+          ]
+        ],
+        "thu": [
+          [
+            "14:00",
+            "23:59"
+          ]
+        ],
+        "fri": [
+          [
+            "14:00",
+            "23:59"
+          ]
+        ],
+        "sat": [
+          [
+            "12:00",
+            "23:59"
+          ]
+        ],
+        "sun": [
+          [
+            "12:00",
+            "23:59"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Bay Trail Start (Bayfront)",
+      "category": "outdoors",
+      "address": "Bay Trail at Bayfront Expy",
+      "lat": 37.489373,
+      "lng": -122.1511,
+      "priceLevel": 1,
+      "typicalCostUsd": 0,
+      "description": "Flat paved trail along the marsh; easy 5K loop.",
+      "hours": {
+        "mon": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "05:00",
+            "22:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Ravenswood Board Game Cafe",
+      "category": "games",
+      "address": "Ravenswood Ave, Belle Haven",
+      "lat": 37.476286,
+      "lng": -122.145831,
+      "priceLevel": 1,
+      "typicalCostUsd": 8,
+      "description": "Shelf of 300 games, $8 table fee, snacks.",
+      "hours": {
+        "mon": [
+          [
+            "12:00",
+            "23:00"
+          ]
+        ],
+        "tue": [
+          [
+            "12:00",
+            "23:00"
+          ]
+        ],
+        "wed": [
+          [
+            "12:00",
+            "23:00"
+          ]
+        ],
+        "thu": [
+          [
+            "12:00",
+            "23:00"
+          ]
+        ],
+        "fri": [
+          [
+            "12:00",
+            "23:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "23:59"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "23:59"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Menlo Film Lab",
+      "category": "photo",
+      "address": "Willow Rd near Middlefield",
+      "lat": 37.477954,
+      "lng": -122.162421,
+      "priceLevel": 2,
+      "typicalCostUsd": 12,
+      "description": "Film developing, rentals, and a small darkroom.",
+      "hours": {
+        "mon": [
+          [
+            "10:00",
+            "19:00"
+          ]
+        ],
+        "tue": [
+          [
+            "10:00",
+            "19:00"
+          ]
+        ],
+        "wed": [
+          [
+            "10:00",
+            "19:00"
+          ]
+        ],
+        "thu": [
+          [
+            "10:00",
+            "19:00"
+          ]
+        ],
+        "fri": [
+          [
+            "10:00",
+            "19:00"
+          ]
+        ],
+        "sat": [
+          [
+            "10:00",
+            "17:00"
+          ]
+        ],
+        "sun": [
+          [
+            "10:00",
+            "17:00"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "El Camino Coffee Works",
+      "category": "cafe",
+      "address": "Hamilton Ave near Willow Rd",
+      "lat": 37.478469,
+      "lng": -122.152233,
+      "priceLevel": 1,
+      "typicalCostUsd": 6,
+      "description": "Roastery cafe with long tables and good wifi.",
+      "hours": {
+        "mon": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "tue": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "wed": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "thu": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "fri": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "sat": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ],
+        "sun": [
+          [
+            "06:30",
+            "18:00"
+          ]
+        ]
+      }
+    }
+  ]
+}

@@ -111,6 +111,134 @@ Versions on 2026-11-12: `next@15` resolves to 15.5.29, `@supabase/supabase-js` i
 2.119.0, `@playwright/test` is 1.65.0, and `@faker-js/faker` is 10.6.0 (ESM-only; pin
 it).
 
+**Friend locations ("Find My" inside Facebook), Out Here P0.** Added on 2026-11-12 at
+Andrew's request. The Friends view of the map shows friends' live locations as avatar
+pins with **status bubbles** (thought or status with an emoji, what they're doing, what
+they want to do, and "updated N min ago"), whether or not Muse matched anyone.
+
+- **Friend card.** Tapping a pin opens distance and walking minutes, the bubble, View
+  profile, Message, and "Want to hang?".
+- **People sheet.** A list sorted by distance mirrors the pins. Far-away friends (other
+  cities) show with city and distance.
+- **Your own sharing.**
+  - Audience: friends, Close friends, a list, or nobody.
+  - Precision: exact or approximate.
+  - Pause sharing.
+  - Edit your bubble.
+  - Shares expire after 4 hours.
+- **Live.** Updates arrive in about 2 s over Broadcast `location:<userId>`.
+- **Where it is specified.** Contract: `LocationShare`, `FriendPin`, `StatusBubble` in
+  `src/shared/types.ts`; routes in `src/shared/api.ts`; table
+  `0002_location_shares.sql`, applied on dev and demo.
+- **Seed.** About 25 of Alex's friends share.
+  - Six are local, with bubbles that make the demo story visible: Maya near her office,
+    "craving dumplings 🥟", "at work till 5:15"; Jordan at Boulder Bay Gym; Kai and Nina
+    near Dumpling Den; Priya at Stanford.
+  - The rest are college and hometown friends in other cities (San Francisco, LA,
+    Seattle, Austin, New York) with ordinary bubbles.
+  - A few share approximate locations, and one is paused.
+- **Muse.** Uses bubbles plus availability to propose overlaps. It never reveals a
+  location the viewer could not already see.
+
+**Muse Intros (Boardy-style warm introductions), Out Here P0.** Added on 2026-11-12 at
+Andrew's request. Muse acts like a trusted friend who introduces two people who would
+genuinely click. The hangout matching only puts people at the same event; Intros
+connect two people one to one. Intros can reach friends-of-friends and people in your
+Groups, not only friends who share a location. Andrew confirmed the choices below on
+2026-11-12 (kinds 1 a,b,c; reach a; frequency a+c; consent modelled on Boardy).
+
+- **Kinds** (each person opts into which ones they want, per kind, in Intro settings):
+  - **Friendship**: new-in-town friends with overlapping interests.
+  - **Networking / coffee chat**: career, side hustles, "15-min coffee".
+  - **Dating**: only between two people who both opted into dating and match
+    each other's stated preferences (age range, gender interest). Shown under a Dating
+    label, consistent with Facebook Dating.
+  - **Hookups: not built** (Andrew picked a,b,c), because of safety and policy risk with
+    Meta judges. Mention it in Q&A as deliberately excluded.
+- **Reach: 2nd-degree connections plus members of Groups you are in.**
+  - Every intro names its trust path: "You both know Priya", or "You're both in Bay Area
+    Local Shows".
+  - 3rd-degree is allowed only through two named mutuals.
+  - Never strangers with no path.
+- **The quality bar is the product.** Muse sends an intro only when it would make the
+  intro as a good friend would.
+  - Pipeline:
+    1. **Candidates** (code): opted-in people in reach, matching kind and preferences,
+       within a reasonable distance for in-person kinds; drop anyone already a friend,
+       blocked, or recently introduced.
+    2. **Score** (Muse Spark, strict JSON): fit 0-100 with reasons tied to specific
+       shared interests, goals, "looking for" text, timing and the trust path.
+    3. **Threshold** (code): send only when the score is at least 85 AND there are 2 or
+       more concrete reasons AND the trust path exists.
+    4. **Write** (Muse): a short intro note per person, in a warm friend's voice, citing
+       the real reasons and a concrete first step ("you both climb at Boulder Bay; try
+       the Thursday intro session").
+  - If nobody clears the bar, Muse sends nothing. That is a feature, and the UI says
+    "Muse only introduces when it's confident".
+- **Frequency: at most 1 new automatic intro per person per week, plus on-request intros**
+  the user asks for ("find me a climbing partner"), which still must clear the bar or get a
+  "no great match yet" answer.
+- **Consent: double opt-in, the way Boardy does it.** Boardy (boardy.ai, checked
+  2026-11-12) checks fit "for both of you before anyone hears about it", makes "the intro
+  once you both say yes", then sends the intro into a shared thread and stays in it to
+  schedule. It first learns what you are working on, and matches take it hours, not
+  seconds. Muse does the same:
+  - Each person privately gets an "Intro from Muse" card: who (first name, photo,
+    mutual or group path), why (2-3 reasons), the suggested first step, Accept, and
+    "Not now".
+  - Nothing about A is shown to B beyond that card, and no chat opens until **both**
+    accept.
+  - After both accept, Muse opens a 3-person Messenger thread (both people plus Muse)
+    with its intro note, and **stays in the thread to schedule**. It proposes 2-3
+    concrete times and places from both people's availability, location shares, and
+    Out Here places or quests, and books the one they pick ("see you Thu 6:30 at Boulder
+    Bay").
+  - Learning step: when a user turns on Intros, Muse asks 3 short questions in
+    Messenger (what you are looking for, what you are working on or into, when you are
+    free) and writes the answers into their Intro profile. Seeded for demo personas.
+  - Pacing: automatic rounds run in the background (`runIntroRound()`, a demo control
+    triggers one). The UI says "Muse takes its time to find someone great".
+  - Declining is silent. The other person only ever sees "didn't work out this time".
+- **Each user's Intro profile** (Profile → Intros settings): kinds on or off, a
+  "looking for" free-text line per kind ("climbing partner", "PM coffee chats",
+  "someone to try new restaurants with"), dating preferences, a max distance, and pause.
+  Seeded for the demo personas.
+- **Where it shows.**
+  - An Intros entry in the left nav and menu: inbox of intro cards, "Ask Muse for an
+    intro", and settings.
+  - Notifications: "Muse has an intro for you".
+  - On the Out Here Friends map: an accepted intro's person appears once they share
+    location with you.
+- **Data (migration 0003).**
+  - `intro_profiles` (user_id, kinds jsonb with per-kind on/off and looking_for text,
+    dating_prefs jsonb, max_km, paused).
+  - `intros` (id, kind, a_id, b_id, trust_path jsonb, score, reasons jsonb, note_a,
+    note_b, first_step, status proposed|a_accepted|b_accepted|accepted|declined|expired,
+    thread_id, created_at, decided_at).
+  - Every Muse scoring call is logged to `muse_runs`, which is the Q&A evidence that
+    the AI does the hard part.
+- **Routes.**
+  - `GET /api/intros` (viewer's cards)
+  - `POST /api/intros/request` {kind, lookingFor}
+  - `POST /api/intros/:id/respond` {accept}
+  - `GET/PUT /api/intros/profile`
+  - Server job `runIntroRound()`, callable from a demo control.
+- **Demo story.**
+  - Alex has opted into Friendship and Networking ("looking for: people to climb with,
+    PM coffee chats").
+  - Muse finds **Jordan**, a friend of Maya's, not Alex's: both climb, both are new grads
+    in product. The card says "You both know Maya · you both boulder · Jordan is at
+    Boulder Bay Thursdays".
+  - Alex accepts. Switch to Jordan's tab; Jordan accepts. A Messenger thread opens with
+    Muse's intro note.
+  - A second seeded request ("find me a dating match") shows "no great match yet",
+    which demonstrates the quality bar.
+  - A seeded weak candidate (score about 60) proves the threshold drops it, visible in
+    `muse_runs`.
+- **Milestone.** Built in M4 with its own builder slice (intros). Data and Muse parts
+  first, then UI. The P0 checkpoint stays the M3 hangout loop. Intros are the second
+  demo segment and the first thing to show after it.
+
 **Map, in two steps.** One map stack: `maplibre-gl` with the OpenFreeMap Positron
 style above. No Leaflet, react-leaflet, or CARTO anywhere.
 
@@ -618,6 +746,7 @@ cut from the bottom of the current milestone, never from Out Here P0.
 | M2 | +1:45 | Muse pipeline: parse (Ember) → candidates (code) → rank/explain (Spark) → validate, with `muse_runs` logging and fixtures | builder **muse** |
 | M2 | +1:45 | Out Here map tab (MapLibre + OpenFreeMap, overhead view), Friends/Explore toggle, quest pins with live seat counts, quest sheet, "I'm free" composer | builder **map** |
 | M3 | +2:45 | Integrate all three. Invites as notifications, Accept, and `join_quest`. Live seats over Broadcast in two tabs. Playwright `demo.spec.ts` drives the full flow with two personas. **P0 checkpoint on the preview URL with real Muse.** | main + e2e-verifier |
+| M4 | +3:45 | Muse Intros slice (section 2 "Muse Intros"): migration 0003, intro profiles seed, candidates → Spark score → threshold → notes, double opt-in cards, Messenger thread on accept, demo story Alex ↔ Jordan | builder **intros** |
 | M4 | +3:45 | Group page Hangouts tab; FB-P1 Messenger (invites as messages), Events, Search | builder **fb** |
 | M4 | +3:45 | Kit P1: "We're done" → photo → crew album with Muse caption → "Do this again" | builder **memories** |
 | M4 | +3:45 | Tilted walking view with 3D buildings (section 2, "Map, in two steps"). Only after the M3 checkpoint passes; cut first if M4 runs late. | builder **map** |
@@ -641,6 +770,33 @@ cut from the bottom of the current milestone, never from Out Here P0.
    - After round 3, merge what passes.
    - Revert what does not, and log it under Known issues.
 5. Minor findings go to a `docs/POLISH.md` queue. M5 and spare time work through it.
+
+**Browser walkthrough (end of every milestone, main session, Claude in Chrome)**
+
+1. Open the milestone's preview URL in two Chrome tabs, `?as=alex` and `?as=maya`.
+2. Click through every flow the milestone touched the way a real user would, at
+   1440 px and resized to 390 px. This includes the demo loop once M3 exists.
+3. Screenshot each screen with `save_to_disk` into `.verify/walk/<milestone>/`.
+4. Compare the screenshots side by side with `reference/fb/` and `docs/FB_SPEC.md`.
+5. Record the main flow as a GIF into `docs/evidence/gifs/<milestone>.gif`.
+6. Every broken flow, dead control, or visible "doesn't look like Facebook" difference
+   becomes a task. Broken flows are fixed first, in this milestone. Looks go to
+   `docs/POLISH.md` with a screenshot path.
+7. If Chrome is disconnected, do the same with Playwright screenshots and say so in
+   `docs/PROGRESS.md`.
+
+**UI iteration loop (M5 and any spare time after a milestone)**
+
+1. Take the top 5 items of `docs/POLISH.md`, ordered by how visible they are on the demo
+   path.
+2. Fix them in one builder slice.
+3. Re-run `ui-critic` on the same screens, and do a Chrome walkthrough of them.
+4. Score the round as the count of `ui-critic` findings at major severity.
+5. Repeat until two rounds in a row have no major finding on the demo path. Then move to
+   the next surface: feed, profile, friends, groups, messenger, events, marketplace,
+   reels.
+6. Log each round's before and after screenshot paths and its score in
+   `docs/PROGRESS.md`, so the morning handoff shows the UI improving.
 
 **Milestone loop (end of every milestone)**
 

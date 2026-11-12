@@ -1,0 +1,57 @@
+{
+  "name": "out-here",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check-env": "node --env-file=.env.local scripts/check-env.mjs",
+    "db:migrate:dev": "node --env-file=.env.local scripts/db-migrate.mjs dev",
+    "db:migrate:demo": "node --env-file=.env.local scripts/db-migrate.mjs demo",
+    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts dev",
+    "seed:demo": "node --env-file=.env.local --import tsx scripts/seed.ts demo",
+    "storage:setup": "node --env-file=.env.local scripts/storage-setup.mjs dev",
+    "gen:content": "node --env-file=.env.local scripts/gen-content.mjs",
+    "gen:images": "node --env-file=.env.local scripts/gen-images.mjs",
+    "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs",
+    "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.0",
+    "clsx": "2.1.1",
+    "date-fns": "4.4.0",
+    "lucide-react": "1.72.0",
+    "maplibre-gl": "6.18.0",
+    "next": "15.5.29",
+    "openai": "7.55.0",
+    "pg": "8.23.1",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "sharp": "0.35.5",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@faker-js/faker": "10.6.0",
+    "@playwright/test": "1.65.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.29",
+    "tailwindcss": "^4",
+    "tsx": "4.23.15",
+    "typescript": "^5",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
