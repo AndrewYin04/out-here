@@ -11,7 +11,8 @@ import { ChevronRight, Images, List as ListIcon, Map as MapIcon, Users, X } from
 import { useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { MapAttribution } from '@/features/map';
-import { AvatarStack, Card, cn, EmptyState, IconButton, LinkButton, Skeleton } from '@/features/ui';
+import { LookAvatarStack } from '@/features/avatar';
+import { Card, cn, EmptyState, IconButton, LinkButton, Skeleton } from '@/features/ui';
 import { BackButton } from './BackButton';
 import { CommunityBoard } from './CommunityBoard';
 import { loadCrewRows, type CrewRow } from './data';
@@ -310,7 +311,7 @@ function CrewCard({ crew }: { crew: CrewRow }) {
           {others.length > 0 && <p className="mt-0.5 text-[13px] text-fb-text-2">With {others.join(', ')}</p>}
           {crew.sharedPrefs.length > 0 && <p className="mt-0.5 text-[13px] text-fb-text-2">Into: {crew.sharedPrefs.join(', ')}</p>}
         </div>
-        {members.length > 0 && <AvatarStack people={members.map((m) => ({ name: m.name, src: m.avatarUrl }))} size={32} max={5} />}
+        {members.length > 0 && <LookAvatarStack people={members} size={32} max={5} />}
       </div>
 
       {rest.length > 0 && (

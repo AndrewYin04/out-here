@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { AvatarCustomizer, LookFigure } from '@/features/avatar';
 import { apiFetch, useApi, useViewer } from '@/features/data';
 import { errorText, MESSENGER_TO_READY, mutualLabel, removeFriend, respondRequest, sendRequest } from '@/features/fb/friends';
 import { CoverHeaderSkeleton, ROUTES, SplitBodySkeleton } from '@/features/fb/shell';
@@ -183,6 +184,28 @@ function Header({ data, tab, onChanged, onEdit }: { data: ProfileResponse; tab: 
 }
 
 // ---------- cards ----------
+
+/** The person's avatar look (full body); on your own profile, "Edit avatar" opens the customizer. */
+function AvatarCard({ data }: { data: ProfileResponse }) {
+  const [editing, setEditing] = useState(false);
+  const p = data.profile;
+  const self = data.relationship === 'self';
+  return (
+    <Card flushOnMobile className="p-4" data-testid="avatar-card">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-[20px] font-bold text-fb-text">Avatar</h2>
+        {self && <Button variant="secondary" size="sm" onClick={() => setEditing(true)} data-testid="edit-avatar">Edit avatar</Button>}
+      </div>
+      <div className="mt-3 flex justify-center rounded-card bg-[#EEF3FA] py-3">
+        <LookFigure personId={p.id} label={`${p.name}'s avatar`} className="h-[220px]" />
+      </div>
+      <p className="mt-2 text-center text-[13px] text-fb-text-2">
+        {self ? 'How friends see you on the Out Here map.' : `How ${firstName(p.name)} shows up on the Out Here map.`}
+      </p>
+      {self && <AvatarCustomizer personId={p.id} open={editing} onClose={() => setEditing(false)} />}
+    </Card>
+  );
+}
 
 function IntroCard({ data, onEdit }: { data: ProfileResponse; onEdit: () => void }) {
   const p = data.profile;
@@ -547,6 +570,7 @@ export function ProfileView({ handle, tab, showMutual = false }: { handle: strin
             )}
             <div className="space-y-4 lg:sticky lg:top-[72px] lg:col-start-1 lg:row-span-2 lg:row-start-1">
               <IntroCard data={data} onEdit={() => setEditing(true)} />
+              <AvatarCard data={data} />
               <PhotosCard handle={data.profile.handle} />
               <FriendsCard data={data} />
             </div>

@@ -25,3 +25,7 @@ venue in the seed data is fictional. Venue names such as "Dumpling Den" and
 ## Map
 
 - Map tiles: OpenFreeMap © OpenMapTiles Data from OpenStreetMap.
+
+## Avatars
+
+- Person model, rig and idle pose: [Kenney "Animated Characters Protagonists"](https://kenney.nl/assets/animated-characters-protagonists) (CC0). Recolourable textures and renders in `public/avatars/` are built from it by `assets/avatars/build_avatars.py`.

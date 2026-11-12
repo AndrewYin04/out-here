@@ -11,7 +11,8 @@
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Avatar, cn } from '@/features/ui';
+import { LookAvatar } from '@/features/avatar';
+import { cn } from '@/features/ui';
 import type { FriendPin, LatLng, Profile } from '@/shared/types';
 import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type ChipOptions, type ChipSide } from './chips';
 import { FriendCard } from './FriendCard';
@@ -207,7 +208,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
         <MapMarker map={map} lib={lib} at={me.location} z={2} label="Your location">
           <div className="flex flex-col items-center" data-testid="my-pin">
             <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-blue">
-              <Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />
+              <LookAvatar person={viewer} size={36} decorative />
             </span>
             <span className="mt-0.5 rounded-full bg-fb-blue px-1.5 text-[11px] font-semibold leading-4 text-white">
               {me.paused ? 'Paused' : 'You'}
@@ -238,7 +239,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
             <span className="flex -space-x-3">
               {g.pins.slice(0, 3).map((p) => (
                 <span key={p.friend.id} className="rounded-full ring-2 ring-fb-green">
-                  <Avatar src={p.friend.avatarUrl} name={p.friend.name} size={32} decorative className="ring-2 ring-white" />
+                  <LookAvatar person={p.friend} size={32} decorative className="ring-2 ring-white" />
                 </span>
               ))}
             </span>
@@ -290,7 +291,7 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
         </span>
       )}
       <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-green transition-transform group-hover:scale-105">
-        <Avatar src={pin.friend.avatarUrl} name={pin.friend.name} size={36} decorative />
+        <LookAvatar person={pin.friend} size={36} decorative />
       </span>
     </button>
   );

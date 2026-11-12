@@ -8,7 +8,8 @@ import { Clock, Footprints, Hand, MapPin, MessageCircle, Send, UserRound } from 
 import { useEffect, useState } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
 import type { HangSuggestion } from '@/features/data/locations';
-import { Avatar, Button, LinkButton, Sheet, Skeleton, useToast } from '@/features/ui';
+import { LookAvatar } from '@/features/avatar';
+import { Button, LinkButton, Sheet, Skeleton, useToast } from '@/features/ui';
 import { formatDemoTime } from '@/shared/demo';
 import type { FriendPin } from '@/shared/types';
 
@@ -97,7 +98,7 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
         )}
         <div className="flex items-center gap-3">
           <span className="rounded-full p-[3px] ring-[3px] ring-fb-green">
-            <Avatar src={f.avatarUrl} name={f.name} size={60} decorative />
+            <LookAvatar person={f} size={60} decorative />
           </span>
           <div className="min-w-0">
             <p className="flex items-center gap-1 text-[15px] text-fb-text">
