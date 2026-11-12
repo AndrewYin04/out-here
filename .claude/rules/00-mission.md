@@ -45,6 +45,12 @@ Do not start a tier until every item in the tier above works end-to-end on the d
 6. **Invite + join live**: send invite, friend accepts (second browser/device with demo user switcher), **seat count updates live on every screen**.
 7. **Demo user switcher** (no real auth) with seeded personas.
 
+1b. **Muse Intros (Boardy-style warm intros).** Muse introduces two people one to one, the way a trusted friend would. Kinds: Friendship, Networking/coffee chat, and Dating (opt-in on both sides). Hookups are out of the demo.
+   - Reach is friends-of-friends and members of your Groups, and every intro names its trust path ("you both know Maya").
+   - The quality bar is strict: score at least 85, 2 or more concrete reasons, and a trust path. Otherwise nothing is sent. At most 1 intro per person per week, plus intros you ask for.
+   - Double opt-in: both people privately accept before anything is shared or a Messenger thread opens.
+   - Full spec: MVP-BUILD-PLAN-itr-1.md, "Muse Intros". Built in M4 as its own slice, after the M3 checkpoint.
+
 **P1 — the reason to come back**
 8. **"We're done" → photo prompt** for everyone who joined (BeReal-style "take a photo together") → **shared crew album**; Muse writes the caption.
 9. **Social Continuity — "Get this group together again"**: a crew forms automatically after a hangout; Muse remembers shared preferences and proposes the next time/place/activity that fits everyone's windows. No group chat or recurring event to manage.

@@ -140,6 +140,93 @@ they want to do, and "updated N min ago"), whether or not Muse matched anyone.
 - **Muse.** Uses bubbles plus availability to propose overlaps. It never reveals a
   location the viewer could not already see.
 
+**Muse Intros (Boardy-style warm introductions), Out Here P0.** Added on 2026-11-12 at
+Andrew's request. Muse acts like a trusted friend who introduces two people who would
+genuinely click. The hangout matching only puts people at the same event; Intros
+connect two people one to one. Intros can reach friends-of-friends and people in your
+Groups, not only friends who share a location. Answers pending from Andrew are marked
+**(default)**; change them if he replies.
+
+- **Kinds** (each person opts into which ones they want, per kind, in Intro settings):
+  - **Friendship** (default on): new-in-town friends with overlapping interests.
+  - **Networking / coffee chat** (default): career, side hustles, "15-min coffee".
+  - **Dating** (default): only between two people who both opted into dating and match
+    each other's stated preferences (age range, gender interest). Shown under a Dating
+    label, consistent with Facebook Dating.
+  - **Hookups: out of the demo build (default)**, because of safety and policy risk with
+    Meta judges. Mention it in Q&A as deliberately excluded.
+- **Reach (default): 2nd-degree connections plus members of Groups you are in.**
+  - Every intro names its trust path: "You both know Priya", or "You're both in Bay Area
+    Local Shows".
+  - 3rd-degree is allowed only through two named mutuals.
+  - Never strangers with no path.
+- **The quality bar is the product.** Muse sends an intro only when it would make the
+  intro as a good friend would.
+  - Pipeline:
+    1. **Candidates** (code): opted-in people in reach, matching kind and preferences,
+       within a reasonable distance for in-person kinds; drop anyone already a friend,
+       blocked, or recently introduced.
+    2. **Score** (Muse Spark, strict JSON): fit 0-100 with reasons tied to specific
+       shared interests, goals, "looking for" text, timing and the trust path.
+    3. **Threshold** (code): send only when the score is at least 85 AND there are 2 or
+       more concrete reasons AND the trust path exists.
+    4. **Write** (Muse): a short intro note per person, in a warm friend's voice, citing
+       the real reasons and a concrete first step ("you both climb at Boulder Bay; try
+       the Thursday intro session").
+  - If nobody clears the bar, Muse sends nothing. That is a feature, and the UI says
+    "Muse only introduces when it's confident".
+- **Frequency (default): at most 1 new intro per person per week**, plus intros the user
+  asks for ("find me a climbing partner"), which still must clear the bar or get a
+  "no great match yet" answer.
+- **Consent (default): double opt-in.**
+  - Each person privately gets an "Intro from Muse" card: who (first name, photo,
+    mutual or group path), why (2-3 reasons), the suggested first step, Accept, and
+    "Not now".
+  - Nothing about A is shown to B beyond that card, and no chat opens until **both**
+    accept.
+  - After both accept, Muse opens a Messenger thread with its intro note and a
+    suggested time or place (it may use the Out Here quest or place data).
+  - Declining is silent. The other person only ever sees "didn't work out this time".
+- **Each user's Intro profile** (Profile → Intros settings): kinds on or off, a
+  "looking for" free-text line per kind ("climbing partner", "PM coffee chats",
+  "someone to try new restaurants with"), dating preferences, a max distance, and pause.
+  Seeded for the demo personas.
+- **Where it shows.**
+  - An Intros entry in the left nav and menu: inbox of intro cards, "Ask Muse for an
+    intro", and settings.
+  - Notifications: "Muse has an intro for you".
+  - On the Out Here Friends map: an accepted intro's person appears once they share
+    location with you.
+- **Data (migration 0003).**
+  - `intro_profiles` (user_id, kinds jsonb with per-kind on/off and looking_for text,
+    dating_prefs jsonb, max_km, paused).
+  - `intros` (id, kind, a_id, b_id, trust_path jsonb, score, reasons jsonb, note_a,
+    note_b, first_step, status proposed|a_accepted|b_accepted|accepted|declined|expired,
+    thread_id, created_at, decided_at).
+  - Every Muse scoring call is logged to `muse_runs`, which is the Q&A evidence that
+    the AI does the hard part.
+- **Routes.**
+  - `GET /api/intros` (viewer's cards)
+  - `POST /api/intros/request` {kind, lookingFor}
+  - `POST /api/intros/:id/respond` {accept}
+  - `GET/PUT /api/intros/profile`
+  - Server job `runIntroRound()`, callable from a demo control.
+- **Demo story.**
+  - Alex has opted into Friendship and Networking ("looking for: people to climb with,
+    PM coffee chats").
+  - Muse finds **Jordan**, a friend of Maya's, not Alex's: both climb, both are new grads
+    in product. The card says "You both know Maya · you both boulder · Jordan is at
+    Boulder Bay Thursdays".
+  - Alex accepts. Switch to Jordan's tab; Jordan accepts. A Messenger thread opens with
+    Muse's intro note.
+  - A second seeded request ("find me a dating match") shows "no great match yet",
+    which demonstrates the quality bar.
+  - A seeded weak candidate (score about 60) proves the threshold drops it, visible in
+    `muse_runs`.
+- **Milestone.** Built in M4 with its own builder slice (intros). Data and Muse parts
+  first, then UI. The P0 checkpoint stays the M3 hangout loop. Intros are the second
+  demo segment and the first thing to show after it.
+
 **Map, in two steps.** One map stack: `maplibre-gl` with the OpenFreeMap Positron
 style above. No Leaflet, react-leaflet, or CARTO anywhere.
 
@@ -647,6 +734,7 @@ cut from the bottom of the current milestone, never from Out Here P0.
 | M2 | +1:45 | Muse pipeline: parse (Ember) → candidates (code) → rank/explain (Spark) → validate, with `muse_runs` logging and fixtures | builder **muse** |
 | M2 | +1:45 | Out Here map tab (MapLibre + OpenFreeMap, overhead view), Friends/Explore toggle, quest pins with live seat counts, quest sheet, "I'm free" composer | builder **map** |
 | M3 | +2:45 | Integrate all three. Invites as notifications, Accept, and `join_quest`. Live seats over Broadcast in two tabs. Playwright `demo.spec.ts` drives the full flow with two personas. **P0 checkpoint on the preview URL with real Muse.** | main + e2e-verifier |
+| M4 | +3:45 | Muse Intros slice (section 2 "Muse Intros"): migration 0003, intro profiles seed, candidates → Spark score → threshold → notes, double opt-in cards, Messenger thread on accept, demo story Alex ↔ Jordan | builder **intros** |
 | M4 | +3:45 | Group page Hangouts tab; FB-P1 Messenger (invites as messages), Events, Search | builder **fb** |
 | M4 | +3:45 | Kit P1: "We're done" → photo → crew album with Muse caption → "Do this again" | builder **memories** |
 | M4 | +3:45 | Tilted walking view with 3D buildings (section 2, "Map, in two steps"). Only after the M3 checkpoint passes; cut first if M4 runs late. | builder **map** |
