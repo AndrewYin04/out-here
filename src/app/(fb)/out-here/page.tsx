@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { BRAND } from '@/config/brand';
 import { Skeleton, SkeletonGroup } from '@/features/ui';
+import { ImFreeButton, PlanSheet } from '@/features/outhere';
 import { DEMO_AREA_LABEL } from '@/shared/demo';
 
 export const metadata: Metadata = { title: 'Map' };
@@ -42,6 +43,11 @@ export default function OutHerePage() {
           </div>
         </div>
       </SkeletonGroup>
+      {/* M2b outhere builder: until the map builder's page lands, mount the loop UI here. */}
+      <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
+        <ImFreeButton />
+      </div>
+      <PlanSheet />
     </div>
   );
 }

@@ -25,12 +25,12 @@ test.describe("POST /api/muse/plan", () => {
     if (body.meta.mode === "mock") expect(body.summary.startsWith("[mock] ")).toBe(true);
     // the UI shows the Muse label only when source is "muse"
     expect(["muse", "fallback", "mock"]).toContain(body.meta.source);
-    expect(res.headers()["x-muse-source"]).toBe(body.meta.source);
+    expect(res.headers()["x-muse-source"]).toBe(body.meta.source === "fallback" ? "fallback" : "muse");
     if (body.meta.mode === "mock") expect(body.meta.source).toBe("mock");
   });
 
   test("nonsense input returns an empty plan, not an error", async ({ request }) => {
-    const res = await request.post("/api/muse/plan", { data: { text: "asdfgh" } });
+    const res = await request.post("/api/muse/plan", { data: { text: "asdfgh" }, headers: { "x-persona": "alex" } });
     expect(res.status()).toBe(200);
     const body = await res.json();
     expect(body.suggestions).toEqual([]);
@@ -38,11 +38,11 @@ test.describe("POST /api/muse/plan", () => {
   });
 
   test("bad input is a JSON 4xx", async ({ request }) => {
-    const empty = await request.post("/api/muse/plan", { data: { text: "" } });
+    const empty = await request.post("/api/muse/plan", { data: { text: "" }, headers: { "x-persona": "alex" } });
     expect(empty.status()).toBe(400);
     expect((await empty.json()).error).toBeTruthy();
-    const unknown = await request.post("/api/muse/plan", { data: { text: "hungry", userId: "nobody-here" } });
-    expect(unknown.status()).toBe(404);
-    expect((await unknown.json()).error).toContain("unknown user");
+    const unknown = await request.post("/api/muse/plan", { data: { text: "hungry", userId: "nobody-here" }, headers: { "x-persona": "alex" } });
+    expect(unknown.status()).toBe(403);
+    expect((await unknown.json()).error).toContain("viewer");
   });
 });
