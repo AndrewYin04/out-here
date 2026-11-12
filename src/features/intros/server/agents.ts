@@ -2,14 +2,16 @@
 // Agent A represents the viewer and sees only the viewer's own profile and Intro settings plus
 // public facts about B; Agent B is the mirror. They trade 2 short turns each (A pitches, B
 // responds with fit and a question, A answers it, B gives a verdict). A judge call then scores
-// the pair from the transcript and the code-found shared facts. Code enforces the bar afterwards.
+// the pair from the transcript and the code-found shared facts and picks which facts hold up;
+// the reasons each person reads are those facts as code wrote them for that side, never model
+// text, so the other side's private looking-for words cannot reach them. Code enforces the bar.
 // Each side stores its own turns in full and the other agent's turns as one-line outcomes only.
 import { z } from 'zod';
 import { museJSON, MuseTimeoutError, type MuseJSONOptions, type MuseResult } from '@/features/muse';
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
 import {
-  codeScore, distinctReasons, distinctTopics, factsFor, firstName, introProfileOf, kindsOn, trustLabels, type Candidate, type SharedFact,
+  codeScore, distinctTopics, factsFor, firstName, introProfileOf, kindsOn, trustLabels, type Candidate, type SharedFact,
 } from './rules';
 
 const ROUTE = 'intros/click';
@@ -82,6 +84,16 @@ export function stepVerb(kind: IntroKind, questTitle: string | null): string {
   return 'worth a 20-minute coffee';
 }
 
+/** The facts the judge accepted, by 1-based number, in its order, each once, at most 3. */
+export function pickFacts(facts: string[], picks: number[]): string[] {
+  const out: string[] = [];
+  for (const n of picks) {
+    const f = facts[n - 1];
+    if (f && !out.includes(f)) out.push(f);
+  }
+  return out.slice(0, 3);
+}
+
 /** One side's private copy: its own turns in full, the other agent's turns as outcomes only. */
 export function sideLog(log: AgentTurn[], side: 'a' | 'b'): AgentTurn[] {
   return log.map((t) => (t.agent === side ? { ...t } : { agent: t.agent, text: '', outcome: t.outcome || 'replied' }));
@@ -101,8 +113,9 @@ const TURN_JSON = {
 };
 const JudgeZ = z.object({
   score: z.number().int().min(0).max(100),
-  reasonsA: z.array(z.string().min(1).max(220)).max(3),
-  reasonsB: z.array(z.string().min(1).max(220)).max(3),
+  /** Numbers (1-based) of the factsForA / factsForB lines the judge accepts as real reasons. */
+  factsA: z.array(z.number().int()).max(6),
+  factsB: z.array(z.number().int()).max(6),
   summary: z.string().min(1).max(280),
   noteA: z.string().min(1).max(400),
   noteB: z.string().min(1).max(400),
@@ -110,11 +123,11 @@ const JudgeZ = z.object({
 type Judge = z.infer<typeof JudgeZ>;
 const JUDGE_JSON = {
   type: 'object', additionalProperties: false,
-  required: ['score', 'reasonsA', 'reasonsB', 'summary', 'noteA', 'noteB'],
+  required: ['score', 'factsA', 'factsB', 'summary', 'noteA', 'noteB'],
   properties: {
     score: { type: 'integer', minimum: 0, maximum: 100 },
-    reasonsA: { type: 'array', maxItems: 3, items: { type: 'string' } },
-    reasonsB: { type: 'array', maxItems: 3, items: { type: 'string' } },
+    factsA: { type: 'array', maxItems: 6, items: { type: 'integer' } },
+    factsB: { type: 'array', maxItems: 6, items: { type: 'integer' } },
     summary: { type: 'string' },
     noteA: { type: 'string' },
     noteB: { type: 'string' },
@@ -217,11 +230,12 @@ export async function runClick(
 
   const factsA = factsFor(c.facts, 'a');
   const factsB = factsFor(c.facts, 'b');
+  const numbered = (fs: string[]) => fs.map((f, n) => `${n + 1}. ${f}`).join('\n') || '(none)';
   const kindNoun = c.kind === 'dating' ? 'date' : c.kind === 'networking' ? 'coffee chat' : 'friend match';
   const mockJudge = (): Judge => ({
     score: codeScore(fit),
-    reasonsA: factsA.slice(0, 3),
-    reasonsB: factsB.slice(0, 3),
+    factsA: factsA.map((_, n) => n + 1),
+    factsB: factsB.map((_, n) => n + 1),
     // The summary and notes name the trust path, the kind and the first step; the shared facts
     // live only in the reasons, so the card never says the same fact twice.
     summary: fit >= 2
@@ -246,8 +260,8 @@ export async function runClick(
         content: [
           'You are Muse, judging whether two people on Facebook should get a warm one-to-one intro, like a trusted friend would.',
           'Score fit 0-100. 85+ only when you would bet on this intro. Never invent facts.',
-          'reasonsA: up to 3 reasons written to A as "you", naming B by first name, each restating a different fact from factsForA (never the same fact twice). reasonsB: the mirror, from factsForB.',
-          'Never quote one person\'s private "looking for" text to the other person; keep the wording given for each side.',
+          'factsA: the numbers of the factsForA lines that are real, concrete reasons for this intro, best first; factsB: the same for factsForB. Leave out any line the transcript contradicts.',
+          'Never quote or paraphrase one person\'s private "looking for" text, or what their agent said they want, to the other person.',
           'summary: one sentence to both people naming the trust path and the kind. noteA: 1-2 sentences to A on why your agents think A and B would click; noteB: the mirror.',
           'summary, noteA and noteB must not repeat any fact used in the reasons; name the kind and the first step instead.',
           `End noteA and noteB with what the first step is worth, tied to the kind, e.g. "${verb}".`,
@@ -258,8 +272,8 @@ export async function runClick(
         content: [
           `Kind: ${c.kind}. A: ${aName}. B: ${bName}.`,
           `Trust path: ${trust.join('; ')}`,
-          `factsForA: ${JSON.stringify(factsA)}`,
-          `factsForB: ${JSON.stringify(factsB)}`,
+          `factsForA:\n${numbered(factsA)}`,
+          `factsForB:\n${numbered(factsB)}`,
           `First step: ${step.text}`,
           `Agent transcript:\n${log.map((t) => `${t.agent === 'a' ? `${aName}'s agent` : `${bName}'s agent`}: ${t.text}`).join('\n')}`,
         ].join('\n'),
@@ -268,12 +282,11 @@ export async function runClick(
     mock: mockJudge,
   }, deadline);
   const j = judged.data;
-  const clean = (rs: string[]) => rs.map((r) => r.trim()).filter(Boolean);
   return {
     score: j.score,
-    // Each reason must restate a different code-found fact; repeats and unfounded reasons are dropped.
-    reasonsA: distinctReasons(clean(j.reasonsA), c.facts, 'a', [aName, bName]),
-    reasonsB: distinctReasons(clean(j.reasonsB), c.facts, 'b', [aName, bName]),
+    // The reasons are the accepted facts in code's wording for that side; unknown numbers are dropped.
+    reasonsA: pickFacts(factsA, j.factsA),
+    reasonsB: pickFacts(factsB, j.factsB),
     summary: j.summary.trim(),
     noteA: j.noteA.trim(),
     noteB: j.noteB.trim(),

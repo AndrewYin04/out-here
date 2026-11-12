@@ -13,7 +13,7 @@ import { TABLE_KEYS, TABLE_NAMES, toRow } from '@/features/data/db';
 import { buildMemoryDb } from '@/features/data/memory-store';
 import { SupabaseBackend } from '@/features/data/supabase-store';
 import { MIN_RETRY_MS, museWithRetry } from '@/features/intros/server/agents';
-import { introProfileOf } from '@/features/intros/server/rules';
+import { candidatesFor, introProfileOf } from '@/features/intros/server/rules';
 import { privacyGuard, privateTexts } from '@/features/intros/server/privacy';
 import { listIntros, requestIntro, respondIntro, runIntroRound } from '@/features/intros/server/service';
 
@@ -42,10 +42,16 @@ function live() {
 }
 const mock = () => { process.env.MUSE_MOCK = '1'; };
 
-const line = (content: string, key: string) => {
-  const l = content.split('\n').find((x) => x.startsWith(`${key}: `));
-  return l ? l.slice(key.length + 2) : '';
+/** The numbered lines under `key:` in the judge prompt ("factsForA:\n1. ...\n2. ..."). */
+const numberedLines = (content: string, key: string): string[] => {
+  const ls = content.split('\n');
+  const i = ls.indexOf(`${key}:`);
+  if (i < 0) return [];
+  const out: string[] = [];
+  for (const l of ls.slice(i + 1)) { const m = /^\d+\. (.*)$/.exec(l); if (!m) break; out.push(m[1]); }
+  return out;
 };
+const nums = (fs: string[]) => fs.map((_, n) => n + 1);
 
 /**
  * A stand-in for live Muse: agent turns say something short; the judge scores 91 and echoes the
@@ -63,11 +69,11 @@ function fakeMuse(opts: {
     if (err) throw err;
     const content = req.messages.at(-1)!.content;
     if (req.schemaName === 'intro_judge') {
-      const factsA = JSON.parse(line(content, 'factsForA') || '[]') as string[];
-      const factsB = JSON.parse(line(content, 'factsForB') || '[]') as string[];
+      const factsA = numberedLines(content, 'factsForA');
+      const factsB = numberedLines(content, 'factsForB');
       const strong = factsA.length >= 2 && factsB.length >= 2;
       const reply = opts.judge?.(factsA, factsB) ?? {
-        score: strong ? 91 : 60, reasonsA: factsA.slice(0, 3), reasonsB: factsB.slice(0, 3),
+        score: strong ? 91 : 60, factsA: nums(factsA), factsB: nums(factsB),
         summary: 'You share a connection and your agents said yes.',
         noteA: 'Your agents think this is worth a coffee.', noteB: 'Your agents think this is worth a coffee.',
       };
@@ -334,36 +340,93 @@ describe('privacy: no card quotes the other side\'s looking-for before both acce
     for (const s of alexSecrets) expect(cardText(j)).not.toContain(s.toLowerCase());
   });
 
-  it('a live judge that quotes the other side gets paraphrased into a shared-interest reason', async () => {
+  it('no pre-accept card reason says what the other person or their agent was looking for (review P1)', async () => {
+    const directional = /agent|was looking for|is looking for|looking for something similar|(?<!You're )looking for/i;
+    for (const mode of ['mock', 'live'] as const) {
+      if (mode === 'mock') mock(); else { live(); fakeMuse(); }
+      const store = createMemoryStore();
+      const id = await proposed(store);
+      const a = (await listIntros(store, alex)).intros[0];
+      expect(a.state).toBe('new');
+      expect(a.reasons.length).toBeGreaterThanOrEqual(2);
+      for (const r of a.reasons) expect(r, r).not.toMatch(directional);
+      await respondIntro(store, alex, id, true);
+      const j = (await listIntros(store, jordan)).intros[0];
+      expect(j.state).toBe('new');
+      expect(j.reasons.length).toBeGreaterThanOrEqual(2);
+      for (const r of j.reasons) expect(r, r).not.toMatch(directional);
+      // A "you're looking for" reason only ever quotes the reader's own settings.
+      const own = async (id2: string) => privateOf(store, id2);
+      for (const r of a.reasons.filter((x) => x.startsWith("You're looking for"))) {
+        expect((await own(alex)).some((t) => r.includes(t)), r).toBe(true);
+      }
+      for (const r of j.reasons.filter((x) => x.startsWith("You're looking for"))) {
+        expect((await own(jordan)).some((t) => r.includes(t)), r).toBe(true);
+      }
+    }
+  });
+
+  it('candidate facts never write one person\'s want to the other person', async () => {
+    mock();
+    const store = createMemoryStore();
+    const { view } = await store.museContext();
+    for (const c of candidatesFor(view, alex, { kinds: ['friendship', 'networking', 'dating'], nowMs: Date.now() })) {
+      for (const f of c.facts) {
+        if (f.looker === 'a') expect(f.forB, f.forA ?? '').toBeNull();
+        if (f.looker === 'b') expect(f.forA, f.forB ?? '').toBeNull();
+        for (const t of [f.forA, f.forB]) if (t) expect(t).not.toMatch(/agent|something similar/);
+      }
+    }
+  });
+
+  it('a live judge cannot write reasons: they are code-found facts; notes that paraphrase the other side fall back', async () => {
     live();
     const store = createMemoryStore();
     const { view } = await store.museContext();
     const jl = introProfileOf(view, jordan).kinds.friendship.lookingFor;   // "friends for local shows and gig nights"
     const al = introProfileOf(view, alex).kinds.friendship.lookingFor;     // "people to go to local shows with"
+    const sent: { a: string[]; b: string[] }[] = [];
     fakeMuse({
-      judge: (factsA, factsB) => ({
-        score: 91,
-        reasonsA: [`Jordan is looking for ${jl}`, ...factsA.slice(0, 2)],
-        reasonsB: [`Alex wants ${al}`, ...factsB.slice(0, 2)],
-        summary: `Alex wants ${al} and Jordan wants ${jl}.`,
-        noteA: `Jordan said they want ${jl}.`,
-        noteB: `Alex said they want ${al}.`,
-      }),
+      judge: (factsA, factsB) => {
+        sent.push({ a: factsA, b: factsB });
+        return {
+          score: 91, factsA: [2, 1, 2, 99], factsB: nums(factsB),
+          summary: `Alex wants ${al} and Jordan wants ${jl}.`,
+          noteA: 'Jordan wants a gig-night buddy.',
+          noteB: 'Alex wants to meet people who do product and design coffee chats.',
+        };
+      },
     });
     const r = await runIntroRound(store, alex);
     const a = r.intro!;
     expect(a.state).toBe('new');
-    expect(cardText(a)).not.toContain(jl.toLowerCase());
-    expect(cardText(a)).not.toContain('gig nights');
+    // What the judge saw for A (every candidate) holds none of the candidates' private words.
+    for (const x of sent) expect(x.a.join(' ').toLowerCase()).not.toMatch(/gig|friends for local shows/);
+    // Reasons are the picked facts (by number, deduped, unknown numbers dropped), in code's wording.
+    const call = sent.find((x) => x.a[1] === a.reasons[0]);
+    expect(call).toBeDefined();
+    expect(a.reasons).toEqual([call!.a[1], call!.a[0]]);
+    expect(cardText(a)).not.toContain('gig');
     expect(a.summary).toBe('Your agents agree Jordan would be a good intro for you.');
-    // The quote became a reason built from words both sides wrote.
-    expect(a.reasons).toContain("You're both looking for people into local shows");
     await respondIntro(store, alex, a.id, true);
     const j = (await listIntros(store, jordan)).intros[0];
     expect(cardText(j)).not.toContain(al.toLowerCase());
-    // The stored summary (later Muse's note to both) was replaced too.
+    expect(j.reasons).toEqual(call!.b.slice(0, 3));
     expect((await row(store, a.id)).summary).not.toContain(al);
     expect((await row(store, a.id)).summary).not.toContain(jl);
+  });
+
+  it('a judge that returns reason text instead of fact numbers is rejected, not shown', async () => {
+    live();
+    const store = createMemoryStore();
+    fakeMuse({
+      judge: () => ({
+        score: 95, reasonsA: ['Jordan wants a gig-night buddy', 'x'], reasonsB: ['y', 'z'],
+        summary: 's', noteA: 'n', noteB: 'n',
+      }),
+    });
+    const r = await runIntroRound(store, alex);
+    expect(r.intro).toBeNull();
   });
 
   it('an on-request looking-for text is kept from the other side', async () => {
@@ -372,14 +435,14 @@ describe('privacy: no card quotes the other side\'s looking-for before both acce
     const ask = 'friends for vinyl swaps and gig nights';
     fakeMuse({
       judge: (factsA, factsB) => ({
-        score: 91, reasonsA: factsA.slice(0, 3), reasonsB: [`Alex is after ${ask}`, ...factsB.slice(0, 2)],
-        summary: 'You share a connection.', noteA: 'Worth a coffee.', noteB: `Alex wants ${ask}.`,
+        score: 91, factsA: nums(factsA), factsB: nums(factsB),
+        summary: 'You share a connection.', noteA: 'Worth a coffee.', noteB: 'Alex is hunting for swaps of vinyl.',
       }),
     });
     const r = await requestIntro(store, alex, 'friendship', ask);
     expect(r.intro).not.toBeNull();
     const stored = await row(store, r.intro!.id) as Intro;
-    expect([...(stored.reasonsB ?? []), stored.noteB].join(' ').toLowerCase()).not.toContain('vinyl swaps');
+    expect([...(stored.reasonsB ?? []), stored.noteB].join(' ').toLowerCase()).not.toContain('swap');
   });
 
   it('guard unit: own words and public facts pass, the other side\'s words do not', () => {
@@ -397,6 +460,28 @@ describe('privacy: no card quotes the other side\'s looking-for before both acce
     expect(g.reasons(['Jordan wants gig nights', 'You both love local bands'])).toEqual([
       "You're both looking for people into local shows", 'You both love local bands',
     ]);
+  });
+
+  it('guard unit: paraphrases of the other side\'s words are caught (plurals, hyphens, word order, rare words)', () => {
+    const viewer = { interests: ['local bands', 'dumplings'], bio: 'New in town.', job: 'Junior product analyst' } as never;
+    const other = { interests: ['local bands', 'film photography'], bio: '', job: 'Freelance graphic designer' } as never;
+    const g = privacyGuard({
+      viewer, seenOther: other,
+      viewerIntro: { userId: 'x', kinds: { friendship: { on: true, lookingFor: 'people to go to local shows with' }, networking: { on: true, lookingFor: 'product/design coffee chats' }, dating: { on: false, lookingFor: '' } }, datingPrefs: null, maxKm: 25, paused: false },
+      secrets: ['friends for local shows and gig nights', 'coffee chats with product people about design work'],
+    });
+    // The 5 paraphrases from review P2 that the old exact-bigram guard let through, plus two more.
+    for (const t of [
+      'Jordan wants a gig-night buddy', 'Jordan loves gigs at night', 'Jordan wants to meet product people',
+      'Jordan is hoping for gig night friends', 'Jordan privately said they want nights out at gigs',
+      'Jordan wants gig nights', 'Jordan wants people (product ones) for chats',
+    ]) expect(g.leaks(t), t).toBe(true);
+    for (const t of [
+      "You're looking for people to go to local shows with, and Jordan is into local bands",
+      "You're looking for product/design coffee chats, and Jordan works as a freelance graphic designer",
+      "You're both looking for new friends into local shows", "You're both open to coffee chats about product and design",
+      'Your agents agree Jordan is a strong friend match for you, and they think it\'s worth going to the local-band show pregame together.',
+    ]) expect(g.leaks(t), t).toBe(false);
   });
 
   it('a stored row that quotes private text is cleaned when the card is built', async () => {

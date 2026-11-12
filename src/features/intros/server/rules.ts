@@ -102,42 +102,56 @@ const hit = (keys: string[], text: string | null | undefined) => {
 const article = (s: string) => (/^[aeiou]/i.test(s) ? 'an' : 'a');
 
 /**
- * Where y's profile matches what someone is looking for. Public fields (interests, job, bio)
- * come first. y's own Intro settings are the last resort and are never quoted to the other side.
+ * Where y's public profile (as x may see it) matches what x is looking for: interests, job, bio.
+ * y's own Intro settings are never evidence here; a want both sides wrote is a mutual fact.
  */
-type Evidence = { you: string; they: (name: string) => string; term: string };
-function evidence(y: Profile, yP: IntroProfile, keys: string[], kind: IntroKind): Evidence | null {
+type Evidence = { they: (name: string) => string; term: string };
+function evidence(y: Profile, keys: string[], kind: IntroKind): Evidence | null {
   const job = y.job ?? null;
-  const yLooking = kindsOn(yP).map((k) => yP.kinds[k].lookingFor).filter(Boolean);
   const lowerJob = job ? `${article(job)} ${job.charAt(0).toLowerCase()}${job.slice(1)}` : '';
-  const byJob = (): Evidence | null => (job && hit(keys, job)
-    ? { you: `you work as ${lowerJob}`, they: (n) => `${n} works as ${lowerJob}`, term: job } : null);
+  const byJob = (): Evidence | null => (job && hit(keys, job) ? { they: (n) => `${n} works as ${lowerJob}`, term: job } : null);
   const byInterest = (): Evidence | null => {
     const i = y.interests.find((x) => hit(keys, x));
-    return i ? { you: `you're into ${i}`, they: (n) => `${n} is into ${i}`, term: i } : null;
+    return i ? { they: (n) => `${n} is into ${i}`, term: i } : null;
   };
   const byBio = (): Evidence | null => {
     const k = hit(keys, y.bio);
-    return k ? { you: `your bio mentions ${k}`, they: (n) => `${n}'s bio mentions ${k}`, term: k } : null;
+    return k ? { they: (n) => `${n}'s bio mentions ${k}`, term: k } : null;
   };
-  const byLooking = (): Evidence | null => {
-    const l = yLooking.find((x) => hit(keys, x));
-    return l ? { you: `you're looking for ${l}`, they: (n) => `${n} is looking for something similar`, term: l } : null;
-  };
-  const order = kind === 'networking' ? [byJob, byInterest, byBio, byLooking] : [byInterest, byJob, byBio, byLooking];
+  const order = kind === 'networking' ? [byJob, byInterest, byBio] : [byInterest, byJob, byBio];
   for (const f of order) { const e = f(); if (e) return e; }
   return null;
 }
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "shows" and "show", "gigs" and "gig" count as one word when two wants are compared. */
+export const stem = (w: string) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y`
+  : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
+
+const MUTUAL_LINE: Record<IntroKind, (words: string) => string> = {
+  friendship: (w) => `You're both looking for new friends into ${w}`,
+  networking: (w) => `You're both open to coffee chats about ${w}`,
+  dating: (w) => `You're both hoping to meet someone into ${w}`,
+};
+const joinWords = (ws: string[]) => (ws.length > 2 ? `${ws.slice(0, -1).join(', ')} and ${ws.at(-1)}` : ws.join(' and '));
 
 /**
- * One concrete shared fact, written three ways: forA addresses A as "you", forB addresses B,
- * and judge is the neutral server-side form. A person's own looking-for text is quoted only to
- * them; the other side sees a public-level paraphrase.
+ * The words two looking-for texts share, in `mine`'s order and spelling: "people to go to local
+ * shows with" and "friends for local shows and gig nights" share "local", "shows". Empty when none.
+ */
+export function sharedWants(mine: string, theirs: string): string[] {
+  const t = new Set(keywords(theirs).map(stem));
+  return keywords(mine).filter((w) => t.has(stem(w)));
+}
+
+/**
+ * One concrete shared fact, written to each side: forA addresses A as "you", forB addresses B.
+ * A side whose text is null never sees the fact. A fact about what x is looking for is written
+ * to x only ("You're looking for ..., and Jordan works as ..."): y is never told what x's agent
+ * was looking for. A want both sides wrote for a kind both turned on is written to both
+ * symmetrically ("You're both open to coffee chats about design"), each in their own words.
  */
 export type SharedFact = {
-  keyword: string; forA: string; forB: string; judge: string; looker: 'a' | 'b' | null;
+  keyword: string; forA: string | null; forB: string | null; looker: 'a' | 'b' | null;
   /** Keywords of the underlying thing (an interest, a job): two facts sharing one are the same fact. */
   topic: string[];
 };
@@ -165,32 +179,10 @@ export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
   const seen: string[][] = [];
   const out: string[] = [];
   for (const f of [...facts].sort((x, y) => rank(x) - rank(y))) {
-    if (seen.some((t) => sameTopic(t, f.topic))) continue;
+    const text = side === 'a' ? f.forA : f.forB;
+    if (!text || seen.some((t) => sameTopic(t, f.topic))) continue;
     seen.push(f.topic);
-    out.push(side === 'a' ? f.forA : f.forB);
-  }
-  return out;
-}
-
-/**
- * Keeps model-written reasons that each restate a different code-found fact (by keyword overlap
- * with that side's wording); a reason matching no fact, or a fact already used, is dropped.
- */
-export function distinctReasons(reasons: string[], facts: SharedFact[], side: 'a' | 'b', names: string[]): string[] {
-  const skip = new Set(names.map((n) => n.toLowerCase()));
-  const kw = (t: string) => keywords(t).filter((k) => !skip.has(k));
-  const used: string[][] = [];
-  const out: string[] = [];
-  for (const r of reasons) {
-    const rk = kw(r);
-    let best: SharedFact | null = null; let bestN = 0;
-    for (const f of facts) {
-      const n = kw(side === 'a' ? f.forA : f.forB).filter((k) => rk.includes(k)).length;
-      if (n > bestN) { best = f; bestN = n; }
-    }
-    if (!best || bestN < 2 || used.some((t) => sameTopic(t, best.topic))) continue;
-    used.push(best.topic);
-    out.push(r);
+    out.push(text);
   }
   return out;
 }
@@ -207,27 +199,32 @@ export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroPr
   for (const i of a.interests) {
     if (bInterests.has(i.toLowerCase())) {
       const t = `You both love ${i}`;
-      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, judge: `Both love ${i}`, looker: null, topic: keywords(i) });
+      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, looker: null, topic: keywords(i) });
     }
   }
+  // A want both sides wrote, for a kind both turned on: one symmetric line, each in their own words.
+  for (const k of INTRO_KINDS) {
+    if (!aP.kinds[k]?.on || !bP.kinds[k]?.on) continue;
+    const aw = sharedWants(aP.kinds[k].lookingFor, bP.kinds[k].lookingFor);
+    const bw = sharedWants(bP.kinds[k].lookingFor, aP.kinds[k].lookingFor);
+    if (!aw.length || !bw.length) continue;
+    out.push({ keyword: aw[0], forA: MUTUAL_LINE[k](joinWords(aw)), forB: MUTUAL_LINE[k](joinWords(bw)), looker: null, topic: aw });
+  }
   // Evidence about y uses only the fields x is allowed to see (y always sees their own).
-  const pairs: [Profile, IntroProfile, Profile, IntroProfile, boolean][] = [
-    [a, aP, v.profileFor(a.id, b), bP, true], [b, bP, v.profileFor(b.id, a), aP, false],
+  const pairs: [IntroProfile, Profile, boolean][] = [
+    [aP, v.profileFor(a.id, b), true], [bP, v.profileFor(b.id, a), false],
   ];
-  for (const [x, xP, y, yP, xIsA] of pairs) {
+  for (const [xP, y, xIsA] of pairs) {
     for (const k of kindsOn(xP)) {
       const looking = xP.kinds[k].lookingFor.trim();
       if (!looking) continue;
       const keys = keywords(looking);
-      const e = evidence(y, yP, keys, k);
+      const e = evidence(y, keys, k);
       if (!e) continue;
-      const X = firstName(x); const Y = firstName(y);
-      const forX = `You're looking for ${looking}, and ${e.they(Y)}`;
-      const forY = `${cap(e.you)}, which is what ${X}'s agent was looking for`;
+      const forX = `You're looking for ${looking}, and ${e.they(firstName(y))}`;
       out.push({
         keyword: hit(keys, looking) ?? keys[0],
-        forA: xIsA ? forX : forY, forB: xIsA ? forY : forX,
-        judge: `${X} is looking for ${looking}; ${e.they(Y)}`,
+        forA: xIsA ? forX : null, forB: xIsA ? null : forX,
         looker: xIsA ? 'a' : 'b',
         topic: keywords(e.term),
       });

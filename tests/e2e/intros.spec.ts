@@ -44,6 +44,9 @@ test.describe('Muse Intros', () => {
       // Reasons talk to alex as "you" and never quote Jordan's private settings.
       await expect(card.getByTestId('intro-reasons')).not.toContainText('Alex');
       await expect(card.getByTestId('intro-reasons')).not.toContainText('gig nights');
+      // Review P1: before Jordan says yes, nothing tells Alex what Jordan (or Jordan's agent) asked for.
+      await expect(card.getByTestId('intro-reasons')).not.toContainText(/agent|was looking for|something similar/);
+      await alex.screenshot({ path: `.verify/intros/intros-alex-new-${width}.png` });
       await expect(card.getByTestId('first-step')).toContainText('Local-band show pregame');
       await expect(card.getByRole('link', { name: 'See on map' })).toHaveAttribute('href', /^\/out-here\?quest=/);
 
@@ -80,6 +83,9 @@ test.describe('Muse Intros', () => {
       await expect(jCard).toHaveAttribute('data-state', 'new');
       await expect(jCard).toContainText('Alex already said yes');
       await expect(jCard.getByTestId('intro-reasons')).not.toContainText('Jordan');
+      await expect(jCard.getByTestId('intro-reasons')).not.toContainText(/agent|was looking for|something similar/);
+      expect(await jCard.getByTestId('intro-reasons').locator('li').count()).toBeGreaterThanOrEqual(2);
+      await jordan.screenshot({ path: `.verify/intros/intros-jordan-new-${width}.png` });
       await expect(jCard.getByRole('button', { name: 'Accept' })).toBeInViewport();
       await jCard.getByRole('button', { name: 'Accept' }).click();
       await expect(jCard.getByTestId('intro-status')).toHaveText("You're connected");
