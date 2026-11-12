@@ -56,6 +56,14 @@ export function MessengerPage() {
 
   const showConversation = !!activeId || !!to;
 
+  // Desktop opens the most recent chat right away, like facebook.com/messages. Phones keep the
+  // chat list as the first screen. router.replace so Back does not bounce to /messages.
+  useEffect(() => {
+    if (activeId || to || !shown || shown.length === 0) return;
+    if (typeof window === 'undefined' || !window.matchMedia('(min-width: 768px)').matches) return;
+    router.replace(ROUTES.thread(shown[0].id));
+  }, [activeId, to, shown, router]);
+
   return (
     <div className="grid h-[calc(100dvh-112px)] md:h-[calc(100dvh-56px)] md:grid-cols-[360px_minmax(0,1fr)]" data-testid="messenger">
       <Card

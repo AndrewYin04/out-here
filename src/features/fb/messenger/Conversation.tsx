@@ -270,13 +270,14 @@ function Bubble({ m, mine, first, last, onRetry }: { m: Pending; mine: boolean; 
     ? cn('rounded-[18px]', !first && 'rounded-tr-[4px]', !last && 'rounded-br-[4px]')
     : cn('rounded-[18px]', !first && 'rounded-tl-[4px]', !last && 'rounded-bl-[4px]');
   return (
-    <div className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
+    <div className={cn('flex min-w-0 max-w-full flex-col', mine ? 'items-end' : 'items-start')}>
       <p
         data-testid={mine ? 'bubble-mine' : 'bubble-theirs'}
         data-pending={sending ? '1' : undefined}
         title={new Date(m.createdAt).toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })}
         className={cn(
-          'whitespace-pre-wrap break-words text-[15px] leading-5',
+          // overflow-wrap:anywhere also lowers min-content width, so a long URL wraps inside the bubble.
+          'max-w-full whitespace-pre-wrap text-[15px] leading-5 [overflow-wrap:anywhere]',
           emojiOnly ? 'text-[32px] leading-10' : cn('px-3 py-2', radius, mine ? 'bg-fb-blue text-white' : 'bg-[#E2E5E9] text-fb-text'),
           sending && 'opacity-70',
         )}
