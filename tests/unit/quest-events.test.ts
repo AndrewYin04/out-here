@@ -150,6 +150,11 @@ describe('plan page details', () => {
     expect(seen.memberCount).toBe(2);
     expect(seen.quest.memberIds).toHaveLength(2);
     expect(seen.quest.memberIds).not.toContain(maya);
+    // A stranger to the host still sees their own friend going.
+    const mayasFriend = [...v.friendIds(maya)].find((id) => id !== alex && !v.areFriends(id, alex))!;
+    const seenByMayasFriend = await store.quest(mayasFriend, quest.id);
+    expect(seenByMayasFriend.canSeeGuests).toBe(false);
+    expect(seenByMayasFriend.members.map((m) => m.id)).toEqual([maya]);
     const friend = await store.quest(maya, quest.id);
     expect(friend.canSeeGuests).toBe(true);
     expect(friend.members.map((m) => m.id).sort()).toEqual([alex, maya].sort());

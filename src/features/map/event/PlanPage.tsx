@@ -220,7 +220,7 @@ export function PlanPage({ id }: { id: string }) {
         <h2 className="text-[17px] font-bold text-fb-text">
           Going <span className="font-normal text-fb-text-2">· {d.memberCount}</span>
         </h2>
-        {d.canSeeGuests ? (
+        {d.canSeeGuests || guests.length > 0 ? (
           <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="plan-guests">
             {guests.map((p) => (
               <li key={p.id} className="flex min-w-0 items-center gap-2">
@@ -234,9 +234,11 @@ export function PlanPage({ id }: { id: string }) {
               </li>
             ))}
           </ul>
-        ) : (
+        ) : null}
+        {!d.canSeeGuests && (
           <p className="mt-1 text-fb-body text-fb-text-2" data-testid="plan-guests-hidden">
-            {d.memberCount} {d.memberCount === 1 ? 'person is' : 'people are'} going. Names show to the host&apos;s friends and people who join.
+            {guests.length > 0 ? 'Only your friends are shown. ' : `${d.memberCount} ${d.memberCount === 1 ? 'person is' : 'people are'} going. `}
+            Other names show to the host&apos;s friends and people who join.
           </p>
         )}
       </Card>

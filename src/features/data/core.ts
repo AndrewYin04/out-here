@@ -29,7 +29,7 @@ export type QuestDetail = {
   quest: Quest; seatsLeft: number; host: PersonCard | null; members: PersonCard[]; viewerIsMember: boolean;
   /** Going count, host included. Shown to everyone, even when `members` is hidden. */
   memberCount: number;
-  /** False for strangers: they see the count, never who is going. */
+  /** False for strangers to the host: `members` then holds only the viewer and their own friends; the rest is a count. */
   canSeeGuests: boolean;
   /** Members who checked in at the spot ("5 here"). */
   hereCount: number;
@@ -628,7 +628,8 @@ export class CoreStore {
     const g = q.groupId ? v.groupById.get(q.groupId) : undefined;
     return {
       quest: v.questFor(viewerId, q), seatsLeft: v.seatsLeft(q), host: v.person(viewerId, q.hostId),
-      members: canSeeGuests ? v.people(viewerId, memberIds) : [],
+      // Strangers to the host still see their own friends going (never anyone else).
+      members: v.people(viewerId, canSeeGuests ? memberIds : memberIds.filter((m) => m === viewerId || v.areFriends(viewerId, m))),
       viewerIsMember: memberIds.includes(viewerId),
       memberCount: memberIds.length, canSeeGuests,
       hereCount: here.length, viewerCheckedIn: here.includes(viewerId), isLive: v.isQuestLive(q),

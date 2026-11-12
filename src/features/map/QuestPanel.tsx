@@ -169,7 +169,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
                 Going <span className="font-normal text-fb-text-2">· {shown.memberCount ?? people.length}</span>
               </h3>
               {shown.canSeeGuests === false && (
-                <p className="text-fb-meta text-fb-text-2" data-testid="quest-guests-hidden">Guests are visible to the host&apos;s friends and people who join.</p>
+                <p className="text-fb-meta text-fb-text-2" data-testid="quest-guests-hidden">{people.length > 0 ? 'Only your friends are shown. ' : ''}Other guests show to the host&apos;s friends and people who join.</p>
               )}
               {friendLine && <p className="text-fb-meta text-fb-text-2" data-testid="quest-friends-going">{friendLine}</p>}
               <ul className="mt-2 space-y-2" data-testid="quest-going">
