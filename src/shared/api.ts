@@ -14,6 +14,10 @@
 // POST /api/availability               body: { userId, text, startsAt, endsAt, location } -> { availability }
 // DELETE /api/availability                                              -> { ok: true }  ("Busy": ends the viewer's windows)
 // GET  /api/availability/free-with-me                                   -> FreeWithMeResponse (friends free when the viewer is, ranked)
+// POST /api/together                   body: { friendIds }              -> TogetherResponse  (opens the group's shared plan, or creates it with Muse)
+// GET  /api/together                                                    -> { plans: TogetherView[] }  (viewer's open + just-confirmed plans)
+// GET  /api/together/:id                                                -> TogetherResponse
+// POST /api/together/:id/vote          body: { questId, in }            -> TogetherResponse  (locks when every member is in on one option)
 // GET  /api/friends/:userId/availability                                -> { items: (Availability & { friend: Profile })[] }
 // GET  /api/locations/friends          (viewer from x-persona)          -> { pins: FriendPin[] }   (canSee on audience; fuzzed when approximate; paused/expired hidden)
 // GET  /api/locations/me                                                -> { share: LocationShare | null }
@@ -82,6 +86,7 @@ import type {
   Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
   Notification, PlanSuggestion, Post, Profile, Quest, ReactionCounts, ReactionType, Reel,
   RsvpStatus, Story, Thread,
+  TogetherPlan,
 } from './types';
 
 export type ApiError = { error: string };
@@ -114,6 +119,8 @@ export type FreeWithMeItem = {
 };
 /** Empty when the viewer is busy. `group` is the suggested set of friend ids, best first. */
 export type FreeWithMeResponse = { items: FreeWithMeItem[]; group: ID[] };
+export type TogetherView = TogetherPlan & { members: PersonCard[] };
+export type TogetherResponse = { plan: TogetherView };
 export type FriendAvailabilityResponse = { items: (Availability & { friend: Profile })[] };
 export type UsersResponse = { users: Profile[] };
 export type CreateInviteBody = {

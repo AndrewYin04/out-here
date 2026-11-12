@@ -1,18 +1,19 @@
 'use client';
-// Step 1 and the start of step 2 of the loop:
-// - StatusPill: the viewer's status (Free till X / Free at X / Busy) and a menu to change it.
-//   Free and Free later create an availability window friends can see; Busy ends them.
-// - BothFreeNudge: "You and Maya are both free till 12:10" when the viewer's window overlaps a
-//   friend's, with "Make a plan" opening the composer for the two of them.
+// "Am I free?" and who's free with you:
+// - useMyStatus: the viewer's status (Free till X / Free at X / Busy) and actions to change it.
+//   Free creates an availability window friends can see; Busy ends them and gives no reason.
+// - StatusRow: that status at the top of the "I'm free" composer, so status and Muse are one place.
+// - BothFreeNudge: who's free when you are, the suggested group, and the shared plan once
+//   someone in the group started one.
 import { ChevronDown, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch, apiPost, useApi, useViewer } from '@/features/data';
 import { Avatar, cn } from '@/features/ui';
 import {
   DEMO_CENTER, formatDemoTime, freeStatus, freeStatusLabel,
-  type Availability, type FreeWithMeResponse, type LatLng, type LocationShare, type FreeStatus,
+  type Availability, type FreeWithMeResponse, type LatLng, type LocationShare, type FreeStatus, type TogetherResponse, type TogetherView,
 } from '@/shared';
-import { AVAILABILITY_CHANGED as CHANGED, availabilityChanged, openPlanWith, usePlanOpen } from './plan-state';
+import { AVAILABILITY_CHANGED as CHANGED, availabilityChanged, openTogether, usePlanOpen, useTogetherId } from './plan-state';
 
 export function useMyAvailability() {
   const { viewer } = useViewer();
@@ -39,40 +40,14 @@ function useNowTick(ms = 30_000): number {
   return tick;
 }
 
-const NOW_OPTIONS = [{ label: '30 min', min: 30 }, { label: '1 hr', min: 60 }, { label: '2 hr', min: 120 }] as const;
-const LATER_OPTIONS = [{ label: 'in 30 min', min: 30 }, { label: 'in 1 hr', min: 60 }, { label: 'in 2 hr', min: 120 }] as const;
-const LATER_LENGTH_MIN = 60;
-
-function Dot({ s }: { s: FreeStatus }) {
-  return (
-    <span aria-hidden className={cn(
-      'size-2.5 shrink-0 rounded-full',
-      s.kind === 'free' ? 'bg-fb-green' : s.kind === 'later' ? 'border-2 border-fb-green bg-white' : 'bg-fb-text-2',
-    )} />
-  );
-}
-
-export function StatusPill({ className }: { className?: string }) {
-  const planOpen = usePlanOpen();
+/** The viewer's status and the actions that change it. */
+export function useMyStatus() {
   useNowTick();
   const mine = useMyAvailability();
   const share = useApi<{ share: LocationShare | null }>('/api/locations/me');
   const status = freeStatus(mine.data?.items ?? [], new Date());
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    const onDown = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setOpen(false); };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('pointerdown', onDown);
-    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pointerdown', onDown); };
-  }, [open]);
-
   const where: LatLng = share.data?.share?.location ?? DEMO_CENTER;
 
   const run = useCallback(async (action: () => Promise<unknown>) => {
@@ -82,7 +57,6 @@ export function StatusPill({ className }: { className?: string }) {
       await action();
       availabilityChanged();
       await mine.refetch();
-      setOpen(false);
     } catch {
       setError('Couldn’t update your status. Try again.');
     } finally {
@@ -90,68 +64,58 @@ export function StatusPill({ className }: { className?: string }) {
     }
   }, [mine]);
 
-  const setFree = (startMin: number, lengthMin: number) => run(() => {
+  const setFree = (startMin: number, lengthMin: number, note = 'free') => run(() => {
     // "Now" starts a few seconds back so client/server clock skew can't make it "later".
     const start = new Date(Date.now() + (startMin === 0 ? -5_000 : startMin * 60_000));
     const end = new Date(Date.now() + (startMin + lengthMin) * 60_000);
-    return apiPost('/api/availability', {
-      text: note.trim() || 'free', startsAt: start.toISOString(), endsAt: end.toISOString(), location: where,
-    });
+    return apiPost('/api/availability', { text: note.trim() || 'free', startsAt: start.toISOString(), endsAt: end.toISOString(), location: where });
   });
   const setBusyStatus = () => run(() => apiFetch('/api/availability', { method: 'DELETE' }));
+  return { status, busy, error, setFree, setBusy: setBusyStatus };
+}
 
-  if (planOpen) return null;
+export function StatusDot({ s, className }: { s: FreeStatus; className?: string }) {
   return (
-    <div ref={menuRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        data-testid="status-pill"
-        data-status={status.kind}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-2 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-card hover:bg-fb-hover"
-      >
-        <Dot s={status} />
-        {freeStatusLabel(status)}
-        <ChevronDown size={16} aria-hidden className="text-fb-text-2" />
-      </button>
+    <span aria-hidden className={cn(
+      'size-2.5 shrink-0 rounded-full',
+      s.kind === 'free' ? 'bg-fb-green' : s.kind === 'later' ? 'border-2 border-fb-green bg-white' : 'bg-fb-text-2',
+      className,
+    )} />
+  );
+}
 
-      {open && (
-        <div role="menu" aria-label="Your status" data-testid="status-menu"
-          className="absolute bottom-full left-1/2 mb-2 w-[300px] max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-card bg-fb-surface p-3 shadow-popover">
-          <p className="text-[13px] text-fb-text-2">Friends you share with see this on their map. Busy shows no reason.</p>
-          <label htmlFor="status-note" className="mt-3 block text-[13px] font-semibold text-fb-text">Up for anything? (optional)</label>
-          <input id="status-note" value={note} maxLength={80} placeholder="hungry, coffee, a walk…" onChange={(e) => setNote(e.target.value)}
-            className="mt-1 w-full rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 text-[14px] outline-none focus:border-fb-blue" />
+const QUICK = [{ label: '30 min', min: 30 }, { label: '1 hr', min: 60 }, { label: '2 hr', min: 120 }] as const;
 
-          <p className="mt-3 flex items-center gap-2 text-[14px] font-semibold"><Dot s={{ kind: 'free', until: '' }} />Free now for</p>
-          <div className="mt-1 flex gap-2">
-            {NOW_OPTIONS.map((o) => (
-              <button key={o.min} type="button" role="menuitem" aria-label={`Free now for ${o.label}`} disabled={busy} onClick={() => void setFree(0, o.min)}
-                className="h-8 flex-1 rounded-pill bg-fb-blue-tint text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50">
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          <p className="mt-3 flex items-center gap-2 text-[14px] font-semibold"><Dot s={{ kind: 'later', from: '', until: '' }} />Free later, for an hour</p>
-          <div className="mt-1 flex gap-2">
-            {LATER_OPTIONS.map((o) => (
-              <button key={o.min} type="button" role="menuitem" aria-label={`Free ${o.label} for an hour`} disabled={busy} onClick={() => void setFree(o.min, LATER_LENGTH_MIN)}
-                className="h-8 flex-1 rounded-pill bg-fb-secondary-btn text-[13px] font-semibold text-fb-text hover:brightness-95 disabled:opacity-50">
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          <button type="button" role="menuitem" disabled={busy || status.kind === 'busy'} onClick={() => void setBusyStatus()}
-            className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-btn bg-fb-secondary-btn text-[14px] font-semibold text-fb-text hover:brightness-95 disabled:opacity-50">
-            <Dot s={{ kind: 'busy' }} />{status.kind === 'busy' ? 'You’re busy' : 'Set to busy'}
-          </button>
-          {error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{error}</p>}
+/**
+ * Top of the composer. Free: "You're free till 3:49 · friends can see it · Set busy".
+ * Busy: "Just show friends you're free" with 30 min / 1 hr / 2 hr (no Muse needed).
+ * Sending the composer also marks you free for the window Muse understood.
+ */
+export function StatusRow({ note }: { note?: string }) {
+  const { status, busy, error, setFree, setBusy } = useMyStatus();
+  return (
+    <div className="px-4 pb-2" data-testid="status-row" data-status={status.kind}>
+      {status.kind === 'busy' ? (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <span className="text-[13px] text-fb-text-2">Or just show friends you’re free:</span>
+          {QUICK.map((o) => (
+            <button key={o.min} type="button" disabled={busy} aria-label={`Free now for ${o.label}`}
+              onClick={() => void setFree(0, o.min, note)}
+              className="h-7 rounded-pill bg-fb-blue-tint px-2.5 text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50">
+              {o.label}
+            </button>
+          ))}
         </div>
+      ) : (
+        <p className="flex flex-wrap items-center gap-2 text-[13px] text-fb-text-2">
+          <StatusDot s={status} />
+          <span><span className="font-semibold text-fb-text">You’re {freeStatusLabel(status).replace(/^Free/, 'free')}</span> · friends can see it</span>
+          <button type="button" disabled={busy} onClick={() => void setBusy()} className="font-semibold text-fb-blue hover:underline disabled:opacity-50">
+            Set busy
+          </button>
+        </p>
       )}
+      {error && <p role="alert" className="mt-1 text-[13px] text-fb-red">{error}</p>}
     </div>
   );
 }
@@ -190,7 +154,32 @@ export function BothFreeNudge({ className }: { className?: string }) {
   // A new suggestion from the server resets the selection to it.
   useEffect(() => { setPicked(new Set(groupKey ? groupKey.split(',') : [])); }, [groupKey]);
 
-  if (planOpen || items.length === 0 || hidden === groupKey) return null;
+  // Shared plans: one per group, so whoever taps first starts it and everyone else opens the same one.
+  const togetherOpenId = useTogetherId();
+  const shared = useApi<{ plans: TogetherView[] }>('/api/together', [`user:${viewer.id}`]);
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const start = async (friendIds: string[]) => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const r = await apiPost<TogetherResponse>('/api/together', { friendIds });
+      openTogether(r.plan.id);
+      void shared.refetch();
+    } catch {
+      setStartError('Muse couldn’t reach everyone just now. Try again.');
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  if (planOpen || togetherOpenId) return null;
+  const live = shared.data?.plans ?? [];
+  const pending = live.find((p) => p.status === 'proposing');
+  const done = live.find((p) => p.status === 'confirmed');
+  if (pending) return <SharedBanner plan={pending} viewerId={viewer.id} className={className} />;
+  if (done && hidden !== done.id) return <SharedBanner plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
+  if (items.length === 0 || hidden === groupKey) return null;
   const byId = new Map(items.map((i) => [i.friend.id, i]));
   const group = (api.data?.group ?? []).flatMap((id) => byId.get(id) ?? []);
   const lead = group.length > 0 ? group : [items[0]];
@@ -205,7 +194,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
     : lead[0].text && lead[0].text !== 'free' ? `“${lead[0].text}”` : `${leadNames[0]} shared they’re free`;
   const others = items.length - lead.length;
   const chosen = items.filter((i) => picked.has(i.friend.id));
-  const plan = (people: typeof items) => openPlanWith(`with ${names(people.map((p) => first(p.friend.name)))}, `);
+  const plan = (people: typeof items) => { if (!starting) void start(people.map((p) => p.friend.id)); };
   const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
@@ -223,9 +212,9 @@ export function BothFreeNudge({ className }: { className?: string }) {
           <p className="truncate text-[12px] text-fb-text-2">{sub}</p>
         </div>
         {!expanded && (
-          <button type="button" onClick={() => plan(lead)}
-            className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
-            Make a plan
+          <button type="button" onClick={() => plan(lead)} disabled={starting} data-testid="free-see-plans"
+            className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
+            {starting ? '✨ Asking…' : 'See plans'}
           </button>
         )}
         <button type="button" aria-label="Hide" onClick={() => setHidden(groupKey)}
@@ -273,12 +262,59 @@ export function BothFreeNudge({ className }: { className?: string }) {
             })}
           </ul>
           <div className="border-t border-fb-divider-soft p-2.5">
-            <button type="button" disabled={chosen.length === 0} onClick={() => plan(chosen)} data-testid="free-make-plan"
+            <button type="button" disabled={chosen.length === 0 || starting} onClick={() => plan(chosen)} data-testid="free-make-plan"
               className="h-10 w-full rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-50">
-              {chosen.length === 0 ? 'Pick who to invite' : `Make a plan with ${names(chosen.map((c) => first(c.friend.name)))}`}
+              {starting ? '✨ Muse is asking everyone…' : chosen.length === 0 ? 'Pick who to plan with' : `See plans with ${names(chosen.map((c) => first(c.friend.name)))}`}
             </button>
           </div>
         </div>
+      )}
+      {startError && <p role="alert" className="px-3 pb-2 text-[13px] text-fb-red">{startError}</p>}
+    </div>
+  );
+}
+
+/**
+ * The group's shared plan, once someone started it: "Maya started a plan for you two · See plans",
+ * "Waiting on Maya", or "It's a plan: Dumplings with Maya". Who is in for what shows only inside.
+ */
+function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherView; viewerId: string; className?: string; onHide?: () => void }) {
+  const others = plan.members.filter((m) => m.id !== viewerId);
+  const who = names(others.map((m) => first(m.name)));
+  const iVoted = (plan.votes[viewerId] ?? []).length > 0;
+  const starter = plan.members.find((m) => m.id === plan.startedBy);
+  const confirmed = plan.status === 'confirmed' ? plan.options.find((o) => o.questId === plan.confirmedQuestId) : null;
+  const title = confirmed
+    ? `It’s a plan: ${confirmed.emoji} ${confirmed.title}`
+    : plan.startedBy !== viewerId && !iVoted && starter
+      ? `${first(starter.name)} started a plan for you ${others.length === 1 ? 'two' : 'all'}`
+      : iVoted ? `Waiting on ${who}…` : `Your plan with ${who}`;
+  const sub = confirmed
+    ? `With ${who} · ${confirmed.venueName} · ${formatDemoTime(confirmed.startsAt)}`
+    : `✨ Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
+  return (
+    <div role="region" aria-label="Your shared plan" data-testid="shared-banner"
+      className={cn('flex items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>
+      <span className="flex shrink-0 -space-x-3">
+        {others.slice(0, 3).map((m) => (
+          <span key={m.id} className="rounded-full ring-[3px] ring-fb-green">
+            <Avatar src={m.avatarUrl} name={m.name} size={36} decorative className="ring-2 ring-white" />
+          </span>
+        ))}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold leading-5 text-fb-text" data-testid="shared-banner-title">{title}</p>
+        <p className="truncate text-[12px] text-fb-text-2">{sub}</p>
+      </div>
+      <button type="button" onClick={() => openTogether(plan.id)}
+        className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+        {confirmed ? 'Open' : iVoted ? 'Open' : 'See plans'}
+      </button>
+      {onHide && (
+        <button type="button" aria-label="Hide" onClick={onHide}
+          className="flex size-8 shrink-0 items-center justify-center rounded-full text-fb-text-2 hover:bg-fb-hover">
+          <X size={18} aria-hidden />
+        </button>
       )}
     </div>
   );

@@ -7,16 +7,16 @@ import {
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite,
+  type Story, type Invite, type TogetherOption,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse,
+  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
 import type { Backend } from './backend';
 import { pairSignals } from './matching';
-import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
+import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow, TogetherRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
@@ -725,7 +725,7 @@ export class CoreStore {
   /** "Busy": ends the viewer's current and upcoming free windows and tells friends. */
   async clearAvailability(viewerId: ID): Promise<void> {
     const v = await this.view();
-    const at = new Date();
+    const at = now();
     const nowIso = at.toISOString();
     const open = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
     for (const a of open) {
@@ -741,8 +741,8 @@ export class CoreStore {
   /** Friends free when the viewer is, ranked, with a suggested group. Empty when the viewer is busy. */
   async freeWithMe(viewerId: ID): Promise<FreeWithMeResponse> {
     const v = await this.view();
-    const now = new Date();
-    const t = now.toISOString();
+    const at = now();
+    const t = at.toISOString();
     const mine = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t);
     if (mine.length === 0) return { items: [], group: [] };
     const me = v.profileById.get(viewerId);
@@ -750,7 +750,7 @@ export class CoreStore {
     for (const a of v.db.availability) {
       if (a.endsAt <= t || !v.areFriends(viewerId, a.userId) || !v.canSee(viewerId, a.userId, a.audience)) continue;
       for (const w of mine) {
-        const o = overlapWindow(w, a, now);
+        const o = overlapWindow(w, a, at);
         if (!o) continue;
         const prev = best.get(a.userId);
         if (prev && prev.from <= o.from) continue;
@@ -761,7 +761,7 @@ export class CoreStore {
       }
     }
     const pair = await pairSignals(this, [viewerId, ...best.keys()]);
-    const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), now, { viewerId, pair });
+    const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), at, { viewerId, pair });
     const items: FreeWithMeItem[] = ranked.flatMap((r) => {
       const friend = v.person(viewerId, r.id);
       if (!friend) return [];
@@ -785,6 +785,108 @@ export class CoreStore {
     return v.db.availability.filter((a) => friends.has(a.userId) && a.endsAt > t && v.canSee(viewerId, a.userId, a.audience))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map(({ audience: _a, ...a }) => { void _a; return { ...a, friend: v.profileFor(viewerId, v.profileById.get(a.userId)!) }; });
+  }
+
+  // ---------- Out Here: plan together ----------
+  private togetherView(v: View, viewerId: ID, row: TogetherRow): TogetherView {
+    const { memberKey: _k, ...plan } = row;
+    void _k;
+    const expired = plan.status === 'proposing' && plan.expiresAt <= iso();
+    return { ...plan, status: expired ? 'expired' : plan.status, members: v.people(viewerId, plan.memberIds) };
+  }
+
+  private togetherRow(v: View, viewerId: ID, id: ID): TogetherRow {
+    const row = v.db.togetherPlans.find((p) => p.id === id);
+    if (!row || !row.memberIds.includes(viewerId)) throw notFound('plan_not_found');
+    return row;
+  }
+
+  /** The group's open shared plan (viewer + friendIds), or null. */
+  async openTogether(viewerId: ID, friendIds: ID[]): Promise<TogetherView | null> {
+    const v = await this.view();
+    const key = [...new Set([viewerId, ...friendIds])].sort().join(',');
+    const t = iso();
+    const row = v.db.togetherPlans.find((p) => p.memberKey === key && p.status === 'proposing' && p.expiresAt > t);
+    return row ? this.togetherView(v, viewerId, row) : null;
+  }
+
+  /**
+   * Creates the group's shared plan. If another member created one in the meantime (both
+   * tapped at once), returns theirs: the unique index on (member_key) where open makes the
+   * second insert fail, and the in-process check covers MemoryStore.
+   */
+  async createTogether(viewerId: ID, body: { friendIds: ID[]; options: TogetherOption[]; summary: string; expiresAt: string }): Promise<TogetherView> {
+    const v = await this.view();
+    const memberIds = [...new Set([viewerId, ...body.friendIds])].sort();
+    if (memberIds.length < 2) throw badRequest('pick at least one friend');
+    for (const id of memberIds) if (id !== viewerId && !v.areFriends(viewerId, id)) throw badRequest('everyone must be your friend');
+    const existing = await this.openTogether(viewerId, body.friendIds);
+    if (existing) return existing;
+    const row: TogetherRow = {
+      id: uuid(), memberKey: memberIds.join(','), memberIds, startedBy: viewerId,
+      options: body.options, votes: {}, status: 'proposing', confirmedQuestId: null,
+      summary: body.summary, expiresAt: body.expiresAt, createdAt: iso(),
+    };
+    try {
+      await this.backend.insert('togetherPlans', [row]);
+    } catch (e) {
+      const theirs = await this.openTogether(viewerId, body.friendIds);
+      if (theirs) return theirs;
+      throw e;
+    }
+    for (const m of memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id: row.id });
+    return this.togetherView(await this.view(), viewerId, row);
+  }
+
+  /** The viewer's open plans and ones confirmed in the last 2 hours, newest first. */
+  async togetherPlans(viewerId: ID): Promise<TogetherView[]> {
+    const v = await this.view();
+    const t = now().getTime();
+    return v.db.togetherPlans
+      .filter((p) => p.memberIds.includes(viewerId) && (
+        (p.status === 'proposing' && Date.parse(p.expiresAt) > t)
+        || (p.status === 'confirmed' && Date.parse(p.createdAt) > t - 2 * 3600_000)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((p) => this.togetherView(v, viewerId, p));
+  }
+
+  async together(viewerId: ID, id: ID): Promise<TogetherView> {
+    const v = await this.view();
+    return this.togetherView(v, viewerId, this.togetherRow(v, viewerId, id));
+  }
+
+  /**
+   * "I'm in" (or not) on one option. When every member is in on the same option, the plan
+   * locks: everyone joins that quest (atomic join; a full quest marks the option and keeps
+   * proposing) and all members get the update.
+   */
+  async voteTogether(viewerId: ID, id: ID, questId: ID, isIn: boolean): Promise<TogetherView> {
+    const v = await this.view();
+    const row = this.togetherRow(v, viewerId, id);
+    if (row.status !== 'proposing' || row.expiresAt <= iso()) return this.togetherView(v, viewerId, row);
+    if (!row.options.some((o) => o.questId === questId)) throw badRequest('not an option in this plan');
+    const mine = new Set(row.votes[viewerId] ?? []);
+    if (isIn) mine.add(questId); else mine.delete(questId);
+    const votes = { ...row.votes, [viewerId]: [...mine] };
+    let patch: Partial<TogetherRow> = { votes };
+    const agreed = row.options.find((o) => row.memberIds.every((m) => (votes[m] ?? []).includes(o.questId)));
+    if (agreed) {
+      try {
+        for (const m of row.memberIds) {
+          if (!(await this.view()).questMemberIds(agreed.questId).includes(m)) await this.joinQuest(m, agreed.questId);
+        }
+        patch = { votes, status: 'confirmed', confirmedQuestId: agreed.questId };
+      } catch {
+        // full (or gone): drop the option so nobody keeps waiting on it
+        patch = { votes, options: row.options.map((o) => (o.questId === agreed.questId ? { ...o, seatsLeft: 0 } : o)) };
+      }
+    }
+    await this.backend.update('togetherPlans', { id }, patch);
+    const after = await this.view();
+    const updated = after.db.togetherPlans.find((p) => p.id === id)!;
+    await publish(`together:${id}`, { status: updated.status });
+    for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
+    return this.togetherView(after, viewerId, updated);
   }
 
   // ---------- Out Here: invites ----------

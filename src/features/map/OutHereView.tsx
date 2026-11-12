@@ -8,7 +8,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, PlanSheet, StatusPill, usePlanSuggestions } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, PlanSheet, TogetherSheet, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
@@ -92,6 +92,15 @@ export function OutHereView() {
   }, [planPicks, mode, friendPins.data]);
 
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  const planOpen = usePlanOpen();
+  const togetherId = useTogetherId();
+  const sheetOpen = planOpen || togetherId !== null;
+  // "See it on the map" from a confirmed shared plan opens that quest's panel here.
+  useEffect(() => {
+    const on = (e: Event) => select((e as CustomEvent<string>).detail);
+    window.addEventListener('outhere:select-quest', on);
+    return () => window.removeEventListener('outhere:select-quest', on);
+  }, [select]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
 
@@ -170,18 +179,20 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* ImFreeButton is an unpositioned pill; place it above the map canvas, bottom centre,
-          with the viewer's status pill above it. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex flex-col items-center gap-2 max-md:bottom-20">
-        <StatusPill className="pointer-events-auto" />
-        <div className="pointer-events-auto flex items-center gap-2">
-          <ImFreeButton />
-          <Link href="/events?tab=going" className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-sm font-semibold text-fb-text shadow-card hover:bg-fb-hover">
-            <CalendarCheck size={17} aria-hidden />Your plans
-          </Link>
+      {/* One row at the bottom: the "I'm free" button (it also shows your status) and Your plans. */}
+      {!sheetOpen && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
+          <div className="pointer-events-auto flex items-center gap-2">
+            <ImFreeButton />
+            <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
+              className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
+              <CalendarCheck size={22} aria-hidden />
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
       <PlanSheet />
+      <TogetherSheet />
 
       {!unsupported && (
         <MapAttribution className={cn('absolute bottom-0 right-0', selectedId && 'max-md:hidden')} />
