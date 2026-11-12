@@ -6,7 +6,12 @@
 //
 // ---- Kit (Out Here) ----
 // GET  /api/quests?lat&lng&radiusM&viewerId          -> { quests: Quest[] }     (approxLocation unless member)
-// POST /api/quests                     body: Omit<Quest,'id'|'memberIds'|'status'|'createdAt'|'approxLocation'> -> { quest }
+// POST /api/quests                     body: CreateQuestBody -> { quest }   (429 after EVENTS_PER_DAY in 24 h; publishes quests:new {questId})
+// GET  /api/quests/:id                                                  -> QuestDetail   (members [] + canSeeGuests false for strangers)
+// POST /api/quests/:id/checkin         body: { location }               -> { hereCount }   (members, live, within 150 m)
+// POST /api/quests/:id/report          body: { reason? }                -> { ok: true }    (hides the plan for the reporter)
+// GET  /api/quests/:id/posts                                            -> { posts: PostView[] }   (the plan page's activity feed)
+// POST /api/quests/:id/posts           body: { text, media? }           -> { post: PostView }
 // POST /api/quests/:id/join            body: { userId, withFriendId? }  -> { quest, seatsLeft }   (409 if full)
 // POST /api/quests/:id/leave           body: { userId }                 -> { quest, seatsLeft }
 // POST /api/quests/:id/complete        body: { userId }                 -> { quest, crew }        (host only; creates/updates crew)
@@ -27,7 +32,7 @@
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
 // POST /api/muse/regroup               body: { crewId, now? }           -> { suggestion: PlanSuggestion, message: string }
-// POST /api/muse/create-quest          body: { userId, text, location } -> { draft: Partial<Quest>, pitch: string }
+// POST /api/muse/create-quest          body: { text, location, now? }   -> { draft: Partial<Quest> & { durationMin }, pitch: string }
 // POST /api/muse/caption               body: { questId, crewId }        -> { caption: string }
 // POST /api/muse/daily                 body: { date }                   -> DailyQuest
 // POST /api/muse/verify-photo          body: { date, photoUrl }         -> { verified: boolean, note: string }
@@ -85,7 +90,14 @@ export type ApiError = { error: string };
 // ---- Kit ----
 export type QuestsQuery = { lat: number; lng: number; radiusM?: number; viewerId?: ID };
 export type QuestsResponse = { quests: Quest[] };
-export type CreateQuestBody = Omit<Quest, 'id' | 'memberIds' | 'status' | 'createdAt' | 'approxLocation'>;
+export type CreateQuestBody = Omit<Quest, 'id' | 'memberIds' | 'status' | 'createdAt' | 'approxLocation' | 'isPublic'> & {
+  /** Friends to invite; required for visibility 'friends' (invite only). */
+  inviteIds?: ID[];
+};
+export type QuestCheckinBody = { location: LatLng };
+export type QuestCheckinResponse = { hereCount: number };
+export type QuestReportBody = { reason?: string };
+export type QuestPostBody = { text: string; media?: string[] };
 export type QuestResponse = { quest: Quest };
 export type JoinQuestBody = { userId: ID; withFriendId?: ID };
 export type JoinQuestResponse = { quest: Quest; seatsLeft: number };
@@ -116,8 +128,10 @@ export type MusePlanBody = { userId: ID; text: string; location: LatLng; now?: s
 export type MusePlanResponse = MusePlan;
 export type MuseRegroupBody = { crewId: ID; now?: string };
 export type MuseRegroupResponse = { suggestion: PlanSuggestion; message: string };
-export type MuseCreateQuestBody = { userId: ID; text: string; location: LatLng };
-export type MuseCreateQuestResponse = { draft: Partial<Quest>; pitch: string };
+export type MuseCreateQuestBody = { text: string; location: LatLng; now?: string };
+export type MuseQuestDraft = Pick<Quest, 'title' | 'emoji' | 'category' | 'description' | 'venueName' | 'startsAt' | 'endsAt'
+  | 'capacity' | 'priceMax' | 'tags' | 'placeId' | 'bubbleText'> & { location: LatLng };
+export type MuseCreateQuestResponse = { draft: MuseQuestDraft; pitch: string };
 export type MuseCaptionBody = { questId: ID; crewId: ID };
 export type MuseCaptionResponse = { caption: string };
 export type MuseDailyBody = { date: string };
@@ -153,7 +167,7 @@ export type CreatePostBody = {
   text: string;
   media?: string[];               // urls returned by POST /api/uploads
   audience: Audience;
-  target?: { type: 'profile' } | { type: 'group'; slug: string } | { type: 'event'; slug: string };
+  target?: { type: 'profile' } | { type: 'group'; slug: string } | { type: 'event'; slug: string } | { type: 'quest'; id: ID };
   sharedPostId?: ID;
 };
 

@@ -8,6 +8,8 @@ import type {
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
 export type QuestMemberRow = { questId: ID; userId: ID; joinedAt: string; viaFriendId: ID | null };
+export type QuestCheckinRow = { questId: ID; userId: ID; checkedInAt: string };
+export type QuestReportRow = { id: ID; questId: ID; reporterId: ID; reason: string; createdAt: string };
 export type AvailabilityRow = Availability & { audience: Audience };
 export type GroupRow = Omit<Group, 'memberCount'>;
 export type EventRow = Omit<Event, 'goingCount' | 'interestedCount'>;
@@ -32,6 +34,8 @@ export type Db = {
   availability: AvailabilityRow[];
   quests: QuestRow[];
   questMembers: QuestMemberRow[];
+  questCheckins: QuestCheckinRow[];
+  questReports: QuestReportRow[];
   invites: InviteRow[];
   crews: CrewRow[];
   crewMembers: CrewMemberRow[];
@@ -60,6 +64,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   profiles: 'profiles', friendships: 'friendships', friendLists: 'friend_lists',
   friendListMembers: 'friend_list_members', groups: 'groups', groupMembers: 'group_members',
   places: 'places', availability: 'availability', quests: 'quests', questMembers: 'quest_members',
+  questCheckins: 'quest_checkins', questReports: 'quest_reports',
   invites: 'invites', crews: 'crews', crewMembers: 'crew_members', memories: 'memories',
   dailyQuests: 'daily_quests', dailyEntries: 'daily_entries', events: 'events', eventRsvps: 'event_rsvps',
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
@@ -72,7 +77,7 @@ export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   profiles: ['id'], friendships: ['userA', 'userB'], friendLists: ['id'], friendListMembers: ['listId', 'userId'],
   groups: ['id'], groupMembers: ['groupId', 'userId'], places: ['id'], availability: ['id'], quests: ['id'],
-  questMembers: ['questId', 'userId'], invites: ['id'], crews: ['id'], crewMembers: ['crewId', 'userId'],
+  questMembers: ['questId', 'userId'], questCheckins: ['questId', 'userId'], questReports: ['id'], invites: ['id'], crews: ['id'], crewMembers: ['crewId', 'userId'],
   memories: ['id'], dailyQuests: ['date'], dailyEntries: ['date', 'userId'], events: ['id'],
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],

@@ -68,6 +68,9 @@ export interface DataStore {
   joinQuest: CoreStore['joinQuest'];
   leaveQuest: CoreStore['leaveQuest'];
   completeQuest: CoreStore['completeQuest'];
+  questPosts: CoreStore['questPosts'];
+  checkIn: CoreStore['checkIn'];
+  reportQuest: CoreStore['reportQuest'];
   createAvailability: CoreStore['createAvailability'];
   myAvailability: CoreStore['myAvailability'];
   friendAvailability: CoreStore['friendAvailability'];

@@ -6,7 +6,7 @@ import {
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite,
+  type Story, type Invite, type QuestVisibility,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
@@ -15,7 +15,7 @@ import type {
 } from '@/shared/api';
 import type { Backend } from './backend';
 import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
-import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
+import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
@@ -25,7 +25,28 @@ const iso = () => now().toISOString();
 const uuid = () => crypto.randomUUID();
 const firstName = (p: Profile | undefined) => p?.name.split(' ')[0] ?? 'Someone';
 
-export type QuestDetail = { quest: Quest; seatsLeft: number; host: PersonCard | null; members: PersonCard[]; viewerIsMember: boolean };
+export type QuestDetail = {
+  quest: Quest; seatsLeft: number; host: PersonCard | null; members: PersonCard[]; viewerIsMember: boolean;
+  /** Going count, host included. Shown to everyone, even when `members` is hidden. */
+  memberCount: number;
+  /** False for strangers: they see the count, never who is going. */
+  canSeeGuests: boolean;
+  /** Members who checked in at the spot ("5 here"). */
+  hereCount: number;
+  viewerCheckedIn: boolean;
+  /** Between start and end right now. */
+  isLive: boolean;
+  /** Posts on the plan's page. */
+  postCount: number;
+  group: { slug: string; name: string } | null;
+};
+
+/** How many plans one person can post in a rolling 24 hours. */
+export const EVENTS_PER_DAY = 5;
+/** Check-in must be this close to the exact spot. */
+export const CHECKIN_RADIUS_M = 150;
+/** Check-in opens this long before the start. */
+const CHECKIN_EARLY_MIN = 15;
 export type AvailabilityItem = Availability & { friend: Profile };
 export type InviteView = Invite & { from: PersonCard | null; to: PersonCard | null; quest: Quest | null };
 export type PostWithShared = PostView & { sharedPost: PostView | null };
@@ -122,6 +143,10 @@ export class CoreStore {
       const e = v.eventBySlug.get(body.target.slug);
       if (!e) throw notFound('event_not_found');
       targetType = 'event'; targetId = e.id;
+    } else if (body.target?.type === 'quest') {
+      const q = v.questById.get(body.target.id);
+      if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+      targetType = 'quest'; targetId = q.id;
     }
     const listId = audienceListId(body.audience);
     if (listId) {
@@ -145,6 +170,9 @@ export class CoreStore {
         await this.notify(after, m, 'group_post', viewerId, 'post', post.id,
           `${firstName(after.profileById.get(viewerId))} posted in ${g.name}.`);
       }
+    }
+    if (targetType === 'quest') {
+      await publish(`quest:${targetId}`, { postCount: after.questPostIds(targetId).length });
     }
     if (post.sharedPostId) {
       const orig = after.postById.get(post.sharedPostId)!;
@@ -595,30 +623,100 @@ export class CoreStore {
     const q = v.questById.get(questId);
     if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
     const memberIds = v.questMemberIds(q.id);
+    const canSeeGuests = v.canSeeQuestGuests(viewerId, q);
+    const here = v.questCheckinIds(q.id);
+    const g = q.groupId ? v.groupById.get(q.groupId) : undefined;
     return {
       quest: v.questFor(viewerId, q), seatsLeft: v.seatsLeft(q), host: v.person(viewerId, q.hostId),
-      members: v.people(viewerId, memberIds), viewerIsMember: memberIds.includes(viewerId),
+      members: canSeeGuests ? v.people(viewerId, memberIds) : [],
+      viewerIsMember: memberIds.includes(viewerId),
+      memberCount: memberIds.length, canSeeGuests,
+      hereCount: here.length, viewerCheckedIn: here.includes(viewerId), isLive: v.isQuestLive(q),
+      postCount: v.questPostIds(q.id).length,
+      group: g ? { slug: g.slug, name: g.name } : null,
     };
   }
 
-  async createQuest(viewerId: ID, body: Omit<CreateQuestBody, 'hostId'> & { hostId?: ID }): Promise<Quest> {
+  /** Posts on a plan's page, newest first. */
+  async questPosts(viewerId: ID, questId: ID): Promise<PostView[]> {
+    const v = await this.view();
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    return v.questPostIds(questId).map((id) => v.postView(viewerId, v.postById.get(id)!));
+  }
+
+  /**
+   * "I'm here": a member checks in at the spot while the plan is live (or 15 min before).
+   * The point must be within CHECKIN_RADIUS_M of the exact location.
+   */
+  async checkIn(viewerId: ID, questId: ID, at: LatLng): Promise<{ hereCount: number }> {
+    const v = await this.view();
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    if (!v.questMemberIds(q.id).includes(viewerId)) throw forbidden('join the plan to check in');
+    const t = now();
+    if (t < new Date(new Date(q.startsAt).getTime() - CHECKIN_EARLY_MIN * 60_000)) throw badRequest('check-in opens 15 min before the start');
+    if (t >= new Date(q.endsAt) || q.status === 'done') throw badRequest('this plan has ended');
+    if (haversineMeters(at, q.location) > CHECKIN_RADIUS_M) throw badRequest('you need to be at the spot to check in');
+    await this.backend.upsert('questCheckins', [{ questId, userId: viewerId, checkedInAt: iso() }]);
+    const after = await this.view();
+    const aq = after.questById.get(questId)!;
+    const hereCount = after.questCheckinIds(questId).length;
+    await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(aq), memberCount: after.questMemberIds(questId).length, hereCount });
+    return { hereCount };
+  }
+
+  /** Report a plan: stored for review, and hidden from the reporter right away. */
+  async reportQuest(viewerId: ID, questId: ID, reason: string): Promise<{ ok: true }> {
+    const v = await this.view();
+    // Reporting twice is a no-op (the plan is already hidden from this viewer).
+    if (v.db.questReports.some((r) => r.questId === questId && r.reporterId === viewerId)) return { ok: true };
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    if (q.hostId === viewerId) throw badRequest('you host this plan');
+    await this.backend.insert('questReports', [{ id: uuid(), questId, reporterId: viewerId, reason: reason.slice(0, 300), createdAt: iso() }]);
+    return { ok: true };
+  }
+
+  async createQuest(viewerId: ID, body: Omit<CreateQuestBody, 'hostId' | 'visibility' | 'posterUrl' | 'bubbleText'> & {
+    hostId?: ID; visibility?: QuestVisibility; posterUrl?: string | null; bubbleText?: string | null; isPublic?: boolean;
+  }): Promise<Quest> {
     const v = await this.view();
     if (body.hostId && body.hostId !== viewerId) throw forbidden('hostId must be the viewer');
     if (body.groupId && !v.groupRole(body.groupId, viewerId)) throw forbidden('join the group to host a hangout there');
     if (new Date(body.endsAt) <= new Date(body.startsAt)) throw badRequest('endsAt must be after startsAt');
+    // Older callers send only isPublic; visibility wins when both are present.
+    const visibility: QuestVisibility = body.visibility ?? (body.isPublic === false ? (body.groupId ? 'group' : 'open') : 'community');
+    if (visibility === 'group' && !body.groupId) throw badRequest('pick a group for a group plan');
+    const inviteIds = [...new Set((body.inviteIds ?? []).filter((id) => id !== viewerId))];
+    if (visibility === 'friends' && inviteIds.length === 0) throw badRequest('invite at least one friend');
+    for (const id of inviteIds) if (!v.areFriends(viewerId, id)) throw badRequest('invites go to friends');
+    const dayAgo = new Date(now().getTime() - 24 * 60 * 60_000).toISOString();
+    const recent = v.db.quests.filter((q) => q.hostId === viewerId && q.createdAt > dayAgo).length;
+    if (recent >= EVENTS_PER_DAY) throw tooMany(`You can post ${EVENTS_PER_DAY} plans a day`);
     const id = uuid();
     const row: QuestRow = {
       id, hostId: viewerId, title: body.title, emoji: body.emoji, category: body.category,
       description: body.description, venueName: body.venueName, location: body.location,
       approxLocation: fuzzLocation(body.location, id), startsAt: body.startsAt, endsAt: body.endsAt,
       capacity: body.capacity, priceMax: body.priceMax, tags: body.tags, status: 'open',
-      isPublic: body.isPublic, createdAt: iso(), groupId: body.groupId ?? null, placeId: body.placeId ?? null,
+      isPublic: visibility === 'community', visibility, posterUrl: body.posterUrl ?? null,
+      bubbleText: body.bubbleText?.trim() || null,
+      createdAt: iso(), groupId: body.groupId ?? null, placeId: body.placeId ?? null,
     };
     await this.backend.insert('quests', [row]);
     await this.backend.joinQuest(id, viewerId, null);
+    for (const toId of inviteIds) {
+      await this.createInvite(viewerId, {
+        toId, questId: id, suggestionTitle: `${row.emoji} ${row.title}`,
+        message: `${row.emoji} ${row.title}, want to come?`,
+      });
+    }
     const after = await this.view();
     const q = after.questById.get(id)!;
     await publish(`quest:${id}`, { seatsLeft: after.seatsLeft(q), memberCount: after.questMemberIds(id).length });
+    // Ids only: every map refetches /api/quests, which applies canSeeQuest for its viewer.
+    await publish('quests:new', { questId: id });
     return after.questFor(viewerId, q);
   }
 

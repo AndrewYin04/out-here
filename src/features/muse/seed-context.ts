@@ -7,7 +7,7 @@ import seedPlacesJson from '../../../supabase/seed-places.json';
 import {
   DEMO_AVAILABILITY, DEMO_CENTER, DEMO_DRIVER_HANDLE, DEMO_QUESTS, LOCAL_CIRCLES, NEVER_PRESEATED,
   PERSONA_HANDLES, deriveFriendGraph, floorToMinute, friendAdjacency, fuzzLocation, mulberry32,
-  offsetPoint, profileId, seedId, shuffled,
+  offsetPoint, profileId, questVisibilityFields, seedId, shuffled,
   type Availability, type ID, type LatLng, type Profile, type Quest,
 } from '../../shared';
 import {
@@ -107,10 +107,12 @@ export function buildSeedWorld(now: Date): SeedWorld {
       approxLocation: fuzzLocation(exact, id),
       startsAt: starts.toISOString(), endsAt: addMin(starts, q.durationMin).toISOString(),
       capacity: q.capacity, memberIds: members.map(profileId), priceMax: q.priceMax, tags: q.tags,
-      status: members.length >= q.capacity ? 'full' : 'open', isPublic: true,
+      status: members.length >= q.capacity ? 'full' : 'open',
       createdAt: addMin(demoNow, -(60 + qi * 7)).toISOString(),
       groupId: q.groupSlug && groupMembers.has(q.groupSlug) ? seedId('group', q.groupSlug) : null,
       placeId: seedId('place', place.name),
+      ...questVisibilityFields(q.groupSlug && groupMembers.has(q.groupSlug) ? q.visibility ?? 'community' : 'community'),
+      posterUrl: null, bubbleText: q.bubbleText ?? null,
     });
   });
 
