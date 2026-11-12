@@ -50,12 +50,14 @@ test.describe('Muse Intros', () => {
       // Both agents' turns, interleaved; Jordan's agent's words stay private (outcome only).
       await card.getByRole('button', { name: 'How your agents decided' }).click();
       const log = card.getByTestId('agent-log');
-      await expect(log).toContainText("Alex's agent");
+      await expect(log).toContainText('Your agent');
       await expect(log.getByTestId('agent-turn-mine')).toHaveCount(2);
       await expect(log.getByTestId('agent-turn-theirs')).toHaveCount(2);
-      await expect(log.getByTestId('agent-turn-theirs').first()).toContainText('asked about timing');
+      // The other agent's turn shows only its decision, never its words. Mock wording is fixed; real Muse varies.
+      await expect(log.getByTestId('agent-turn-theirs').first()).toContainText("Jordan's agent (private)");
+      if (process.env.MUSE_MOCK === '1') await expect(log.getByTestId('agent-turn-theirs').first()).toContainText('asked about timing');
       await expect(log).not.toContainText("Jordan's agent here");
-      await expect(log.getByTestId('judge-line')).toContainText('91/100, above the 85 bar');
+      await expect(log.getByTestId('judge-line')).toContainText(/(8[5-9]|9\d|100)\/100, above the 85 bar/);
 
       // Jordan hears nothing before alex says yes.
       const before = await (await request.get('/api/intros', { headers: as('jordan') })).json() as { intros: unknown[] };

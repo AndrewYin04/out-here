@@ -67,6 +67,10 @@ export function useApi<T>(
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(path !== null);
   const seq = useRef(0);
+  // The newest response applied so far. A burst of realtime messages starts several fetches; a
+  // response is shown if it is newer than the last one shown, not only if it is the very last
+  // fetch, so a stream of messages cannot hold back data that has already arrived.
+  const applied = useRef(0);
   /** fresh: read past the server's snapshot cache (used when a realtime message triggered it). */
   const load = useCallback(async (fresh: boolean) => {
     if (!path) return;
@@ -74,7 +78,7 @@ export function useApi<T>(
     setLoading(true);
     try {
       const d = await apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {});
-      if (n === seq.current) { setData(d); setError(null); }
+      if (n > applied.current) { applied.current = n; setData(d); setError(null); }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -82,7 +86,8 @@ export function useApi<T>(
     }
   }, [path]);
   const refetch = useCallback(() => load(true), [load]);
-  useEffect(() => { void load(false); }, [load, handle]);
+  // A new path or persona: ignore every fetch still in flight for the old one.
+  useEffect(() => { applied.current = seq.current; void load(false); }, [load, handle]);
   const derived = data && channelsOf ? channelsOf(data) : [];
   useChannel([...channels, ...derived], (channel, payload) => {
     if (patch) setData((prev) => (prev ? patch(prev, channel, payload) : prev));
