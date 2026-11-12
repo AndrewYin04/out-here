@@ -55,6 +55,11 @@ test.describe("Memory journey", () => {
     await page.getByTestId("memories-view-list").click();
     await expect(page.getByTestId("crew-card").first()).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/view=list/);
+
+    // Back leads to the Friends map (Memories sits next to Friends on Out Here).
+    await page.getByTestId("memories-back").getByRole("link").click();
+    await expect(page).toHaveURL(/\/out-here\?mode=friends/);
+    await expect(page.getByTestId("map-mode-friends")).toHaveAttribute("aria-pressed", "true", { timeout: 15_000 });
   });
 
   test("an unknown crew shows a clear not-found state", async ({ page }) => {

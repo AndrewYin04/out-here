@@ -12,6 +12,7 @@ import { useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { MapAttribution } from '@/features/map';
 import { AvatarStack, Card, cn, EmptyState, IconButton, LinkButton, Skeleton } from '@/features/ui';
+import { BackButton } from './BackButton';
 import { loadCrewRows, type CrewRow } from './data';
 import { formatJourneyDay, photoLabel } from './journey';
 import type { MemoriesMapProps } from './MemoriesMap';
@@ -87,12 +88,13 @@ function MemoriesView({ handle }: { handle: string | null }) {
 
   return (
     <div className="mx-auto w-full max-w-[680px] px-0 pb-6 md:px-4 md:pt-4">
-      <div className="flex items-start gap-3 px-4 py-3 md:px-0">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
-          <p className="mt-1 text-[15px] text-fb-text-2">Your Out Here hangouts: relive them, then get the crew together again.</p>
+      <div className="px-4 py-3 md:px-0">
+        <div className="flex items-center gap-3">
+          <BackButton className="shrink-0" />
+          <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
+          {hasCrews && <ViewToggle view={view} onView={setView} />}
         </div>
-        {hasCrews && <ViewToggle view={view} onView={setView} />}
+        <p className="mt-2 text-[15px] text-fb-text-2">Your Out Here hangouts: relive them, then get the crew together again.</p>
       </div>
       {notice && <p className="mx-4 mb-3 rounded-card bg-fb-blue-tint px-3 py-2 text-[15px] text-fb-text md:mx-0" role="status">{notice}</p>}
       {error && <Card padded className="text-fb-text-2" role="alert">Could not load memories: {error}</Card>}
@@ -164,8 +166,11 @@ function MapView({ crews, onView, onUnsupported }: { crews: CrewRow[]; onView: (
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex items-center justify-between gap-2 px-3">
-          <span className="pointer-events-auto rounded-pill bg-fb-surface px-3 py-1.5 text-[15px] font-semibold text-fb-text shadow-card">
-            {total} {total === 1 ? 'memory' : 'memories'}
+          <span className="pointer-events-auto flex items-center gap-2">
+            <BackButton />
+            <span className="rounded-pill bg-fb-surface px-3 py-1.5 text-[15px] font-semibold text-fb-text shadow-card">
+              {total} {total === 1 ? 'memory' : 'memories'}
+            </span>
           </span>
           <ViewToggle view="map" onView={onView} className="pointer-events-auto" />
         </div>
