@@ -166,6 +166,14 @@ export function Conversation({ threadId, thread, viewerId, online, presenceReady
         ) : (
           <div className="flex flex-col gap-2">
             {groups.map((g) => {
+              if (g.messages[0].kind === 'muse') {
+                return (
+                  <div key={g.key} className="flex flex-col gap-0.5">
+                    {g.divider && <p className="py-2 text-center text-[12px] font-medium text-fb-text-2" data-testid="time-divider">{g.divider}</p>}
+                    {g.messages.map((m) => <MuseNote key={m.id} text={m.text} />)}
+                  </div>
+                );
+              }
               const mine = g.fromId === viewerId;
               const sender = people.get(g.fromId);
               return (
@@ -260,6 +268,19 @@ function HeaderButton({ label, onClick, pressed, testId, children }: { label: st
       className="flex h-9 w-9 items-center justify-center rounded-full text-fb-blue hover:bg-fb-hover">
       {children}
     </button>
+  );
+}
+
+/** Muse's intro note: a centred card from Muse, not a bubble from either person. */
+function MuseNote({ text }: { text: string }) {
+  const body = text.replace(/^✨ Muse:s*/, '');
+  return (
+    <div className="my-2 flex justify-center" data-testid="muse-note">
+      <div className="w-full max-w-[420px] rounded-card border border-fb-divider bg-fb-surface px-4 py-3 text-center shadow-card">
+        <p className="mb-1 text-[12px] font-semibold text-fb-blue">✨ Muse</p>
+        <p className="whitespace-pre-wrap break-words text-[15px] leading-5 text-fb-text [overflow-wrap:anywhere]">{body}</p>
+      </div>
+    </div>
   );
 }
 

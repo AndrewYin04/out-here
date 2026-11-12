@@ -7,6 +7,7 @@ import {
   MapPin,
   MessageCircle,
   Search,
+  Sparkles,
   Store,
   Users,
   UserGroup,
@@ -31,6 +32,7 @@ export const PRIMARY_DESTINATIONS: Destination[] = [
   { id: 'groups', label: 'Groups', href: ROUTES.groups, icon: UserGroup, color: '#2ABBA7', description: 'Your communities' },
   { id: 'marketplace', label: 'Marketplace', href: ROUTES.marketplace, icon: Store, color: '#1877F2', description: 'Buy and sell nearby' },
   { id: 'events', label: 'Events', href: ROUTES.events, icon: CalendarDays, color: '#F3425F', description: 'Shows, games, meetups' },
+  { id: 'intros', label: 'Intros', href: ROUTES.intros, icon: Sparkles, color: '#7B4FE0', description: 'Warm intros from Muse' },
   { id: 'memories', label: 'Memories', href: ROUTES.memories, icon: Images, color: '#9360F7', description: 'Crew albums and recaps' },
   { id: 'saved', label: 'Saved', href: ROUTES.saved, icon: Bookmark, color: '#B24FD6', description: 'Things you saved' },
 ];

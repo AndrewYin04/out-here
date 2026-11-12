@@ -10,6 +10,7 @@ import {
   DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
 } from '../../shared/seed/story';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
+import { SEED_INTRO_PROFILES } from '../../shared/seed/intros';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -119,6 +120,7 @@ export const TABLE_ORDER = [
   'quests', 'quest_members', 'availability', 'invites', 'crews', 'crew_members', 'memories',
   'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
+  'intro_profiles', 'intros',
 ] as const;
 
 const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
@@ -535,6 +537,20 @@ export function buildSeed(
       emoji: s.bubble.emoji, thought: s.bubble.thought, doing: s.bubble.doing, wants_to: s.bubble.wantsTo,
       updated_at: iso(addMin(demoNow, -s.updatedMinAgo)),
       expires_at: iso(addMin(demoNow, s.expiresInMin ?? SHARE_TTL_MIN)),
+    });
+  }
+
+  // Muse Intros settings (no intros: Muse makes them live)
+  const offKind = { on: false, lookingFor: '' };
+  for (const s of SEED_INTRO_PROFILES) {
+    if (!has(s.handle)) { warnings.push(`intro profile: unknown handle "${s.handle}" skipped`); continue; }
+    t.intro_profiles.push({
+      user_id: pid(s.handle),
+      kinds: JSON.stringify({
+        friendship: s.kinds.friendship ?? offKind, networking: s.kinds.networking ?? offKind, dating: s.kinds.dating ?? offKind,
+      }),
+      dating_prefs: s.datingPrefs ? JSON.stringify(s.datingPrefs) : null,
+      max_km: s.maxKm ?? 25, paused: s.paused ?? false,
     });
   }
 

@@ -94,6 +94,12 @@ export interface DataStore {
   updateMyLocation: CoreStore['updateMyLocation'];
   hangInvite: CoreStore['hangInvite'];
   hangSuggestion: CoreStore['hangSuggestion'];
+  // Muse Intros storage (features/intros applies the rules and per-side visibility)
+  saveIntroProfile: CoreStore['saveIntroProfile'];
+  insertIntro: CoreStore['insertIntro'];
+  updateIntro: CoreStore['updateIntro'];
+  removeIntros: CoreStore['removeIntros'];
+  notifyIntro: CoreStore['notifyIntro'];
 }
 
 const g = globalThis as unknown as { __outhereSupabaseStore?: { key: string; store: DataStore } };
