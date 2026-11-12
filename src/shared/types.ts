@@ -216,7 +216,8 @@ export type NotificationType =
   | 'friend_request' | 'friend_accept'
   | 'comment' | 'reply' | 'reaction'
   | 'group_post' | 'event_invite'
-  | 'quest_invite' | 'quest_join' | 'message';
+  | 'quest_invite' | 'quest_join' | 'message'
+  | 'hangout_rate';   // "How was Dumpling Den?" after a hangout ends
 export type NotificationObjectType =
   'post' | 'comment' | 'profile' | 'group' | 'event' | 'quest' | 'invite' | 'thread';
 export type Notification = {
@@ -243,3 +244,28 @@ export type MuseRun = {
   promptTokens: number | null; completionTokens: number | null;
   ok: boolean; error: string | null; createdAt: string;
 };
+
+// ---- Post-hangout rating (spec: docs/HANGOUT_RATINGS.md) ----
+// Beli-style: pick a bucket, then place the hangout against your past ones to get a 0-10 score.
+// A hangout is rated, never a person. The per-person "hang again?" answer is private: only the
+// server and Muse read it; no route returns another person's answer, and Muse never quotes it.
+export type HangoutVerdict = 'loved' | 'fine' | 'meh';
+/** Score range per bucket, inclusive. The comparison step picks a score inside the range. */
+export const VERDICT_RANGES: Record<HangoutVerdict, [number, number]> = {
+  loved: [6.7, 10], fine: [3.4, 6.6], meh: [0, 3.3],
+};
+export type HangoutRating = {
+  id: ID; questId: ID; raterId: ID;
+  verdict: HangoutVerdict;
+  score: number;            // 0-10, one decimal, inside VERDICT_RANGES[verdict]
+  highlights: string[];     // chips from HANGOUT_HIGHLIGHTS
+  note: string;             // optional; private to the rater (and Muse)
+  photoIds: ID[];           // Memory ids the rater added in this flow (photos live in memories)
+  createdAt: string; updatedAt: string;
+};
+export const HANGOUT_HIGHLIGHTS = [
+  'great conversation', 'good food', 'easy to find', 'met someone new', 'good vibe',
+  'want to go back', 'too loud', 'too crowded', 'ran late', 'too pricey',
+] as const;
+/** One rater's private answer about one other attendee of one hangout. */
+export type HangAgain = { questId: ID; raterId: ID; subjectId: ID; again: boolean; createdAt: string };

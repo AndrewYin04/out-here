@@ -25,6 +25,10 @@
 // POST /api/memories                   multipart: photo, crewId, questId, uploaderId?, caption? -> { memory }
 // GET  /api/memories/:id/photo                                      -> image bytes (crew members only)
 // GET  /api/memories?crewId                                             -> { memories: Memory[] }
+// GET  /api/quests/:id/rating          (viewer from x-persona)          -> HangoutRatingState      (viewer's own rating only)
+// PUT  /api/quests/:id/rating          body: RateHangoutBody            -> { rating: HangoutRating } (attendee, after start; upsert)
+// GET  /api/quests/:id/recap           (viewer from x-persona)          -> HangoutRecap            (members only; no hang-again, no notes)
+// GET  /api/me/ratings                 (viewer from x-persona)          -> { ratings: (HangoutRating & { quest: Quest })[] } (own history, score desc)
 // GET  /api/daily?date / POST /api/daily/entry                          -> DailyQuest / { entry }
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
@@ -77,7 +81,7 @@
 
 import type {
   Audience, Availability, Comment, Crew, DailyEntry, DailyQuest, Event, EventRsvp, FriendList,
-  Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
+  Friendship, Group, GroupRole, HangoutRating, HangoutVerdict, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
   Notification, PlanSuggestion, Post, Profile, Quest, ReactionCounts, ReactionType, Reel,
   RsvpStatus, Story, Thread,
 } from './types';
@@ -200,3 +204,21 @@ export type ListingResponse = { listing: Listing; seller: PersonCard };
 export type ReelsResponse = { reels: Reel[] };
 export type MessagesResponse = { messages: Message[] };
 export type ThreadsResponse = { threads: ThreadView[] };
+
+// ---- Post-hangout rating (spec: docs/HANGOUT_RATINGS.md) ----
+export type RateHangoutBody = {
+  verdict: HangoutVerdict; score: number; highlights: string[]; note?: string; photoIds?: ID[];
+  again: { subjectId: ID; again: boolean }[];   // only other attendees; a person left out = not answered
+};
+export type HangoutRatingState = {
+  rating: HangoutRating | null;
+  again: { subjectId: ID; again: boolean }[];   // the viewer's own answers
+  attendees: PersonCard[];                       // other members, for the "hang again?" rows
+  compareWith: { questId: ID; title: string; emoji: string; score: number; verdict: HangoutVerdict }[]; // viewer's past rated hangouts, for placement
+};
+export type HangoutRecap = {
+  quest: Quest; members: PersonCard[]; photos: Memory[];
+  ratedCount: number; verdicts: Record<HangoutVerdict, number>;
+  highlights: { label: string; count: number }[];   // counted across raters, most first
+  myRating: HangoutRating | null;
+};
