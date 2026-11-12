@@ -46,16 +46,24 @@ export class SupabaseBackend implements Backend {
   private async loadTable<T extends TableKey>(key: T): Promise<RowOf<T>[]> {
     const table = TABLE_NAMES[key];
     const order = PRIMARY_KEYS[key].map(snake);
-    const rows: Record<string, unknown>[] = [];
     const scope = currentScope();
-    for (let from = 0; ; from += PAGE) {
-      let q = this.client.from(table).select('*');
+    const page = (from: number, count: boolean) => {
+      let q = this.client.from(table).select('*', count ? { count: 'exact' } : undefined);
       for (const col of order) q = q.order(col, { ascending: true });
       if (scope) scope.queries++;
-      const { data, error } = await q.range(from, from + PAGE - 1);
-      fail(table, error);
-      rows.push(...((data ?? []) as Record<string, unknown>[]));
-      if (!data || data.length < PAGE) break;
+      return q.range(from, from + PAGE - 1);
+    };
+    // First page also returns the exact row count; the remaining pages load in parallel
+    // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
+    const first = await page(0, true);
+    fail(table, first.error);
+    const rows: Record<string, unknown>[] = [...((first.data ?? []) as Record<string, unknown>[])];
+    const total = first.count ?? rows.length;
+    if (rows.length === PAGE && total > PAGE) {
+      const rest = await Promise.all(
+        Array.from({ length: Math.ceil(total / PAGE) - 1 }, (_, i) => page((i + 1) * PAGE, false)),
+      );
+      for (const r of rest) { fail(table, r.error); rows.push(...((r.data ?? []) as Record<string, unknown>[])); }
     }
     return rows.map((r) => fromRow(key, r));
   }

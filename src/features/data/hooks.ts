@@ -55,7 +55,13 @@ export type ApiState<T> = { data: T | null; error: string | null; loading: boole
  * GET `path` as the current persona; refetches when the persona changes and when any of
  * `channels` (or the ones `channelsOf(data)` returns) receives a message. `path` null = idle.
  */
-export function useApi<T>(path: string | null, channels: readonly string[] = [], channelsOf?: (data: T) => string[]): ApiState<T> {
+export function useApi<T>(
+  path: string | null,
+  channels: readonly string[] = [],
+  channelsOf?: (data: T) => string[],
+  /** Optional: apply a realtime payload (ids/counts only) to the current data at once, before the refetch confirms it. */
+  patch?: (data: T, channel: string, payload: unknown) => T,
+): ApiState<T> {
   const { handle } = useViewer();
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +84,10 @@ export function useApi<T>(path: string | null, channels: readonly string[] = [],
   const refetch = useCallback(() => load(true), [load]);
   useEffect(() => { void load(false); }, [load, handle]);
   const derived = data && channelsOf ? channelsOf(data) : [];
-  useChannel([...channels, ...derived], () => { void load(true); });
+  useChannel([...channels, ...derived], (channel, payload) => {
+    if (patch) setData((prev) => (prev ? patch(prev, channel, payload) : prev));
+    void load(true);
+  });
   return { data, error, loading, refetch };
 }
 
@@ -90,7 +99,12 @@ export function useQuests(center: { lat: number; lng: number } | null, radiusM =
 
 export function useQuest(id: string | null) {
   return useApi<{ quest: Quest; seatsLeft: number; members: unknown[]; viewerIsMember: boolean }>(
-    id ? `/api/quests/${id}` : null, id ? [`quest:${id}`] : []);
+    id ? `/api/quests/${id}` : null, id ? [`quest:${id}`] : [], undefined,
+    // The quest:<id> payload carries the authoritative seat count from the write; show it at once.
+    (prev, _channel, payload) => {
+      const p = payload as { seatsLeft?: unknown } | null;
+      return p && typeof p.seatsLeft === 'number' ? { ...prev, seatsLeft: p.seatsLeft } : prev;
+    });
 }
 
 export function useFriendAvailability() {
