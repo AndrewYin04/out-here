@@ -1,0 +1,185 @@
+// Muse one-line plan draft (POST /api/muse/create-quest). The model proposes; code decides:
+// the place must be one of the real places near the pin, times are resolved from what the
+// user said, and every number is clamped. Mock mode uses the same validator.
+import { z } from 'zod';
+import { haversineMeters, walkingMinutes, type LatLng, type QuestCategory } from '../../shared';
+import type { MuseQuestDraft } from '../../shared/api';
+import { createQuestMessages } from './prompts/create-quest';
+import { localLabel, nextClock, parseClock } from './time';
+import type { MuseMessage } from './client';
+
+export const QUEST_CATEGORIES: readonly QuestCategory[] = ['food', 'music', 'sports', 'study', 'thrift', 'art', 'outdoors', 'games', 'other'];
+
+export type DraftPlace = {
+  placeId: string; name: string; category: string; typicalCostUsd: number; location: LatLng; walkMin: number;
+};
+export type CreateQuestContext = {
+  text: string;
+  now: Date;
+  /** Where the host dropped the pin. */
+  pin: LatLng;
+  hostFirstName: string;
+  hostInterests: string[];
+  places: DraftPlace[];
+};
+
+const nullableInt = z.number().int().nullable().catch(null);
+export const RawDraftZ = z.object({
+  title: z.string().trim().min(1).max(120),
+  emoji: z.string().trim().min(1).max(16).catch('✨'),
+  category: z.string().trim().catch('other'),
+  description: z.string().trim().max(400).catch(''),
+  placeId: z.string().nullable().catch(null),
+  startClock: z.string().nullable().catch(null),
+  startsInMinutes: nullableInt,
+  durationMinutes: nullableInt,
+  capacity: nullableInt,
+  priceMax: z.number().nullable().catch(null),
+  tags: z.array(z.string()).max(8).catch([]),
+  bubbleText: z.string().trim().max(200).nullable().catch(null),
+  pitch: z.string().trim().max(400).catch(''),
+});
+export type RawDraft = z.output<typeof RawDraftZ>;
+
+const nullable = (type: string) => ({ type: [type, 'null'] });
+export const RAW_DRAFT_JSON_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['title', 'emoji', 'category', 'description', 'placeId', 'startClock', 'startsInMinutes', 'durationMinutes',
+    'capacity', 'priceMax', 'tags', 'bubbleText', 'pitch'],
+  properties: {
+    title: { type: 'string' }, emoji: { type: 'string' },
+    category: { type: 'string', enum: [...QUEST_CATEGORIES] },
+    description: { type: 'string' }, placeId: nullable('string'), startClock: nullable('string'),
+    startsInMinutes: nullable('integer'), durationMinutes: nullable('integer'), capacity: nullable('integer'),
+    priceMax: nullable('number'), tags: { type: 'array', items: { type: 'string' } },
+    bubbleText: nullable('string'), pitch: { type: 'string' },
+  },
+};
+
+/** Up to 8 real places within `radiusM` of the pin, nearest first. */
+export function nearbyPlaces(
+  places: { id: string; name: string; category: string; typicalCostUsd: number; location: LatLng | null }[],
+  pin: LatLng, radiusM = 400, limit = 8,
+): DraftPlace[] {
+  return places.flatMap((p) => {
+    if (!p.location) return [];
+    const m = haversineMeters(pin, p.location);
+    return m <= radiusM
+      ? [{ placeId: p.id, name: p.name, category: p.category, typicalCostUsd: p.typicalCostUsd, location: p.location, walkMin: walkingMinutes(pin, p.location), m }]
+      : [];
+  }).sort((a, b) => a.m - b.m).slice(0, limit).map(({ m: _m, ...p }) => { void _m; return p; });
+}
+
+export function draftMessages(ctx: CreateQuestContext): MuseMessage[] {
+  return createQuestMessages({
+    text: ctx.text, nowLabel: localLabel(ctx.now), hostFirstName: ctx.hostFirstName, hostInterests: ctx.hostInterests,
+    places: ctx.places.map((p) => ({
+      placeId: p.placeId, name: p.name, category: p.category,
+      typicalCost: p.typicalCostUsd > 0 ? `$${p.typicalCostUsd}` : 'free', walk: `${p.walkMin} min walk from the pin`,
+    })),
+    categories: QUEST_CATEGORIES,
+  });
+}
+
+// Words that are prompt plumbing, never user copy.
+const FIELD_WORDS = /\b(placeId|startClock|startsInMinutes|durationMinutes|bubbleText|priceMax|walkMin|typicalCost|JSON)\b/g;
+const clean = (s: string) => s.replace(FIELD_WORDS, '').replace(/\s{2,}/g, ' ').trim();
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+const roundTo5 = (ms: number) => Math.ceil(ms / (5 * 60_000)) * 5 * 60_000;
+
+/** Turns a model (or mock) draft into a safe plan draft. Never throws. */
+export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: MuseQuestDraft; pitch: string } {
+  const nowMs = ctx.now.getTime();
+  const category = (QUEST_CATEGORIES as readonly string[]).includes(raw.category) ? raw.category as QuestCategory : 'other';
+  const place = raw.placeId ? ctx.places.find((p) => p.placeId === raw.placeId) ?? null : null;
+
+  let start = roundTo5(nowMs + 30 * 60_000);
+  const clock = parseClock(raw.startClock);
+  if (clock) start = nextClock(ctx.now, clock).getTime();
+  else if (raw.startsInMinutes !== null && raw.startsInMinutes >= 0) start = roundTo5(nowMs + raw.startsInMinutes * 60_000);
+  // Plans are for today-ish: anything over 24 h out (or in the past) falls back to 30 min from now.
+  if (start < nowMs - 60_000 || start > nowMs + 24 * 60 * 60_000) start = roundTo5(nowMs + 30 * 60_000);
+  const duration = clamp(raw.durationMinutes ?? 60, 15, 360);
+
+  const priceMax = clamp(Math.round(raw.priceMax ?? place?.typicalCostUsd ?? 0), 0, 1000);
+  const tags = [...new Set(raw.tags.map((t) => t.trim().toLowerCase()).filter((t) => t && t.length <= 40))].slice(0, 4);
+  const bubble = raw.bubbleText ? clean(raw.bubbleText).slice(0, 80) : '';
+  const title = clean(raw.title).slice(0, 120) || 'Hang out';
+  const draft: MuseQuestDraft = {
+    title,
+    emoji: [...raw.emoji.trim()].slice(0, 2).join('') || '✨',
+    category,
+    description: clean(raw.description).slice(0, 400),
+    venueName: place?.name ?? 'Dropped pin',
+    location: place?.location ?? ctx.pin,
+    placeId: place?.placeId ?? null,
+    startsAt: new Date(start).toISOString(),
+    endsAt: new Date(start + duration * 60_000).toISOString(),
+    capacity: clamp(raw.capacity ?? 6, 2, 50),
+    priceMax,
+    tags,
+    bubbleText: bubble || null,
+  };
+  const pitch = clean(raw.pitch) || (place ? `I picked ${place.name}, ${place.walkMin} min from your pin.` : 'I kept your pin as the spot.');
+  return { draft, pitch };
+}
+
+// ---------- mock (offline) ----------
+
+const RULES: { re: RegExp; emoji: string; category: QuestCategory; tags: string[]; placeCategory?: RegExp }[] = [
+  { re: /\bboba|bubble tea|milk tea\b/, emoji: '🧋', category: 'food', tags: ['boba'], placeCategory: /cafe|boba/i },
+  { re: /\bcoffee|latte|cafe\b/, emoji: '☕', category: 'food', tags: ['coffee'], placeCategory: /cafe/i },
+  { re: /\bdumpling/, emoji: '🥟', category: 'food', tags: ['dumplings'], placeCategory: /food/i },
+  { re: /\bpho|ramen|noodle/, emoji: '🍜', category: 'food', tags: ['noodles'], placeCategory: /food/i },
+  { re: /\btaco/, emoji: '🌮', category: 'food', tags: ['tacos'], placeCategory: /food/i },
+  { re: /\blunch|dinner|eat|food|hungry\b/, emoji: '🍽️', category: 'food', tags: ['food'], placeCategory: /food/i },
+  { re: /\bstudy|homework|exam|cs club\b/, emoji: '📚', category: 'study', tags: ['study'], placeCategory: /library|cafe/i },
+  { re: /\bvolleyball|soccer|basketball|frisbee|pickup\b/, emoji: '🏐', category: 'sports', tags: ['pickup'], placeCategory: /sports/i },
+  { re: /\bclimb|boulder/, emoji: '🧗', category: 'sports', tags: ['climbing'], placeCategory: /climb/i },
+  { re: /\brun\b|\b5k\b|\bjog/, emoji: '🏃', category: 'outdoors', tags: ['running'], placeCategory: /outdoor|park/i },
+  { re: /\bwalk|sunset|park\b/, emoji: '🌅', category: 'outdoors', tags: ['walk'], placeCategory: /outdoor|park/i },
+  { re: /\bthrift|vintage\b/, emoji: '🧥', category: 'thrift', tags: ['thrifting'], placeCategory: /thrift/i },
+  { re: /\bboard games?|smash|games?\b/, emoji: '🎲', category: 'games', tags: ['games'], placeCategory: /games/i },
+  { re: /\bshow|band|music|open mic\b/, emoji: '🎸', category: 'music', tags: ['live music'], placeCategory: /music/i },
+  { re: /\bsketch|draw|art|gallery\b/, emoji: '🎨', category: 'art', tags: ['art'], placeCategory: /art|cafe/i },
+];
+
+function clockFrom(h: string, m: string | undefined, ampm: string | undefined): string {
+  let hour = Number(h);
+  const minute = m ? Number(m) : 0;
+  if (ampm === 'pm' && hour < 12) hour += 12;
+  if (ampm === 'am' && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/** Deterministic stand-in for the model, used in mock mode, on failure, and by tests. */
+export function mockDraft(ctx: CreateQuestContext): RawDraft {
+  const text = ` ${ctx.text.toLowerCase().replace(/\s+/g, ' ')} `;
+  const rule = RULES.find((r) => r.re.test(text)) ?? null;
+  const at = /\bat (\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(text);
+  const inMin = /\bin (\d+)\s*(?:min|mins|minutes)\b/.exec(text);
+  const people = /\b(\d+)\s*(?:people|ppl|spots|of us)\b/.exec(text) ?? /\bme \+ ?(\d+)\b/.exec(text);
+  const place = rule?.placeCategory
+    ? ctx.places.find((p) => rule.placeCategory!.test(p.category) || rule.re.test(p.name.toLowerCase())) ?? null
+    : null;
+  const title = ctx.text.trim()
+    .replace(/\b(at \d{1,2}(:\d{2})?\s*(am|pm)?|in \d+\s*(min|mins|minutes)|today|tonight|rn|right now)\b/gi, '')
+    .replace(/[,.!?]+$/g, '').replace(/\s{2,}/g, ' ').trim();
+  const nice = title ? title[0].toUpperCase() + title.slice(1) : 'Hang out';
+  return {
+    title: nice.slice(0, 60),
+    emoji: rule?.emoji ?? '✨',
+    category: rule?.category ?? 'other',
+    description: place ? `${nice} at ${place.name}. Come say hi, all welcome.` : `${nice}. Come say hi, all welcome.`,
+    placeId: place?.placeId ?? null,
+    startClock: at ? clockFrom(at[1], at[2], at[3]) : null,
+    startsInMinutes: at ? null : inMin ? Number(inMin[1]) : /\b(rn|right now|now)\b/.test(text) ? 0 : /\bafter class\b/.test(text) ? 60 : null,
+    durationMinutes: null,
+    capacity: people ? Number(people[1]) + (people[0].startsWith('me') ? 1 : 0) : null,
+    priceMax: null,
+    tags: rule?.tags ?? [],
+    bubbleText: rule ? `${rule.emoji} ${nice}, come join` : `${nice}, come join`,
+    pitch: place ? `I picked ${place.name}, ${place.walkMin} min from your pin.` : 'I kept your pin as the spot.',
+  };
+}
