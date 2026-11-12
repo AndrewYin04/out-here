@@ -111,6 +111,35 @@ Versions on 2026-11-12: `next@15` resolves to 15.5.29, `@supabase/supabase-js` i
 2.119.0, `@playwright/test` is 1.65.0, and `@faker-js/faker` is 10.6.0 (ESM-only; pin
 it).
 
+**Friend locations ("Find My" inside Facebook), Out Here P0.** Added on 2026-11-12 at
+Andrew's request. The Friends view of the map shows friends' live locations as avatar
+pins with **status bubbles** (thought or status with an emoji, what they're doing, what
+they want to do, and "updated N min ago"), whether or not Muse matched anyone.
+
+- **Friend card.** Tapping a pin opens distance and walking minutes, the bubble, View
+  profile, Message, and "Want to hang?".
+- **People sheet.** A list sorted by distance mirrors the pins. Far-away friends (other
+  cities) show with city and distance.
+- **Your own sharing.**
+  - Audience: friends, Close friends, a list, or nobody.
+  - Precision: exact or approximate.
+  - Pause sharing.
+  - Edit your bubble.
+  - Shares expire after 4 hours.
+- **Live.** Updates arrive in about 2 s over Broadcast `location:<userId>`.
+- **Where it is specified.** Contract: `LocationShare`, `FriendPin`, `StatusBubble` in
+  `src/shared/types.ts`; routes in `src/shared/api.ts`; table
+  `0002_location_shares.sql`, applied on dev and demo.
+- **Seed.** About 25 of Alex's friends share.
+  - Six are local, with bubbles that make the demo story visible: Maya near her office,
+    "craving dumplings 🥟", "at work till 5:15"; Jordan at Boulder Bay Gym; Kai and Nina
+    near Dumpling Den; Priya at Stanford.
+  - The rest are college and hometown friends in other cities (San Francisco, LA,
+    Seattle, Austin, New York) with ordinary bubbles.
+  - A few share approximate locations, and one is paused.
+- **Muse.** Uses bubbles plus availability to propose overlaps. It never reveals a
+  location the viewer could not already see.
+
 **Map, in two steps.** One map stack: `maplibre-gl` with the OpenFreeMap Positron
 style above. No Leaflet, react-leaflet, or CARTO anywhere.
 

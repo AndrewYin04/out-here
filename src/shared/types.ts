@@ -42,6 +42,40 @@ export type Availability = {            // an "I'm free" signal
   location: LatLng; intent: MuseIntent | null; createdAt: string;
 };
 
+// ---- Friend locations + status bubbles ("Find My" inside Facebook) ----
+// One row per user. Who can see it is an Audience checked with canSee(); precision
+// 'approximate' means viewers get a fuzzed point (~500 m-1 km), never the exact one.
+export type LocationPrecision = 'exact' | 'approximate';
+export type StatusBubble = {
+  emoji: string | null;          // "🥟"
+  thought: string | null;        // "craving dumplings"
+  doing: string | null;          // "at work till 5:15"
+  wantsTo: string | null;        // "try the new boba place"
+};
+export type LocationShare = {
+  userId: ID;
+  location: LatLng;              // exact; servers return a fuzzed point when precision is approximate
+  placeLabel: string | null;     // "Menlo Park" / "near Hacker Way" / "San Diego, CA"
+  precision: LocationPrecision;
+  audience: Audience;            // who may see this share
+  paused: boolean;
+  bubble: StatusBubble;
+  updatedAt: string;             // ISO
+  expiresAt: string;             // ISO; expired shares are hidden
+};
+// What a viewer receives for one friend on the Friends map.
+export type FriendPin = {
+  friend: Profile;
+  location: LatLng;              // already fuzzed if approximate
+  placeLabel: string | null;
+  precision: LocationPrecision;
+  bubble: StatusBubble;
+  updatedAt: string;
+  distanceKm: number;
+  walkingMinutes: number | null; // null when too far to walk
+  availability: Availability | null; // their active "I'm free" signal, if any
+};
+
 export type QuestStatus = 'open' | 'full' | 'live' | 'done';
 export type QuestCategory =
   'food' | 'music' | 'sports' | 'study' | 'thrift' | 'art' | 'outdoors' | 'games' | 'other';

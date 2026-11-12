@@ -24,7 +24,20 @@ If a feature doesn't make a step of this loop better, it is out of scope. Our ow
 Do not start a tier until every item in the tier above works end-to-end on the deployed build.
 
 **P0 — must work live in the demo**
-1. **Live map** (MapLibre + OpenFreeMap) with **Friends** / **Explore** toggle. Explore = public quest pins with open-seat badges. Friends = friends' shared availability + quests friends joined.
+1. **Live map** (MapLibre + OpenFreeMap) with **Friends** / **Explore** toggle. Explore = public quest pins with open-seat badges. Friends = friends' shared live locations with status bubbles (item 1a), friends' shared availability, and quests friends joined.
+1a. **Friend locations + status bubbles ("Find My" inside Facebook), shown regardless of any Muse match.**
+   - Each friend who shares with you appears on the Friends map as their avatar pin.
+   - Each pin has a **status bubble** with up to three parts: a thought or status line with an emoji ("craving dumplings 🥟"), what they're doing ("at work till 5:15"), and what they want to do ("want to try the new boba place"). The bubble also shows "updated N min ago".
+   - Tapping a friend opens a card: name, distance and walking minutes, the bubble, and actions View profile, Message, and "Want to hang?". "Want to hang?" sends an invite that suggests a nearby quest or place.
+   - A friends list or sheet ("People", sorted by distance) mirrors the pins, like Find My's People tab. Friends far away (other cities) appear with city and distance, and the map can zoom out to them.
+   - **You set your own sharing:**
+     - Who sees you: friends, Close friends, a custom list, or nobody. This is the same Audience model and `canSee` as posts.
+     - Precision: exact, or approximate (about 500 m to 1 km, fuzzed).
+     - Pause sharing at any time.
+     - Edit your status bubble.
+     - Shared locations expire, for example after 4 hours unless refreshed.
+   - Live: a friend's pin and bubble update on every screen within about 2 s when they move or edit their status, over a Broadcast `location:<userId>` event carrying ids only, after which clients refetch.
+   - Muse builds on this layer, it does not replace it. Muse uses bubbles and availability to propose overlaps ("Maya's bubble says craving dumplings and she's 9 min away").
 2. **"I'm free" composer**: free text + optional time window ("hungry, 30 min, under $15").
 3. **Micro-hangouts / time-fit**: Muse only suggests plans that fit the window **including walking time** there.
 4. **Muse plan**: parse intent → candidate generation (code) → Muse ranks, explains in plain language, adds friend-bridge line, drafts invite → validation (code). Returns 2–3 suggestions.

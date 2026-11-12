@@ -12,6 +12,11 @@
 // POST /api/quests/:id/complete        body: { userId }                 -> { quest, crew }        (host only; creates/updates crew)
 // POST /api/availability               body: { userId, text, startsAt, endsAt, location } -> { availability }
 // GET  /api/friends/:userId/availability                                -> { items: (Availability & { friend: Profile })[] }
+// GET  /api/locations/friends          (viewer from x-persona)          -> { pins: FriendPin[] }   (canSee on audience; fuzzed when approximate; paused/expired hidden)
+// GET  /api/locations/me                                                -> { share: LocationShare | null }
+// PUT  /api/locations/me               body: Partial<Pick<LocationShare,'location'|'placeLabel'|'precision'|'audience'|'paused'|'bubble'>> -> { share }
+//      (publishes Broadcast location:<userId> {userId, updatedAt}; clients refetch /api/locations/friends)
+// POST /api/locations/hang             body: { toId, questId?, placeId?, message } -> { invite }   ("Want to hang?" from a friend card)
 // GET  /api/users                                                       -> { users: Profile[] }   (demo switcher)
 // POST /api/invites                    body: { fromId, toId, questId, suggestionTitle, message } -> { invite }
 // POST /api/invites/:id/respond        body: { status: 'accepted'|'declined' } -> { invite, quest? } (accept auto-joins)
