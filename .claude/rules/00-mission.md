@@ -48,7 +48,7 @@ Do not start a tier until every item in the tier above works end-to-end on the d
 1b. **Muse Intros (Boardy-style warm intros).** Muse introduces two people one to one, the way a trusted friend would. Kinds: Friendship, Networking/coffee chat, and Dating (opt-in on both sides). Hookups are out of the demo.
    - Reach is friends-of-friends and members of your Groups, and every intro names its trust path ("you both know Maya").
    - The quality bar is strict: score at least 85, 2 or more concrete reasons, and a trust path. Otherwise nothing is sent. At most 1 intro per person per week, plus intros you ask for.
-   - Double opt-in: both people privately accept before anything is shared or a Messenger thread opens.
+   - Double opt-in like Boardy: both people privately accept before anything is shared; then Muse opens a 3-person Messenger thread and stays in it to schedule a time and place.
    - Full spec: MVP-BUILD-PLAN-itr-1.md, "Muse Intros". Built in M4 as its own slice, after the M3 checkpoint.
 
 **P1 — the reason to come back**

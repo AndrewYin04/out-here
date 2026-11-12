@@ -144,18 +144,18 @@ they want to do, and "updated N min ago"), whether or not Muse matched anyone.
 Andrew's request. Muse acts like a trusted friend who introduces two people who would
 genuinely click. The hangout matching only puts people at the same event; Intros
 connect two people one to one. Intros can reach friends-of-friends and people in your
-Groups, not only friends who share a location. Answers pending from Andrew are marked
-**(default)**; change them if he replies.
+Groups, not only friends who share a location. Andrew confirmed the choices below on
+2026-11-12 (kinds 1 a,b,c; reach a; frequency a+c; consent modelled on Boardy).
 
 - **Kinds** (each person opts into which ones they want, per kind, in Intro settings):
-  - **Friendship** (default on): new-in-town friends with overlapping interests.
-  - **Networking / coffee chat** (default): career, side hustles, "15-min coffee".
-  - **Dating** (default): only between two people who both opted into dating and match
+  - **Friendship**: new-in-town friends with overlapping interests.
+  - **Networking / coffee chat**: career, side hustles, "15-min coffee".
+  - **Dating**: only between two people who both opted into dating and match
     each other's stated preferences (age range, gender interest). Shown under a Dating
     label, consistent with Facebook Dating.
-  - **Hookups: out of the demo build (default)**, because of safety and policy risk with
+  - **Hookups: not built** (Andrew picked a,b,c), because of safety and policy risk with
     Meta judges. Mention it in Q&A as deliberately excluded.
-- **Reach (default): 2nd-degree connections plus members of Groups you are in.**
+- **Reach: 2nd-degree connections plus members of Groups you are in.**
   - Every intro names its trust path: "You both know Priya", or "You're both in Bay Area
     Local Shows".
   - 3rd-degree is allowed only through two named mutuals.
@@ -175,17 +175,29 @@ Groups, not only friends who share a location. Answers pending from Andrew are m
        the Thursday intro session").
   - If nobody clears the bar, Muse sends nothing. That is a feature, and the UI says
     "Muse only introduces when it's confident".
-- **Frequency (default): at most 1 new intro per person per week**, plus intros the user
-  asks for ("find me a climbing partner"), which still must clear the bar or get a
+- **Frequency: at most 1 new automatic intro per person per week, plus on-request intros**
+  the user asks for ("find me a climbing partner"), which still must clear the bar or get a
   "no great match yet" answer.
-- **Consent (default): double opt-in.**
+- **Consent: double opt-in, the way Boardy does it.** Boardy (boardy.ai, checked
+  2026-11-12) checks fit "for both of you before anyone hears about it", makes "the intro
+  once you both say yes", then sends the intro into a shared thread and stays in it to
+  schedule. It first learns what you are working on, and matches take it hours, not
+  seconds. Muse does the same:
   - Each person privately gets an "Intro from Muse" card: who (first name, photo,
     mutual or group path), why (2-3 reasons), the suggested first step, Accept, and
     "Not now".
   - Nothing about A is shown to B beyond that card, and no chat opens until **both**
     accept.
-  - After both accept, Muse opens a Messenger thread with its intro note and a
-    suggested time or place (it may use the Out Here quest or place data).
+  - After both accept, Muse opens a 3-person Messenger thread (both people plus Muse)
+    with its intro note, and **stays in the thread to schedule**. It proposes 2-3
+    concrete times and places from both people's availability, location shares, and
+    Out Here places or quests, and books the one they pick ("see you Thu 6:30 at Boulder
+    Bay").
+  - Learning step: when a user turns on Intros, Muse asks 3 short questions in
+    Messenger (what you are looking for, what you are working on or into, when you are
+    free) and writes the answers into their Intro profile. Seeded for demo personas.
+  - Pacing: automatic rounds run in the background (`runIntroRound()`, a demo control
+    triggers one). The UI says "Muse takes its time to find someone great".
   - Declining is silent. The other person only ever sees "didn't work out this time".
 - **Each user's Intro profile** (Profile → Intros settings): kinds on or off, a
   "looking for" free-text line per kind ("climbing partner", "PM coffee chats",
