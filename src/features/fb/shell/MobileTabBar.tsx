@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Badge, cn } from '@/features/ui';
 import { MOBILE_TABS, isActivePath, type MobileTabId } from './nav';
-import { useShellData } from './ShellDataProvider';
+import { useNotificationBadge } from '@/features/fb/notifications';
 
 const ICONS: Record<MobileTabId, typeof House> = {
   home: House,
@@ -19,7 +19,7 @@ const ICONS: Record<MobileTabId, typeof House> = {
 /** Bottom tab bar below 768 px: 24 px icons, 11 px labels, active blue. */
 export function MobileTabBar() {
   const pathname = usePathname() ?? '/';
-  const { notificationCount } = useShellData();
+  const { count: notificationCount } = useNotificationBadge();
   return (
     <nav
       aria-label="Tab bar"

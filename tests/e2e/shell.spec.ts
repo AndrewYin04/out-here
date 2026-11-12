@@ -56,7 +56,7 @@ test.describe('desktop 1440', () => {
     await expect(page.getByTestId('contacts-list').getByRole('link').first()).toBeVisible();
     await expect(page.getByTestId('online-dot').first()).toBeVisible();
     await expect(page.getByTestId('tab-out-here')).toContainText('Out Here');
-    await expect(page.getByRole('link', { name: 'Notifications' }).getByTestId('count-badge')).toBeVisible();
+    await expect(page.getByTestId('notifications-bell').getByTestId('count-badge')).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -77,7 +77,8 @@ test.describe('desktop 1440', () => {
     }
     await page.getByRole('link', { name: 'Messenger' }).first().click();
     await expect(page).toHaveURL(/\/messages$/);
-    await page.getByRole('link', { name: 'Notifications' }).first().click();
+    await page.getByTestId('notifications-bell').click();
+    await page.getByTestId('notifications-panel').getByRole('link', { name: 'See all' }).click();
     await expect(page).toHaveURL(/\/notifications$/);
     await page.getByRole('search').getByRole('searchbox').fill('dumplings');
     await page.getByRole('search').getByRole('searchbox').press('Enter');
