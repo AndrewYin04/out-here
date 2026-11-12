@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ChipLink, Divider, Skeleton, cn } from '@/features/ui';
 import { ROUTES, sectionRow, type Section } from './nav';
 import { useShellData } from './ShellDataProvider';
@@ -177,8 +177,18 @@ export function SectionChips({ section }: { section: Section }) {
 }
 
 function ChipsView({ section, activeId }: { section: Section; activeId: string | null }) {
+  const navRef = useRef<HTMLElement>(null);
+  // Scroll the chip row (not the page) so the selected chip is in view, centered when possible.
+  useEffect(() => {
+    const nav = navRef.current;
+    const chip = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !chip) return;
+    const left = chip.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+    nav.scrollLeft = Math.max(0, left - (nav.clientWidth - chip.offsetWidth) / 2);
+  }, [activeId]);
   return (
     <nav
+      ref={navRef}
       aria-label={`${section.title} sections`}
       data-testid="section-chips"
       className="flex gap-2 overflow-x-auto bg-fb-surface px-4 py-3 md:bg-transparent md:px-0 lg:hidden"

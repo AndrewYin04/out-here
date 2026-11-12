@@ -56,3 +56,20 @@ export function introRows(p: Profile): IntroRow[] {
   if (p.pronouns) rows.push({ field: 'pronouns', text: p.pronouns });
   return rows;
 }
+
+// Seeded generated scene images (public/seed) used as a cover photo when a person has none.
+const COVERS = [
+  'groups/bay-area-local-shows', 'groups/boba-and-sketch', 'groups/boulder-buddies-bay', 'groups/cheap-eats-south-bay',
+  'groups/film-photo-walks-bay', 'groups/k-food-crew', 'groups/menlo-park-new-grads', 'groups/peninsula-board-game-night',
+  'groups/peninsula-thrift-walks', 'groups/pickup-volleyball-peninsula', 'groups/stanford-grad-socials',
+  'groups/sunset-runners-bayfront', 'events/bayfront-overlook-photo-walk', 'events/bayfront-sunset-5k',
+  'events/dumpling-den-dumpling-night', 'events/film-lab-darkroom-night', 'events/hacker-way-sunday-volleyball',
+  'events/k-food-potluck-bayfront', 'events/signal-room-indie-night', 'events/willow-thrift-walk',
+];
+
+/** Stable per-person cover: the same handle always gets the same image. */
+export function coverFor(handle: string): string {
+  let h = 0;
+  for (let i = 0; i < handle.length; i++) h = (h * 31 + handle.charCodeAt(i)) >>> 0;
+  return `/seed/${COVERS[h % COVERS.length]}.webp`;
+}

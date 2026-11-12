@@ -5,7 +5,7 @@ import {
   demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
-  type NotificationType, type Post, type Profile, type Quest, type ReactionType, type Reel, type RsvpStatus,
+  type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
   type Story, type Invite,
 } from '@/shared';
 import type {
@@ -220,6 +220,17 @@ export class CoreStore {
   }
 
   // ---------- profiles ----------
+  /** The viewer edits their own bio and per-field audiences (Edit profile). */
+  async updateProfile(viewerId: ID, patch: { bio?: string; fieldVisibility?: Partial<Record<ProfileField, Audience>> }): Promise<void> {
+    const v = await this.view();
+    const me = v.profileById.get(viewerId);
+    if (!me) throw notFound('profile not found');
+    const next: Partial<Profile> = {};
+    if (patch.bio !== undefined) next.bio = patch.bio.trim();
+    if (patch.fieldVisibility) next.fieldVisibility = { ...me.fieldVisibility, ...patch.fieldVisibility };
+    if (Object.keys(next).length) await this.backend.update('profiles', { id: viewerId }, next);
+  }
+
   async profile(viewerId: ID, handle: string): Promise<ProfileResponse> {
     const v = await this.view();
     const p = this.resolvePerson(v, handle);
@@ -312,6 +323,7 @@ export class CoreStore {
     if (!f || f.status !== 'pending') throw notFound('no pending request');
     if (action === 'delete') {
       await this.backend.remove('friendships', { userA: f.userA, userB: f.userB });
+      await publish(`user:${p.id}`, { type: 'friendship', id: viewerId });
       return null;
     }
     if (f.requesterId === viewerId) throw forbidden('only the recipient can confirm');
@@ -330,6 +342,8 @@ export class CoreStore {
     await this.backend.remove('friendships', { userA: f.userA, userB: f.userB });
     const myLists = v.db.friendLists.filter((l) => l.ownerId === viewerId).map((l) => l.id);
     if (myLists.length) await this.backend.remove('friendListMembers', { listId: myLists, userId: p.id });
+    // Ids only: the other person's request grid and profile header refetch through the API.
+    await publish(`user:${p.id}`, { type: 'friendship', id: viewerId });
   }
 
   async suggestions(viewerId: ID, limit = 20): Promise<PersonCard[]> {

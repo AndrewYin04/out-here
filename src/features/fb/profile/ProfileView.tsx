@@ -7,14 +7,16 @@ import {
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { apiFetch, useApi, useViewer } from '@/features/data';
-import { errorText, mutualLabel, removeFriend, respondRequest, sendRequest } from '@/features/fb/friends';
+import { errorText, MESSENGER_TO_READY, mutualLabel, removeFriend, respondRequest, sendRequest } from '@/features/fb/friends';
 import { CoverHeaderSkeleton, ROUTES, SplitBodySkeleton } from '@/features/fb/shell';
 import {
   Avatar, AvatarStack, Button, Card, EmptyState, LinkButton, MenuItem, Popover, Skeleton, Tabs, useToast,
 } from '@/features/ui';
 import type { FeedResponse, PersonCard, PostView, ProfileResponse } from '@/shared/api';
 import type { ProfileField } from '@/shared/types';
-import { audienceLabel, introRows } from './format';
+import { audienceLabel, coverFor, introRows } from './format';
+import { EditProfileModal } from './EditProfileModal';
+import { OutHereCard } from './OutHereCard';
 import { PostCard } from './PostCard';
 
 export type ProfileTab = 'posts' | 'about' | 'friends' | 'photos';
@@ -29,7 +31,7 @@ const friendsLabel = (n: number) => (n === 1 ? '1 friend' : `${n} friends`);
 
 // ---------- header ----------
 
-function Actions({ data, onChanged }: { data: ProfileResponse; onChanged: () => void }) {
+function Actions({ data, onChanged, onEdit }: { data: ProfileResponse; onChanged: () => void; onEdit: () => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const p = data.profile;
@@ -45,7 +47,7 @@ function Actions({ data, onChanged }: { data: ProfileResponse; onChanged: () => 
       setBusy(false);
     }
   };
-  const message = (
+  const message = MESSENGER_TO_READY && (
     <LinkButton href={ROUTES.chatWith(p.handle)} variant={data.relationship === 'friends' ? 'primary' : 'secondary'} icon={<MessageCircle size={16} aria-hidden />}>
       Message
     </LinkButton>
@@ -54,9 +56,9 @@ function Actions({ data, onChanged }: { data: ProfileResponse; onChanged: () => 
   switch (data.relationship) {
     case 'self':
       return (
-        <LinkButton href={`${ROUTES.profile(p.handle)}?tab=about`} variant="secondary" icon={<Pencil size={16} aria-hidden />}>
+        <Button variant="secondary" icon={<Pencil size={16} aria-hidden />} onClick={onEdit}>
           Edit profile
-        </LinkButton>
+        </Button>
       );
     case 'friends':
       return (
@@ -119,16 +121,16 @@ function Actions({ data, onChanged }: { data: ProfileResponse; onChanged: () => 
   }
 }
 
-function Cover({ url, name }: { url: string | null; name: string }) {
+function Cover({ url, name }: { url: string; name: string }) {
   return (
-    <div className="relative h-[200px] overflow-hidden bg-gradient-to-b from-[#dfe6f1] to-[#9fb3cf] md:h-[340px] md:rounded-b-card lg:h-[400px]">
+    <div className="relative h-[200px] overflow-hidden bg-fb-skeleton md:h-[300px] md:rounded-b-card lg:h-[360px]" data-testid="profile-cover">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {url && <img src={url} alt={`${name}'s cover photo`} className="h-full w-full object-cover" />}
+      <img src={url} alt={`${name}'s cover photo`} className="h-full w-full object-cover" />
     </div>
   );
 }
 
-function Header({ data, tab, onChanged }: { data: ProfileResponse; tab: ProfileTab; onChanged: () => void }) {
+function Header({ data, tab, onChanged, onEdit }: { data: ProfileResponse; tab: ProfileTab; onChanged: () => void; onEdit: () => void }) {
   const p = data.profile;
   const base = ROUTES.profile(p.handle);
   const tabs = [
@@ -140,11 +142,11 @@ function Header({ data, tab, onChanged }: { data: ProfileResponse; tab: ProfileT
   return (
     <header className="bg-fb-surface shadow-card" data-testid="profile-header">
       <div className="mx-auto max-w-[1250px]">
-        <Cover url={p.coverUrl} name={p.name} />
+        <Cover url={p.coverUrl ?? coverFor(p.handle)} name={p.name} />
       </div>
       <div className="mx-auto max-w-[1100px] px-4 md:px-8">
         <div className="flex flex-col items-center gap-3 pb-4 md:flex-row md:items-end md:gap-5">
-          <div className="-mt-[88px] shrink-0 rounded-full bg-fb-surface p-1 md:-mt-[42px]">
+          <div className="relative z-10 -mt-[84px] shrink-0 rounded-full bg-fb-surface p-1 ring-4 ring-white" data-testid="profile-avatar">
             <Avatar src={p.avatarUrl} name={p.name} size={168} decorative />
           </div>
           <div className="min-w-0 flex-1 text-center md:pb-2 md:text-left">
@@ -169,7 +171,7 @@ function Header({ data, tab, onChanged }: { data: ProfileResponse; tab: ProfileT
             )}
           </div>
           <div className="flex flex-wrap justify-center gap-2 md:pb-2" data-testid="profile-actions">
-            <Actions data={data} onChanged={onChanged} />
+            <Actions data={data} onChanged={onChanged} onEdit={onEdit} />
           </div>
         </div>
         <div className="border-t border-fb-divider-soft">
@@ -182,7 +184,7 @@ function Header({ data, tab, onChanged }: { data: ProfileResponse; tab: ProfileT
 
 // ---------- cards ----------
 
-function IntroCard({ data }: { data: ProfileResponse }) {
+function IntroCard({ data, onEdit }: { data: ProfileResponse; onEdit: () => void }) {
   const p = data.profile;
   const rows = introRows(p);
   return (
@@ -212,9 +214,9 @@ function IntroCard({ data }: { data: ProfileResponse }) {
         </div>
       )}
       {data.relationship === 'self' && (
-        <LinkButton href={`${ROUTES.profile(p.handle)}?tab=about`} variant="secondary" block className="mt-4">
+        <Button variant="secondary" block className="mt-4" onClick={onEdit}>
           Edit details
-        </LinkButton>
+        </Button>
       )}
     </Card>
   );
@@ -505,6 +507,7 @@ function PhotosTab({ data }: { data: ProfileResponse }) {
 export function ProfileView({ handle, tab, showMutual = false }: { handle: string; tab: ProfileTab; showMutual?: boolean }) {
   const { viewer } = useViewer();
   const { data, error, refetch } = useApi<ProfileResponse>(`/api/profile/${encodeURIComponent(handle)}`, [`user:${viewer.id}`]);
+  const [editing, setEditing] = useState(false);
 
   if (error && !data) {
     return (
@@ -526,16 +529,30 @@ export function ProfileView({ handle, tab, showMutual = false }: { handle: strin
 
   return (
     <div data-testid="profile-view" data-relationship={data.relationship}>
-      <Header data={data} tab={tab} onChanged={refetch} />
+      <Header data={data} tab={tab} onChanged={refetch} onEdit={() => setEditing(true)} />
+      {data.relationship === 'self' && (
+        <EditProfileModal key={data.profile.id} data={data} open={editing} onClose={() => setEditing(false)} onSaved={refetch} />
+      )}
       <div className="mx-auto max-w-[1100px] py-4 md:px-8">
         {tab === 'posts' && (
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-            <div className="space-y-4 lg:sticky lg:top-[72px]">
-              <IntroCard data={data} />
+            {/* Out Here card first on phones; on desktop it heads the posts column. */}
+            {data.relationship === 'friends' && (
+              <OutHereCard
+                friendId={data.profile.id}
+                handle={data.profile.handle}
+                firstName={firstName(data.profile.name)}
+                className="lg:col-start-2 lg:row-start-1"
+              />
+            )}
+            <div className="space-y-4 lg:sticky lg:top-[72px] lg:col-start-1 lg:row-span-2 lg:row-start-1">
+              <IntroCard data={data} onEdit={() => setEditing(true)} />
               <PhotosCard handle={data.profile.handle} />
               <FriendsCard data={data} />
             </div>
-            <PostsList handle={data.profile.handle} name={data.profile.name} />
+            <div className="lg:col-start-2">
+              <PostsList handle={data.profile.handle} name={data.profile.name} />
+            </div>
           </div>
         )}
         {tab === 'about' && <AboutTab data={data} />}

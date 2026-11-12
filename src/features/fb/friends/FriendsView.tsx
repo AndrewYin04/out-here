@@ -7,7 +7,7 @@ import { useApi, useViewer } from '@/features/data';
 import { CardGridSkeleton, ListSkeleton, PageHeader, ROUTES, useShellData } from '@/features/fb/shell';
 import { Avatar, Card, EmptyState, MenuItem, MenuLink, Popover, useToast } from '@/features/ui';
 import type { FriendRequestView, FriendsResponse, PersonCard } from '@/shared/api';
-import { errorText, removeFriend, respondRequest, sendRequest } from './api';
+import { errorText, GONE_NOTE, isGone, MESSENGER_TO_READY, removeFriend, respondRequest, sendRequest } from './api';
 import { ListsManager } from './ListsManager';
 import { mutualLabel, PersonTile, TileGrid } from './PersonTile';
 
@@ -56,7 +56,12 @@ function RequestsGrid({ limit, title, showSent }: { limit?: number; title: strin
       inc.mark(p, action === 'confirm' ? 'Request accepted' : 'Request removed');
       refetch();
     } catch (e) {
-      toast.show(errorText(e));
+      if (isGone(e)) {
+        inc.mark(p, GONE_NOTE);
+        refetch();
+      } else {
+        toast.show(errorText(e));
+      }
     } finally {
       setBusy(null);
     }
@@ -261,9 +266,11 @@ function AllFriends() {
                 >
                   {(close) => (
                     <>
-                      <MenuLink href={ROUTES.chatWith(f.handle)} onNavigate={close}>
-                        Message {f.name.split(' ')[0]}
-                      </MenuLink>
+                      {MESSENGER_TO_READY && (
+                        <MenuLink href={ROUTES.chatWith(f.handle)} onNavigate={close}>
+                          Message {f.name.split(' ')[0]}
+                        </MenuLink>
+                      )}
                       <MenuItem
                         onSelect={() => {
                           close();

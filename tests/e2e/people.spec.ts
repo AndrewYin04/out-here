@@ -5,8 +5,14 @@ import { expect, test, type Browser, type ConsoleMessage, type Page } from '@pla
 // every test puts the friend graph back the way it found it.
 
 const PAIRS = {
-  desktop: { asker: 'nina', askerName: 'Nina Park', target: 'maya', deleter: 'leo', deleterName: 'Leo Marchetti' },
-  phone: { asker: 'kai', askerName: 'Kai Nakamura', target: 'maya', deleter: 'sam', deleterName: 'Sam Okafor' },
+  desktop: {
+    asker: 'nina', askerName: 'Nina Park', target: 'maya', deleter: 'leo', deleterName: 'Leo Marchetti',
+    canceler: 'nina', cancelTarget: 'leo', editor: 'alex',
+  },
+  phone: {
+    asker: 'kai', askerName: 'Kai Nakamura', target: 'maya', deleter: 'sam', deleterName: 'Sam Okafor',
+    canceler: 'kai', cancelTarget: 'priya', editor: 'jordan',
+  },
 } as const;
 
 function pair(name: string) {
@@ -45,8 +51,21 @@ test('Intro shows only the fields the viewer can see', async ({ page }, info) =>
   await expect(intro.locator('[data-field="job"]')).toHaveText('UX researcher');
   await expect(intro.locator('[data-field="hometown"]')).toContainText('Cupertino');
   await expect(page.getByTestId('profile-actions').getByRole('button', { name: 'Friends' })).toBeVisible();
-  await expect(page.getByTestId('profile-actions').getByRole('link', { name: 'Message' })).toHaveAttribute('href', '/messages?to=maya');
+  // Message stays hidden until the Messenger slice opens a thread from ?to= (MESSENGER_TO_READY).
+  await expect(page.getByTestId('profile-actions').getByRole('link', { name: 'Message' })).toHaveCount(0);
   await expect(page.getByTestId('profile-post').first()).toBeVisible();
+
+  // The cover is a photo, and the avatar sits on it (overlaps the cover by about 84 px).
+  const cover = page.getByTestId('profile-cover');
+  await expect(cover.locator('img')).toHaveAttribute('src', /\/seed\/.+\.webp$/);
+  const coverBox = await cover.boundingBox();
+  const avatarBox = await page.getByTestId('profile-avatar').boundingBox();
+  expect(coverBox!.y + coverBox!.height - avatarBox!.y).toBeGreaterThanOrEqual(70);
+
+  // Out Here card: Maya's live "I'm free" signal and a hang action, for friends only.
+  const outHere = page.getByTestId('outhere-card');
+  await expect(outHere).toContainText('min walk from you');
+  await expect(outHere.getByRole('link', { name: 'Want to hang with Maya?' })).toHaveAttribute('href', '/out-here?with=maya');
 
   // A non-friend sees the public fields only, plus the mutual friend count.
   await page.goto(`/profile/maya?as=${p.asker}`);
@@ -55,6 +74,7 @@ test('Intro shows only the fields the viewer can see', async ({ page }, info) =>
   await expect(intro.locator('[data-field="job"]')).toHaveCount(0);
   await expect(intro.locator('[data-field="hometown"]')).toHaveCount(0);
   await expect(page.getByTestId('mutual-count')).toHaveText('1 mutual');
+  await expect(page.getByTestId('outhere-card')).toHaveCount(0);
 
   await page.getByTestId('mutual-count').click();
   await expect(page).toHaveURL(/tab=friends/);
@@ -70,13 +90,92 @@ test('Intro shows only the fields the viewer can see', async ({ page }, info) =>
   expect(errors).toEqual([]);
 });
 
-test('own profile shows Edit profile and who can see each detail', async ({ page }) => {
-  await page.goto('/profile/alex?as=alex');
-  const edit = page.getByTestId('profile-actions').getByRole('link', { name: 'Edit profile' });
-  await expect(edit).toBeVisible();
-  await edit.click();
-  await expect(page).toHaveURL(/tab=about/);
-  await expect(page.getByTestId('field-audience').first()).toBeVisible();
+test('Edit profile saves the bio and who can see a detail', async ({ page }, info) => {
+  const errors = watchErrors(page);
+  const me = pair(info.project.name).editor;
+  const before = await api(page, me, 'GET', `/api/profile/${me}`);
+  const oldBio: string = before.profile.bio;
+  const oldJob: string = before.profile.fieldVisibility.job ?? 'public';
+
+  await page.goto(`/profile/${me}?as=${me}`);
+  await page.getByTestId('profile-actions').getByRole('button', { name: 'Edit profile' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Edit profile' });
+  const bio = `E2E bio ${info.project.name}`;
+  await dialog.getByTestId('bio-input').fill(bio);
+  await dialog.getByTestId('audience-job').selectOption('only_me');
+  await dialog.getByTestId('save-profile').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('intro-card')).toContainText(bio);
+
+  // Another persona no longer sees the job the editor set to Only me.
+  const seen = await api(page, 'priya', 'GET', `/api/profile/${me}`);
+  expect(seen.profile.job).toBeNull();
+
+  // Restore through the same dialog.
+  await page.getByTestId('intro-card').getByRole('button', { name: 'Edit details' }).click();
+  await dialog.getByTestId('bio-input').fill(oldBio);
+  await dialog.getByTestId('audience-job').selectOption(oldJob);
+  await dialog.getByTestId('save-profile').click();
+  await expect(dialog).toHaveCount(0);
+  const after = await api(page, me, 'GET', `/api/profile/${me}`);
+  expect(after.profile.bio).toBe(oldBio);
+  expect(after.profile.fieldVisibility.job ?? 'public').toBe(oldJob);
+  expect(errors).toEqual([]);
+});
+
+test('two personas: a canceled request leaves the other side live', async ({ page, browser }, info) => {
+  const p = pair(info.project.name);
+  await api(page, p.canceler, 'DELETE', `/api/friends/${p.cancelTarget}`);
+
+  const other = await personaPage(browser, info);
+  try {
+    await other.goto(`/friends?tab=requests&as=${p.cancelTarget}`);
+    const tile = other.locator(`[data-testid="person-tile"][data-handle="${p.canceler}"]`);
+    await expect(other.getByRole('heading', { name: 'Friend requests' })).toBeVisible();
+
+    await page.goto(`/profile/${p.cancelTarget}?as=${p.canceler}`);
+    const actions = page.getByTestId('profile-actions');
+    await actions.getByRole('button', { name: 'Add friend' }).click();
+    await expect(tile).toBeVisible({ timeout: 10_000 });
+
+    await actions.getByRole('button', { name: 'Cancel request' }).click();
+    await expect(actions.getByRole('button', { name: 'Add friend' })).toBeVisible();
+    // The canceled request leaves the recipient's grid without a reload.
+    await expect(tile).toHaveCount(0, { timeout: 10_000 });
+  } finally {
+    await other.context().close();
+  }
+
+  // With live updates cut off, a stale Confirm says the request is gone instead of a raw error.
+  await api(page, p.canceler, 'POST', '/api/friends/requests', { toId: p.cancelTarget });
+  const stale = await personaPage(browser, info);
+  try {
+    await stale.route('**/api/realtime?**', (r) => r.abort());
+    await stale.goto(`/friends?tab=requests&as=${p.cancelTarget}`);
+    const tile = stale.locator(`[data-testid="person-tile"][data-handle="${p.canceler}"]`);
+    await expect(tile).toBeVisible();
+    await api(page, p.canceler, 'DELETE', `/api/friends/${p.cancelTarget}`);
+    await tile.getByRole('button', { name: 'Confirm' }).click();
+    await expect(tile).toContainText('This request is no longer available');
+    await expect(tile.getByRole('button')).toHaveCount(0);
+    await expect(stale.getByText('no pending request')).toHaveCount(0);
+  } finally {
+    await stale.context().close();
+  }
+});
+
+test('phone: the selected section chip is scrolled into view', async ({ page }, info) => {
+  test.skip(info.project.name !== 'phone', 'the chip row only shows below 1024 px');
+  for (const tab of ['lists', 'all', 'birthdays']) {
+    await page.goto(`/friends?tab=${tab}&as=alex`);
+    const chip = page.getByTestId('section-chips').locator('[aria-current="page"]');
+    await expect(chip).toBeVisible();
+    await expect.poll(async () => {
+      const b = await chip.boundingBox();
+      const w = page.viewportSize()!.width;
+      return b ? b.x >= 0 && b.x + b.width <= w : false;
+    }).toBe(true);
+  }
 });
 
 test('two personas: Add friend, then Confirm from Friend requests', async ({ page, browser }, info) => {
