@@ -1,0 +1,204 @@
+{
+  "description": "Muse plan fixtures. Quest keys are DEMO_QUESTS keys (src/shared/seed/story.ts); people are handles. 'now' is Thu 4:00 PM PT; seed times are relative to it. Run by tests/unit/muse-fixtures.test.ts (mock) and npm run eval:muse:plan (real API).",
+  "now": "2026-11-12T16:00:00-08:00",
+  "cases": [
+    {
+      "id": "demo-hungry-40",
+      "viewer": "alex",
+      "text": "hungry, got like 40 min, under $15",
+      "expect": {
+        "topQuest": "dumplings",
+        "topFriends": [
+          "maya"
+        ],
+        "excludes": [
+          "ramen",
+          "sushi"
+        ],
+        "minSuggestions": 1,
+        "maxSuggestions": 3,
+        "budgetMax": 15,
+        "windowMinutes": 40,
+        "maxTravel": 25,
+        "topHasInviteDraft": true
+      }
+    },
+    {
+      "id": "demo-hungry-15",
+      "viewer": "alex",
+      "text": "hungry, 15 min",
+      "expect": {
+        "only": [
+          "boba"
+        ],
+        "excludes": [
+          "dumplings",
+          "ramen",
+          "sushi"
+        ],
+        "windowMinutes": 15,
+        "startsWithinMin": 15
+      }
+    },
+    {
+      "id": "music-tonight",
+      "viewer": "alex",
+      "text": "anything with music tonight",
+      "expect": {
+        "includes": [
+          "band-pregame"
+        ],
+        "categories": [
+          "music"
+        ],
+        "minSuggestions": 1
+      }
+    },
+    {
+      "id": "meet-climbers",
+      "viewer": "alex",
+      "text": "I want to meet people who climb",
+      "expect": {
+        "topQuest": "bouldering",
+        "minSuggestions": 1
+      }
+    },
+    {
+      "id": "before-class-30",
+      "viewer": "alex",
+      "text": "30 min before class",
+      "expect": {
+        "windowMinutes": 30,
+        "startsWithinMin": 30,
+        "excludes": [
+          "ramen",
+          "sushi",
+          "study"
+        ],
+        "minSuggestions": 1,
+        "maxTravel": 25
+      }
+    },
+    {
+      "id": "cheap-food-before-7",
+      "viewer": "alex",
+      "text": "cheap food before 7",
+      "expect": {
+        "includes": [
+          "dumplings"
+        ],
+        "excludes": [
+          "sushi",
+          "ramen",
+          "tacos"
+        ],
+        "endsBy": "19:00",
+        "minSuggestions": 1
+      }
+    },
+    {
+      "id": "nonsense",
+      "viewer": "alex",
+      "text": "asdfgh",
+      "expect": {
+        "empty": true
+      }
+    },
+    {
+      "id": "volleyball-now",
+      "viewer": "alex",
+      "text": "down for volleyball rn",
+      "expect": {
+        "topQuest": "volleyball",
+        "only": [
+          "volleyball"
+        ]
+      }
+    },
+    {
+      "id": "board-games-tonight",
+      "viewer": "alex",
+      "text": "board games tonight?",
+      "expect": {
+        "topQuest": "board-games",
+        "excludes": [
+          "smash",
+          "dumplings"
+        ]
+      }
+    },
+    {
+      "id": "outside-2h",
+      "viewer": "alex",
+      "text": "free for the next 2 hours, want to be outside",
+      "expect": {
+        "includes": [
+          "5k"
+        ],
+        "excludes": [
+          "sunset-walk"
+        ],
+        "windowMinutes": 120,
+        "startsWithinMin": 120
+      }
+    },
+    {
+      "id": "ramen-cannot-make-start",
+      "viewer": "alex",
+      "text": "ramen, ok walking 30 min",
+      "expect": {
+        "excludes": [
+          "ramen"
+        ],
+        "only": []
+      }
+    },
+    {
+      "id": "free-next-hour",
+      "viewer": "alex",
+      "text": "something free in the next hour",
+      "expect": {
+        "budgetMax": 0,
+        "excludes": [
+          "dumplings",
+          "boba",
+          "sushi"
+        ],
+        "maxPrice": 0,
+        "minSuggestions": 1
+      }
+    },
+    {
+      "id": "thrift-afternoon",
+      "viewer": "alex",
+      "text": "thrifting this afternoon",
+      "expect": {
+        "topQuest": "thrift"
+      }
+    },
+    {
+      "id": "study-2h",
+      "viewer": "alex",
+      "text": "quiet study session, 2 hours",
+      "expect": {
+        "topQuest": "study",
+        "only": [
+          "study"
+        ]
+      }
+    },
+    {
+      "id": "maya-dumplings",
+      "viewer": "maya",
+      "text": "dumplings in the next hour?",
+      "expect": {
+        "topQuest": "dumplings",
+        "excludes": [
+          "ramen",
+          "sushi",
+          "boba"
+        ]
+      }
+    }
+  ]
+}

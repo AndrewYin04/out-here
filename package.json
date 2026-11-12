@@ -18,7 +18,8 @@
     "storage:setup": "node --env-file=.env.local scripts/storage-setup.mjs dev",
     "gen:content": "node --env-file=.env.local scripts/gen-content.mjs",
     "gen:images": "node --env-file=.env.local scripts/gen-images.mjs",
-    "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs"
+    "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs",
+    "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",

@@ -1,0 +1,29 @@
+// Barrel for the muse area. Server-side only: importing values from here pulls in the
+// `openai` client and node:crypto. Client components should `import type` from here only.
+export {
+  MuseError, MUSE_TIMEOUT_MS, extractJSON, hashInput, isMockMode, modelFor, museJSON, onRun, setMuseTransport,
+} from './client';
+export type {
+  MuseEffort, MuseJSONOptions, MuseMessage, MuseModelRole, MuseResult, MuseRunRecord, MuseTransport, MuseUsage,
+} from './client';
+export {
+  UnknownUserError, firstName, getPlanContextProvider, setPlanContextProvider, sharedInterests,
+} from './context';
+export type { PlanContext, PlanContextProvider, PlanContextRequest, PlanFriend } from './context';
+export { buildSeedWorld, contextFromWorld, seedPlanContextProvider } from './seed-context';
+export type { SeedWorld } from './seed-context';
+export { mockParse, parseIntent, toMuseIntent } from './intent';
+export type { ParsedIntent, RawIntent } from './intent';
+export {
+  activityMatches, buildCandidates, friendsFreeInWindow, interestsMatchingQuest, isFoodCompatible, walkCap,
+} from './candidates';
+export type {
+  CandidateInput, CandidateResult, DropReason, DroppedQuest, FriendFree, FriendOverlap, PlanCandidate,
+} from './candidates';
+export { MAX_SUGGESTIONS, rankAndExplain } from './rank';
+export type { RankResult } from './rank';
+export { leakedNames, validate } from './validate';
+export { plan } from './plan';
+export type { PlanInput, PlanMeta, PlanOutput, PlanTimings } from './plan';
+export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
+export type { TimeExpression } from './time';
