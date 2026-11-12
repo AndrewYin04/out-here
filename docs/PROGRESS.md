@@ -8,3 +8,4 @@
 
 ## Judge scores
 (none yet)
+- 03:25 Thu — Preview deploy pipeline works after vercel.json framework=nextjs (repro: build ok then STATIC_BUILD_NO_OUT_DIR). Preview 37d714b: https://out-here-n7qwhjznv-andrews-projects-76721bc6.vercel.app (behind Vercel SSO; posted blocked). M1 workflow running (data + content agents, then seed+verify).

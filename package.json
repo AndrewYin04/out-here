@@ -13,9 +13,11 @@
     "check-env": "node --env-file=.env.local scripts/check-env.mjs",
     "db:migrate:dev": "node --env-file=.env.local scripts/db-migrate.mjs dev",
     "db:migrate:demo": "node --env-file=.env.local scripts/db-migrate.mjs demo",
-    "seed": "node -e \"console.error('seed not implemented yet (M1)');process.exit(1)\"",
-    "seed:demo": "node -e \"console.error('seed not implemented yet (M1)');process.exit(1)\"",
-    "gen:images": "node -e \"console.error('gen:images not implemented yet (M1)');process.exit(1)\"",
+    "seed": "node --env-file=.env.local --import tsx scripts/seed.ts dev",
+    "seed:demo": "node --env-file=.env.local --import tsx scripts/seed.ts demo",
+    "storage:setup": "node --env-file=.env.local scripts/storage-setup.mjs dev",
+    "gen:content": "node --env-file=.env.local scripts/gen-content.mjs",
+    "gen:images": "node --env-file=.env.local scripts/gen-images.mjs",
     "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs"
   },
   "dependencies": {
