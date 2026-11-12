@@ -13,6 +13,12 @@ export const GET = route(async ({ store, viewer }) => {
   ]);
   const walkMinutes: Record<ID, number> = {};
   for (const q of quests) walkMinutes[q.id] = walkingMinutes(viewer.home, q.location);
-  const out: MapContext = { viewer, origin: viewer.home, walkMinutes, friendIds: friends.map((f) => f.id) };
+  const out: MapContext = {
+    viewer,
+    origin: viewer.home,
+    walkMinutes,
+    friendIds: friends.map((f) => f.id),
+    friends: friends.map((f) => ({ id: f.id, name: f.name, avatarUrl: f.avatarUrl })),
+  };
   return out;
 });

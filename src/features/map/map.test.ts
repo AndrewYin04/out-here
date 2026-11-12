@@ -1,29 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { declutter } from './declutter';
-import { priceLabel, seatBadge, startsLabel, walkLabel } from './format';
+import { cluster, shortTitle } from './cluster';
+import { friendsGoingLine, isSoon, pinTime, priceLabel, seatBadge, startsLabel, walkLabel } from './format';
 
-describe('declutter', () => {
-  it('keeps separate pins in place', () => {
-    const out = declutter([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 100, y: 0 }], 48);
-    expect(out.get('a')).toEqual({ dx: 0, dy: 0 });
-    expect(out.get('b')).toEqual({ dx: 0, dy: 0 });
+const box = (x: number, y: number, w = 46, h = 56) => ({ x, y, w, h });
+
+describe('cluster', () => {
+  it('keeps separate pins apart', () => {
+    const out = cluster([{ id: 'a', box: box(0, 0) }, { id: 'b', box: box(100, 0) }]);
+    expect(out.get('a')).toEqual([]);
+    expect(out.get('b')).toEqual([]);
   });
-  it('moves the lower-priority pin off an overlapping one', () => {
-    const out = declutter([{ id: 'a', x: 0, y: 0 }, { id: 'b', x: 10, y: 5 }], 48);
-    expect(out.get('a')).toEqual({ dx: 0, dy: 0 });
-    const b = out.get('b')!;
-    const x = 10 + b.dx, y = 5 + b.dy;
-    expect(Math.abs(x) >= 48 || Math.abs(y) >= 48).toBe(true);
+  it('folds an overlapping lower-priority pin into the first one', () => {
+    const out = cluster([{ id: 'a', box: box(0, 0) }, { id: 'b', box: box(10, 5) }, { id: 'c', box: box(30, 30) }]);
+    expect(out.get('a')).toEqual(['b', 'c']);
+    expect(out.has('b')).toBe(false);
   });
-  it('avoids obstacles and leaves no pair overlapping', () => {
-    const pins = Array.from({ length: 12 }, (_, i) => ({ id: String(i), x: i * 3, y: i * 2 }));
-    const out = declutter(pins, 40, [{ x: -20, y: -20, w: 40, h: 40 }]);
-    const boxes = pins.map((p) => ({ x: p.x + out.get(p.id)!.dx - 20, y: p.y + out.get(p.id)!.dy - 20 }));
-    boxes.push({ x: -20, y: -20 });
-    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i], b = boxes[j];
-      expect(Math.abs(a.x - b.x) >= 40 || Math.abs(a.y - b.y) >= 40).toBe(true);
+  it('leaves no two shown pins overlapping', () => {
+    const pins = Array.from({ length: 20 }, (_, i) => ({ id: String(i), box: box((i * 37) % 200, (i * 53) % 180) }));
+    const out = cluster(pins);
+    const shown = pins.filter((p) => out.has(p.id)).map((p) => p.box);
+    for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
+      const a = shown[i], b = shown[j];
+      expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h).toBe(false);
     }
+    const absorbed = [...out.values()].reduce((n, g) => n + g.length, 0);
+    expect(shown.length + absorbed).toBe(pins.length);
+  });
+  it('shortens titles for pin labels', () => {
+    expect(shortTitle('Dumplings before the rush')).toBe('Dumplings');
+    expect(shortTitle('Thrift walk on Willow')).toBe('Thrift walk');
+    expect(shortTitle('Pickup volleyball, need 1')).toBe('Pickup volleyball');
+    expect(shortTitle('Ramen run')).toBe('Ramen run');
   });
 });
 
@@ -35,12 +42,23 @@ describe('format', () => {
     expect(startsLabel({ startsAt: '2026-11-12T20:30:00Z', endsAt: '2026-11-12T21:00:00Z' }, base)).toBe('Starts at 12:30 PM');
     expect(startsLabel({ startsAt: '2026-11-12T16:00:00Z', endsAt: '2026-11-12T17:00:00Z' }, base)).toBe('Ended');
   });
-  it('labels seats, price and walking', () => {
+  it('labels pin times and soon plans', () => {
+    expect(pinTime({ startsAt: '2026-11-12T18:24:00Z', endsAt: '2026-11-12T19:00:00Z' }, base)).toBe('in 24 min');
+    expect(pinTime({ startsAt: '2026-11-12T17:50:00Z', endsAt: '2026-11-12T19:00:00Z' }, base)).toBe('Now');
+    expect(pinTime({ startsAt: '2026-11-12T20:30:00Z', endsAt: '2026-11-12T21:00:00Z' }, base)).toBe('12:30 PM');
+    expect(isSoon({ startsAt: '2026-11-12T18:30:00Z', endsAt: '2026-11-12T19:00:00Z' }, base)).toBe(true);
+    expect(isSoon({ startsAt: '2026-11-12T18:45:00Z', endsAt: '2026-11-12T19:00:00Z' }, base)).toBe(false);
+  });
+  it('labels seats, price, walking and friends going', () => {
     expect(seatBadge(2)).toBe('2 left');
     expect(seatBadge(0)).toBe('Full');
     expect(priceLabel(12)).toBe('Up to $12');
     expect(priceLabel(0)).toBe('Free');
     expect(walkLabel(9)).toBe('9 min walk');
     expect(walkLabel(undefined)).toBeNull();
+    expect(friendsGoingLine([])).toBeNull();
+    expect(friendsGoingLine(['Nina Park'])).toBe('Nina Park is going');
+    expect(friendsGoingLine(['Nina Park', 'Kai Nakamura'])).toBe('Nina Park and Kai Nakamura are going');
+    expect(friendsGoingLine(['Nina Park', 'Kai Nakamura', 'Maya Chen'])).toBe('Nina Park and 2 other friends are going');
   });
 });

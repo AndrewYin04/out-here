@@ -8,6 +8,11 @@ export type MapContext = {
   /** Server-computed walking minutes from `origin` to each visible quest's returned location. */
   walkMinutes: Record<ID, number>;
   friendIds: ID[];
+  /** The viewer's friends' names and faces (Friends mode avatar stacks). */
+  friends: FriendFace[];
 };
 
 export type MapMode = 'explore' | 'friends';
+
+/** A friend's face on a quest pin in Friends mode. */
+export type FriendFace = { id: ID; name: string; avatarUrl: string };

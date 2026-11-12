@@ -41,8 +41,11 @@ test.describe('phone 390', () => {
     await openMap(page, 'alex');
     const pin = page.getByTestId('quest-pin-dumplings');
     await expect(pin).toBeVisible();
-    await expect(pin).toHaveAttribute('aria-label', /Dumplings before the rush, \d+ left/);
-    await page.waitForTimeout(500); // let the declutter pass settle
+    await expect(pin).toHaveAttribute('aria-label', /Dumplings before the rush, starts (in \d+ min|.*[AP]M)|happening now/);
+    await expect(pin).toHaveAttribute('aria-label', /\d+ left/);
+    await page.waitForTimeout(500); // let the clustering pass settle
+    // Pins carry a "title · time" label, and no leader lines are drawn.
+    await expect(page.locator('[data-role="pin-label"]').filter({ visible: true }).first()).toHaveText(/ · (in \d+ min|Now|\d+:\d\d [AP]M)$/);
 
     const mine = (await pin.boundingBox())!;
     const markers = page.locator('[data-map-marker]');
@@ -81,13 +84,33 @@ test.describe('phone 390', () => {
     expect(errors).toEqual([]);
   });
 
-  test('join and leave update the seat count on the pin and in the sheet', async ({ page }) => {
+  test('a "+N" bubble zooms in on the plans it holds', async ({ page }) => {
     await openMap(page, 'alex');
+    await expect(page.getByTestId('quest-pin-dumplings')).toBeVisible();
+    await page.waitForTimeout(500);
+    const bubble = page.locator('[data-role="cluster"]').filter({ visible: true }).first();
+    test.skip((await bubble.count()) === 0, 'no pins are grouped at this framing');
+    const root = bubble.locator('xpath=..');
+    const id = await root.getAttribute('data-quest-id');
+    const n = Number(((await bubble.textContent()) ?? '+0').slice(1));
+    const hiddenBefore = await page.locator('[data-quest-id][data-clustered]').count();
+    await bubble.click();
+    // After the zoom the group splits: fewer pins are folded away, or this bubble holds fewer.
+    await expect.poll(async () => {
+      const hidden = await page.locator('[data-quest-id][data-clustered]').count();
+      const same = page.locator(`[data-quest-id="${id}"] [data-role="cluster"]`);
+      const now = (await same.isVisible()) ? Number(((await same.textContent()) ?? '+0').slice(1)) : 0;
+      return hidden < hiddenBefore || now < n;
+    }, { timeout: 5000 }).toBe(true);
+  });
+
+  test('join and leave update the seat count on the pin and in the sheet', async ({ page }) => {
+    // Thrift may sit in a "+N" group on a phone, so open it by link; its pin still tracks seats.
+    await openMap(page, 'alex', `&quest=${seedId('quest', 'thrift')}`);
     const pin = page.getByTestId('quest-pin-thrift');
-    await expect(pin).toBeVisible();
+    await expect(pin).toHaveAttribute('aria-label', /\d+ left/);
     const before = await badgeSeats(pin);
     expect(before).toBeGreaterThan(0);
-    await pin.click();
     const sheet = page.getByTestId('quest-sheet');
     await expect(sheet.getByRole('heading', { name: 'Thrift walk on Willow' })).toBeVisible();
     await sheet.getByRole('button', { name: 'Join', exact: true }).click();
@@ -108,7 +131,14 @@ test.describe('phone 390', () => {
     await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
     // Kai (Alex's friend) hosts the dumpling quest, so it stays; the count can only shrink.
     await expect(page.getByTestId('quest-pin-dumplings')).toBeVisible();
-    expect(await page.locator('[data-map-marker="quest"]').count()).toBeLessThanOrEqual(all);
+    const friendsCount = await page.locator('[data-map-marker="quest"]').count();
+    expect(friendsCount).toBeLessThanOrEqual(all);
+    // The filter says what it shows, and each pin names the friends going.
+    await expect(page.getByTestId('friends-filter-chip')).toHaveText(`Plans your friends joined · ${friendsCount}`);
+    await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai going/);
+    await page.getByTestId('quest-pin-dumplings').click();
+    await expect(page.getByTestId('quest-sheet').getByTestId('quest-friends-going')).toHaveText(/Kai Nakamura (is|and .+ are) going/);
+    await page.getByTestId('quest-sheet').getByRole('button', { name: 'Close' }).click();
     await page.getByTestId('map-mode-explore').click();
     await expect(page.locator('[data-map-marker="quest"]')).toHaveCount(all);
   });
@@ -171,6 +201,12 @@ test.describe('desktop 1440', () => {
     await expect(sheet.getByRole('heading', { name: 'Dumplings before the rush' })).toBeVisible();
     await expect(sheet.getByTestId('quest-walk')).toHaveText(/\d+ min walk/);
     await expect(page.getByTestId('map-attribution').filter({ visible: true })).toHaveCount(1);
+    // The panel is only as tall as its content, and the map moves the pin out from under it.
+    const s = (await sheet.boundingBox())!;
+    expect(s.height).toBeLessThan(700);
+    const join = (await sheet.getByRole('button', { name: 'Report' }).boundingBox())!;
+    expect(s.y + s.height - (join.y + join.height)).toBeLessThan(30);
+    await expect.poll(async () => (await page.getByTestId('quest-pin-dumplings').boundingBox())?.x ?? 0, { timeout: 5000 }).toBeGreaterThan(s.x + s.width);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(page).not.toHaveURL(/quest=/);

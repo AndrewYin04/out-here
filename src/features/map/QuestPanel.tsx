@@ -7,7 +7,7 @@ import { ApiFetchError, apiPost, useApi, type QuestDetail } from '@/features/dat
 import { Avatar, Button, IconButton, Skeleton, useToast } from '@/features/ui';
 import type { PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
-import { priceLabel, startsLabel, walkLabel } from './format';
+import { friendsGoingLine, priceLabel, startsLabel, walkLabel } from './format';
 import { MapAttribution } from './MapAttribution';
 
 export type QuestPanelProps = {
@@ -67,14 +67,14 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   const isMember = shown?.viewerIsMember ?? false;
   const isHost = q?.hostId === viewerId;
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
-  const friendCount = people.filter((p) => p.isFriend).length;
+  const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
   const walk = walkLabel(walkMinutes);
 
   return (
     <section
       aria-label={q ? q.title : 'Plan details'}
       data-testid="quest-sheet"
-      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[58%] flex-col rounded-t-sheet bg-fb-surface shadow-popover md:bottom-4 md:left-4 md:right-auto md:top-4 md:max-h-none md:w-[380px] md:rounded-card"
+      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[58%] flex-col rounded-t-sheet bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[380px] md:rounded-card"
     >
       {/* On phones the attribution rides on top of the sheet so it is never covered. */}
       <MapAttribution className="absolute bottom-full right-0 mb-1 md:hidden" />
@@ -147,7 +147,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               <h3 className="text-[17px] font-bold">
                 Going <span className="font-normal text-fb-text-2">· {people.length}</span>
               </h3>
-              {friendCount > 0 && <p className="text-fb-meta text-fb-text-2">{friendCount === 1 ? '1 friend' : `${friendCount} friends`} going</p>}
+              {friendLine && <p className="text-fb-meta text-fb-text-2" data-testid="quest-friends-going">{friendLine}</p>}
               <ul className="mt-2 space-y-2" data-testid="quest-going">
                 {people.map((p) => (
                   <li key={p.id} className="flex items-center gap-2">

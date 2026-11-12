@@ -7,12 +7,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton } from '@/features/map/friends';
 import { ImFreeButton, PlanSheet } from '@/features/outhere';
-import { cn } from '@/features/ui';
+import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
 import { QuestPanel } from './QuestPanel';
-import type { MapContext, MapMode } from './types';
+import type { FriendFace, MapContext, MapMode } from './types';
 
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 
@@ -59,6 +59,14 @@ export function OutHereView() {
     const friends = new Set(ctx?.friendIds ?? []);
     return live.filter((q) => q.memberIds.some((m) => friends.has(m)));
   }, [mode, live, ctx]);
+  // Friends mode: the faces of friends who joined each plan, shown on its pin.
+  const friendFaces = useMemo(() => {
+    if (mode !== 'friends' || !ctx) return null;
+    const byId = new Map(ctx.friends.map((f) => [f.id, f]));
+    const out: Record<string, FriendFace[]> = {};
+    for (const q of visible) out[q.id] = q.memberIds.flatMap((m) => byId.get(m) ?? []);
+    return out;
+  }, [mode, ctx, visible]);
 
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
@@ -75,6 +83,9 @@ export function OutHereView() {
           selectedId={selectedId}
           viewerId={persona.id}
           origin={ctx?.origin ?? null}
+          walkMinutes={ctx?.walkMinutes ?? null}
+          friendFaces={friendFaces}
+          now={now}
           testIdFor={testIdFor}
           onSelect={select}
           onMap={setMap}
@@ -107,10 +118,22 @@ export function OutHereView() {
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} />
           <PeopleButton map={map} />
-          {!unsupported && visible.length === 0 && live.length > 0 && (
-            <p role="status" className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text-2 shadow-card">
-              No friends have joined a plan yet
+          {visible.length > 0 && (
+            <p role="status" data-testid="friends-filter-chip" className="pointer-events-none absolute left-1/2 top-[60px] z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card">
+              Plans your friends joined · {visible.length}
             </p>
+          )}
+          {!unsupported && ctx && questsApi.data && visible.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
+              <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">
+                <EmptyState
+                  title="No plans with friends right now"
+                  body="When a friend joins a plan nearby, it shows up here."
+                  action={<Button variant="secondary" onClick={() => setMode('explore')}>See all plans</Button>}
+                  className="py-6"
+                />
+              </div>
+            </div>
           )}
         </>
       )}

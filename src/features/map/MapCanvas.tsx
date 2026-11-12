@@ -8,9 +8,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 // the worker file the bundler emits as a static asset instead.
 setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
 import { useEffect, useRef, useState } from 'react';
-import type { LatLng, Quest } from '@/shared';
-import { declutter, type Box } from './declutter';
-import { seatBadge, seatsLeftOf } from './format';
+import type { ID, LatLng, Quest } from '@/shared';
+import { cluster, overlaps, shortTitle, type Box } from './cluster';
+import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
+import type { FriendFace } from './types';
 
 export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 /** Menlo Park framing: Meta campus, Bayfront Park (north), Belle Haven (east), Willow Rd toward downtown. */
@@ -18,14 +19,31 @@ const FRAME_SW: [number, number] = [-122.168, 37.468];
 const FRAME_NE: [number, number] = [-122.134, 37.497];
 const TILE_TIMEOUT_MS = 8000;
 const PIN = 40;
-const SLOT = 52; // collision square per pin: circle plus seat badge plus a small gap
-const ME_SLOT = 24;
+/** Collision box of a pin around its point: circle plus seat badge, and the label when shown. */
+const BOX_W = 46;
+const BOX_TOP = 30;
+const BOX_BOTTOM = 32;
+const LABEL_H = 16;
+/** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
+const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
+/** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
+const MOBILE_LABELS = 5;
+const LABEL_ALL_ZOOM = 15;
+/** Phones open on the viewer and the nearest few plans. */
+const MOBILE_NEAREST = 5;
+/** Desktop quest panel: 380 px wide plus its 16 px inset. */
+const PANEL_INSET = 396;
 
 export type MapCanvasProps = {
   quests: Quest[];
   selectedId: string | null;
   viewerId: string | null;
   origin: LatLng | null;
+  /** Server-computed walking minutes per quest; the phone framing uses the nearest plans. */
+  walkMinutes: Record<ID, number> | null;
+  /** Friends mode: faces of the friends who joined each quest. */
+  friendFaces: Record<ID, FriendFace[]> | null;
+  now: Date;
   testIdFor: (questId: string) => string;
   onSelect: (questId: string) => void;
   onMap: (map: MapLibreMap | null) => void;
@@ -33,7 +51,11 @@ export type MapCanvasProps = {
   onUnsupported: () => void;
 };
 
-type PinRefs = { marker: Marker; root: HTMLDivElement; button: HTMLButtonElement; badge: HTMLSpanElement; line: HTMLSpanElement; dot: HTMLSpanElement; seats: number };
+type PinParts = {
+  root: HTMLDivElement; button: HTMLButtonElement; circle: HTMLSpanElement; badge: HTMLSpanElement;
+  label: HTMLSpanElement; more: HTMLButtonElement; faces: HTMLSpanElement;
+};
+type PinRefs = PinParts & { marker: Marker; seats: number; facesKey: string };
 
 export function hasWebGL(): boolean {
   try {
@@ -44,51 +66,76 @@ export function hasWebGL(): boolean {
   }
 }
 
-function buildPin(q: Quest, testId: string): Omit<PinRefs, 'marker' | 'seats'> {
+const isDesktop = () => window.matchMedia('(min-width: 768px)').matches;
+
+function buildPin(q: Quest, testId: string): PinParts {
   const root = document.createElement('div');
   root.style.width = '0';
   root.style.height = '0';
   root.dataset.questId = q.id;
 
-  const line = document.createElement('span');
-  line.setAttribute('aria-hidden', 'true');
-  line.style.cssText = 'position:absolute;left:0;top:0;height:2px;background:#65686C;transform-origin:0 50%;display:none;pointer-events:none;';
-  const dot = document.createElement('span');
-  dot.setAttribute('aria-hidden', 'true');
-  dot.style.cssText = 'position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:9999px;background:#65686C;border:2px solid #fff;box-sizing:content-box;margin:-2px 0 0 -2px;display:none;pointer-events:none;';
-
   const button = document.createElement('button');
   button.type = 'button';
-  button.dataset.testid = testId;
   button.setAttribute('data-testid', testId);
   button.setAttribute('data-map-marker', 'quest');
   button.className = 'oh-quest-pin';
-  button.style.cssText = `position:absolute;width:${PIN}px;height:${SLOT - 4}px;left:${-PIN / 2}px;top:${-PIN / 2}px;padding:0;border:0;background:transparent;cursor:pointer;`;
+  button.style.cssText = `position:absolute;width:${PIN}px;height:${PIN + 8}px;left:${-PIN / 2}px;top:${-PIN / 2}px;padding:0;border:0;background:transparent;cursor:pointer;`;
 
   const circle = document.createElement('span');
-  circle.style.cssText = `display:flex;align-items:center;justify-content:center;width:${PIN}px;height:${PIN}px;border-radius:9999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);font-size:22px;line-height:1;transition:box-shadow .15s, transform .15s;`;
+  circle.style.cssText = `display:flex;align-items:center;justify-content:center;width:${PIN}px;height:${PIN}px;border-radius:9999px;background:#fff;font-size:22px;line-height:1;transition:box-shadow .15s, transform .15s;`;
   circle.textContent = q.emoji;
-  circle.dataset.role = 'circle';
 
   const badge = document.createElement('span');
-  badge.style.cssText = 'position:absolute;left:50%;top:30px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 6px;font:700 11px/14px var(--font-sans);border:2px solid #fff;';
-  button.append(circle, badge);
-  root.append(line, dot, button);
-  return { root, button, badge, line, dot };
+  badge.style.cssText = 'position:absolute;left:50%;top:30px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 6px;font:700 11px/14px var(--font-sans);border:2px solid #fff;color:#fff;';
+
+  const label = document.createElement('span');
+  label.setAttribute('data-role', 'pin-label');
+  label.style.cssText = 'position:absolute;left:50%;top:48px;transform:translateX(-50%);white-space:nowrap;font:600 12px/15px var(--font-sans);color:#080809;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff,0 0 4px #fff;pointer-events:none;';
+
+  const faces = document.createElement('span');
+  faces.setAttribute('aria-hidden', 'true');
+  faces.style.cssText = 'position:absolute;left:-12px;top:-10px;display:none;pointer-events:none;';
+
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.setAttribute('data-role', 'cluster');
+  more.style.cssText = 'position:absolute;left:4px;top:-34px;min-width:24px;height:24px;padding:0 6px;border-radius:9999px;border:0;background:#fff;color:#080809;font:700 12px/24px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer;display:none;';
+
+  button.append(circle, badge, label, faces);
+  root.append(button, more);
+  return { root, button, circle, badge, label, more, faces };
 }
 
-function paintPin(p: Omit<PinRefs, 'marker'>, q: Quest, selected: boolean) {
+function paintFaces(p: PinRefs, faces: FriendFace[]) {
+  const key = faces.map((f) => f.id).join(',');
+  if (key === p.facesKey) return;
+  p.facesKey = key;
+  p.faces.replaceChildren();
+  p.faces.style.display = faces.length ? 'flex' : 'none';
+  faces.slice(0, 2).forEach((f, i) => {
+    const img = document.createElement('img');
+    img.src = f.avatarUrl;
+    img.alt = '';
+    img.style.cssText = `width:20px;height:20px;border-radius:9999px;border:2px solid #fff;object-fit:cover;background:#E2E5E9;box-sizing:content-box;${i > 0 ? 'margin-left:-8px;' : ''}`;
+    p.faces.append(img);
+  });
+}
+
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[]) {
   const seats = seatsLeftOf(q);
-  const label = seatBadge(seats);
-  p.badge.textContent = label;
+  const seatText = seatBadge(seats);
+  const time = pinTime(q, now);
+  p.badge.textContent = seatText;
   p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
-  p.badge.style.color = '#fff';
-  p.button.setAttribute('aria-label', `${q.title}, ${label}`);
+  p.label.textContent = `${shortTitle(q.title)} · ${time}`;
+  const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
+  p.button.setAttribute('aria-label', `${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-  const circle = p.button.firstElementChild as HTMLElement;
-  circle.style.boxShadow = selected ? '0 0 0 3px #0866FF, 0 2px 6px rgba(0,0,0,.35)' : '0 1px 3px rgba(0,0,0,.35)';
-  circle.style.transform = selected ? 'scale(1.1)' : 'none';
+  const ring = selected ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
+  p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
+  p.circle.style.transform = selected ? 'scale(1.1)' : 'none';
   p.root.style.zIndex = selected ? '3' : '1';
+  paintFaces(p, faces);
 }
 
 function pulse(el: HTMLElement) {
@@ -99,47 +146,60 @@ function pulse(el: HTMLElement) {
   );
 }
 
-export default function MapCanvas({ quests, selectedId, viewerId, origin, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
+export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pins = useRef(new Map<string, PinRefs>());
+  const groups = useRef(new Map<string, string[]>());
   const me = useRef<Marker | null>(null);
   const order = useRef<string[]>([]);
   const framed = useRef(false);
-  const originRef = useRef(origin);
-  useEffect(() => { originRef.current = origin; }, [origin]);
   const frame = useRef(0);
   const select = useRef(onSelect);
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
   const [tiles, setTiles] = useState<'loading' | 'ready' | 'failed'>('loading');
   useEffect(() => { select.current = onSelect; });
 
-  // Re-place pins so none overlaps another (or the viewer's dot) at the current zoom.
+  // Show the pins that fit; a pin that would overlap a higher-priority one joins its "+N" group.
   const layout = useRef(() => {});
   layout.current = () => {
     const map = mapRef.current;
     if (!map) return;
-    const obstacles: Box[] = [];
-    if (me.current) {
-      const p = map.project(me.current.getLngLat());
-      obstacles.push({ x: p.x - ME_SLOT / 2, y: p.y - ME_SLOT / 2, w: ME_SLOT, h: ME_SLOT });
-    }
     const input = order.current.flatMap((id) => {
       const ref = pins.current.get(id);
       if (!ref) return [];
       const p = map.project(ref.marker.getLngLat());
-      return [{ id, x: p.x, y: p.y }];
+      const box: Box = { x: p.x - BOX_W / 2, y: p.y - BOX_TOP, w: BOX_W, h: BOX_TOP + BOX_BOTTOM };
+      return [{ id, box, p }];
     });
-    const placed = declutter(input, SLOT, obstacles);
-    for (const [id, { dx, dy }] of placed) {
+    const g = cluster(input);
+    groups.current = g;
+    // Labels go to the shown pins in priority order, wherever they clear every pin and label.
+    const maxLabels = isDesktop() || map.getZoom() >= LABEL_ALL_ZOOM ? Infinity : MOBILE_LABELS;
+    const shownBoxes = input.filter((x) => g.has(x.id));
+    const taken: Box[] = [];
+    for (const { id, p } of shownBoxes) {
       const ref = pins.current.get(id)!;
-      ref.button.style.left = `${dx - PIN / 2}px`;
-      ref.button.style.top = `${dy - PIN / 2}px`;
-      const moved = dx !== 0 || dy !== 0;
-      ref.line.style.display = moved ? 'block' : 'none';
-      ref.dot.style.display = moved ? 'block' : 'none';
-      if (moved) {
-        ref.line.style.width = `${Math.hypot(dx, dy)}px`;
-        ref.line.style.transform = `translateY(-1px) rotate(${Math.atan2(dy, dx)}rad)`;
+      const lw = labelWidth(ref.label.textContent ?? '');
+      const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
+      const fits = taken.length < maxLabels
+        && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
+        && !taken.some((t) => overlaps(t, lb));
+      const show = fits || id === selectedRef.current;
+      if (show) taken.push(lb);
+      ref.label.style.display = show ? 'block' : 'none';
+    }
+    for (const [id, ref] of pins.current) {
+      const members = g.get(id);
+      ref.root.style.display = members ? 'block' : 'none';
+      ref.root.toggleAttribute('data-clustered', !members);
+      if (members && members.length > 0) {
+        ref.more.style.display = 'block';
+        ref.more.textContent = `+${members.length}`;
+        ref.more.setAttribute('aria-label', `${members.length} more ${members.length === 1 ? 'plan' : 'plans'} here. Zoom in`);
+      } else {
+        ref.more.style.display = 'none';
       }
     }
   };
@@ -147,6 +207,20 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, testId
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => layout.current());
   };
+
+  // Tap "+N": zoom in on that group until its pins split apart.
+  const zoomInto = useRef((id: string) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const b = new LngLatBounds();
+    for (const x of [id, ...(groups.current.get(id) ?? [])]) {
+      const r = pins.current.get(x);
+      if (r) b.extend(r.marker.getLngLat());
+    }
+    const cam = map.cameraForBounds(b, { padding: 90, maxZoom: 18 });
+    const zoom = Math.min(18, Math.max(cam?.zoom ?? 0, map.getZoom() + 1.5));
+    map.easeTo({ center: b.getCenter(), zoom, duration: 450 });
+  });
 
   // Create the map once.
   useEffect(() => {
@@ -173,8 +247,9 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, testId
     }
     map.touchZoomRotate.disableRotation();
     // Zoom buttons on desktop; phones pinch.
-    if (window.matchMedia('(min-width: 768px)').matches) map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    if (isDesktop()) map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;
+    framed.current = false; // a new map (dev Strict Mode remounts) needs its own first framing
     let loaded = false;
     const timer = window.setTimeout(() => { if (!loaded) setTiles('failed'); }, TILE_TIMEOUT_MS);
     map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); });
@@ -209,33 +284,45 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, testId
       if (!ref) {
         const parts = buildPin(q, testIdFor(q.id));
         parts.button.addEventListener('click', (e) => { e.stopPropagation(); select.current(q.id); });
+        parts.more.addEventListener('click', (e) => { e.stopPropagation(); zoomInto.current(q.id); });
         const marker = new Marker({ element: parts.root, anchor: 'center' }).setLngLat(lngLat).addTo(map);
-        ref = { ...parts, marker, seats: seatsLeftOf(q) };
+        ref = { ...parts, marker, seats: seatsLeftOf(q), facesKey: '' };
         pins.current.set(q.id, ref);
       } else {
         ref.marker.setLngLat(lngLat);
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref.badge); }
       }
-      paintPin(ref, q, q.id === selectedId);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? []);
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }
     }
-    // First data: frame the plans (and the viewer) so the pins use the whole screen.
-    if (!framed.current && quests.length > 0) {
-      framed.current = true;
-      const b = new LngLatBounds();
-      for (const q of quests) b.extend([q.location.lng, q.location.lat]);
-      const o = originRef.current;
-      if (o) b.extend([o.lng, o.lat]);
-      const desktop = window.matchMedia('(min-width: 768px)').matches;
-      map.fitBounds(b, { padding: desktop ? { top: 90, bottom: 60, left: 120, right: 120 } : { top: 80, bottom: 60, left: 36, right: 36 }, maxZoom: 15.5, duration: 0 });
-    }
     const rank = (q: Quest) => (q.id === selectedId ? 0 : viewerId && q.memberIds.includes(viewerId) ? 1 : 2);
     order.current = [...quests].sort((a, b) => rank(a) - rank(b) || a.startsAt.localeCompare(b.startsAt)).map((q) => q.id);
     schedule();
-  }, [quests, selectedId, viewerId, testIdFor]);
+  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces]);
+
+  // First framing, once the plans and the viewer's walking times are in. Desktop shows every
+  // plan; phones show the viewer and the nearest few, so the first view is not a crowd of pins.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || framed.current || quests.length === 0 || !origin || !walkMinutes) return;
+    framed.current = true;
+    const desktop = isDesktop();
+    const pick = desktop
+      ? quests
+      : [...quests].sort((a, b) => (walkMinutes[a.id] ?? 1e9) - (walkMinutes[b.id] ?? 1e9)).slice(0, MOBILE_NEAREST);
+    const b = new LngLatBounds();
+    for (const q of pick) b.extend([q.location.lng, q.location.lat]);
+    b.extend([origin.lng, origin.lat]);
+    map.fitBounds(b, {
+      padding: desktop ? { top: 90, bottom: 70, left: 120, right: 120 } : { top: 100, bottom: 120, left: 80, right: 80 },
+      maxZoom: desktop ? 15.5 : 15,
+      duration: 0,
+    });
+    schedule();
+  }, [quests, origin, walkMinutes]);
 
   // The viewer's own dot (where walking times are measured from).
   useEffect(() => {
@@ -248,21 +335,24 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, testId
     el.style.cssText = 'width:18px;height:18px;border-radius:9999px;background:#0866FF;border:3px solid #fff;box-shadow:0 0 0 6px rgba(8,102,255,.2),0 1px 3px rgba(0,0,0,.3);';
     const marker = new Marker({ element: el, anchor: 'center' }).setLngLat([origin.lng, origin.lat]).addTo(map);
     me.current = marker;
-    schedule();
     return () => { marker.remove(); if (me.current === marker) me.current = null; };
   }, [origin]);
 
-  // Pan so a newly selected pin is not hidden under the sheet or panel.
+  // Keep the selected pin in view beside the panel (desktop) or above the sheet (phones);
+  // clear the padding when the panel closes.
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
     const ref = selectedId ? pins.current.get(selectedId) : null;
-    if (!map || !ref) return;
-    const desktop = window.matchMedia('(min-width: 768px)').matches;
-    const padding = desktop ? { left: 400, right: 40, top: 80, bottom: 40 } : { left: 24, right: 24, top: 80, bottom: Math.round(window.innerHeight * 0.55) };
-    const p = map.project(ref.marker.getLngLat());
-    const { clientWidth: w, clientHeight: h } = map.getContainer();
-    const inside = p.x > padding.left && p.x < w - padding.right && p.y > padding.top && p.y < h - padding.bottom;
-    if (!inside) map.easeTo({ center: ref.marker.getLngLat(), padding, duration: 400 });
+    if (!ref) {
+      const p = map.getPadding();
+      if (p.left || p.bottom) map.easeTo({ padding: { left: 0, right: 0, top: 0, bottom: 0 }, duration: 300 });
+      return;
+    }
+    const padding = isDesktop()
+      ? { left: PANEL_INSET, right: 0, top: 0, bottom: 0 }
+      : { left: 0, right: 0, top: 0, bottom: Math.round(map.getContainer().clientHeight * 0.5) };
+    map.easeTo({ center: ref.marker.getLngLat(), padding, duration: 400 });
   }, [selectedId]);
 
   return (
@@ -270,7 +360,7 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, testId
       {/* Inline position: maplibre-gl.css sets .maplibregl-map { position: relative } outside any layer. */}
       <div ref={container} style={{ position: 'absolute', inset: 0 }} data-testid="map-canvas" />
       {tiles === 'failed' && (
-        <p role="status" className="pointer-events-none absolute left-1/2 top-16 z-[2] -translate-x-1/2 rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text-2 shadow-card">
+        <p role="status" className="pointer-events-none absolute bottom-24 left-1/2 z-[2] -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text-2 shadow-card">
           Map details didn&apos;t load. Plans are still live.
         </p>
       )}
