@@ -32,7 +32,13 @@ export type ShellStaticData = {
 
 export type ShellContextValue = ShellViewerData & {
   personas: ShellPerson[];
-  /** Handle of the active persona (from ?as=, then sessionStorage, then the default). */
-  activeHandle: string;
+  /**
+   * Handle of the active persona (from ?as=, then sessionStorage, then the default), or null
+   * on the server and during hydration, before the browser state has been read. While it is
+   * null the viewer fields hold an empty placeholder; never send x-persona from them.
+   */
+  activeHandle: string | null;
+  /** True once activeHandle is known. */
+  ready: boolean;
   switchPersona: (handle: string) => void;
 };

@@ -6,6 +6,7 @@ import {
   useId,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
@@ -32,7 +33,11 @@ export type PopoverProps = {
   className?: string;
 };
 
-/** Anchored panel under its trigger (account menu, menu grid). Closes on Escape or outside press. */
+/**
+ * Panel under its trigger (account menu, menu grid). From 768 px it is anchored to the trigger
+ * with `width`; on phones it is a full-width panel under the top bar. Closes on Escape or
+ * outside press.
+ */
 export function Popover({ trigger, children, align = 'right', kind = 'menu', label, width = 344, className }: PopoverProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -62,10 +67,14 @@ export function Popover({ trigger, children, align = 'right', kind = 'menu', lab
           role={kind}
           aria-label={label}
           onKeyDown={onKeyDown}
-          style={{ width }}
+          style={{ '--popover-w': `${width}px` } as CSSProperties}
           className={cn(
-            'absolute top-[calc(100%+8px)] z-50 max-h-[calc(100vh-72px)] max-w-[calc(100vw-16px)] overflow-y-auto rounded-card bg-fb-surface p-2 shadow-popover',
-            align === 'right' ? 'right-0' : 'left-0',
+            'z-50 overflow-y-auto rounded-card bg-fb-surface p-2 shadow-popover',
+            // Below 768 px the panel is pinned 8 px from both screen edges under the 56 px top
+            // bar and above the 56 px tab bar, so it can never hang off a phone screen.
+            'fixed inset-x-2 top-16 max-h-[calc(100dvh-136px)]',
+            'md:absolute md:inset-x-auto md:top-[calc(100%+8px)] md:max-h-[calc(100vh-72px)] md:w-[var(--popover-w)] md:max-w-[calc(100vw-16px)]',
+            align === 'right' ? 'md:right-0' : 'md:left-0',
             className,
           )}
         >

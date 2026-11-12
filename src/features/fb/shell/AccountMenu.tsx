@@ -2,13 +2,13 @@
 
 import { Check, UserRound } from 'lucide-react';
 import { BRAND } from '@/config/brand';
-import { Avatar, MenuItem, MenuLabel, MenuLink, MenuSeparator, Popover } from '@/features/ui';
+import { Avatar, MenuItem, MenuLabel, MenuLink, MenuSeparator, Popover, Skeleton } from '@/features/ui';
 import { ROUTES } from './nav';
 import { useShellData } from './ShellDataProvider';
 
 /** The avatar button at the top right. Its menu hosts the demo persona switcher. */
 export function AccountMenu() {
-  const { viewer, personas, activeHandle, switchPersona } = useShellData();
+  const { viewer, personas, activeHandle, ready, switchPersona } = useShellData();
   return (
     <Popover
       label="Account"
@@ -17,26 +17,35 @@ export function AccountMenu() {
         <button
           type="button"
           {...props}
-          aria-label={`Account: ${viewer.name}`}
+          aria-label={ready ? `Account: ${viewer.name}` : 'Account'}
           data-testid="account-button"
+          data-ready={ready}
           className="relative flex h-10 w-10 items-center justify-center rounded-full hover:brightness-95"
         >
-          <Avatar src={viewer.avatarUrl} name={viewer.name} size={40} decorative />
+          {ready ? (
+            <Avatar src={viewer.avatarUrl} name={viewer.name} size={40} decorative />
+          ) : (
+            <Skeleton shape="circle" width={40} height={40} />
+          )}
         </button>
       )}
     >
       {(close) => (
         <>
-          <MenuLink
-            href={ROUTES.profile(viewer.handle)}
-            onNavigate={close}
-            icon={<Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />}
-            description="See your profile"
-            className="shadow-card"
-          >
-            <span className="font-semibold">{viewer.name}</span>
-          </MenuLink>
-          <MenuSeparator />
+          {ready && (
+            <>
+              <MenuLink
+                href={ROUTES.profile(viewer.handle)}
+                onNavigate={close}
+                icon={<Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />}
+                description="See your profile"
+                className="shadow-card"
+              >
+                <span className="font-semibold">{viewer.name}</span>
+              </MenuLink>
+              <MenuSeparator />
+            </>
+          )}
           <MenuLabel>
             <span className="flex items-center gap-2">
               <UserRound size={18} aria-hidden /> Demo: switch persona

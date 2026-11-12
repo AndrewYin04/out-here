@@ -1,10 +1,25 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { defaultSwitchPersona, resolvePersonaHandle } from './persona';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { defaultSwitchPersona } from './persona';
+import { useResolvedPersona } from './useResolvedPersona';
 import type { ShellContextValue, ShellStaticData, ShellViewerData } from './types';
 
 const ShellContext = createContext<ShellContextValue | null>(null);
+
+/**
+ * Shown while the tab's persona is unknown: in server HTML and in the hydration render.
+ * Components draw skeletons for it instead of another persona's name and avatar.
+ */
+export const UNRESOLVED_VIEWER_DATA: ShellViewerData = {
+  viewer: { handle: '', name: '', avatarUrl: null },
+  contacts: [],
+  shortcuts: [],
+  groupChats: [],
+  birthdays: [],
+  notificationCount: 0,
+  messageCount: 0,
+};
 
 export type ShellDataProviderProps = {
   /** Static fallback for all personas (from getDemoShellData() on the server). */
@@ -19,21 +34,17 @@ export type ShellDataProviderProps = {
 };
 
 export function ShellDataProvider({ data, activeHandle, overrides, onSwitchPersona, children }: ShellDataProviderProps) {
-  // First render uses the default persona on both server and client (no hydration mismatch),
-  // then the effect switches to the tab's saved persona.
-  const [resolved, setResolved] = useState(data.defaultHandle);
-  useEffect(() => {
-    setResolved(resolvePersonaHandle(Object.keys(data.viewers), data.defaultHandle));
-  }, [data]);
-
-  const handle = activeHandle && data.viewers[activeHandle] ? activeHandle : resolved;
+  const valid = useMemo(() => Object.keys(data.viewers), [data]);
+  // null on the server and during hydration; see useResolvedPersona
+  const handle = useResolvedPersona(valid, data.defaultHandle, activeHandle);
   const value = useMemo<ShellContextValue>(() => {
-    const base = data.viewers[handle] ?? data.viewers[data.defaultHandle];
+    const base = handle ? (data.viewers[handle] ?? data.viewers[data.defaultHandle]) : UNRESOLVED_VIEWER_DATA;
     return {
       ...base,
-      ...overrides,
+      ...(handle ? overrides : null),
       personas: data.personas,
       activeHandle: handle,
+      ready: handle !== null,
       switchPersona: onSwitchPersona ?? defaultSwitchPersona,
     };
   }, [data, handle, overrides, onSwitchPersona]);
@@ -46,4 +57,13 @@ export function useShellData(): ShellContextValue {
   const ctx = useContext(ShellContext);
   if (!ctx) throw new Error('useShellData must be used inside <ShellDataProvider>');
   return ctx;
+}
+
+/**
+ * The tab's persona handle, or null until it is known. Per-persona requests (the x-persona
+ * header) must take the handle only from here and must not start while it is null, e.g.
+ * `useEffect(() => { if (handle) load(handle); }, [handle])`.
+ */
+export function usePersonaHandle(): string | null {
+  return useShellData().activeHandle;
 }

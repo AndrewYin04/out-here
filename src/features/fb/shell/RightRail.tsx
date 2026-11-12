@@ -2,7 +2,7 @@
 
 import { Gift, Search } from 'lucide-react';
 import Link from 'next/link';
-import { Avatar, Divider, IconLink } from '@/features/ui';
+import { Avatar, Divider, IconLink, Skeleton } from '@/features/ui';
 import { ROUTES } from './nav';
 import { useShellData } from './ShellDataProvider';
 
@@ -10,7 +10,7 @@ const firstName = (name: string) => name.split(' ')[0];
 
 /** Right rail: birthdays, contacts with online dots, group conversations. */
 export function RightRail() {
-  const { birthdays, contacts, groupChats } = useShellData();
+  const { birthdays, contacts, groupChats, ready } = useShellData();
   return (
     <div className="flex flex-col gap-3 px-2 py-4" data-testid="right-rail">
       {birthdays.length > 0 && (
@@ -43,7 +43,16 @@ export function RightRail() {
             <Search size={16} className="text-fb-text-2" aria-hidden />
           </IconLink>
         </div>
-        {contacts.length === 0 ? (
+        {!ready ? (
+          <div aria-hidden className="space-y-4 px-2 py-2">
+            {Array.from({ length: 8 }, (_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton shape="circle" width={36} height={36} />
+                <Skeleton width={`${55 - (i % 3) * 10}%`} />
+              </div>
+            ))}
+          </div>
+        ) : contacts.length === 0 ? (
           <p className="px-2 text-fb-meta text-fb-text-2">Add friends to see them here.</p>
         ) : (
           <ul data-testid="contacts-list">

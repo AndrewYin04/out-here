@@ -150,6 +150,65 @@ test.describe('desktop 1440', () => {
     }
     expect(errors).toEqual([]);
   });
+
+  test('friends and groups use a section sidebar instead of the home nav and right rail', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto('/friends');
+    const sidebar = page.getByTestId('section-sidebar');
+    await expect(sidebar).toBeVisible();
+    await expect(page.getByTestId('left-nav')).toHaveCount(0);
+    await expect(page.getByTestId('right-rail')).toHaveCount(0);
+    await expect(page.getByTestId('section-chips')).toBeHidden();
+    const friendsNav = sidebar.getByRole('navigation', { name: 'Friends sections' });
+    await expect(friendsNav.getByRole('link')).toHaveText(['Home', 'Friend requests', 'Suggestions', 'All friends', 'Birthdays']);
+    await expect(friendsNav.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    await friendsNav.getByRole('link', { name: 'Friend requests' }).click();
+    await expect(page).toHaveURL(/\/friends\?tab=requests$/);
+    await expect(friendsNav.getByRole('link', { name: 'Friend requests' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('heading', { level: 1, name: 'Friend requests' })).toBeVisible();
+
+    await page.getByTestId('tab-groups').click();
+    await expect(page).toHaveURL(/\/groups$/);
+    const groupsNav = sidebar.getByRole('navigation', { name: 'Groups sections' });
+    await expect(groupsNav.getByRole('link')).toHaveText(['Your feed', 'Discover', 'Your groups']);
+    await groupsNav.getByRole('link', { name: 'Discover' }).click();
+    await expect(page).toHaveURL(/\/groups\?tab=discover$/);
+    await expect(groupsNav.getByRole('link', { name: 'Discover' })).toHaveAttribute('aria-current', 'page');
+    await sidebar.getByRole('navigation', { name: "Groups you've joined" }).getByRole('link').first().click();
+    await expect(page).toHaveURL(/\/groups\/[a-z0-9-]+$/);
+    await page.goto('/groups');
+    const search = page.getByRole('search', { name: 'Search groups' }).getByRole('searchbox');
+    await search.fill('runners');
+    await search.press('Enter');
+    await expect(page).toHaveURL(/\/search\?q=runners&in=groups$/);
+    expect(errors).toEqual([]);
+  });
+
+  // Regression (R1): a Maya tab used to render Alex first (server HTML and the first client
+  // render), so the top bar flashed Alex and child mount effects saw activeHandle 'alex'.
+  test('a persona tab never shows the default persona, in HTML or while hydrating', async ({ page, request }) => {
+    const html = await (await request.get('/?as=maya')).text();
+    // the persona list travels in the RSC payload as data; what matters is the rendered markup
+    expect(html).not.toContain('Account: Alex');
+    expect(html).not.toContain('>Alex Rivera<');
+    expect(html).toContain('aria-label="Account"');
+
+    await page.addInitScript(() => {
+      const seen: string[] = [];
+      (window as unknown as { __accountLabels: string[] }).__accountLabels = seen;
+      new MutationObserver(() => {
+        const label = document.querySelector('[data-testid="account-button"]')?.getAttribute('aria-label');
+        if (label && seen[seen.length - 1] !== label) seen.push(label);
+      }).observe(document, { subtree: true, childList: true, attributes: true });
+    });
+    const errors = watchErrors(page);
+    await page.goto('/?as=maya');
+    await expect(page.getByTestId('account-button')).toHaveAttribute('aria-label', 'Account: Maya Chen');
+    await expect(page.getByTestId('left-nav').getByRole('link', { name: 'Maya Chen' })).toBeVisible();
+    const labels = await page.evaluate(() => (window as unknown as { __accountLabels: string[] }).__accountLabels);
+    expect(labels.filter((l) => l.includes('Alex'))).toEqual([]);
+    expect(errors).toEqual([]);
+  });
 });
 
 test.describe('mobile 390', () => {
@@ -207,6 +266,49 @@ test.describe('mobile 390', () => {
     for (const name of PERSONAS) await expect(list.getByRole('menuitem', { name: new RegExp(name) })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(list).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  // Regression (E1/U1/U2): the top-bar icons stopped at x=263 and the 360 px account menu was
+  // anchored to them, so it started at x=-97 and cut off every persona name.
+  test('top bar icons sit flush right and the account menu fits on screen', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto('/?as=maya');
+    const button = await page.getByTestId('account-button').boundingBox();
+    expect(button).not.toBeNull();
+    expect(button!.x + button!.width).toBeGreaterThanOrEqual(390 - 16);
+    await page.getByTestId('account-button').click();
+    const menu = page.getByRole('menu', { name: 'Account' });
+    await expect(menu).toBeVisible();
+    const box = await menu.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    const tabBar = await page.getByTestId('mobile-tab-bar').boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(tabBar!.y);
+    const personaRows = menu.getByTestId('persona-list');
+    for (const name of PERSONAS) {
+      const row = await personaRows.getByRole('menuitem', { name: new RegExp(name) }).boundingBox();
+      expect(row!.x, name).toBeGreaterThanOrEqual(0);
+      expect(row!.x + row!.width, name).toBeLessThanOrEqual(390);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test('friends and groups show their section rows as chips', async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto('/friends');
+    await expect(page.getByTestId('section-sidebar')).toBeHidden();
+    const chips = page.getByTestId('section-chips');
+    await expect(chips).toBeVisible();
+    await chips.getByRole('link', { name: 'Suggestions' }).click();
+    await expect(page).toHaveURL(/\/friends\?tab=suggestions$/);
+    await expect(chips.getByRole('link', { name: 'Suggestions' })).toHaveAttribute('aria-current', 'page');
+    await page.getByTestId('mtab-groups').click();
+    await page.getByTestId('section-chips').getByRole('link', { name: 'Your groups' }).click();
+    await expect(page).toHaveURL(/\/groups\?tab=yours$/);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
     expect(errors).toEqual([]);
   });
 

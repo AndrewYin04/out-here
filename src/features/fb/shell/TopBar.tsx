@@ -126,7 +126,8 @@ export function TopBar() {
         <SearchField />
       </div>
       <CenterTabs pathname={pathname} />
-      <div className="flex items-center justify-end gap-2">
+      {/* col-start-3 keeps this cluster flush right below 768 px, where CenterTabs is hidden */}
+      <div className="col-start-3 flex items-center justify-end gap-2">
         <IconLink label="Search" href={ROUTES.search} className="md:hidden">
           <Search size={20} aria-hidden />
         </IconLink>

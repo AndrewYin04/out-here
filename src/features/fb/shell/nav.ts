@@ -53,12 +53,14 @@ export function isActivePath(pathname: string, href: string): boolean {
 }
 
 /**
- * feed: left nav + center column + right rail (Home, Friends, Groups index, Events...).
+ * feed: left nav + center column + right rail (Home, Events, Notifications...).
  * full: the page owns the whole width under the top bar (map, Messenger, profile, group page).
+ * section: a section sidebar (see SECTIONS) + a wide main column, no right rail (Friends, Groups).
  */
-export type ShellLayout = 'feed' | 'full';
+export type ShellLayout = 'feed' | 'full' | 'section';
 
 export function layoutFor(pathname: string): ShellLayout {
+  if (sectionFor(pathname)) return 'section';
   if (
     isActivePath(pathname, ROUTES.outHere) ||
     isActivePath(pathname, ROUTES.messages) ||
@@ -68,4 +70,54 @@ export function layoutFor(pathname: string): ShellLayout {
     return 'full';
   }
   return 'feed';
+}
+
+/**
+ * Section pages (/friends, /groups) swap the home left nav for their own sidebar and drop the
+ * right rail, as Facebook does. Each row is the section page with ?tab=<id> (none for the
+ * first row); surface builders read that param to pick what the main column shows.
+ */
+export type SectionId = 'friends' | 'groups';
+export type SectionRow = { id: string; label: string; href: string };
+export type Section = { id: SectionId; title: string; base: string; rows: SectionRow[]; search?: { label: string } };
+
+const sectionRows = (base: string, rows: [string, string][]): SectionRow[] =>
+  rows.map(([id, label], i) => ({ id, label, href: i === 0 ? base : `${base}?tab=${id}` }));
+
+export const SECTIONS: Record<SectionId, Section> = {
+  friends: {
+    id: 'friends',
+    title: 'Friends',
+    base: ROUTES.friends,
+    rows: sectionRows(ROUTES.friends, [
+      ['home', 'Home'],
+      ['requests', 'Friend requests'],
+      ['suggestions', 'Suggestions'],
+      ['all', 'All friends'],
+      ['birthdays', 'Birthdays'],
+    ]),
+  },
+  groups: {
+    id: 'groups',
+    title: 'Groups',
+    base: ROUTES.groups,
+    search: { label: 'Search groups' },
+    rows: sectionRows(ROUTES.groups, [
+      ['feed', 'Your feed'],
+      ['discover', 'Discover'],
+      ['yours', 'Your groups'],
+    ]),
+  },
+};
+
+/** The section a pathname belongs to (only the index pages, not /groups/<slug>). */
+export function sectionFor(pathname: string): Section | null {
+  if (pathname === ROUTES.friends) return SECTIONS.friends;
+  if (pathname === ROUTES.groups) return SECTIONS.groups;
+  return null;
+}
+
+/** The selected row for a ?tab= value; unknown or missing values select the first row. */
+export function sectionRow(section: Section, tab: string | null | undefined): SectionRow {
+  return section.rows.find((r) => r.id === tab) ?? section.rows[0];
 }

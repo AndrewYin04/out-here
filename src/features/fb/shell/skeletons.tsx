@@ -29,7 +29,13 @@ export function PostSkeleton({ withMedia = false }: { withMedia?: boolean }) {
         <Skeleton width="92%" />
         <Skeleton width="70%" />
       </div>
-      {withMedia && <Skeleton shape="block" className="aspect-[16/9] w-full rounded-none" />}
+      {/* Inset, fixed-height photo placeholder: a full-bleed grey block blended into the page
+          background and read as an empty void instead of a card. */}
+      {withMedia && (
+        <div className="px-4 pb-1">
+          <Skeleton shape="block" className="h-[180px] w-full md:h-[240px]" />
+        </div>
+      )}
       <div className="px-4">
         <div className="flex h-10 items-center justify-between">
           <Skeleton width={64} />
@@ -50,7 +56,8 @@ export function FeedSkeleton({ count = 3 }: { count?: number }) {
   return (
     <SkeletonGroup label="posts" className="flex flex-col gap-2 md:gap-4">
       {Array.from({ length: count }, (_, i) => (
-        <PostSkeleton key={i} withMedia={i % 2 === 0} />
+        // the first post is text-only so the first screen always shows a complete card
+        <PostSkeleton key={i} withMedia={i % 2 === 1} />
       ))}
     </SkeletonGroup>
   );

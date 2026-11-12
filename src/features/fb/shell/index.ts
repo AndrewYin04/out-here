@@ -7,7 +7,7 @@ export { RightRail } from './RightRail';
 export { MobileTabBar } from './MobileTabBar';
 export { AccountMenu } from './AccountMenu';
 export { Wordmark, BrandFooter } from './Brand';
-export { ShellDataProvider, useShellData } from './ShellDataProvider';
+export { ShellDataProvider, useShellData, usePersonaHandle, UNRESOLVED_VIEWER_DATA } from './ShellDataProvider';
 export type { ShellDataProviderProps } from './ShellDataProvider';
 export {
   PERSONA_STORAGE_KEY,
@@ -15,8 +15,9 @@ export {
   resolvePersonaHandle,
   defaultSwitchPersona,
 } from './persona';
-export { ROUTES, CENTER_TABS, MOBILE_TABS, isActivePath, layoutFor } from './nav';
-export type { ShellLayout, CenterTab, CenterTabId, MobileTabId } from './nav';
+export { ROUTES, CENTER_TABS, MOBILE_TABS, SECTIONS, isActivePath, layoutFor, sectionFor, sectionRow } from './nav';
+export { SectionSidebar, SectionChips } from './SectionNav';
+export type { ShellLayout, CenterTab, CenterTabId, MobileTabId, Section, SectionId, SectionRow } from './nav';
 export { PRIMARY_DESTINATIONS, MORE_DESTINATIONS, DestinationIcon } from './destinations';
 export type { Destination } from './destinations';
 export {
