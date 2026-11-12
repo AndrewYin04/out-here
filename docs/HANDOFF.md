@@ -6,6 +6,7 @@ Read this first. Everything below was built overnight by Claude Code on branch `
 
 - **Preview (latest, 76f0286):** https://out-here-53rpnemqr-andrews-projects-76721bc6.vercel.app (pages, APIs and the Muse plan smoke-tested at 06:55 PT; the full two-tab demo was walked in Chrome on the previous preview 3df9384)
   - It sits behind Vercel login. Until someone turns off Deployment Protection, open it while logged in to Vercel, or ask Andrew for a share link (Vercel dashboard, Share). Share links are credentials: never commit or post them.
+- **Team bulletin:** `docs/TEAM.md` (how people and agents claim and update tasks; tracker issue #33) and `scripts/team.sh` (the CLI: `bash scripts/team.sh sync`).
 - **Board (talk to the agent):** https://github.com/AndrewYin04/out-here/issues/1
 - **Deploy requests:** issue #4 (comment `DEPLOY <branch>`), see `docs/DEPLOYS.md`.
 - **Draft PR:** `overnight` → `main` (the team merges).
@@ -43,12 +44,12 @@ Two devices or two browser windows (each tab is its own persona): window A `…/
 
 ## Track 4 — Your Plans and Memories
 
-The `feat/your-plans-memories` branch extends the overnight MVP. The preview above still points to the overnight deploy.
+Your Plans and photo capture extend the overnight MVP. The preview above predates these changes.
 
 - **Your plans** opens **Events → Going** at `/events?tab=going`. It lists the active persona's joined hangouts, attendees, meetup time and place, and estimated departure time from the demo origin. The list refreshes when an RSVP changes or a hangout is completed.
 - **Walking view handoff.** `GET /api/quests/mine` returns `{ plans: YourPlan[] }` with each joined quest's ID, member-visible destination, people, and estimated walk time. The walking team can change **Walk there** in `src/features/memories/YourPlans.tsx` to its first-person route for that quest ID. Today it opens walking directions in Google Maps.
 - **Capture.** Any attendee can tap **We’re done** once the hangout starts. Attendees then have **Add a photo** on the past plan. Select or take a photo, optionally ask Muse for a caption based on the meetup details, and save it to the crew album. **Get this group together again** remains in the album. Repeated completion reuses the same crew.
-- **Deploy setup.** Run `node scripts/db-migrate.mjs dev` against the development database before testing hosted capture. Use the `demo` target when preparing the shared demo database. Migration `0003_crew_photos.sql` provisions the private `crew-photos` bucket. New uploads are served through a crew-membership check. Use fictional photos and personas on the shared hackathon preview, since the persona switcher is demo identity.
+- **Deploy setup.** Run `npm run db:migrate:demo` from the configured deployment checkout before testing photo capture on the shared preview. Use `npm run db:migrate:dev` for the development database. Migration `0003_crew_photos.sql` provisions the private `crew-photos` bucket. New uploads are served through a crew-membership check. Use fictional photos and personas on the shared hackathon preview, since the persona switcher is demo identity.
 - **Rehearse.** Use Alex and Maya in separate sessions. Join the same plan and open **Your plans** on both. Use a started or ended fixture for capture. Have Maya complete and upload, and open the crew album as Alex. The future dumpling meetup stays in **Upcoming** until it starts. `tests/e2e/your-plans.spec.ts` creates its own started hangout and exercises this flow with mock Muse and a synthetic photo.
 
 ## Not done (team daytime list, in priority order)
@@ -56,6 +57,12 @@ The `feat/your-plans-memories` branch extends the overnight MVP. The preview abo
 **New ideas from Andrew (Thu morning), not started:**
 - **"Click": agents that vet a match for you.** Like Boardy, but each person's own Muse agent represents them, and two agents talk to each other first about whether their people would be a good fit (interests, goals, what each is looking for, timing, dealbreakers). Only when both agents agree is an intro proposed to the two humans, who then each accept (double opt-in). The agent-to-agent conversation is the visible AI work: show a short "why your agents think you'd click" summary, and keep the transcript private to each side. Builds on the Muse Intros spec in MVP-BUILD-PLAN-itr-1.md (reach, trust path, score threshold, frequency cap).
 - **First-person "Pokémon Go" map view.** A character avatar for the viewer standing on the map, in a tilted 3D street-level view, that walks toward plans shown as landmark "stadiums" (quest venues as visible 3D markers you can see from a distance, with seat counts). Tapping a stadium opens the quest; walking (or tapping a direction) moves the avatar along the route, with the walk minutes counting down. Extends the planned 3D walking view (MapLibre pitch ~60 plus fill-extrusion buildings); never uses real GPS without consent, and the demo moves the avatar along a simulated route.
+
+**More ideas from Andrew (Thu late morning), not started:**
+- **Third-person "Pokémon Go" view, zoomed in on your avatar.** The camera follows the viewer's avatar from just behind and above it (tilted 3D street level), so you see your character on the map and the plans around you. Pairs with the first-person "stadiums" idea above.
+- **Muse as a companion character.** A small Muse agent floats next to your avatar on the map. When you ask it something ("I'm free", a question about a plan), it floats in front of your avatar and "talks to you": its answer appears as speech from the character, then it returns to your side.
+- **Partiful-style event page.** Tapping into an event or plan opens a Partiful-like page: cover, host, time and place, the guest list (going, maybe, invited, friends first), and an activity feed where guests comment, react and post updates. See partiful.com for the interface to match.
+- **Announcements delivered by Muse.** When you host a hangout, you can record a short voice or video message and broadcast it to the people you choose, or let Muse choose who it fits. Animation: your agent heads out across the map to "deliver" it, and each recipient sees a Muse agent arrive on their screen to tell them about the event and play your recording, with Join and Not now.
 
 From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan:
 1. **Demo reset button** (review B1): `resetStory(now)` + `POST /api/demo/reset` so the stage reset does not need the laptop.

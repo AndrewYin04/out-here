@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Footprints, Clock, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, cn } from '@/features/ui';
@@ -68,6 +68,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const { viewer } = useViewer();
   const [inviteFor, setInviteFor] = useState<PersonCard | null>(null);
   const [draft, setDraft] = useState('');
+  const [whyOpen, setWhyOpen] = useState(false);
   /** friend id -> invite id */
   const [sentTo, setSentTo] = useState<Map<string, string>>(new Map());
   /** friend id -> what they answered */
@@ -188,12 +189,23 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       </div>
 
-      <div className="mt-2">
-        {showMuse && (s.reason || s.bridge) && <MuseLabel />}
-        {s.reason && <p data-testid="suggestion-reason" className="mt-1 text-[15px] leading-5 text-fb-text">{s.reason}</p>}
-        {/* The pre-check row already says who's coming; the bridge line would repeat it. */}
-        {s.bridge && !(s.precheck && s.precheck.length > 0) && <p className="mt-1 text-[13px] text-fb-text-2">{s.bridge}</p>}
-      </div>
+      {/* The short bridge line shows; Muse's full reasoning opens on tap so the card stays light. */}
+      {s.bridge && !(s.precheck && s.precheck.length > 0) && <p className="mt-2 text-[13px] text-fb-text-2">{s.bridge}</p>}
+      {s.reason && (
+        <div className="mt-1.5">
+          <button
+            type="button"
+            aria-expanded={whyOpen}
+            onClick={() => setWhyOpen((v) => !v)}
+            data-testid="suggestion-why"
+            className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
+          >
+            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
+            {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+          </button>
+          {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}
+        </div>
+      )}
 
       {people.length > 0 && s.precheck && s.precheck.length > 0 ? (
         <ul className="mt-2 flex flex-wrap gap-2" data-testid="precheck">
