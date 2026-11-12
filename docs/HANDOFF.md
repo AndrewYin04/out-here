@@ -22,6 +22,9 @@ Read this first. Everything below was built overnight by Claude Code on branch `
 **Out Here tab:**
 - MapLibre + OpenFreeMap map of Menlo Park with plan pins and live seat badges (Explore view) and a quest panel to join or leave.
 - Friends view ("Find My"): friends' avatar pins with status bubbles, People list by distance, friend card (profile, message, Want to hang?), and your own sharing settings (audience, exact or approximate, pause, edit bubble).
+- **Muse picks on the map:** after a plan, the picked pins get a ring and a "✨ Muse pick" label, other pins dim, and the map frames you, Maya and the pick. Reasons cite a concrete fact (a friend's bubble, a shared interest, budget headroom), never generic filler.
+- **Entry points:** the Feed's Out Here card "I'm free" opens the composer (`/out-here?free=1`); `/out-here?mode=friends` opens the Friends map; friend cards show View profile and Want to hang? (Message is hidden until Messenger can open a thread).
+- **Memories** (`/memories`): Alex's crews with their album photos and "Get this group together again", where Muse proposes the next plan from the crew's shared interests and free windows. Notifications include Out Here invites and joins.
 - **The core loop:** "✨ I'm free" → type what you want → Muse (real API) picks plans that fit your time, walking distance, budget and free friends, explains why in plain words, and drafts the invite → invite a friend → the friend sees it live and accepts → seats update live on every screen.
 
 Muse in the loop: parse with `muse-ember-1.0`, rank and explain with `muse-ember-1.0` (Spark was 5.7-7.0 s; set `MUSE_RANK_ROLE=smart` to use Spark). Measured on Vercel: plan 2.1-4.3 s, Muse 1.0-2.6 s.
@@ -45,7 +48,7 @@ From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan
 2. **Production**: in Vercel, turn off Deployment Protection (or share the link), then promote the verified preview to Production and give judges the production URL. Previews and Production both read the demo database right now (review D11 suggests previews read dev).
 3. **Muse Intros** (Boardy-style warm intros; full spec in the plan, "Muse Intros"; review B3 fixes the Alex-Jordan story).
 4. **Messenger** (`/messages` inbox and docked chats; invites as messages).
-5. Memories loop ("We're done" → photo → crew album → Do this again; review B7: any member can complete).
+5. Memories capture ("We're done" → photo prompt → album; review B7: any member can complete). The /memories page and Muse regroup exist; capturing a new photo after a live hangout does not.
 6. 3D walking view, Events detail, Search, Marketplace, Reels, Daily Quest, streaks, Wrapped (cut first).
 7. `docs/POLISH.md`: 59 minor UI findings from the review agents.
 
