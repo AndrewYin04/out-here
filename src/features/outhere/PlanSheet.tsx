@@ -8,7 +8,7 @@ import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
@@ -67,7 +67,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [open]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -85,6 +85,7 @@ export function PlanSheet({ className }: { className?: string }) {
     setError(null);
     setWhyOpen(false);
     setAsked(t);
+    setPlanAsk(t);
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
