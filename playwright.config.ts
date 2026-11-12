@@ -9,7 +9,9 @@ const baseURL = externalBase || `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: "tests/e2e",
-  timeout: 45_000,
+  timeout: 90_000,
+  // Real-Supabase runs (dev DB in us-west-2 from this laptop) need longer waits than MemoryStore.
+  expect: { timeout: Number(process.env.E2E_EXPECT_TIMEOUT || 5000) },
   retries: 0,
   reporter: [["list"]],
   use: {

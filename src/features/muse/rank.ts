@@ -203,7 +203,9 @@ export async function rankAndExplain(
         vibe: intent.vibe,
         candidates: promptCandidates(shortlist, maps, ctx.now),
       }),
-      model: 'smart',
+      // Ember by default: Spark at minimal effort measured 5.7 s for parse+rank (too slow live).
+      // MUSE_RANK_ROLE=smart switches ranking back to Spark.
+      model: process.env.MUSE_RANK_ROLE === 'smart' ? 'smart' : 'fast',
       effort: 'minimal',
       mock: () => heuristicOutput(shortlist, intent, maps, friendsFreeNames),
       route,
