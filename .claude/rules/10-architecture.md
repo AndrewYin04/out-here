@@ -12,7 +12,7 @@
 - **Scaffold**: `create-next-app .` refuses a non-empty folder, so the app is scaffolded into an empty temp folder and copied in (plan S3). `next@15` resolves to 15.5.29.
 - **Deploy: Vercel preview from the CLI.** The Vercel project `out-here` is linked locally (`.vercel/`) but not connected to GitHub, so pushing a branch does not deploy it. After each milestone push run `bash scripts/deploy-requests.sh run overnight` (it runs `vercel deploy --yes`, a preview). Never `vercel deploy --prod`; the humans promote the final preview at handoff. Teammates request deploys of their branches by commenting `DEPLOY <branch>` on pinned issue #4. Details: `docs/DEPLOYS.md`.
 - **Platform**: Windows 11. Use `powercfg`, `winget` (Phase S only), and Claude in Chrome (`claude --chrome`) for the browser.
-- New dependencies: only those above plus small, well-known UI helpers (`clsx`, `lucide-react`, `zod`, `date-fns`, `framer-motion`). Anything else → log it in `docs/DECISIONS.md` with a reason first.
+- New dependencies: only those above plus small, well-known UI helpers (`clsx`, `lucide-react`, `zod`, `date-fns`, `framer-motion`), and `three` for the 3D view (world area only, loaded on demand). Anything else → log it in `docs/DECISIONS.md` with a reason first.
 
 ### Where this differs from the original kit (from plan section 2)
 | Kit said | Use instead | Why |
@@ -37,6 +37,7 @@ Every folder has exactly one owner. When the main agent runs subagents in parall
 | **memories** | `src/features/memories/**`, `src/app/(memories)/**` | photo prompt, crew album, "do this again", daily quest, streaks, Wrapped |
 | **facebook** | `src/features/fb/**`, `src/app/(fb)/**` | Facebook base: shell (top bar, left nav, right rail, mobile bottom bar), Feed, Stories, Profile, Friends, Notifications, Groups (with the Hangouts tab), Messenger, Events, Search, Marketplace, Reels |
 | **ui kit** (map owns, others import) | `src/features/ui/**` | Facebook-style primitives: Button, Sheet, Avatar, Chip, Card, PhoneFrame |
+| **world** | `src/features/world/**`, `public/models/**` | the 3D street view: three.js custom layer, characters (placeholder or glTF from `public/models`), Muse pet, camera follow, demo walk and GPS. Spec: `docs/3D_VIEW_PLAN.md` |
 | **config** (main agent) | `src/config/**` | `brand.ts`: wordmark name and logo, so one edit swaps them |
 
 Cross-area imports go **only** through each area's `index.ts` barrel. Never deep-import another area's internals.

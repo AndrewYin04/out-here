@@ -15,6 +15,18 @@ import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
+// The 3D street view (world area). Loaded only when someone opens it, so three.js and the
+// models stay out of the map's first load.
+const World3D = dynamic(() => import('@/features/world').then((m) => m.World3D), { ssr: false });
+
+type MapView = 'map' | '3d';
+const VIEW_KEY = 'outhere.view';
+function readView(): MapView {
+  try { return window.localStorage.getItem(VIEW_KEY) === '3d' ? '3d' : 'map'; } catch { return 'map'; }
+}
+function saveView(v: MapView) {
+  try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* private mode: not remembered */ }
+}
 
 /** Seeded quests get a readable test id ("quest-pin-dumplings"); others use their id. */
 const KEY_BY_ID = new Map(DEMO_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
@@ -45,6 +57,9 @@ export function OutHereView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
+  const [view, setViewState] = useState<MapView>('map');
+  const [viewNote, setViewNote] = useState<string | null>(null);
+  const setView = useCallback((v: MapView) => { setViewState(v); saveView(v); }, []);
 
   // ?quest=<id> deep link opens that quest's sheet; ?mode=friends|explore sets the toggle.
   useEffect(() => {
@@ -53,6 +68,9 @@ export function OutHereView() {
     if (id) setSelectedId(id);
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
+    // ?view=3d|map opens that view (the demo link); otherwise the last one used.
+    const v = params.get('view');
+    setViewState(v === '3d' || v === 'map' ? v : readView());
   }, []);
 
   // The Muse plan on screen: its picked pins stand out, and the map frames them with the viewer
@@ -166,9 +184,24 @@ export function OutHereView() {
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
+  // A friend tapped in the 3D view opens their Find My card (it lives in Friends mode).
+  const openFriend = useCallback((id: string) => {
+    setMode('friends');
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id } })), 60);
+  }, []);
+  const exit3d = useCallback(() => {
+    setView('map');
+    setViewNote('3D was running slowly on this device, so you’re back on the map.');
+  }, [setView]);
+  useEffect(() => {
+    if (!viewNote) return;
+    const t = window.setTimeout(() => setViewNote(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [viewNote]);
+  const show3d = view === '3d' && !unsupported && !!map;
 
   return (
-    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode}>
+    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
         <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
@@ -188,6 +221,49 @@ export function OutHereView() {
           onMap={setMap}
           onUnsupported={onUnsupported}
         />
+      )}
+
+      {show3d && map && (
+        <World3D
+          map={map}
+          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name }}
+          home={ctx?.origin ?? null}
+          quests={shown}
+          picks={picks}
+          selectedId={selectedId}
+          friendPins={allFriendPins}
+          onSelect={select}
+          onOpenFriend={openFriend}
+          onExit={exit3d}
+        />
+      )}
+
+      {/* Map / 3D: one camera, two starting points. Bottom left, clear of the I'm free pill. */}
+      {!unsupported && (
+        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-20">
+          <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
+            {(['map', '3d'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                data-testid={`view-${v}`}
+                onClick={() => setView(v)}
+                className={cn(
+                  'h-8 rounded-pill px-3 text-[14px] font-semibold transition-colors',
+                  view === v ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
+                )}
+              >
+                {v === 'map' ? 'Map' : '3D'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {viewNote && (
+        <p role="status" className="absolute inset-x-4 top-[60px] z-[16] mx-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
+          {viewNote}
+        </p>
       )}
 
       {/* Explore / Friends, and the Muse filter chip beside them */}

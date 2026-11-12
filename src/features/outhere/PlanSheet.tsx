@@ -8,7 +8,7 @@ import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
@@ -67,7 +67,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [open]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -86,17 +86,28 @@ export function PlanSheet({ className }: { className?: string }) {
     setWhyOpen(false);
     setAsked(t);
     setPlanAsk(t);
+    setPlanStatus({ state: 'loading', summary: null, topTitle: null, topReason: null, error: null, live: false });
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions);
       setStatus('done');
+      const top = r.plan.suggestions[0];
+      setPlanStatus({
+        state: 'done',
+        summary: r.plan.summary.replace(/^\[mock\]\s*/, ''),
+        topTitle: top?.title ?? null,
+        topReason: top?.reason ?? null,
+        error: null,
+        live: r.museSource === 'muse',
+      });
       // Only the ask whose results are shown becomes the viewer's availability.
       void shareAvailability(t, r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error'); setPlanSuggestions(null);
+      setPlanStatus({ state: 'error', summary: null, topTitle: null, topReason: null, error: errorText(err, 'Muse could not make a plan right now.'), live: false });
     }
   };
 
