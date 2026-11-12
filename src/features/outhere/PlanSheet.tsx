@@ -8,7 +8,7 @@ import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
+import { setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
@@ -29,6 +29,24 @@ export function ImFreeButton({ className }: { className?: string }) {
     >
       <span aria-hidden>✨</span> I&apos;m free
     </button>
+  );
+}
+
+/**
+ * "Checked with 6 friends · Maya's likely down". Names only friends who came back likely down;
+ * everyone else stays unnamed, so nobody's no is shown.
+ */
+function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Map<string, PersonCard> }) {
+  const checked = plan.meta?.friendsChecked ?? 0;
+  if (checked === 0) return null;
+  const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
+    .flatMap((id) => { const p = friends.get(id); return p ? [p.name.split(' ')[0]] : []; });
+  const who = down.length === 0 ? 'no one free for this yet'
+    : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
+  return (
+    <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
+      Checked with {checked} {checked === 1 ? "friend's" : "friends'"} Muse · <span className="font-semibold text-fb-text">{who}</span>
+    </p>
   );
 }
 
@@ -65,6 +83,16 @@ export function PlanSheet({ className }: { className?: string }) {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+  // "Make a plan" from the both-free nudge starts the composer with that friend's name.
+  const prefill = usePlanPrefill();
+  useEffect(() => {
+    if (!prefill) return;
+    setText(prefill.text);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
     setResult(null); setPlanSuggestions(null);
@@ -172,7 +200,7 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'loading' && (
               <div data-testid="plan-loading" aria-live="polite">
-                <p className="mb-3 px-1 text-[15px] font-semibold text-fb-text">✨ Muse is checking who&apos;s free…</p>
+                <p className="mb-3 px-1 text-[15px] font-semibold text-fb-text">✨ Muse is checking with your friends&apos; Muse…</p>
                 {[0, 1].map((i) => (
                   <div key={i} className="mb-2 rounded-card bg-fb-surface p-3 shadow-card">
                     <div className="flex gap-3">
@@ -197,6 +225,7 @@ export function PlanSheet({ className }: { className?: string }) {
                     <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
                   </div>
                 )}
+                <PrecheckLine plan={result.plan} friends={friendMap} />
                 {result.plan.suggestions.length === 0 ? (
                   <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
                     <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>

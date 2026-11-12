@@ -2,7 +2,8 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId, seedId, walkingMinutes,
+  demoDate, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
@@ -11,9 +12,10 @@ import {
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
+  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse,
 } from '@/shared/api';
 import type { Backend } from './backend';
+import { pairSignals } from './matching';
 import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
@@ -718,6 +720,54 @@ export class CoreStore {
     const { audience: _a, ...availability } = row;
     void _a;
     return availability;
+  }
+
+  /** "Busy": ends the viewer's current and upcoming free windows and tells friends. */
+  async clearAvailability(viewerId: ID): Promise<void> {
+    const v = await this.view();
+    const at = new Date();
+    const nowIso = at.toISOString();
+    const open = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
+    for (const a of open) {
+      // An upcoming window is closed to a 1 s window in the past (the table requires ends_at > starts_at).
+      const patch = a.startsAt < nowIso ? { endsAt: nowIso } : { startsAt: new Date(at.getTime() - 1000).toISOString(), endsAt: nowIso };
+      await this.backend.update('availability', { id: a.id }, patch);
+    }
+    if (open.length === 0) return;
+    const after = await this.view();
+    for (const f of after.friendIds(viewerId)) await publish(`user:${f}`, { type: 'availability', id: open[0].id });
+  }
+
+  /** Friends free when the viewer is, ranked, with a suggested group. Empty when the viewer is busy. */
+  async freeWithMe(viewerId: ID): Promise<FreeWithMeResponse> {
+    const v = await this.view();
+    const now = new Date();
+    const t = now.toISOString();
+    const mine = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t);
+    if (mine.length === 0) return { items: [], group: [] };
+    const me = v.profileById.get(viewerId);
+    const best = new Map<ID, FreeFriendInput & { text: string }>();
+    for (const a of v.db.availability) {
+      if (a.endsAt <= t || !v.areFriends(viewerId, a.userId) || !v.canSee(viewerId, a.userId, a.audience)) continue;
+      for (const w of mine) {
+        const o = overlapWindow(w, a, now);
+        if (!o) continue;
+        const prev = best.get(a.userId);
+        if (prev && prev.from <= o.from) continue;
+        const p = v.profileById.get(a.userId);
+        const theirs = p ? v.profileFor(viewerId, p).interests : [];
+        const shared = (me?.interests ?? []).filter((i) => theirs.some((x) => x.toLowerCase() === i.toLowerCase()));
+        best.set(a.userId, { id: a.userId, from: o.from, until: o.until, friendUntil: a.endsAt, sharedInterests: shared, text: a.text });
+      }
+    }
+    const pair = await pairSignals(this, [viewerId, ...best.keys()]);
+    const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), now, { viewerId, pair });
+    const items: FreeWithMeItem[] = ranked.flatMap((r) => {
+      const friend = v.person(viewerId, r.id);
+      if (!friend) return [];
+      return [{ friend, from: r.from, until: r.until, text: best.get(r.id)!.text, sharedInterests: r.sharedInterests, knows: r.knows, freeNow: r.freeNow, score: r.score }];
+    });
+    return { items, group };
   }
 
   async myAvailability(viewerId: ID): Promise<Availability[]> {

@@ -21,6 +21,26 @@ export function usePlanOpen(): boolean {
   return useSyncExternalStore(subscribe, () => open, () => false);
 }
 
+/** Window event: the viewer's own availability changed (status pill, "I'm free" plan). */
+export const AVAILABILITY_CHANGED = 'outhere:availability-changed';
+export function availabilityChanged(): void {
+  window.dispatchEvent(new Event(AVAILABILITY_CHANGED));
+}
+
+// Text to start the composer with (the "both free" nudge's "Make a plan"). Each call bumps the
+// id so the same text twice still refills the composer.
+let prefill: { id: number; text: string } | null = null;
+
+export function openPlanWith(text: string): void {
+  prefill = { id: (prefill?.id ?? 0) + 1, text };
+  open = true;
+  for (const l of listeners) l();
+}
+
+export function usePlanPrefill(): { id: number; text: string } | null {
+  return useSyncExternalStore(subscribe, () => prefill, () => null);
+}
+
 // The suggestions of the plan on screen, so the map can highlight their pins. PlanSheet sets
 // them when a plan returns; closing the sheet clears them.
 export type PlanPicks = { questIds: string[]; topFriendIds: string[] };

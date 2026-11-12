@@ -45,6 +45,8 @@ export type PlanMeta = {
   summaryIssue: string | null;
   budgetMs: number;
   candidateCount: number;
+  /** Pre-check: how many friends' agents were asked (all friends; busy ones just answer nothing). */
+  friendsChecked: number;
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -102,6 +104,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     summaryIssue: null,
     budgetMs,
     candidateCount: 0,
+    friendsChecked: ctx.friends.length,
     dropped: [],
     issues: [],
     ...rest,

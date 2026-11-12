@@ -129,6 +129,18 @@ export type PlanSuggestion = {
   bridge: string | null;         // "Maya's going too" — only from public/shared info
   startsAt: string; travelMinutes: number; fitsWindow: true;   // non-fitting suggestions are dropped by code
   seatsLeft: number | null; inviteDraft: string | null;
+  /** Pre-check: what each invited friend's agent answered, from what that friend shared. */
+  precheck?: FriendCheck[];
+};
+
+// Pre-check: before a suggestion is shown, the friend's agent answers "likely down" only from
+// what the friend chose to share (free window, interests, status). Busy or unshared friends are
+// never listed, so nobody sees a no.
+export type FriendCheck = {
+  friendId: ID;
+  verdict: 'likely_down';
+  freeUntil: string;   // ISO
+  because: string[];   // ["free till 12:10 PM", "likes dumplings", "craving dumplings"]
 };
 
 export type MusePlan = { intent: MuseIntent; suggestions: PlanSuggestion[]; summary: string };

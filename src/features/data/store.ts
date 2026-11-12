@@ -71,6 +71,8 @@ export interface DataStore {
   completeQuest: CoreStore['completeQuest'];
   createAvailability: CoreStore['createAvailability'];
   myAvailability: CoreStore['myAvailability'];
+  clearAvailability: CoreStore['clearAvailability'];
+  freeWithMe: CoreStore['freeWithMe'];
   friendAvailability: CoreStore['friendAvailability'];
   invites: CoreStore['invites'];
   invite: CoreStore['invite'];

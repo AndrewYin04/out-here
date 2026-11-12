@@ -8,7 +8,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { ImFreeButton, PlanSheet, usePlanSuggestions } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, PlanSheet, StatusPill, usePlanSuggestions } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
@@ -163,8 +163,17 @@ export function OutHereView() {
         </>
       )}
 
-      {/* ImFreeButton is an unpositioned pill; place it above the map canvas, bottom centre. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
+      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). */}
+      {!selectedId && (
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
+          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
+        </div>
+      )}
+
+      {/* ImFreeButton is an unpositioned pill; place it above the map canvas, bottom centre,
+          with the viewer's status pill above it. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex flex-col items-center gap-2 max-md:bottom-20">
+        <StatusPill className="pointer-events-auto" />
         <div className="pointer-events-auto flex items-center gap-2">
           <ImFreeButton />
           <Link href="/events?tab=going" className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-sm font-semibold text-fb-text shadow-card hover:bg-fb-hover">

@@ -1,7 +1,7 @@
 // Step 4: validation, pure code. Whatever the ranker returned, only suggestions for real,
 // fitting candidates survive, every number shown to the user is recomputed from data, and
 // model text (reason, bridge, invite, summary) may quote only facts code can back.
-import { walkingMinutes, type MuseIntent, type MusePlan, type PlanSuggestion, type Quest } from '../../shared';
+import { formatDemoTime, walkingMinutes, type FriendCheck, type MuseIntent, type MusePlan, type PlanSuggestion, type Quest } from '../../shared';
 import type { PlanCandidate } from './candidates';
 import type { PlanContext } from './context';
 import { bridgeText, inviteText, reasonText } from './explain';
@@ -176,6 +176,25 @@ export function claimIssue(text: string, f: ClaimFacts, label: string): string |
   return null;
 }
 
+/**
+ * Pre-check, in code: each invited friend's agent answers "likely down" from what the friend
+ * shared. Every kept friend already passed buildCandidates (free at the start, can walk there in
+ * time, shares an interest with the plan), so the answer cites those facts. Friends who are busy
+ * or did not share never reach this list, so a no is never shown to anyone.
+ */
+export function precheckFor(c: PlanCandidate, friendIds: readonly string[]): FriendCheck[] {
+  return friendIds.flatMap((id) => {
+    const f = c.friendOverlap.find((x) => x.friendId === id);
+    if (!f) return [];
+    const because = [`free till ${formatDemoTime(f.freeUntil)}`];
+    if (f.sharedWithQuest[0]) because.push(`likes ${f.sharedWithQuest[0]}`);
+    // the bubble line is "thought · doing · wants to"; the thought alone reads best on a card
+    const thought = f.status?.split(' · ')[0]?.trim();
+    if (thought) because.push(thought);
+    return [{ friendId: id, verdict: 'likely_down' as const, freeUntil: f.freeUntil, because }];
+  });
+}
+
 export function validate(
   suggestions: PlanSuggestion[],
   candidates: PlanCandidate[],
@@ -231,6 +250,7 @@ export function validate(
       kind: 'join_quest',
       questId: quest.id,
       friendIds: keptFriends,
+      precheck: precheckFor(c, keptFriends),
       title: quest.title,
       emoji: quest.emoji,
       reason,

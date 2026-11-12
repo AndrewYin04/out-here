@@ -12,6 +12,8 @@
 // POST /api/quests/:id/leave           body: { userId }                 -> { quest, seatsLeft }
 // POST /api/quests/:id/complete        body: { userId? }                -> { quest, crew }        (attendee, after the start)
 // POST /api/availability               body: { userId, text, startsAt, endsAt, location } -> { availability }
+// DELETE /api/availability                                              -> { ok: true }  ("Busy": ends the viewer's windows)
+// GET  /api/availability/free-with-me                                   -> FreeWithMeResponse (friends free when the viewer is, ranked)
 // GET  /api/friends/:userId/availability                                -> { items: (Availability & { friend: Profile })[] }
 // GET  /api/locations/friends          (viewer from x-persona)          -> { pins: FriendPin[] }   (canSee on audience; fuzzed when approximate; paused/expired hidden)
 // GET  /api/locations/me                                                -> { share: LocationShare | null }
@@ -101,6 +103,17 @@ export type CreateAvailabilityBody = {
   userId: ID; text: string; startsAt: string; endsAt: string; location: LatLng;
 };
 export type AvailabilityResponse = { availability: Availability };
+export type FreeWithMeItem = {
+  friend: PersonCard;
+  from: string; until: string;        // overlap with the viewer's window
+  text: string;                       // the friend's own note ("on a long lunch")
+  sharedInterests: string[];
+  knows: ID[];                        // other free friends this friend is friends with
+  freeNow: boolean;
+  score: number;
+};
+/** Empty when the viewer is busy. `group` is the suggested set of friend ids, best first. */
+export type FreeWithMeResponse = { items: FreeWithMeItem[]; group: ID[] };
 export type FriendAvailabilityResponse = { items: (Availability & { friend: Profile })[] };
 export type UsersResponse = { users: Profile[] };
 export type CreateInviteBody = {

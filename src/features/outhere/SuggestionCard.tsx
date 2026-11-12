@@ -172,7 +172,23 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         {s.bridge && <p className="mt-1 text-[13px] text-fb-text-2">{s.bridge}</p>}
       </div>
 
-      {people.length > 0 && (
+      {people.length > 0 && s.precheck && s.precheck.length > 0 ? (
+        <ul className="mt-2 flex flex-col gap-1" data-testid="precheck">
+          {s.precheck.flatMap((c) => {
+            const p = friends.get(c.friendId);
+            if (!p) return [];
+            return [(
+              <li key={c.friendId} className="flex items-start gap-2 rounded-[10px] bg-fb-bg px-2 py-1.5 text-[13px]">
+                <Avatar src={p.avatarUrl} name={p.name} size={24} ring />
+                <span className="min-w-0">
+                  <span className="font-semibold text-fb-green">✓ {p.name.split(' ')[0]}: likely down</span>
+                  <span className="text-fb-text-2"> · {c.because.join(' · ')}</span>
+                </span>
+              </li>
+            )];
+          })}
+        </ul>
+      ) : people.length > 0 && (
         <div className="mt-2 flex items-center gap-2 text-[13px] text-fb-text-2">
           <Users size={14} aria-hidden />
           <div className="flex -space-x-1.5">
