@@ -38,7 +38,7 @@
       "hometown": "Cupertino, CA",
       "currentCity": "Redwood City, CA",
       "job": "UX researcher",
-      "bio": "just moved to Redwood City for UX research, off at 5:15 and usually free until 6",
+      "bio": "just moved to Redwood City for UX research, usually take a long lunch around 11",
       "interests": [
         "dumplings",
         "local bands",
@@ -5080,7 +5080,7 @@
       "comments": [
         {
           "authorHandle": "maya",
-          "text": "i am free every day at 5:15 for dumpling emergency purposes",
+          "text": "i am free every day at lunch for dumpling emergency purposes",
           "minutesAfter": 12,
           "replies": []
         },
@@ -5308,7 +5308,7 @@
         "type": "profile"
       },
       "audience": "public",
-      "text": "new job finally settling in — off at 5:15 and free til 6 most days. anyone want short after-work plans? coffee, walks, anything?",
+      "text": "new job finally settling in — take long lunches most days. anyone want short after-work plans? coffee, walks, anything?",
       "image": null,
       "hoursAgo": 30,
       "reactions": {
@@ -9542,7 +9542,7 @@
         },
         {
           "fromHandle": "maya",
-          "text": "lol same, i just moved. are you off work yet? i'm off at 5:15 and free till 6",
+          "text": "lol same, i just moved. are you off work yet? i'm on a long lunch most days",
           "minutesAgo": 171
         },
         {
