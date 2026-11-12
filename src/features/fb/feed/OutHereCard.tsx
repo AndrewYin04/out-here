@@ -122,7 +122,7 @@ export function OutHereCard() {
       )}
 
       <div className="mt-3 flex gap-2">
-        <LinkButton href={ROUTES.outHere} size="sm" className="flex-1" data-testid="home-outhere-free-button">I&apos;m free</LinkButton>
+        <LinkButton href={`${ROUTES.outHere}?free=1`} size="sm" className="flex-1" data-testid="home-outhere-free-button">I&apos;m free</LinkButton>
         <LinkButton href={ROUTES.outHere} size="sm" variant="secondary" className="flex-1">Open map</LinkButton>
       </div>
     </Card>

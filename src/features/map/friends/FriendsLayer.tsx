@@ -2,16 +2,18 @@
 // Friends on the Out Here map: an avatar pin with a green ring and a status chip per friend who
 // shares with the viewer, plus the viewer's own pin. Below zoom 13 nearby pins merge into a
 // cluster (tap zooms in); at closer zooms pins that would overlap fan out around their point.
-// Chips never overlap: in order of distance (then most recently updated), each chip keeps its
-// full text only if its box is clear of every avatar and every chip already placed, else it
-// shrinks to its emoji, else it is hidden. On phones below zoom 15 chips show the emoji only.
+// Chips never overlap: in order of distance (then most recently updated), each chip takes the
+// first mode and side (above the avatar, then below) whose box is clear of every avatar and every
+// chip already placed, else it is hidden. Desktop: the full thought wrapped to 2 lines (200 px
+// wide), then the short form. Phones: the emoji plus the first 18 characters and an ellipsis, then
+// the first 10; never the emoji alone.
 // Markers are MapLibre HTML markers whose content React renders through portals.
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Avatar } from '@/features/ui';
+import { Avatar, cn } from '@/features/ui';
 import type { FriendPin, LatLng, Profile } from '@/shared/types';
-import { CHIP_MAX_W, chipText, placeChips, type ChipMode } from './chips';
+import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type ChipOptions, type ChipSide } from './chips';
 import { FriendCard } from './FriendCard';
 import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMyShare, PANEL_PX } from './useFindMy';
 
@@ -22,8 +24,13 @@ type MapLib = typeof import('maplibre-gl');
 const CLUSTER_BELOW_ZOOM = 13;
 const CLUSTER_PX = 56;
 const OVERLAP_PX = 44;
-/** Phones show emoji-only chips below this zoom. */
-const NARROW_FULL_CHIP_ZOOM = 15;
+/** Maps narrower than this get the short chip only. */
+const NARROW_MAP_PX = 600;
+// A chip that collides tries the other side of the avatar, then a shorter form, before it hides.
+const WIDE_CHIPS: ChipOptions = { maxW: CHIP_WRAP_W, lines: 2, modes: ['full', 'short', 'mini'], sides: ['above', 'below'], shift: true };
+const NARROW_CHIPS: ChipOptions = { modes: ['short', 'mini'], sides: ['above', 'below'], shift: true };
+/** On phones, Friends mode first frames the friends within this distance so their chips separate. */
+const LOCAL_KM = 3;
 
 /** Loads maplibre-gl in the browser only (it touches window on import). */
 function useMapLib(): MapLib | null {
@@ -85,7 +92,7 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
   return groups;
 }
 
-type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode };
+type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
 
 export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
   const lib = useMapLib();
@@ -96,6 +103,23 @@ export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
   const pins = useMemo(() => data?.pins ?? [], [data]);
   const openPin = pins.find((p) => p.friend.id === openId) ?? null;
   const me = mine?.share;
+
+  // Phones: once the pins load, frame the local friends and the viewer so their chips separate
+  // (the default camera is set for the desktop map and leaves some of them off a 390 px screen).
+  const [framed, setFramed] = useState(false);
+  useEffect(() => {
+    if (!map || framed || pins.length === 0 || isDesktop()) return;
+    const c = map.getContainer();
+    if (c.clientWidth >= NARROW_MAP_PX) return;
+    const pts = [...pins.filter((p) => p.distanceKm < LOCAL_KM).map((p) => p.location), ...(me ? [me.location] : [])];
+    setFramed(true);
+    if (pts.length < 2) return;
+    const lats = pts.map((p) => p.lat);
+    const lngs = pts.map((p) => p.lng);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
+      padding: { top: 150, bottom: 120, left: 36, right: 36 }, maxZoom: 16, duration: 0,
+    });
+  }, [map, pins, me, framed]);
 
   // Opens a friend's card and flies the map so their pin is clear of the card:
   // window event "findmy:open" { detail: { id, zoom? } } (the People sheet sends it).
@@ -155,9 +179,15 @@ export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
       return { pin, x: pt.x + offset[0], y: pt.y + offset[1] };
     });
     const mePt = me ? map.project([me.location.lng, me.location.lat]) : null;
-    const emojiOnly = view.w < 600 && zoom < NARROW_FULL_CHIP_ZOOM;
-    const modes = placeChips(screen, mePt ? { x: mePt.x, y: mePt.y } : null, view, emojiOnly);
-    return { clusters, singles: placed.map((s) => ({ ...s, chip: modes.get(s.pin.friend.id) ?? 'none' })) };
+    const opts = view.w < NARROW_MAP_PX ? NARROW_CHIPS : WIDE_CHIPS;
+    const chips = placeChipsSided(screen, mePt ? { x: mePt.x, y: mePt.y } : null, view, false, opts);
+    return {
+      clusters,
+      singles: placed.map((s) => {
+        const c = chips.get(s.pin.friend.id);
+        return { ...s, chip: c?.mode ?? 'none', side: c?.side ?? 'above', dx: c?.dx ?? 0 };
+      }),
+    };
   }, [map, pins, tick, me]);
 
   if (!map || !lib) return null;
@@ -175,9 +205,9 @@ export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
           </div>
         </MapMarker>
       )}
-      {layout.singles.map(({ pin, offset, chip }) => (
+      {layout.singles.map(({ pin, offset, chip, side, dx }) => (
         <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={openId === pin.friend.id ? 5 : 3}>
-          <FriendPinView pin={pin} chip={chip} onOpen={() => openFromPin(pin)} />
+          <FriendPinView pin={pin} chip={chip} side={side} dx={dx} onOpen={() => openFromPin(pin)} />
         </MapMarker>
       ))}
       {layout.clusters.map((g) => (
@@ -211,9 +241,10 @@ export function FriendsLayer({ map, viewer }: FriendsLayerProps) {
   );
 }
 
-function FriendPinView({ pin, chip, onOpen }: { pin: FriendPin; chip: ChipMode; onOpen: () => void }) {
+function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: ChipMode; side: ChipSide; dx: number; onOpen: () => void }) {
   const b = pin.bubble;
   const text = chipText(pin);
+  const shown = thoughtFor(b.thought, chip);
   return (
     <button
       type="button"
@@ -221,19 +252,27 @@ function FriendPinView({ pin, chip, onOpen }: { pin: FriendPin; chip: ChipMode; 
       data-testid="friend-pin"
       data-handle={pin.friend.handle}
       data-chip={chip}
+      data-chip-side={chip === 'none' ? undefined : side}
       aria-label={`${pin.friend.name}${text ? `, ${text}` : ''}, updated ${updatedAgo(pin.updatedAt)}`}
-      className="group flex flex-col items-center outline-none"
+      className="group relative flex flex-col items-center outline-none"
     >
       {chip !== 'none' && (
         <span
-          className="mb-1 flex flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover"
-          style={{ maxWidth: CHIP_MAX_W }}
+          className={cn(
+            'absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
+          )}
+          style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}
         >
-          <span className="flex max-w-full items-center gap-1 text-[13px] font-semibold leading-4 text-fb-text" data-testid="friend-chip">
+          <span className="flex max-w-full items-center gap-1 text-left text-[13px] font-semibold leading-4 text-fb-text" data-testid="friend-chip">
             {b.emoji && <span className="shrink-0 text-[16px] leading-none" aria-hidden>{b.emoji}</span>}
-            {chip === 'full' && b.thought && <span className="truncate">{b.thought}</span>}
+            {shown && (
+              <span className={chip === 'full' ? 'line-clamp-2 break-words' : 'whitespace-nowrap'} data-testid="friend-chip-text">
+                {shown}
+              </span>
+            )}
           </span>
-          {chip === 'full' && (
+          {shown && (
             <span className="hidden text-[11px] leading-[14px] text-fb-text-2 group-hover:block group-focus-visible:block">
               updated {updatedAgo(pin.updatedAt)}
             </span>
