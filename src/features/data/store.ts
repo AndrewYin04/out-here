@@ -45,6 +45,9 @@ export interface DataStore {
   groups: CoreStore['groups'];
   group: CoreStore['group'];
   groupPosts: CoreStore['groupPosts'];
+  // Memories boards
+  crewPosts: CoreStore['crewPosts'];
+  communityPosts: CoreStore['communityPosts'];
   groupMembers: CoreStore['groupMembers'];
   groupHangouts: CoreStore['groupHangouts'];
   joinGroup: CoreStore['joinGroup'];

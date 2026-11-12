@@ -160,7 +160,25 @@ export class View {
       return g.privacy === 'public' || this.groupRole(post.targetId, viewerId) !== null;
     }
     if (post.targetType === 'event') return true;
+    // Memories boards: a crew's board is for its members; the community board is public.
+    if (post.targetType === 'crew') return this.crewMemberIds(post.targetId).includes(viewerId);
+    if (post.targetType === 'community') return true;
     return this.canSee(viewerId, post.authorId, post.audience);
+  }
+
+  /**
+   * Who wrote something on a public board, as the viewer may see it: the viewer and friends in
+   * full; anyone else by first name only, with no handle (so no profile link) and no counts.
+   */
+  boardPerson(viewerId: ID, id: ID): PersonCard | null {
+    const p = this.person(viewerId, id);
+    if (!p || id === viewerId || p.isFriend) return p;
+    return { id: p.id, handle: '', name: p.name.split(' ')[0] ?? p.name, avatarUrl: p.avatarUrl, mutualFriendCount: 0, isFriend: false };
+  }
+
+  /** Author card for a post: public-board posts and their comments hide strangers' full names. */
+  private authorFor(viewerId: ID, post: Post | undefined, id: ID): PersonCard | null {
+    return post?.targetType === 'community' ? this.boardPerson(viewerId, id) : this.person(viewerId, id);
   }
 
   reactionCounts(postId: ID): ReactionCounts {
@@ -177,8 +195,9 @@ export class View {
   commentTree(viewerId: ID, postId: ID): CommentView[] {
     const all = this.commentsBy.get(postId) ?? [];
     const replies = groupBy(all.filter((c) => c.parentId), (c) => c.parentId!);
+    const post = this.postById.get(postId);
     const view = (c: Comment, withReplies: boolean): CommentView | null => {
-      const author = this.person(viewerId, c.authorId);
+      const author = this.authorFor(viewerId, post, c.authorId);
       if (!author) return null;
       const rs = withReplies ? (replies.get(c.id) ?? []).map((r) => view(r, false)).filter((x): x is CommentView => !!x) : [];
       return { ...c, author, replies: rs };
@@ -194,7 +213,7 @@ export class View {
     const shared = post.sharedPostId ? this.postById.get(post.sharedPostId) : undefined;
     return {
       ...post,
-      author: this.person(viewerId, post.authorId) ?? {
+      author: this.authorFor(viewerId, post, post.authorId) ?? {
         id: post.authorId, handle: 'unknown', name: 'Unknown', avatarUrl: '', mutualFriendCount: 0, isFriend: false,
       },
       group: group ? { id: group.id, slug: group.slug, name: group.name } : null,

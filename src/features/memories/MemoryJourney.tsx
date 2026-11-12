@@ -4,9 +4,10 @@
 // timeline, sheet and Muse state; the map (JourneyMap from ./mapSlot) only receives props.
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Images } from 'lucide-react';
+import { ArrowLeft, Images, MessagesSquare } from 'lucide-react';
 import { usePersonaHandle } from '@/features/fb/shell';
-import { Card, EmptyState, IconLink, Skeleton } from '@/features/ui';
+import { Card, EmptyState, IconButton, IconLink, Sheet, Skeleton } from '@/features/ui';
+import { CrewBoard } from './CrewBoard';
 import { CrewNotFoundError, loadJourney, type JourneyData } from './data';
 import { formatJourneyDay, photoLabel, stopLabel, toMapPoints } from './journey';
 import { JourneyMap } from './mapSlot';
@@ -69,6 +70,7 @@ function JourneyView({ data }: { data: JourneyData }) {
   const [sheetOpen, setSheetOpen] = useState(true);
   const [sheetMode, setSheetMode] = useState<SheetMode>('collapsed');
   const [focusRequest, setFocusRequest] = useState(0);
+  const [boardOpen, setBoardOpen] = useState(false);
   const regroup = useRegroup(journey.crewId, meta, viewerId);
 
   const index = Math.max(0, journey.stops.findIndex((s) => s.id === selectedId));
@@ -102,7 +104,14 @@ function JourneyView({ data }: { data: JourneyData }) {
             {[day, stopLabel(journey.stops.length), photoLabel(journey.photoCount)].filter(Boolean).join(' · ')}
           </p>
         </div>
+        <IconButton label="Crew board" onClick={() => setBoardOpen(true)} data-testid="open-crew-board">
+          <MessagesSquare size={20} aria-hidden />
+        </IconButton>
       </header>
+
+      <Sheet open={boardOpen} onClose={() => setBoardOpen(false)} title={`${journey.title} board`}>
+        <CrewBoard crewId={journey.crewId} crewName={journey.title} />
+      </Sheet>
 
       <div className="relative min-h-0 flex-1">
         <JourneyMap

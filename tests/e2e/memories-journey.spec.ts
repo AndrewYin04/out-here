@@ -62,6 +62,29 @@ test.describe("Memory journey", () => {
     await expect(page.getByTestId("map-mode-friends")).toHaveAttribute("aria-pressed", "true", { timeout: 15_000 });
   });
 
+  test("boards: the crew board is private to the crew; the public board shows strangers by first name", async ({ browser }) => {
+    const alex = await browser.newPage();
+    await alex.goto("/memories?as=alex&view=list");
+    await alex.getByTestId("explore-memory").first().click();
+    await alex.getByTestId("open-crew-board").click();
+    await expect(alex.getByTestId("crew-board")).toBeVisible({ timeout: 15_000 });
+    await alex.getByTestId("board-text").fill("Same time next week?");
+    await alex.getByTestId("board-post").click();
+    await expect(alex.getByTestId("crew-board").getByText("Same time next week?").first()).toBeVisible({ timeout: 10_000 });
+
+    await alex.goto("/memories?as=alex&view=board");
+    await alex.getByTestId("board-text").fill("Go on a weeknight, no line.");
+    await alex.getByTestId("board-post").click();
+    await expect(alex.getByTestId("community-post").first()).toContainText("Go on a weeknight, no line.", { timeout: 10_000 });
+
+    const jordan = await browser.newPage();
+    await jordan.goto("/memories?as=jordan&view=board");
+    const post = jordan.getByTestId("community-post").filter({ hasText: "Go on a weeknight, no line." }).first();
+    await expect(post).toBeVisible({ timeout: 15_000 });
+    await expect(post.getByTestId("community-post-author")).toHaveText("Alex");
+    await expect(jordan.getByTestId("community-board").locator('a[href^="/profile"]')).toHaveCount(0);
+  });
+
   test("an unknown crew shows a clear not-found state", async ({ page }) => {
     await page.goto("/memories/not-a-crew?as=alex");
     await expect(page.getByText("Memory not found")).toBeVisible({ timeout: 15_000 });

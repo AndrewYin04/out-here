@@ -7,12 +7,13 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Images, List as ListIcon, Map as MapIcon, X } from 'lucide-react';
+import { ChevronRight, Images, List as ListIcon, Map as MapIcon, Users, X } from 'lucide-react';
 import { useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { MapAttribution } from '@/features/map';
 import { AvatarStack, Card, cn, EmptyState, IconButton, LinkButton, Skeleton } from '@/features/ui';
 import { BackButton } from './BackButton';
+import { CommunityBoard } from './CommunityBoard';
 import { loadCrewRows, type CrewRow } from './data';
 import { formatJourneyDay, photoLabel } from './journey';
 import type { MemoriesMapProps } from './MemoriesMap';
@@ -27,7 +28,8 @@ const MemoriesMap = dynamic<MemoriesMapProps>(() => import('./MemoriesMap'), {
   loading: () => <div className="absolute inset-0 animate-shimmer bg-fb-skeleton" aria-hidden />,
 });
 
-type View = 'map' | 'list';
+type View = 'map' | 'list' | 'board';
+const VIEWS: { id: View; label: string }[] = [{ id: 'map', label: 'Map' }, { id: 'list', label: 'List' }, { id: 'board', label: 'Board' }];
 const PREVIEW_INSET = 200;
 
 export function MemoriesPage() {
@@ -39,7 +41,8 @@ export function MemoriesPage() {
 function initialView(): View {
   if (typeof window === 'undefined') return 'map';
   if (window.location.hash.startsWith('#crew-')) return 'list';
-  return new URLSearchParams(window.location.search).get('view') === 'list' ? 'list' : 'map';
+  const v = new URLSearchParams(window.location.search).get('view');
+  return v === 'list' || v === 'board' ? v : 'map';
 }
 
 function MemoriesView({ handle }: { handle: string | null }) {
@@ -60,8 +63,8 @@ function MemoriesView({ handle }: { handle: string | null }) {
     setViewState(v);
     setNotice(null);
     const url = new URL(window.location.href);
-    if (v === 'list') url.searchParams.set('view', 'list');
-    else url.searchParams.delete('view');
+    if (v === 'map') url.searchParams.delete('view');
+    else url.searchParams.set('view', v);
     window.history.replaceState(window.history.state, '', url);
   }, []);
 
@@ -89,12 +92,12 @@ function MemoriesView({ handle }: { handle: string | null }) {
   return (
     <div className="mx-auto w-full max-w-[680px] px-0 pb-6 md:px-4 md:pt-4">
       <div className="px-4 py-3 md:px-0">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <BackButton className="shrink-0" />
           <h1 className="min-w-0 flex-1 truncate text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
-          {hasCrews && <ViewToggle view={view} onView={setView} />}
+          {crews !== null && !error && <ViewToggle view={view} onView={setView} className="w-full sm:w-auto" stretch />}
         </div>
-        <p className="mt-2 text-[15px] text-fb-text-2">Your Out Here hangouts: relive them, then get the crew together again.</p>
+        {view !== 'board' && <p className="mt-2 text-[15px] text-fb-text-2">Your Out Here hangouts: relive them, then get the crew together again.</p>}
       </div>
       {notice && <p className="mx-4 mb-3 rounded-card bg-fb-blue-tint px-3 py-2 text-[15px] text-fb-text md:mx-0" role="status">{notice}</p>}
       {error && <Card padded className="text-fb-text-2" role="alert">Could not load memories: {error}</Card>}
@@ -103,7 +106,7 @@ function MemoriesView({ handle }: { handle: string | null }) {
           {[0, 1].map((i) => <Card key={i} padded><Skeleton className="h-6 w-40" /><Skeleton className="mt-3 h-40 w-full" /></Card>)}
         </div>
       )}
-      {crews && crews.length === 0 && (
+      {crews && crews.length === 0 && view !== 'board' && (
         <Card>
           <EmptyState
             icon={<Images size={40} />}
@@ -113,7 +116,8 @@ function MemoriesView({ handle }: { handle: string | null }) {
           />
         </Card>
       )}
-      {handle && hasCrews && (
+      {handle && crews && view === 'board' && <CommunityBoard crews={crews} />}
+      {handle && hasCrews && view === 'list' && (
         <div className="flex flex-col gap-3">
           {crews.map((c) => <CrewCard key={c.id} crew={c} />)}
         </div>
@@ -122,23 +126,24 @@ function MemoriesView({ handle }: { handle: string | null }) {
   );
 }
 
-function ViewToggle({ view, onView, className }: { view: View; onView: (v: View) => void; className?: string }) {
+function ViewToggle({ view, onView, className, stretch = false }: { view: View; onView: (v: View) => void; className?: string; stretch?: boolean }) {
   return (
     <div role="group" aria-label="Memories view" className={cn('flex shrink-0 gap-1 rounded-pill bg-fb-surface p-1 shadow-card', className)}>
-      {(['map', 'list'] as const).map((v) => (
+      {VIEWS.map(({ id, label }) => (
         <button
-          key={v}
+          key={id}
           type="button"
-          aria-pressed={view === v}
-          data-testid={`memories-view-${v}`}
-          onClick={() => onView(v)}
+          aria-pressed={view === id}
+          data-testid={`memories-view-${id}`}
+          onClick={() => onView(id)}
           className={cn(
-            'flex h-8 items-center gap-1.5 rounded-pill px-3 text-[15px] font-semibold transition-colors',
-            view === v ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
+            'flex h-8 items-center justify-center gap-1.5 rounded-pill px-2.5 text-[15px] font-semibold transition-colors sm:px-3',
+            stretch && 'flex-1 sm:flex-none',
+            view === id ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
           )}
         >
-          {v === 'map' ? <MapIcon size={16} aria-hidden /> : <ListIcon size={16} aria-hidden />}
-          {v === 'map' ? 'Map' : 'List'}
+          {id === 'map' ? <MapIcon size={16} aria-hidden /> : id === 'list' ? <ListIcon size={16} aria-hidden /> : <Users size={16} aria-hidden />}
+          {label}
         </button>
       ))}
     </div>
@@ -168,7 +173,7 @@ function MapView({ crews, onView, onUnsupported }: { crews: CrewRow[]; onView: (
         <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex items-center justify-between gap-2 px-3">
           <span className="pointer-events-auto flex items-center gap-2">
             <BackButton />
-            <span className="rounded-pill bg-fb-surface px-3 py-1.5 text-[15px] font-semibold text-fb-text shadow-card">
+            <span className="hidden rounded-pill bg-fb-surface px-3 py-1.5 text-[15px] font-semibold text-fb-text shadow-card sm:inline">
               {total} {total === 1 ? 'memory' : 'memories'}
             </span>
           </span>

@@ -174,11 +174,14 @@ export type Event = {
 export type RsvpStatus = 'going' | 'interested' | 'invited';
 export type EventRsvp = { eventId: ID; userId: ID; status: RsvpStatus; createdAt: string };
 
-export type PostTargetType = 'profile' | 'group' | 'event';
+// crew: a crew's private Memories board (targetId = crew id; crew members only).
+// community: the public neighborhood board in Memories (targetId = the quest the post is about;
+// only an attendee may post; strangers see the author's first name only).
+export type PostTargetType = 'profile' | 'group' | 'event' | 'crew' | 'community';
 export type Post = {
   id: ID; authorId: ID;
   targetType: PostTargetType;
-  targetId: ID;              // profile id (the author's own for a timeline post), group id, or event id
+  targetId: ID;              // profile id (own timeline), group id, event id, crew id (crew board), or quest id (community board)
   audience: Audience;
   text: string; media: string[];
   sharedPostId: ID | null;

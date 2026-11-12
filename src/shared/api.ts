@@ -25,6 +25,8 @@
 // POST /api/memories                   multipart: photo, crewId, questId, uploaderId?, caption? -> { memory }
 // GET  /api/memories/:id/photo                                      -> image bytes (crew members only)
 // GET  /api/memories?crewId                                             -> { memories: Memory[] }
+// GET  /api/crews/:id/posts?cursor                                      -> FeedResponse (crew board; crew members only)
+// GET  /api/community/posts?cursor                                      -> CommunityBoardResponse (public board; first names for non-friends)
 // GET  /api/daily?date / POST /api/daily/entry                          -> DailyQuest / { entry }
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
@@ -153,11 +155,18 @@ export type PostView = Post & {
 
 export type FeedResponse = { posts: PostView[]; nextCursor: string | null };
 
+/** The hangout a community-board post is about. No location: the board is public. */
+export type BoardPlace = { questId: ID; title: string; emoji: string; venueName: string; startsAt: string };
+/** GET /api/community/posts: public posts, each tagged with its hangout. Strangers' names are first names only. */
+export type CommunityBoardResponse = FeedResponse & { places: Record<ID, BoardPlace> };
+
 export type CreatePostBody = {
   text: string;
   media?: string[];               // urls returned by POST /api/uploads
   audience: Audience;
-  target?: { type: 'profile' } | { type: 'group'; slug: string } | { type: 'event'; slug: string };
+  target?: { type: 'profile' } | { type: 'group'; slug: string } | { type: 'event'; slug: string }
+    | { type: 'crew'; crewId: ID }          // crew board in Memories (crew members only)
+    | { type: 'community'; questId: ID };   // public board in Memories (attendees of that hangout only)
   sharedPostId?: ID;
 };
 

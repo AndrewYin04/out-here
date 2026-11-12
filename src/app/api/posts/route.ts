@@ -9,6 +9,8 @@ const CreateZ = z.object({
     z.object({ type: z.literal('profile') }),
     z.object({ type: z.literal('group'), slug: z.string().min(1) }),
     z.object({ type: z.literal('event'), slug: z.string().min(1) }),
+    z.object({ type: z.literal('crew'), crewId: IdZ }),
+    z.object({ type: z.literal('community'), questId: IdZ }),
   ]).optional(),
   sharedPostId: IdZ.optional(),
 });

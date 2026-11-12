@@ -9,7 +9,7 @@ import {
   type Story, type Invite,
 } from '@/shared';
 import type {
-  CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
+  BoardPlace, CommentView, CommunityBoardResponse, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
   ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
 } from '@/shared/api';
@@ -89,6 +89,7 @@ export class CoreStore {
     const groups = new Set(v.groupIdsOf(viewerId));
     const c = decodeCursor(cursor);
     const candidates = v.db.posts.filter((p) => {
+      if (p.targetType === 'crew' || p.targetType === 'community') return false; // Memories boards only
       const relevant = p.targetType === 'group'
         ? groups.has(p.targetId)
         : p.authorId === viewerId || friends.has(p.authorId);
@@ -122,8 +123,20 @@ export class CoreStore {
       const e = v.eventBySlug.get(body.target.slug);
       if (!e) throw notFound('event_not_found');
       targetType = 'event'; targetId = e.id;
+    } else if (body.target?.type === 'crew') {
+      const crew = v.db.crews.find((c) => c.id === (body.target as { crewId: ID }).crewId);
+      if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw notFound('crew_not_found');
+      targetType = 'crew'; targetId = crew.id;
+    } else if (body.target?.type === 'community') {
+      const q = v.questById.get(body.target.questId);
+      // Only someone who went can post about a hangout, and only once it has started.
+      if (!q || !v.questMemberIds(q.id).includes(viewerId)) throw forbidden('only people who went can share this hangout');
+      if (Date.parse(q.startsAt) > Date.now()) throw badRequest('this hangout has not happened yet');
+      targetType = 'community'; targetId = q.id;
     }
-    const listId = audienceListId(body.audience);
+    // The community board is public by definition; a crew board ignores audience (members only).
+    const audience: Post['audience'] = targetType === 'community' ? 'public' : body.audience;
+    const listId = audienceListId(audience);
     if (listId) {
       const list = v.db.friendLists.find((l) => l.id === listId);
       if (!list || list.ownerId !== viewerId) throw badRequest('unknown friend list');
@@ -134,7 +147,7 @@ export class CoreStore {
     }
     if (!body.text.trim() && !(body.media?.length) && !body.sharedPostId) throw badRequest('post is empty');
     const post: Post = {
-      id: uuid(), authorId: viewerId, targetType, targetId, audience: body.audience,
+      id: uuid(), authorId: viewerId, targetType, targetId, audience,
       text: body.text, media: body.media ?? [], sharedPostId: body.sharedPostId ?? null, createdAt: iso(),
     };
     await this.backend.insert('posts', [post]);
@@ -262,7 +275,8 @@ export class CoreStore {
   async profilePhotos(viewerId: ID, handle: string): Promise<string[]> {
     const v = await this.view();
     const p = this.resolvePerson(v, handle);
-    return v.db.posts.filter((x) => x.authorId === p.id && x.media.length > 0 && v.canSeePost(viewerId, x))
+    return v.db.posts.filter((x) => x.authorId === p.id && x.media.length > 0
+      && x.targetType !== 'crew' && x.targetType !== 'community' && v.canSeePost(viewerId, x))
       .sort(postOrder).flatMap((x) => x.media);
   }
 
@@ -441,6 +455,35 @@ export class CoreStore {
     const list = v.db.posts.filter((p) => p.targetType === 'group' && p.targetId === g.id && olderThan(p, c)).sort(postOrder);
     const page = list.slice(0, PAGE);
     return { posts: page.map((p) => v.postView(viewerId, p)), nextCursor: list.length > PAGE ? encodeCursor(page[page.length - 1]) : null };
+  }
+
+  // ---------- Memories boards ----------
+  /** A crew's private board (crew members only). */
+  async crewPosts(viewerId: ID, crewId: ID, cursor?: string | null): Promise<FeedResponse> {
+    const v = await this.view();
+    if (!v.crewMemberIds(crewId).includes(viewerId)) throw notFound('crew_not_found');
+    const c = decodeCursor(cursor);
+    const list = v.db.posts.filter((p) => p.targetType === 'crew' && p.targetId === crewId && olderThan(p, c)).sort(postOrder);
+    const page = list.slice(0, PAGE);
+    return { posts: page.map((p) => v.postView(viewerId, p)), nextCursor: list.length > PAGE ? encodeCursor(page[page.length - 1]) : null };
+  }
+
+  /** The public neighborhood board: shared hangout moments, each tagged with its hangout (no location). */
+  async communityPosts(viewerId: ID, cursor?: string | null): Promise<CommunityBoardResponse> {
+    const v = await this.view();
+    const c = decodeCursor(cursor);
+    const list = v.db.posts.filter((p) => p.targetType === 'community' && olderThan(p, c)).sort(postOrder);
+    const page = list.slice(0, PAGE);
+    const places: Record<ID, BoardPlace> = {};
+    for (const p of page) {
+      const q = v.questById.get(p.targetId);
+      if (q) places[q.id] = { questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt };
+    }
+    return {
+      posts: page.map((p) => v.postView(viewerId, p)),
+      nextCursor: list.length > PAGE ? encodeCursor(page[page.length - 1]) : null,
+      places,
+    };
   }
 
   async groupMembers(viewerId: ID, slug: string): Promise<{ members: PersonCard[]; friendCount: number }> {
