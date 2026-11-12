@@ -451,6 +451,20 @@ export function buildSeed(
     notifs.push({ recipient, type: 'friend_request', actor: requester, objectType: 'profile', objectId: pid(requester),
       text: `${nameOf(requester)} sent you a friend request.`, at: friendCreated.get(`${f.userA}|${f.userB}`)! });
   }
+  // Out Here notifications for Alex: friends' invites to plans (one a repeat of a past hangout) and a join
+  const OUT_HERE_NOTIFS = [
+    { type: 'quest_invite', actor: 'maya', quest: 'dumplings', minsAgo: 8, text: (n: string) => `${n} invited you to Dumplings before the rush at Dumpling Den.` },
+    { type: 'quest_join', actor: 'kai', quest: 'bouldering', minsAgo: 20, text: (n: string) => `${n} joined Bouldering intro, a plan near you.` },
+    { type: 'quest_invite', actor: 'zara', quest: 'board-games', minsAgo: 45, text: (n: string) => `${n} wants to do Board game night again and invited you.` },
+  ];
+  for (const n of OUT_HERE_NOTIFS) {
+    const questId = seedId('quest', n.quest);
+    if (!has('alex') || !has(n.actor) || !t.quests.some((q) => q.id === questId)) continue;
+    notifs.push({
+      recipient: 'alex', type: n.type, actor: n.actor, objectType: 'quest', objectId: questId,
+      text: n.text(nameOf(n.actor)), at: addMin(demoNow, -n.minsAgo),
+    });
+  }
   const dayAgo = addMin(refDate, -24 * 60);
   notifs.sort((a, b) => a.at.getTime() - b.at.getTime()).forEach((n, i) => t.notifications.push({
     id: seedId('notification', `${n.recipient}:${n.type}:${n.objectId}:${n.actor}:${i}`),

@@ -17,11 +17,8 @@ export const ROUTES = {
   search: '/search',
   menu: '/menu',
   saved: '/saved',
-  /**
-   * Memories (crew album, Wrapped) belongs to the memories area, which has no route yet.
-   * Until it does, the Memories link opens the Out Here tab on its memories view.
-   */
-  memories: '/out-here?view=memories',
+  /** Memories: crew albums and 'Get this group together again' (memories area). */
+  memories: '/memories',
 } as const;
 
 export type CenterTabId = 'home' | 'friends' | 'out-here' | 'groups' | 'marketplace';
