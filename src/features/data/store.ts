@@ -63,6 +63,7 @@ export interface DataStore {
   search: CoreStore['search'];
   // Out Here
   questsNear: CoreStore['questsNear'];
+  yourPlans: CoreStore['yourPlans'];
   quest: CoreStore['quest'];
   createQuest: CoreStore['createQuest'];
   joinQuest: CoreStore['joinQuest'];
@@ -78,6 +79,7 @@ export interface DataStore {
   crews: CoreStore['crews'];
   memories: CoreStore['memories'];
   addMemory: CoreStore['addMemory'];
+  memoryPhoto: CoreStore['memoryPhoto'];
   daily: CoreStore['daily'];
   dailyEntry: CoreStore['dailyEntry'];
   streak: CoreStore['streak'];

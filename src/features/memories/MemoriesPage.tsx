@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Images, Sparkles } from 'lucide-react';
 import type { Crew, Memory, PersonCard } from '@/shared';
-import { apiFetch, apiPost, ApiFetchError, currentPersona } from '@/features/data';
+import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
@@ -16,22 +16,31 @@ const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angele
 
 export function MemoriesPage() {
   const handle = usePersonaHandle();
+  return <MemoriesView key={handle ?? 'loading'} handle={handle} />;
+}
+
+function MemoriesView({ handle }: { handle: string | null }) {
+  const { viewer } = useViewer();
   const [crews, setCrews] = useState<CrewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  useChannel([`user:${viewer.id}`], (_channel, payload) => {
+    if (payload.type === 'memory' || payload.resync) setRefresh((value) => value + 1);
+  });
 
   useEffect(() => {
     if (!handle) return;
     let alive = true;
-    setCrews(null);
     setError(null);
     (async () => {
       try {
+        const options = { headers: { 'x-outhere-fresh': '1' } };
         const [{ crews: list }, { crews: metas, viewerId }] = await Promise.all([
-          apiFetch<{ crews: Crew[] }>('/api/crews'),
-          apiFetch<{ viewerId: string; crews: CrewMeta[] }>('/api/muse/regroup'),
+          apiFetch<{ crews: Crew[] }>('/api/crews', options),
+          apiFetch<{ viewerId: string; crews: CrewMeta[] }>('/api/muse/regroup', options),
         ]);
         const rows = await Promise.all(list.map(async (c) => {
-          const { memories } = await apiFetch<{ memories: Memory[] }>(`/api/memories?crewId=${encodeURIComponent(c.id)}`)
+          const { memories } = await apiFetch<{ memories: Memory[] }>(`/api/memories?crewId=${encodeURIComponent(c.id)}`, options)
             .catch(() => ({ memories: [] as Memory[] }));
           return { ...c, meta: metas.find((m) => m.crewId === c.id) ?? null, memories, viewerId };
         }));
@@ -41,7 +50,12 @@ export function MemoriesPage() {
       }
     })();
     return () => { alive = false; };
-  }, [handle]);
+  }, [handle, refresh]);
+
+  useEffect(() => {
+    const target = window.location.hash.slice(1);
+    if (crews && target.startsWith('crew-')) document.getElementById(target)?.scrollIntoView({ block: 'start' });
+  }, [crews]);
 
   return (
     <div className="mx-auto w-full max-w-[680px] px-0 pb-6 md:px-4 md:pt-4">
@@ -65,9 +79,9 @@ export function MemoriesPage() {
           />
         </Card>
       )}
-      {crews && crews.length > 0 && (
+      {handle && crews && crews.length > 0 && (
         <div className="flex flex-col gap-3">
-          {crews.map((c) => <CrewCard key={c.id} crew={c} />)}
+          {crews.map((c) => <CrewCard key={c.id} crew={c} handle={handle} />)}
         </div>
       )}
     </div>
@@ -76,7 +90,7 @@ export function MemoriesPage() {
 
 type SendState = { kind: 'idle' } | { kind: 'sending' } | { kind: 'sent'; text: string; href: string } | { kind: 'error'; text: string };
 
-function CrewCard({ crew }: { crew: CrewRow }) {
+function CrewCard({ crew, handle }: { crew: CrewRow; handle: string }) {
   const members = useMemo(() => crew.meta?.members ?? [], [crew.meta]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<(RegroupResult & { mock: boolean }) | null>(null);
@@ -134,7 +148,7 @@ function CrewCard({ crew }: { crew: CrewRow }) {
   }, [crew.meta?.threadId, crew.viewerId, members, result]);
 
   return (
-    <Card as="section" className="overflow-hidden" aria-label={crew.name} data-testid="crew-card">
+    <Card as="section" id={`crew-${crew.id}`} className="scroll-mt-16 overflow-hidden" aria-label={crew.name} data-testid="crew-card">
       <div className="flex items-start gap-3 p-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-[17px] font-semibold text-fb-text">{crew.name}</h2>
@@ -153,7 +167,8 @@ function CrewCard({ crew }: { crew: CrewRow }) {
           {crew.memories.map((m) => (
             <li key={m.id} className="relative aspect-square bg-fb-bg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.photoUrl} alt={m.caption || `${crew.name} photo`} className="h-full w-full object-cover" loading="lazy" />
+              <img src={m.photoUrl === `/api/memories/${m.id}/photo` ? `${m.photoUrl}?as=${encodeURIComponent(handle)}` : m.photoUrl}
+                alt={m.caption || `${crew.name} photo`} className="h-full w-full object-cover" loading="lazy" />
             </li>
           ))}
         </ul>

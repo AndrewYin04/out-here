@@ -227,10 +227,17 @@ export class SupabaseBackend implements Backend {
     return this.seatRpc('leave_quest', { p_quest: questId, p_user: userId }, questId);
   }
 
-  async uploadFile(bucket: 'uploads' | 'memories', path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  async uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string> {
     const { error } = await this.client.storage.from(bucket).upload(path, bytes, { contentType, upsert: false });
     if (error) throw new HttpError(502, `upload failed: ${error.message}`);
+    if (bucket === 'crew-photos') return path;
     return this.client.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+  }
+
+  async downloadCrewPhoto(id: ID): Promise<Blob> {
+    const { data, error } = await this.client.storage.from('crew-photos').download(id);
+    if (error || !data) throw notFound('photo_not_found');
+    return data;
   }
 }
 
