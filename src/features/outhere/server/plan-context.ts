@@ -12,7 +12,7 @@ import {
 /** A friend's status bubble the viewer may see. Text only: never coordinates. */
 export type PlanFriendStatus = { friendId: ID; firstName: string; line: string; bubble: StatusBubble; updatedAt: string };
 
-/** PlanContext plus the friends' status bubbles (the Muse rank prompt reads these once muse wires them in). */
+/** PlanContext plus the friends' status bubbles (also copied onto each PlanFriend.status for the rank prompt). */
 export type StorePlanContext = PlanContext & { friendStatuses: PlanFriendStatus[] };
 
 /** Quests farther than this from the viewer are not planning candidates. */
@@ -48,7 +48,7 @@ export async function buildStorePlanContext(
     .filter((p): p is NonNullable<typeof p> => !!p)
     .map((p) => {
       const profile = view.profileFor(viewer.id, p);
-      return { profile, sharedInterests: sharedInterests(viewer.interests, profile.interests) };
+      return { profile, sharedInterests: sharedInterests(viewer.interests, profile.interests), status: null as string | null };
     });
 
   const friendAvailability = db.availability
@@ -76,6 +76,10 @@ export async function buildStorePlanContext(
       updatedAt: s.updatedAt ?? at,
     });
   }
+
+  // The rank prompt and the offline reasons read each friend's bubble line from PlanFriend.status.
+  const statusOf = new Map(friendStatuses.map((f) => [f.friendId, f.line]));
+  for (const f of friends) f.status = statusOf.get(f.profile.id) ?? null;
 
   return {
     viewer,

@@ -2,7 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetch, apiPost, useChannel, useViewer, type InviteView } from '@/features/data';
+import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, IconButton } from '@/features/ui';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
@@ -87,8 +87,13 @@ function InviteCard({ inv, onRespond, onDismiss }: {
   inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined') => void; onDismiss: (id: string) => void;
 }) {
   const from = inv.from?.name.split(' ')[0] ?? 'A friend';
-  const q = inv.quest;
-  const seats = q ? Math.max(q.capacity - q.memberIds.length, 0) : null;
+  // Live seats: the quest channel updates this card when someone else takes a seat.
+  const live = useQuest(inv.quest?.id ?? null);
+  const q = live.data?.quest ?? inv.quest;
+  const seats = live.data ? live.data.seatsLeft : q ? Math.max(q.capacity - q.memberIds.length, 0) : null;
+  const inviterIn = !!(q && inv.fromId && q.memberIds.includes(inv.fromId));
+  // Join-with-a-friend is the default: when only one seat is left for the two of you, say so.
+  const alone = seats !== null && seats < 2 && !inviterIn && !inv.result;
   return (
     <section
       data-testid="invite-card"
@@ -112,12 +117,19 @@ function InviteCard({ inv, onRespond, onDismiss }: {
           <X size={16} aria-hidden />
         </IconButton>
       </div>
+      {alone && seats! > 0 && (
+        <p data-testid="invite-one-seat" className="mt-2 text-[13px] text-fb-text-2">
+          Only 1 seat is left, so there isn&apos;t room for you and {from}.
+        </p>
+      )}
       {inv.error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{inv.error}</p>}
       {inv.result ? (
         <p data-testid="invite-result" className="mt-2 text-[13px] font-semibold text-fb-text">{inv.result}</p>
       ) : (
         <div className="mt-3 flex gap-2">
-          <Button block disabled={inv.busy} onClick={() => onRespond(inv, 'accepted')}>Accept</Button>
+          <Button block disabled={inv.busy || seats === 0} onClick={() => onRespond(inv, 'accepted')}>
+            {seats === 0 ? 'Full' : alone ? `Join without ${from}` : 'Accept'}
+          </Button>
           <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Decline</Button>
         </div>
       )}

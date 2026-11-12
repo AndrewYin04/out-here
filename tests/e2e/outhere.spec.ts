@@ -35,6 +35,15 @@ test.describe("Out Here plan sheet", () => {
     if ((await cards.count()) === 0) await expect(page.getByTestId("plan-empty")).toContainText("No plan fits 15 minutes right now");
 
     await ask(page, PLACEHOLDER);
+    // the invite draft scrolls its Send button into view, also at 390 px
+    const inviteBtn = page.getByRole("button", { name: /^Invite [A-Z]/ }).first();
+    if (await inviteBtn.count()) {
+      await inviteBtn.click();
+      // only one draft is open, so the page-level Send button is that draft's
+      await expect(page.getByRole("button", { name: "Send invite" })).toBeInViewport();
+      await page.getByRole("button", { name: "Cancel" }).click();
+    }
+
     await page.getByRole("button", { name: "Why not others?" }).click();
     const why = page.getByTestId("why-not");
     await expect(why).toContainText(/\d+ min walk, too far/);
@@ -43,6 +52,63 @@ test.describe("Out Here plan sheet", () => {
     await page.getByRole("button", { name: "Close" }).click();
     await expect(page.getByTestId("plan-sheet")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "I'm free" })).toBeVisible();
+  });
+
+  test("a new ask replaces one still in flight", async ({ page }) => {
+    let calls = 0;
+    await page.route("**/api/muse/plan", async (route) => {
+      calls += 1;
+      if (calls === 1) await new Promise((r) => setTimeout(r, 2_000));
+      await route.continue().catch(() => undefined);
+    });
+    await openSheet(page, "alex");
+    const box = page.getByPlaceholder(PLACEHOLDER);
+    await box.fill("hungry, 15 min");
+    await box.press("Enter");
+    await expect(page.getByTestId("plan-loading")).toBeVisible();
+    await page.waitForTimeout(300);
+    await box.fill(PLACEHOLDER);
+    await box.press("Enter");
+    await expect(page.getByTestId("plan-loading")).toHaveCount(0, { timeout: 15_000 });
+    // the shown plan answers the second ask (40 min), not the first (15 min)
+    const summary = page.getByTestId("plan-summary");
+    await expect(summary).toBeVisible();
+    await page.waitForTimeout(2_200); // the first (aborted) answer must not replace it
+    await expect(summary).not.toContainText("15 min");
+    await expect(page.getByTestId("plan-empty")).toHaveCount(0);
+    await expect(box).toHaveValue(PLACEHOLDER);
+    expect(calls).toBe(2);
+  });
+
+  test("one seat left: Maya is told and can join without Alex", async ({ page, browser }) => {
+    // Its own quest (Jordan hosts, capacity 3), so it never touches Dumpling Den's seats.
+    const as = (h: string) => ({ "x-persona": h });
+    const t0 = Date.now();
+    const created = await page.request.post("/api/quests", {
+      headers: as("jordan"),
+      data: {
+        title: `One seat test ${t0}`, emoji: "🧋", category: "food", venueName: "Test Tea Bar",
+        location: { lat: 37.4852, lng: -122.1482 }, startsAt: new Date(t0 + 20 * 60_000).toISOString(),
+        endsAt: new Date(t0 + 80 * 60_000).toISOString(), capacity: 3, priceMax: 6, isPublic: true,
+      },
+    });
+    expect(created.ok()).toBe(true);
+    const questId = (await created.json()).quest.id as string;
+    const sent = await page.request.post("/api/invites", {
+      headers: as("alex"), data: { toId: "maya", questId, suggestionTitle: `One seat test ${t0}`, message: "boba?" },
+    });
+    expect(sent.ok()).toBe(true);
+    const joined = await page.request.post(`/api/quests/${questId}/join`, { headers: as("priya"), data: {} });
+    expect((await joined.json()).seatsLeft).toBe(1);
+
+    const mayaCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const maya = await mayaCtx.newPage();
+    await maya.goto("/out-here?as=maya");
+    const card = maya.getByTestId("invite-card").filter({ hasText: `One seat test ${t0}` });
+    await expect(card.getByTestId("invite-one-seat")).toContainText("Only 1 seat is left");
+    await card.getByRole("button", { name: "Join without Alex" }).click();
+    await expect(card.getByTestId("invite-result")).toContainText("You're in");
+    await mayaCtx.close();
   });
 
   test("plan route: viewer from x-persona, 403 on a different userId, meta and headers", async ({ request }) => {
@@ -76,7 +142,14 @@ test.describe("Out Here plan sheet", () => {
     await expect(top).toContainText(DUMPLINGS);
     await expect(top).toContainText("Maya");
     await expect(top.getByTestId("seats-left")).toHaveText("2 left");
-    await expect(page.getByTestId("muse-label").first()).toBeVisible();
+    // ✨ Muse only on live model text; offline (mock) text is labelled as such
+    const mode = (await page.request.post("/api/muse/plan", { data: { text: PLACEHOLDER }, headers: { "x-persona": "alex" } })).headers()["x-muse-mode"];
+    if (mode === "mock") {
+      await expect(page.getByTestId("offline-label")).toBeVisible();
+      await expect(page.getByTestId("muse-label")).toHaveCount(0);
+    } else {
+      await expect(page.getByTestId("muse-label").first()).toBeVisible();
+    }
 
     // maya is on Out Here in a second browser context
     const mayaCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -104,6 +177,8 @@ test.describe("Out Here plan sheet", () => {
     await expect(card.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
     await expect(top.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
     await expect(top.getByRole("button", { name: "You're going" })).toBeVisible({ timeout: 3_000 });
+    // the inviter's payoff: Maya said yes, and when to leave
+    await expect(top.getByTestId("invite-outcome")).toContainText("Maya's in. You're both going to Dumpling Den", { timeout: 3_000 });
 
     // the next plan for alex no longer offers it, from the live store
     const res = await page.request.post("/api/muse/plan", { data: { text: PLACEHOLDER }, headers: { "x-persona": "alex" } });
@@ -114,8 +189,10 @@ test.describe("Out Here plan sheet", () => {
     // alex's availability was shared with friends
     const avail = await maya.request.get(`/api/friends/maya/availability`, { headers: { "x-persona": "maya" } });
     if (avail.ok()) {
-      const items = (await avail.json()).items as { text: string }[];
-      expect(items.some((i) => i.text === PLACEHOLDER)).toBe(true);
+      const items = (await avail.json()).items as { text: string; friend: { handle: string } }[];
+      // one active signal per person, from the ask whose results were shown
+      const fromAlex = items.filter((i) => i.friend.handle === "alex");
+      expect(fromAlex.length).toBe(1);
     }
     await mayaCtx.close();
   });

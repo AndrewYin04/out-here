@@ -45,16 +45,25 @@ export function invitedFriends(c: PlanCandidate, intent: MuseIntent): PlanCandid
 const joinNames = (names: string[]) =>
   names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
+/**
+ * Why this plan, for this person. The card already shows time, walk, price and seats, so the
+ * reason never repeats them: it leads with the shared interest and the friend's own words.
+ */
 export function reasonText(c: PlanCandidate, friendIds: string[]): string {
-  const q = c.quest;
-  const first = `${q.title} at ${q.venueName} starts at ${formatDemoTime(q.startsAt)}, a ${c.travelMinutes} min walk, ${priceText(q.priceMax)}.`;
   const friends = c.friendOverlap.filter((f) => friendIds.includes(f.friendId));
   if (friends.length > 0) {
-    const shared = friends[0].sharedWithQuest[0];
-    return `${first} You and ${joinNames(friends.map((f) => f.firstName))} both like ${shared}.`;
+    const f = friends[0];
+    const shared = f.sharedWithQuest[0];
+    if (f.status) return `${f.firstName}'s status says "${f.status}", and you both like ${shared}.`;
+    const room = c.seatsLeft >= friends.length + 1 ? ' and there is room for both of you' : '';
+    return `You and ${joinNames(friends.map((x) => x.firstName))} both like ${shared}${room}.`;
   }
-  if (c.viewerInterests.length > 0) return `${first} It lines up with your interest in ${c.viewerInterests[0]}.`;
-  return `${first} ${plural(c.seatsLeft, 'seat')} left.`;
+  const asked = c.matchedActivities[0];
+  if (c.viewerInterests.length > 0) {
+    return `It lines up with your interest in ${c.viewerInterests[0]}${asked && asked !== c.viewerInterests[0] ? ` and the ${asked} you asked for` : ''}.`;
+  }
+  if (asked) return `It is the ${asked} plan that fits your time best.`;
+  return 'It is the open plan nearby that fits your time best.';
 }
 
 export function bridgeText(c: PlanCandidate, friendIds: string[]): string | null {

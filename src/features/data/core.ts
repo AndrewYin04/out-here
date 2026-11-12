@@ -666,6 +666,10 @@ export class CoreStore {
   // ---------- Out Here: availability ----------
   async createAvailability(viewerId: ID, body: { text: string; startsAt: string; endsAt: string; location: LatLng; audience?: Audience }): Promise<Availability> {
     if (new Date(body.endsAt) <= new Date(body.startsAt)) throw badRequest('endsAt must be after startsAt');
+    // One active signal per person: a new "I'm free" ends the viewer's earlier ones.
+    const nowIso = iso();
+    const prior = (await this.view()).db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
+    for (const a of prior) await this.backend.update('availability', { id: a.id }, { endsAt: nowIso });
     const row: AvailabilityRow = {
       id: uuid(), userId: viewerId, text: body.text, startsAt: body.startsAt, endsAt: body.endsAt,
       location: body.location, intent: null, createdAt: iso(), audience: body.audience ?? 'friends',

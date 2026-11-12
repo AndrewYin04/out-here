@@ -54,7 +54,8 @@ describe('live mode, card text', () => {
     const top = out.plan.suggestions[0];
     expect(top.title).toBe('Dumplings before the rush');
     expect(top.reason).not.toMatch(/\$3|2 min|9:00 PM/);
-    expect(top.reason).toMatch(/\$12/);
+    // the replacement reason says why (shared interest), never the card's price/walk/time
+    expect(top.reason).toMatch(/dumplings/i);
     expect(top.bridge ?? '').not.toMatch(/Free drinks/i);
     expect(top.inviteDraft).not.toMatch(/\$3|9 PM|2 min/);
     const fields = out.meta.issues.map((i) => i.field).filter(Boolean);

@@ -9,7 +9,7 @@ import { shownDrops } from './dropped';
 import { InviteInbox } from './InviteInbox';
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanOpen, usePlanOpen } from './plan-state';
-import { MuseLabel, SuggestionCard } from './SuggestionCard';
+import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
 const CHIPS = ['15 min', '40 min', 'tonight', 'cheap eats', 'meet people'] as const;
@@ -49,6 +49,7 @@ export function PlanSheet({ className }: { className?: string }) {
   const [whyOpen, setWhyOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const seq = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
   const friends = useApi<{ friends: PersonCard[] }>(open ? '/api/friends' : null);
   const friendMap = useMemo(() => new Map((friends.data?.friends ?? []).map((f) => [f.id, f])), [friends.data]);
 
@@ -56,27 +57,34 @@ export function PlanSheet({ className }: { className?: string }) {
     if (open) inputRef.current?.focus();
   }, [open]);
   useEffect(() => {
+    inFlight.current?.abort();
     setResult(null);
     setStatus('idle');
   }, [viewer.id]);
+  useEffect(() => () => inFlight.current?.abort(), []);
 
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
     const t = text.trim();
-    if (!t || status === 'loading') return;
+    if (!t) return;
+    // A new ask replaces one still in flight: abort it, and seq drops any late answer.
+    inFlight.current?.abort();
+    const ctrl = new AbortController();
+    inFlight.current = ctrl;
     const mine = ++seq.current;
     setStatus('loading');
     setError(null);
     setWhyOpen(false);
     setAsked(t);
     try {
-      const r = await requestPlan(t);
+      const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
       setResult(r);
       setStatus('done');
+      // Only the ask whose results are shown becomes the viewer's availability.
       void shareAvailability(t, r.plan);
     } catch (err) {
-      if (mine !== seq.current) return;
+      if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error');
     }
@@ -87,7 +95,9 @@ export function PlanSheet({ className }: { className?: string }) {
     inputRef.current?.focus();
   };
 
-  const showMuse = result?.museSource !== 'fallback';
+  // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
+  const showMuse = result?.museSource === 'muse';
+  const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
 
@@ -131,7 +141,7 @@ export function PlanSheet({ className }: { className?: string }) {
               <button
                 type="submit"
                 aria-label="Find a plan"
-                disabled={!text.trim() || status === 'loading'}
+                disabled={!text.trim()}
                 className="flex size-8 shrink-0 items-center justify-center rounded-full text-fb-blue hover:bg-fb-hover disabled:text-fb-text-2 disabled:opacity-50"
               >
                 <SendHorizontal size={20} aria-hidden />
@@ -174,6 +184,7 @@ export function PlanSheet({ className }: { className?: string }) {
                 {summary && (
                   <div data-testid="plan-summary" className="mb-3 px-1">
                     {showMuse && <MuseLabel className="mb-1" />}
+                    {offline && <OfflineLabel className="mb-1" />}
                     <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
                   </div>
                 )}

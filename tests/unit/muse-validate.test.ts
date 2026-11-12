@@ -69,7 +69,7 @@ describe('validate', () => {
     const out = validate([
       suggestion({ reason: 'Jordan from your coworkers is going.', bridge: 'Priya is free too.' }),
     ], result.candidates, ctx);
-    expect(out.suggestions[0].reason).toContain('Dumpling Den');
+    expect(out.suggestions[0].reason).toMatch(/dumplings/i); // the card shows venue, time and price; the reason says why
     expect(out.suggestions[0].reason).not.toContain('Jordan');
     expect(out.suggestions[0].bridge ?? '').not.toContain('Priya');
   });

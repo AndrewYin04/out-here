@@ -60,6 +60,36 @@ describe('store-backed plan context', () => {
       expect(JSON.stringify(s)).not.toMatch(/"lat"|"lng"/);
     }
   });
+
+  it("a friend's status bubble reaches the reason, and the reason never repeats card facts", async () => {
+    const withShares = {
+      museContext: async () => {
+        const r = await store.museContext();
+        const share = {
+          userId: maya, paused: false, audience: 'friends', expiresAt: new Date(NOW.getTime() + 3600_000).toISOString(),
+          updatedAt: NOW.toISOString(), bubble: { emoji: '🥟', thought: 'craving dumplings', doing: null, wantsTo: null },
+        };
+        return { ...r, db: { ...r.db, locationShares: [share] } as typeof r.db };
+      },
+    };
+    const ctx = await buildStorePlanContext({ userId: alex, location: null, now: NOW }, withShares);
+    expect(ctx.friends.find((f) => f.profile.id === maya)?.status).toBe('craving dumplings 🥟');
+    const out = await plan({ text: TEXT, userId: alex, now: NOW, context: ctx });
+    const top = out.plan.suggestions[0]!;
+    expect(top.reason).toContain('craving dumplings');
+    for (const s of out.plan.suggestions) expect(s.reason).not.toMatch(/\$\d|min walk|starts at/);
+  });
+});
+
+describe('availability', () => {
+  it('keeps one active signal per person: a new ask replaces the last one', async () => {
+    const at = (m: number) => new Date(NOW.getTime() + m * 60_000).toISOString();
+    const loc = { lat: 37.4847, lng: -122.1477 };
+    await store.createAvailability(alex, { text: 'hungry, 15 min', startsAt: at(0), endsAt: at(15), location: loc });
+    await store.createAvailability(alex, { text: TEXT, startsAt: at(0), endsAt: at(40), location: loc });
+    const fromAlex = (await store.friendAvailability(maya)).filter((a) => a.userId === alex);
+    expect(fromAlex.map((a) => a.text)).toEqual([TEXT]);
+  });
 });
 
 describe('bubbleLine', () => {

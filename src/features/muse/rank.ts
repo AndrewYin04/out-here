@@ -101,6 +101,7 @@ function promptCandidates(candidates: PlanCandidate[], maps: IdMaps, now: Date):
     friendsWhoCanCome: c.friendOverlap.map((f) => ({
       id: maps.shortByFriend.get(f.friendId)!, name: f.firstName,
       freeUntil: formatDemoTime(f.freeUntil), likes: f.sharedWithQuest,
+      ...(f.status ? { says: f.status } : {}),
     })),
     friendsAlreadyGoing: c.friendMembers.map((m) => m.firstName),
   }));

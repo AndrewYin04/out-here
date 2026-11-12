@@ -8,6 +8,8 @@ export type PlanFriend = {
   profile: Profile;
   /** viewer.interests ∩ friend.interests (case-insensitive), in the viewer's wording. */
   sharedInterests: string[];
+  /** The friend's status bubble as one line ("craving dumplings 🥟 · at work till 5:15"), when the viewer may see it. Text only, never coordinates. */
+  status?: string | null;
 };
 
 export type PlanContext = {

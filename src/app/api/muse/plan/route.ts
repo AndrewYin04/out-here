@@ -59,10 +59,12 @@ export const POST = route(async ({ req, viewer }) => {
       }];
     });
     // x-muse-source: "fallback" when code answered because a live model step failed, else "muse"
-    // (mock mode counts as muse here; x-muse-mode says mock). The UI hides the label on fallback.
+    // (mock mode counts as muse here; x-muse-mode says mock). The UI hides the ✨ Muse label on
+    // fallback and on mock, and shows mock text as "Offline".
     const museSource = out.meta.source === 'fallback' ? 'fallback' : 'muse';
     return NextResponse.json(
-      { ...out.plan, meta: { ...out.meta, contextSource, dropped } },
+      // origin: the viewer's own starting point, so the composer can share availability from there.
+      { ...out.plan, meta: { ...out.meta, contextSource, dropped, origin: context.location } },
       {
         headers: {
           'x-muse-total-ms': String(out.meta.timings.totalMs), 'x-muse-mode': out.meta.mode,

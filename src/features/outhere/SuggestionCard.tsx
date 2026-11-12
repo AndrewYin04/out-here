@@ -1,11 +1,12 @@
 'use client';
 
-import { Footprints, Clock, Users } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { apiPost, useQuest } from '@/features/data';
+import { CheckCircle2, Footprints, Clock, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, cn } from '@/features/ui';
-import { minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
+import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { errorText } from './plan-api';
+import { setPlanOpen } from './plan-state';
 
 export function MuseLabel({ className }: { className?: string }) {
   return (
@@ -14,6 +15,17 @@ export function MuseLabel({ className }: { className?: string }) {
     </span>
   );
 }
+
+/** Shown in place of the ✨ Muse label when the text came from the offline heuristic (MUSE_MOCK). */
+export function OfflineLabel({ className }: { className?: string }) {
+  return (
+    <span data-testid="offline-label" className={cn('inline-flex items-center rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[12px] font-semibold text-fb-text-2', className)}>
+      Offline suggestions
+    </span>
+  );
+}
+
+type Outcome = { status: 'accepted' | 'declined'; together: boolean };
 
 function startsText(iso: string): string {
   const m = minutesUntil(iso);
@@ -53,9 +65,14 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const isMember = quest.data?.viewerIsMember ?? false;
   const people = s.friendIds.map((id) => friends.get(id)).filter((p): p is PersonCard => !!p);
 
+  const { viewer } = useViewer();
   const [inviteFor, setInviteFor] = useState<PersonCard | null>(null);
   const [draft, setDraft] = useState('');
-  const [sentTo, setSentTo] = useState<Set<string>>(new Set());
+  /** friend id -> invite id */
+  const [sentTo, setSentTo] = useState<Map<string, string>>(new Map());
+  /** friend id -> what they answered */
+  const [outcomes, setOutcomes] = useState<Map<string, Outcome>>(new Map());
+  const draftRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<'invite' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -65,6 +82,34 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setDraft(s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`);
     setError(null);
   };
+  // The draft opens at the bottom of a scrolled sheet: bring its Send button into view.
+  useEffect(() => {
+    if (inviteFor) draftRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [inviteFor]);
+
+  // The inviter's payoff: when a friend answers, user:<me> fires {type:"invite"}; read the outcome.
+  const checkAnswers = useCallback(async () => {
+    if (sentTo.size === 0) return;
+    try {
+      const data = await apiFetch<{ outgoing: InviteView[] }>('/api/invites', { headers: { 'x-outhere-fresh': '1' } });
+      const next = new Map<string, Outcome>();
+      for (const [friendId, inviteId] of sentTo) {
+        const inv = data.outgoing.find((i) => i.id === inviteId);
+        if (!inv || inv.status === 'pending') continue;
+        const together = inv.status === 'accepted' && !!inv.quest?.memberIds.includes(viewer.id) && inv.quest.memberIds.includes(friendId);
+        next.set(friendId, { status: inv.status, together });
+      }
+      setOutcomes(next);
+    } catch {
+      // keep what is shown
+    }
+    void quest.refetch();
+    // quest.refetch is stable per quest id
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentTo, viewer.id]);
+  useChannel(sentTo.size > 0 ? [`user:${viewer.id}`] : [], (_c, payload) => {
+    if ((payload as { type?: string } | null)?.type === 'invite') void checkAnswers();
+  });
 
   const sendInvite = async () => {
     if (!inviteFor || inFlight.current) return;
@@ -72,8 +117,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setBusy('invite');
     setError(null);
     try {
-      await apiPost('/api/invites', { toId: inviteFor.id, questId: s.questId, suggestionTitle: s.title, message: draft.trim() });
-      setSentTo((prev) => new Set(prev).add(inviteFor.id));
+      const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: inviteFor.id, questId: s.questId, suggestionTitle: s.title, message: draft.trim() });
+      setSentTo((prev) => new Map(prev).set(inviteFor.id, out.invite.id));
       setInviteFor(null);
     } catch (e) {
       setError(errorText(e, "Couldn't send the invite. Try again."));
@@ -99,6 +144,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       setBusy(null);
     }
   };
+
+  const venue = quest.data?.quest.venueName ?? null;
+  const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
 
   return (
     <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card">
@@ -135,7 +183,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       )}
 
       {inviteFor && (
-        <div className="mt-3 rounded-card bg-fb-bg p-2">
+        <div ref={draftRef} className="mt-3 scroll-mb-2 rounded-card bg-fb-bg p-2">
           <label htmlFor={`draft-${s.questId}`} className="text-[13px] font-semibold text-fb-text-2">
             Message to {inviteFor.name.split(' ')[0]}
           </label>
@@ -159,9 +207,25 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
 
       {error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{error}</p>}
 
+      {answered.length > 0 && (
+        <div data-testid="invite-outcome" aria-live="polite" className="mt-3 rounded-card bg-fb-bg p-2">
+          {answered.map(({ p, o }) => (
+            <p key={p.id} className="flex items-start gap-2 text-[15px] leading-5 text-fb-text">
+              {o.together && <CheckCircle2 size={18} aria-hidden className="mt-0.5 shrink-0 text-fb-green" />}
+              <span>{outcomeText(p.name.split(' ')[0] ?? p.name, o, venue, s)}</span>
+            </p>
+          ))}
+          {answered.some(({ o }) => o.together) && (
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
+            </div>
+          )}
+        </div>
+      )}
+
       {!inviteFor && (
         <div className="mt-3 flex gap-2">
-          {people.slice(0, 2).map((p) => {
+          {people.slice(0, 2).filter((p) => !outcomes.has(p.id)).map((p) => {
             const sent = sentTo.has(p.id);
             return (
               <Button key={p.id} variant={sent ? 'secondary' : 'primary'} block disabled={sent} onClick={() => openInvite(p)}>
@@ -183,4 +247,14 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       )}
     </article>
   );
+}
+
+/** "Maya's in. You're both going to Dumpling Den, 4:43 PM · leave by 4:34 PM for the 9 min walk." */
+function outcomeText(name: string, o: Outcome, venue: string | null, s: PlanSuggestion): string {
+  if (o.status === 'declined') return `${name} can't make it this time.`;
+  if (!o.together) return `${name} accepted, but only one seat was left, so ${name} took it.`;
+  const leaveBy = new Date(Date.parse(s.startsAt) - s.travelMinutes * 60_000).toISOString();
+  const where = venue ?? s.title;
+  const leave = minutesUntil(leaveBy) > 0 ? ` · leave by ${formatDemoTime(leaveBy)} for the ${s.travelMinutes} min walk` : ` · ${s.travelMinutes} min walk`;
+  return `${name}'s in. You're both going to ${where}, ${formatDemoTime(s.startsAt)}${leave}.`;
 }
