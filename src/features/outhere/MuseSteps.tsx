@@ -45,10 +45,12 @@ export function MuseStepsLoading() {
 
 /** After the plan returns: the real steps, staggered in, with a Hide/Show toggle. */
 export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse: boolean }) {
-  const [open, setOpen] = useState(true);
+  // Collapsed by default: one tap-to-open row, so the suggestions stay the focus.
+  const [open, setOpen] = useState(false);
   const [shown, setShown] = useState(() => (prefersReducedMotion() ? steps.length : 0));
 
   useEffect(() => {
+    if (!open) return;
     if (prefersReducedMotion()) { setShown(steps.length); return; }
     setShown(0);
     let n = 0;
@@ -58,7 +60,7 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
       if (n >= steps.length) window.clearInterval(id);
     }, DONE_STAGGER_MS);
     return () => window.clearInterval(id);
-  }, [steps]);
+  }, [steps, open]);
 
   return (
     <div data-testid="muse-steps" className="mb-3 rounded-card bg-fb-surface px-3 py-2 shadow-card">
@@ -70,7 +72,7 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
       >
         <span className="flex items-center gap-2">
           {showMuse ? <MuseLabel /> : <span aria-hidden>✨</span>}
-          <span className="text-[13px] font-semibold text-fb-text">How Muse got here</span>
+          <span className="text-[13px] font-semibold text-fb-text">How Muse picked these</span>
         </span>
         <span className="flex items-center gap-0.5 text-[13px] text-fb-text-2">
           {open ? 'Hide' : 'Show'}

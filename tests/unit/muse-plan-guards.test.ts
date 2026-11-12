@@ -101,6 +101,20 @@ describe('E1: the pipeline has one deadline', () => {
   });
 });
 
+describe('model text never shows prompt field names', () => {
+  it('replaces a reason or bridge that says "priceMax 12" or "freeUntil"', async () => {
+    setMuseTransport(rankWith((c) => ({
+      summary: 'Dumplings with Maya fit.',
+      picks: [{ ...dumplingPick(c), reason: 'You both like dumplings. With priceMax 12 and walkMin 9 it fits.', bridge: "Maya's freeUntil is 4:50 PM" }],
+    })));
+    const out = await plan({ text: TEXT, userId: 'alex', now: NOW });
+    const s = out.plan.suggestions[0];
+    expect(s.reason).not.toMatch(/priceMax|walkMin/);
+    expect(s.bridge ?? '').not.toMatch(/freeUntil/);
+    expect(out.meta.issues.some((i) => i.issue === 'leaked a data field name')).toBe(true);
+  });
+});
+
 describe('E2: meta.source says who wrote the plan', () => {
   it('is "muse" when both model steps answer', async () => {
     setMuseTransport(rankWith((c) => ({ summary: 'Dumplings with Maya fit.', picks: [dumplingPick(c)] })));
