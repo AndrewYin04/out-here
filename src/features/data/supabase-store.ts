@@ -13,7 +13,9 @@ import { conflict, HttpError, notFound } from './errors';
 import { currentScope } from './request-scope';
 
 const PAGE = 1000;
-export const SNAPSHOT_TTL_MS = 800;
+export const SNAPSHOT_TTL_MS = 10_000;
+/** Ordinary reads may serve a snapshot up to this old while one background reload runs. */
+export const SNAPSHOT_STALE_MS = 60_000;
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 type DbError = { message: string; code?: string } | null;
@@ -80,9 +82,24 @@ export class SupabaseBackend implements Backend {
   /** The shared cache entry if no write happened since it started loading and it is recent. */
   private shared(startedAfter = -Infinity): Promise<Db> {
     const c = this.cache;
-    if (c && c.gen === this.gen && Date.now() - c.at < SNAPSHOT_TTL_MS && c.at >= startedAfter) return c.db;
+    if (c && c.gen === this.gen && c.at >= startedAfter) {
+      const age = Date.now() - c.at;
+      if (age < SNAPSHOT_TTL_MS) return c.db;
+      // Stale-while-revalidate for ordinary reads only (fresh requests pass startedAfter and
+      // never get here with an older load). A full snapshot load is 1-3 s, so plain page reads
+      // take the last snapshot and trigger one background reload. Writes bump `gen`, which skips
+      // this branch, and realtime-triggered refetches are fresh, so cross-tab updates stay exact.
+      if (startedAfter === -Infinity && age < SNAPSHOT_STALE_MS) {
+        if (!this.refreshing) {
+          this.refreshing = this.loadAndCache().catch(() => undefined).finally(() => { this.refreshing = null; });
+        }
+        return c.db;
+      }
+    }
     return this.loadAndCache();
   }
+
+  private refreshing: Promise<unknown> | null = null;
 
   /**
    * In a route: the request's working snapshot. It is loaded once and then kept current with the
