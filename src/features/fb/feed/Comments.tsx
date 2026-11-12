@@ -48,7 +48,10 @@ export function CommentsSection({ postId, preview, total, expanded, onExpand, on
 
   useEffect(() => { registerFocus(() => mainInput.current?.focus()); }, [registerFocus]);
 
-  const list = comments ?? preview;
+  // Collapsed: like Facebook's feed, at most the latest top-level comment and no replies.
+  // Comment, Reply or "View more comments" expands to the full thread and the comment box.
+  const all = comments ?? preview;
+  const list = expanded ? all : all.slice(-1).map((c) => ({ ...c, replies: [] }));
   const shown = countAll(list);
 
   const send = async (text: string, parentId: string | null) => {

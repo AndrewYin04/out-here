@@ -29,6 +29,33 @@ async function openHome(page: Page, as = 'alex') {
 
 const isPhone = (name: string) => name === 'phone';
 
+test('collapsed posts preview at most one comment and no replies', async ({ page }) => {
+  await openHome(page);
+  const cards = page.getByTestId('post-card');
+  const n = await cards.count();
+  let withMore: number | null = null;
+  for (let i = 0; i < n; i++) {
+    const card = cards.nth(i);
+    expect(await card.getByTestId('comment').count()).toBeLessThanOrEqual(1);
+    if (withMore === null && (await card.getByRole('button', { name: 'View more comments' }).count()) > 0) withMore = i;
+  }
+  expect(withMore).not.toBeNull();
+  const card = cards.nth(withMore!);
+  await card.getByRole('button', { name: 'View more comments' }).click();
+  await expect.poll(() => card.getByTestId('comment').count(), { timeout: 10_000 }).toBeGreaterThan(1);
+  await expect(card.getByPlaceholder('Comment as Alex Rivera')).toBeVisible();
+});
+
+test('Out Here card shows live friends and open seats, and opens the map', async ({ page }) => {
+  await openHome(page);
+  const card = page.getByTestId('home-outhere');
+  await expect(card.getByTestId('home-outhere-free')).toContainText(/plans? near you/, { timeout: 15_000 });
+  await expect(card.getByTestId('home-outhere-seats')).toHaveText(/^\d+ seats? left$/);
+  await expect(card.getByRole('link', { name: "I'm free" })).toHaveAttribute('href', '/out-here');
+  await card.getByTestId('home-outhere-plan').click();
+  await expect(page).toHaveURL(/\/out-here\?quest=/);
+});
+
 test('feed renders composer, stories and posts', async ({ page }, info) => {
   const errors = watchErrors(page);
   await openHome(page);
