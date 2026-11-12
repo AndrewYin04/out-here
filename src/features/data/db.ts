@@ -3,7 +3,7 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, Intro, IntroProfile,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -51,6 +51,8 @@ export type Db = {
   listings: Listing[];
   reels: Reel[];
   locationShares: LocationShare[];
+  introProfiles: IntroProfile[];
+  intros: Intro[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -65,6 +67,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares',
+  introProfiles: 'intro_profiles', intros: 'intros',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -77,7 +80,14 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
   notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'],
+  introProfiles: ['userId'], intros: ['id'],
 };
+
+/**
+ * Tables added by migration 0003. A Supabase project that has not run it yet loads them as
+ * empty instead of failing every request.
+ */
+export const OPTIONAL_TABLES: ReadonlySet<TableKey> = new Set<TableKey>(['introProfiles', 'intros']);
 
 export function emptyDb(): Db {
   return Object.fromEntries(TABLE_KEYS.map((k) => [k, []])) as unknown as Db;
@@ -89,7 +99,10 @@ const snake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 const TIME_KEYS = /(_at|^starts_at|^ends_at)$/;
 const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level']);
-const JSON_KEYS = new Set(['field_visibility', 'hours', 'intent', 'output']);
+const JSON_KEYS = new Set([
+  'field_visibility', 'hours', 'intent', 'output',
+  'kinds', 'dating_prefs', 'trust_path', 'reasons', 'first_step', 'agent_log_a', 'agent_log_b',
+]);
 
 /** Postgres row (snake_case) -> Db row (camelCase). */
 export function fromRow<T extends TableKey>(table: T, row: Record<string, unknown>): RowOf<T> {

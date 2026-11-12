@@ -6,7 +6,7 @@ import {
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite,
+  type Story, type Invite, type Intro, type IntroProfile,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
@@ -916,4 +916,10 @@ export class CoreStore {
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
+
+  // ---------- Muse Intros: storage primitives (rules and visibility live in features/intros) ----------
+  async saveIntroProfile(row: IntroProfile): Promise<void> { await this.backend.upsert('introProfiles', [row]); }
+  async insertIntro(row: Intro): Promise<void> { await this.backend.insert('intros', [row]); }
+  async updateIntro(id: ID, patch: Partial<Intro>): Promise<void> { await this.backend.update('intros', { id }, patch); }
+  async removeIntros(ids: ID[]): Promise<void> { if (ids.length) await this.backend.remove('intros', { id: ids }); }
 }

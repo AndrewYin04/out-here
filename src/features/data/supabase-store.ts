@@ -7,7 +7,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ID } from '@/shared';
 import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
 import { CoreStore } from './core';
-import { emptyDb, fromRow, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
+import { emptyDb, fromRow, OPTIONAL_TABLES, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
 import type { SupabaseEnv } from './env';
 import { conflict, HttpError, notFound } from './errors';
 import { currentScope } from './request-scope';
@@ -56,6 +56,8 @@ export class SupabaseBackend implements Backend {
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
     const first = await page(0, true);
+    // A table from a migration this project has not run yet (Postgres 42P01, PostgREST PGRST205).
+    if (first.error && OPTIONAL_TABLES.has(key) && (first.error.code === '42P01' || first.error.code === 'PGRST205')) return [];
     fail(table, first.error);
     const rows: Record<string, unknown>[] = [...((first.data ?? []) as Record<string, unknown>[])];
     const total = first.count ?? rows.length;

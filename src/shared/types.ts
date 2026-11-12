@@ -243,3 +243,46 @@ export type MuseRun = {
   promptTokens: number | null; completionTokens: number | null;
   ok: boolean; error: string | null; createdAt: string;
 };
+
+// ---- Muse Intros (Boardy-style warm intros, vetted by two "Click" agents) ----
+export const INTRO_KINDS = ['friendship', 'networking', 'dating'] as const;
+export type IntroKind = (typeof INTRO_KINDS)[number];
+export type IntroGender = 'man' | 'woman' | 'nonbinary';
+export type IntroKindSetting = { on: boolean; lookingFor: string };
+export type DatingPrefs = { ageMin: number; ageMax: number; genders: IntroGender[] };
+/** One person's Intro settings. Private to that person; agents read it server-side only. */
+export type IntroProfile = {
+  userId: ID;
+  kinds: Record<IntroKind, IntroKindSetting>;
+  datingPrefs: DatingPrefs | null;
+  maxKm: number;
+  paused: boolean;
+};
+/** Why the two people are not strangers: shared friends and/or shared Groups. */
+export type TrustPath = { mutualIds: ID[]; groupIds: ID[]; label: string };
+/** One turn of the agent-to-agent conversation, as stored for one side. */
+export type AgentTurn = { agent: 'a' | 'b'; text: string };
+export type FirstStep = { text: string; questId: ID | null; placeId: ID | null };
+export type IntroStatus = 'proposed' | 'a_accepted' | 'b_accepted' | 'accepted' | 'declined' | 'expired';
+export type IntroSource = 'auto' | 'request';
+/** Stored intro (server-only shape). agentLogA is shown only to A, agentLogB only to B. */
+export type Intro = {
+  id: ID; kind: IntroKind; source: IntroSource; aId: ID; bId: ID;
+  trustPath: TrustPath; score: number; reasons: string[]; summary: string;
+  noteA: string; noteB: string; firstStep: FirstStep;
+  agentLogA: AgentTurn[]; agentLogB: AgentTurn[];
+  status: IntroStatus; declinedBy: ID | null; threadId: ID | null;
+  createdAt: string; decidedAt: string | null;
+};
+/** What one side sees: the other person's card plus only their own agent's turns. */
+export type IntroCardView = {
+  id: ID; kind: IntroKind; score: number;
+  other: { id: ID; handle: string; firstName: string; avatarUrl: string };
+  trustPath: string[];
+  summary: string; reasons: string[]; note: string; firstStep: FirstStep;
+  myAgentLog: string[];
+  /** new: waiting on you; waiting: you accepted; connected: both accepted; closed: declined or expired. */
+  state: 'new' | 'waiting' | 'connected' | 'closed';
+  closedText: string | null;
+  threadId: ID | null; createdAt: string;
+};
