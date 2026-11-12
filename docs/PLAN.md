@@ -4,9 +4,10 @@ Master plan: MVP-BUILD-PLAN-itr-1.md (section 7). Times are PT. Freeze Fri Nov 1
 
 | # | Target (PT) | Work | State |
 |---|---|---|---|
-| S | Thu 03:30 | Phase S: hooks, agents, kit reconcile, scaffold, FB survey, dry run | 🔨 |
-| M1 | Thu 06:00 | Contracts, schema + migration (dev + demo), seed content (Muse), images (Muse), seed dev/demo | ⏳ |
-| M2 | Thu 10:00 | FB-P0 surfaces (builder fb) · Muse pipeline (builder muse) · Out Here map tab (builder map) | ⏳ |
+| S | Thu 03:30 | Phase S: hooks, agents, kit reconcile, scaffold, FB survey (unverified, no browser), preview pipeline | ✅ |
+| M1 | Thu 06:00 | Contracts, schema + migration (dev + demo), seed content (Muse), images (Muse), seed dev/demo | ✅ (images finishing) |
+| M2a | Thu 07:00 | Data layer (store, API, identity, realtime) · Muse pipeline · FB shell + UI kit | 🔨 |
+| M2b | Thu 10:00 | FB-P0 surfaces (feed, profile, friends, notifications, groups) · Out Here map tab | ⏳ |
 | M3 | Thu 13:00 | Integrate; invites, join_quest, live seats; demo.spec.ts; P0 checkpoint on preview with real Muse | ⏳ |
 | M4 | Thu 19:00 | Groups Hangouts, Messenger, Events, Search · memories loop · 3D walking view | ⏳ |
 | M5 | until freeze | Kit P2 (Daily Quest, streaks, Wrapped), FB-P2 (Marketplace, Reels), polish queue, judge-driven fixes | ⏳ |
