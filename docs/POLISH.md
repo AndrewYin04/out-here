@@ -72,3 +72,9 @@ Minor findings from the M2b review agents (e2e-verifier, ui-critic, product-crit
 - [product] Plan sheet, 1440x900 and 390x844: The ✨ Muse label appears three times in one sheet: on the summary and on each card. The repetition makes the screen busier and weakens the one signal that marks the AI. Fix: Put one '✨ Muse' label on the summary block. On cards, mark only the Muse-written reason sentence, for example with a small sparkle.
 - [product] Plan sheet replan after joining, 1440x900: After Alex joins the dumpling quest, the next plan silently drops it and says 'Best bet: Boba + sketching'. Alex is now committed to a plan starting in 23 min, so Muse should acknowledge that and not offer a clashing pla Fix: When the viewer has a joined quest inside the window, open the summary with 'You're going to Dumplings before the rush at 4:43 with Maya.' and offer only plans that fit after it.
 - [product] /out-here, 390x844 and 1440x900: On mobile the floating 'I'm free' pill sits on top of the map page's own bottom-sheet placeholder. On desktop the plan sheet covers the map's bottom-left card. The chip row is cut off at 'meet' with no sign that it scrol Fix: Coordinate with the map builder: one bottom sheet that hosts the composer, with the pill docked above it. On desktop, wrap the chips onto two lines or add an edge fade.
+
+## messenger (round 3 leftovers)
+- [ui] Conversation: show the avatar only on the last bubble of a same-sender run, 2 px gaps inside a run, flatten inner corners.
+- [ui] Composer: add the blue + / photo / sticker / GIF icons left of the field and an emoji button inside the pill; turn the like button into a send arrow while typing.
+- [ui] Chat list: green presence dots can lag ~1 s until Presence answers (fix in src/features/data/realtime-client.ts).
+- [e2e] tests/e2e/messenger.spec.ts shares server state; run with its own server or wait for stable rows before clicking.
