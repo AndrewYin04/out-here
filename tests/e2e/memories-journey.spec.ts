@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // seeded data (the Dumpling Den crew); the map is the 2D preview until the 3D map is wired in.
 test.describe("Memory journey", () => {
   test("alex explores a memory, opens a moment and asks Muse to do it again", async ({ page }) => {
-    await page.goto("/memories?as=alex");
+    await page.goto("/memories?as=alex&view=list");
     const card = page.getByTestId("crew-card").first();
     await expect(card).toBeVisible({ timeout: 15_000 });
     await card.getByTestId("explore-memory").click();
@@ -34,7 +34,27 @@ test.describe("Memory journey", () => {
     await expect(page.getByTestId("moment-sheet")).toBeVisible();
 
     await page.getByRole("link", { name: "Back to Memories" }).click();
+    await expect(page.getByTestId("memories-map-view")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("memories open on the map; a pin leads into its journey; the toggle switches to the list", async ({ page }) => {
+    await page.goto("/memories?as=alex");
+    await expect(page.getByTestId("memories-map-view")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("memories-view-map")).toHaveAttribute("aria-pressed", "true");
+    const pin = page.getByTestId("memory-pin").first();
+    await expect(pin).toBeVisible({ timeout: 15_000 });
+    await pin.click();
+    const preview = page.getByTestId("memory-pin-preview");
+    await expect(preview).toBeVisible();
+    const explore = preview.getByTestId("explore-memory");
+    if (await explore.count()) await explore.click();
+    else await preview.getByTestId("memory-preview-row").first().click();
+    await expect(page.getByTestId("memory-journey")).toBeVisible({ timeout: 15_000 });
+
+    await page.goto("/memories?as=alex");
+    await page.getByTestId("memories-view-list").click();
     await expect(page.getByTestId("crew-card").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page).toHaveURL(/view=list/);
   });
 
   test("an unknown crew shows a clear not-found state", async ({ page }) => {

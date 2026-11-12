@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // Memories: crews with albums, and "Get this group together again" (Muse regroup, mock in builders).
 test.describe("Memories", () => {
   test("alex sees a crew album and gets a regroup suggestion", async ({ page }) => {
-    await page.goto("/memories?as=alex");
+    await page.goto("/memories?as=alex&view=list");
     await expect(page.getByRole("heading", { name: "Memories", level: 1 })).toBeVisible();
     const card = page.getByTestId("crew-card").first();
     await expect(card).toBeVisible({ timeout: 15_000 });
@@ -31,7 +31,7 @@ test.describe("Memories", () => {
 
   test("Send to crew delivers invites", async ({ page }, info) => {
     test.skip(info.project.name !== "desktop", "sends once per server; desktop only");
-    await page.goto("/memories?as=alex");
+    await page.goto("/memories?as=alex&view=list");
     const card = page.getByTestId("crew-card").first();
     await card.getByRole("button", { name: "Get this group together again" }).click();
     await card.getByRole("button", { name: "Send to crew" }).click();

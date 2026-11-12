@@ -12,21 +12,10 @@ import { formatJourneyDay, photoLabel, stopLabel, toMapPoints } from './journey'
 import { JourneyMap } from './mapSlot';
 import { MemoryTimeline } from './MemoryTimeline';
 import { MomentSheet, type SheetMode } from './MomentSheet';
+import { useReducedMotion } from './useReducedMotion';
 import { useRegroup } from './useRegroup';
 
-const FRAME = 'relative flex h-[calc(100dvh-112px)] flex-col overflow-hidden bg-fb-surface md:h-[calc(100dvh-88px)] md:rounded-card md:shadow-card';
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-  return reduced;
-}
+export const FRAME = 'relative flex h-[calc(100dvh-112px)] flex-col overflow-hidden bg-fb-surface md:h-[calc(100dvh-88px)] md:rounded-card md:shadow-card';
 
 export function MemoryJourney({ crewId }: { crewId: string }) {
   const handle = usePersonaHandle();
