@@ -47,6 +47,16 @@
 
   --animate-shimmer: fb-shimmer 1.4s ease-in-out infinite;
   --animate-toast-in: fb-toast-in 160ms ease-out;
+
+  /* Out Here motion. Sheets and banners move with transform only (never fade over the map). */
+  --animate-sheet-up: oh-sheet-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-panel-in: oh-panel-in 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-drop-in: oh-drop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-rise: oh-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-pop-in: oh-pop-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-ping-once: oh-ping 900ms cubic-bezier(0, 0, 0.2, 1) 2;
+  --animate-step-in: oh-step-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-polaroid: oh-polaroid 700ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
 @keyframes fb-shimmer {
@@ -58,6 +68,62 @@
 @keyframes fb-toast-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes oh-sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes oh-panel-in {
+  from { transform: translateX(-24px) scale(0.97); }
+  to { transform: none; }
+}
+
+@keyframes oh-drop-in {
+  from { transform: translateY(-24px) scale(0.94); }
+  to { transform: none; }
+}
+
+/* Cards inside an opaque sheet: rise and fade in, staggered with animation-delay. */
+@keyframes oh-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes oh-pop-in {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes oh-ping {
+  0% { box-shadow: 0 0 0 0 rgb(36 131 44 / 0.55); }
+  100% { box-shadow: 0 0 0 10px rgb(36 131 44 / 0); }
+}
+
+/* A photo drops onto the table like a polaroid: tilted, overshoots, settles straight. */
+@keyframes oh-polaroid {
+  0% { transform: translateY(-36px) rotate(-7deg) scale(0.9); }
+  55% { transform: translateY(2px) rotate(2deg) scale(1.01); }
+  100% { transform: none; }
+}
+
+@keyframes oh-step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Press feedback, the way Facebook's own buttons shrink a little under your finger.
+   Down is quick; the release springs back past 1 and settles. */
+.oh-press {
+  transition-property: color, background-color, border-color, box-shadow, filter, transform;
+  transition-duration: 150ms, 150ms, 150ms, 150ms, 150ms, 260ms;
+  transition-timing-function: ease, ease, ease, ease, ease, cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.oh-press:active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: 150ms, 150ms, 150ms, 150ms, 150ms, 80ms;
 }
 
 html {

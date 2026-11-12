@@ -101,15 +101,15 @@ export function StatusRow({ note }: { note?: string }) {
           {QUICK.map((o) => (
             <button key={o.min} type="button" disabled={busy} aria-label={`Free now for ${o.label}`}
               onClick={() => void setFree(0, o.min, note)}
-              className="h-7 rounded-pill bg-fb-blue-tint px-2.5 text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50">
+              className="oh-press h-7 rounded-pill bg-fb-blue-tint px-2.5 text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50">
               {o.label}
             </button>
           ))}
         </div>
       ) : (
         <p className="flex flex-wrap items-center gap-2 text-[13px] text-fb-text-2">
-          <StatusDot s={status} />
-          <span><span className="font-semibold text-fb-text">You’re {freeStatusLabel(status).replace(/^Free/, 'free')}</span> · friends can see it</span>
+          <StatusDot key={status.kind} s={status} className={status.kind === 'free' ? 'animate-ping-once' : undefined} />
+          <span key={`t-${status.kind}`} className="animate-step-in"><span className="font-semibold text-fb-text">You’re {freeStatusLabel(status).replace(/^Free/, 'free')}</span> · friends can see it</span>
           <button type="button" disabled={busy} onClick={() => void setBusy()} className="font-semibold text-fb-blue hover:underline disabled:opacity-50">
             Set busy
           </button>
@@ -177,8 +177,8 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const live = shared.data?.plans ?? [];
   const pending = live.find((p) => p.status === 'proposing');
   const done = live.find((p) => p.status === 'confirmed');
-  if (pending) return <SharedBanner plan={pending} viewerId={viewer.id} className={className} />;
-  if (done && hidden !== done.id) return <SharedBanner plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
+  if (pending) return <SharedBanner key={`${pending.id}:${(pending.votes[viewer.id] ?? []).length > 0}`} plan={pending} viewerId={viewer.id} className={className} />;
+  if (done && hidden !== done.id) return <SharedBanner key={`${done.id}:confirmed`} plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
   if (items.length === 0 || hidden === groupKey) return null;
   const byId = new Map(items.map((i) => [i.friend.id, i]));
   const group = (api.data?.group ?? []).flatMap((id) => byId.get(id) ?? []);
@@ -198,7 +198,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
-    <div role="region" aria-label="Friends free when you are" data-testid="both-free" className={cn('rounded-card bg-fb-surface shadow-popover', className)}>
+    <div role="region" aria-label="Friends free when you are" data-testid="both-free" className={cn('animate-drop-in rounded-card bg-fb-surface shadow-popover', className)}>
       <div className="flex items-center gap-3 p-2.5 pr-2">
         <span className="flex shrink-0 -space-x-3">
           {lead.slice(0, 3).map((g) => (
@@ -213,7 +213,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
         </div>
         {!expanded && (
           <button type="button" onClick={() => plan(lead)} disabled={starting} data-testid="free-see-plans"
-            className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
+            className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
             {starting ? '✨ Asking…' : 'See plans'}
           </button>
         )}
@@ -294,7 +294,7 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
     : `✨ Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
   return (
     <div role="region" aria-label="Your shared plan" data-testid="shared-banner"
-      className={cn('flex items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>
+      className={cn('flex animate-drop-in items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>
       <span className="flex shrink-0 -space-x-3">
         {others.slice(0, 3).map((m) => (
           <span key={m.id} className="rounded-full ring-[3px] ring-fb-green">
@@ -307,7 +307,7 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
         <p className="truncate text-[12px] text-fb-text-2">{sub}</p>
       </div>
       <button type="button" onClick={() => openTogether(plan.id)}
-        className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+        className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
         {confirmed ? 'Open' : iVoted ? 'Open' : 'See plans'}
       </button>
       {onHide && (

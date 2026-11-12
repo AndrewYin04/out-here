@@ -9,6 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
 import { useEffect, useRef, useState } from 'react';
 import type { ID, LatLng, Quest } from '@/shared';
+import { bump, dropIn, squash } from '@/features/ui';
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
@@ -159,12 +160,11 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   paintFaces(p, faces);
 }
 
-function pulse(el: HTMLElement) {
-  el.dataset.pulse = String(Date.now());
-  el.animate?.(
-    [{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.45)' }, { transform: 'translateX(-50%) scale(1)' }],
-    { duration: 500, iterations: 3, easing: 'ease-in-out' },
-  );
+/** Someone took or freed a seat: the badge bumps and the pin squashes, on every screen. */
+function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
+  p.badge.dataset.pulse = String(Date.now());
+  bump(p.badge, 'translateX(-50%)');
+  squash(p.circle);
 }
 
 export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
@@ -301,6 +301,7 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     if (!map) return;
     const seen = new Set<string>();
     const pickSet = picks ? new Set(picks) : null;
+    let dropped = 0;
     for (const q of quests) {
       seen.add(q.id);
       const lngLat: [number, number] = [q.location.lng, q.location.lat];
@@ -312,10 +313,11 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
         const marker = new Marker({ element: parts.root, anchor: 'center' }).setLngLat(lngLat).addTo(map);
         ref = { ...parts, marker, seats: seatsLeftOf(q), facesKey: '' };
         pins.current.set(q.id, ref);
+        dropIn(parts.circle, Math.min(dropped++ * 35, 420));
       } else {
         ref.marker.setLngLat(lngLat);
         const seats = seatsLeftOf(q);
-        if (seats !== ref.seats) { ref.seats = seats; pulse(ref.badge); }
+        if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
       paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
     }

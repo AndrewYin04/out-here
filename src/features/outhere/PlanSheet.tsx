@@ -12,6 +12,7 @@ import { setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogeth
 import { StatusDot, StatusRow, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
+import { MuseThinking, PLAN_STEPS } from './MuseThinking';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
 const CHIPS = ['15 min', '40 min', 'tonight', 'cheap eats', 'meet people'] as const;
@@ -34,7 +35,7 @@ export function ImFreeButton({ className }: { className?: string }) {
       data-status={status.kind}
       data-testid="im-free"
       className={cn(
-        'inline-flex h-12 items-center gap-2 rounded-full bg-fb-blue px-5 text-[17px] font-semibold text-white shadow-popover transition-colors hover:bg-fb-blue-hover active:brightness-95',
+        'oh-press inline-flex h-12 animate-pop-in items-center gap-2 rounded-full bg-fb-blue px-5 text-[17px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover active:brightness-95',
         className,
       )}
     >
@@ -160,7 +161,7 @@ export function PlanSheet({ className }: { className?: string }) {
           aria-label="I'm free"
           data-testid="plan-sheet"
           className={cn(
-            'absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
+            'absolute inset-x-0 bottom-0 z-30 flex animate-sheet-up flex-col rounded-t-[16px] bg-fb-surface shadow-popover md:animate-panel-in',
             result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[78%]',
             'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
@@ -216,9 +217,9 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'loading' && (
               <div data-testid="plan-loading" aria-live="polite">
-                <p className="mb-3 px-1 text-[15px] font-semibold text-fb-text">✨ Muse is checking with your friends&apos; Muse…</p>
+                <MuseThinking steps={PLAN_STEPS} />
                 {[0, 1].map((i) => (
-                  <div key={i} className="mb-2 rounded-card bg-fb-surface p-3 shadow-card">
+                  <div key={i} className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card" style={{ animationDelay: `${i * 90}ms` }}>
                     <div className="flex gap-3">
                       <Skeleton shape="circle" width={40} height={40} />
                       <div className="flex-1"><Skeleton width="60%" className="h-4" /><Skeleton width="40%" className="mt-2 h-3" /></div>
@@ -235,7 +236,7 @@ export function PlanSheet({ className }: { className?: string }) {
             {status === 'done' && result && (
               <div aria-live="polite">
                 {summary && (
-                  <div data-testid="plan-summary" className="mb-3 px-1">
+                  <div data-testid="plan-summary" className="mb-3 animate-step-in px-1">
                     {showMuse && <MuseLabel className="mb-1" />}
                     {offline && <OfflineLabel className="mb-1" />}
                     <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
@@ -243,14 +244,16 @@ export function PlanSheet({ className }: { className?: string }) {
                 )}
                 <PrecheckLine plan={result.plan} friends={friendMap} />
                 {result.plan.suggestions.length === 0 ? (
-                  <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
+                  <div data-testid="plan-empty" className="animate-rise rounded-card bg-fb-surface p-4 text-center shadow-card">
                     <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
                     <p className="mt-1 text-[13px] text-fb-text-2">Try a longer window, or tap &quot;40 min&quot;.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {result.plan.suggestions.map((s, i) => (
-                      <SuggestionCard key={`${s.questId ?? s.title}-${i}`} s={s} friends={friendMap} showMuse={showMuse} />
+                      <div key={`${s.questId ?? s.title}-${i}`} className="animate-rise" style={{ animationDelay: `${80 + i * 90}ms` }}>
+                        <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} />
+                      </div>
                     ))}
                   </div>
                 )}

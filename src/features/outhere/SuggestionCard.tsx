@@ -3,7 +3,7 @@
 import { CheckCircle2, Footprints, Clock, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, cn } from '@/features/ui';
+import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
@@ -76,6 +76,12 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const [busy, setBusy] = useState<'invite' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  /** The button the viewer last tapped in this card: joins fly from it to the pin. */
+  const tapped = useRef<HTMLElement | null>(null);
+  const celebrate = (joined: boolean) => {
+    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl, s.emoji);
+    else burst(tapped.current, ['💌', '✨'], 6);
+  };
 
   const openInvite = (p: PersonCard) => {
     setInviteFor(p);
@@ -118,8 +124,10 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setBusy('invite');
     setError(null);
     try {
-      if (s.questId && !isMember) await apiPost(`/api/quests/${s.questId}/join`, {});
+      const joining = !!s.questId && !isMember;
+      if (joining) await apiPost(`/api/quests/${s.questId}/join`, {});
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: p.id, questId: s.questId, suggestionTitle: s.title, message: message.trim() });
+      celebrate(joining);
       setSentTo((prev) => new Map(prev).set(p.id, out.invite.id));
       setInviteFor(null);
       await quest.refetch();
@@ -140,6 +148,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setError(null);
     try {
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: inviteFor.id, questId: s.questId, suggestionTitle: s.title, message: draft.trim() });
+      celebrate(false);
       setSentTo((prev) => new Map(prev).set(inviteFor.id, out.invite.id));
       setInviteFor(null);
     } catch (e) {
@@ -157,6 +166,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setError(null);
     try {
       await apiPost(`/api/quests/${s.questId}/join`, {});
+      celebrate(true);
       await quest.refetch();
       onJoined?.();
     } catch (e) {
@@ -171,7 +181,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
 
   return (
-    <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card">
+    <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"
+      onClickCapture={(e) => { tapped.current = (e.target as HTMLElement).closest('button'); }}>
       <div className="flex items-start gap-3">
         <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px]">{s.emoji}</span>
         <div className="min-w-0 flex-1">
@@ -245,7 +256,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       {error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{error}</p>}
 
       {answered.length > 0 && (
-        <div data-testid="invite-outcome" aria-live="polite" className="mt-3 rounded-card bg-fb-bg p-2">
+        <div data-testid="invite-outcome" aria-live="polite" className="mt-3 animate-pop-in rounded-card bg-fb-bg p-2">
           {answered.map(({ p, o }) => (
             <p key={p.id} className="flex items-start gap-2 text-[15px] leading-5 text-fb-text">
               {o.together && <CheckCircle2 size={18} aria-hidden className="mt-0.5 shrink-0 text-fb-green" />}
