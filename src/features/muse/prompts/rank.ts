@@ -15,7 +15,7 @@ export type RankPromptCandidate = {
   seatsLeft: number;
   matches: string[];
   youLike: string[];
-  friendsWhoCanCome: { id: string; name: string; freeUntil: string; likes: string[] }[];
+  friendsWhoCanCome: { id: string; name: string; freeUntil: string; likes: string[]; says?: string }[];
   friendsAlreadyGoing: string[];
 };
 
@@ -40,7 +40,7 @@ export function rankPrompt(input: RankPromptInput): MuseMessage[] {
         'Rules:',
         '- picks: best first, 1 to 3 items, each "candidate" must be an id from the list. Use fewer picks when fewer candidates exist.',
         '- When the user wants friends and a friend can come to a candidate, prefer that candidate and put the friend id(s) in "friends". Only use friend ids listed under that same candidate.',
-        '- reason: 1-2 plain sentences that cite real facts from the data: start time, walk minutes, price, seats left, and an interest the user and friend both like. No hype words, no emojis.',
+        '- reason: 1-2 plain sentences on why this plan suits this user and this friend: an interest they both like, what the friend "says" in their status, or when the friend is free. The card already shows the start time, walk minutes, price and seats left, so never repeat those. No hype words, no emojis.',
         '- bridge: one short line about a listed friend for that candidate ("Maya\'s free till 4:50 PM and likes dumplings too"), or null. Never mention anyone not listed for that candidate.',
         '- inviteDraft: a short casual text from the user to the chosen friend(s) with the plan, time and place; null when "friends" is empty.',
         '- summary: one sentence for the whole set.',

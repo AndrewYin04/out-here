@@ -1,15 +1,9 @@
 "use client";
-// STUB owned by the Out Here loop builder (M2b). The map builder renders ImFreeButton and
-// PlanSheet over the map; the loop builder replaces this file keeping the same export names.
-
-export function ImFreeButton() {
-  return null;
-}
-
-export function PlanSheet() {
-  return null;
-}
-
-export function InviteInbox() {
-  return null;
-}
+// Out Here core loop UI: "I'm free" composer, Muse suggestions, invites. Client-safe barrel.
+// The map page renders <ImFreeButton/> and <PlanSheet/>; <InviteInbox/> can be mounted anywhere
+// (PlanSheet already renders one). Server code imports './server/plan-context' directly.
+export { ImFreeButton, PlanSheet, COMPOSER_PLACEHOLDER } from './PlanSheet';
+export { InviteInbox } from './InviteInbox';
+export { SuggestionCard, MuseLabel, SeatsBadge } from './SuggestionCard';
+export { setPlanOpen, usePlanOpen } from './plan-state';
+export { dropText, shownDrops, type DroppedView, type DropReasonCode } from './dropped';

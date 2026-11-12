@@ -28,6 +28,8 @@ export type FriendFree = {
   freeUntil: string;
   /** Interests the friend shares with the viewer. */
   sharedWithViewer: string[];
+  /** The friend's status bubble line, when shared with the viewer. */
+  status?: string | null;
 };
 
 export type FriendOverlap = FriendFree & {
@@ -157,7 +159,7 @@ export function friendsFreeInWindow(input: Pick<CandidateInput, 'intent' | 'frie
     if (!f || !overlaps(ms(a.startsAt), ms(a.endsAt), ws, we)) continue;
     out.push({
       friendId: f.profile.id, availabilityId: a.id, firstName: firstName(f.profile), availabilityText: a.text,
-      freeFrom: a.startsAt, freeUntil: a.endsAt, sharedWithViewer: f.sharedInterests,
+      freeFrom: a.startsAt, freeUntil: a.endsAt, sharedWithViewer: f.sharedInterests, status: f.status ?? null,
     });
   }
   return out;
