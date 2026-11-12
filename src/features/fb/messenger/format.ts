@@ -37,6 +37,14 @@ export function snippet(t: ThreadView, viewerId: string): string {
   return body;
 }
 
+/**
+ * Chats the list shows. A thread nobody has written in stays hidden (Messenger lists a chat
+ * only after its first message), except `keepId`, the chat open right now.
+ */
+export function listedThreads(threads: ThreadView[], keepId?: string | null): ThreadView[] {
+  return threads.filter((t) => t.lastMessage !== null || t.id === keepId);
+}
+
 export function lastActivity(t: ThreadView): string {
   return t.lastMessage?.createdAt ?? t.lastMessageAt ?? t.createdAt;
 }

@@ -1,15 +1,16 @@
 'use client';
 
-import { MessageCircle, Search } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { apiPost, currentPersona, useOnline, useViewer } from '@/features/data';
+import { apiPost, currentPersona, useViewer } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { Card, EmptyState, Skeleton, SkeletonGroup, cn } from '@/features/ui';
 import { ROUTES } from '@/features/fb/shell/nav';
 import { Conversation } from './Conversation';
-import { threadTitle } from './format';
+import { ChatFilterChips, ChatSearch, ChatsHeader, NewMessagePicker, useChatFilter } from './ChatListControls';
 import { ThreadRow } from './ThreadRow';
+import { usePresence } from './usePresence';
 import { notifyThreadsChanged, useThreads } from './useThreads';
 
 /**
@@ -21,9 +22,9 @@ export function MessengerPage() {
   const router = useRouter();
   const params = useSearchParams();
   const { viewer } = useViewer();
-  const online = useOnline();
+  const { online, ready: presenceReady } = usePresence(viewer.id);
   const { threads, loading, error } = useThreads();
-  const [query, setQuery] = useState('');
+  const [composing, setComposing] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const [opened, setOpened] = useState<ThreadView | null>(null);
   const to = params.get('to');
@@ -47,16 +48,11 @@ export function MessengerPage() {
   }, [to, router]);
 
   const activeId = to ? null : threadParam;
+  const { query, setQuery, filter, setFilter, shown } = useChatFilter(threads, viewer.id, activeId);
   const active = useMemo(
     () => threads?.find((t) => t.id === activeId) ?? (opened?.id === activeId ? opened : null),
     [threads, activeId, opened],
   );
-
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!threads) return null;
-    return q ? threads.filter((t) => threadTitle(t, viewer.id).toLowerCase().includes(q) || t.members.some((m) => m.id !== viewer.id && m.name.toLowerCase().includes(q))) : threads;
-  }, [threads, query, viewer.id]);
 
   const showConversation = !!activeId || !!to;
 
@@ -68,19 +64,14 @@ export function MessengerPage() {
         aria-labelledby="chats-title"
         data-testid="chat-list"
       >
+        {composing ? (
+          <NewMessagePicker onClose={() => setComposing(false)} />
+        ) : (
+        <>
         <div className="px-4 pb-2 pt-3">
-          <h1 id="chats-title" className="text-fb-title font-bold text-fb-text">Chats</h1>
-          <label className="mt-3 flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3">
-            <Search size={16} className="text-fb-text-2" aria-hidden />
-            <span className="sr-only">Search Messenger</span>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Messenger"
-              data-testid="chat-search"
-              className="min-w-0 flex-1 bg-transparent text-[15px] text-fb-text outline-none placeholder:text-fb-text-2"
-            />
-          </label>
+          <ChatsHeader threads={threads} titleId="chats-title" onCompose={() => setComposing(true)} />
+          <ChatSearch value={query} onChange={setQuery} />
+          <ChatFilterChips value={filter} onChange={setFilter} />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
           {loading || !shown ? (
@@ -102,8 +93,8 @@ export function MessengerPage() {
           ) : shown.length === 0 ? (
             <EmptyState
               icon={<MessageCircle size={40} />}
-              title={query ? 'No chats match' : 'No chats yet'}
-              body={query ? `Nothing for "${query}".` : 'Message a friend from Contacts or their profile.'}
+              title={query || filter !== 'all' ? 'No chats match' : 'No chats yet'}
+              body={query ? `Nothing for "${query}".` : filter === 'unread' ? "You're all caught up." : filter === 'groups' ? 'No group chats yet.' : 'Message a friend from Contacts or their profile.'}
             />
           ) : (
             <nav aria-label="Chats">
@@ -113,9 +104,12 @@ export function MessengerPage() {
             </nav>
           )}
         </div>
+        </>
+        )}
       </Card>
 
-      <div className={cn('min-h-0', showConversation ? 'block' : 'hidden md:block')}>
+      {/* On phones an open chat covers the shell's top and bottom bars, like Messenger. */}
+      <div className={cn('min-h-0', showConversation ? 'fixed inset-0 z-[55] bg-fb-surface md:static md:z-auto md:block' : 'hidden md:block')} data-testid="conversation-pane">
         {openError ? (
           <EmptyState className="h-full justify-center bg-fb-surface" title={openError} body="That person may not be in this demo." />
         ) : activeId ? (
@@ -125,6 +119,7 @@ export function MessengerPage() {
             thread={active}
             viewerId={viewer.id}
             online={online}
+            presenceReady={presenceReady}
             onBack={() => router.push(ROUTES.messages)}
           />
         ) : to ? (

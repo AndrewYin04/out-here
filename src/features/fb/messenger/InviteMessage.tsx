@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ApiFetchError, apiPost, useQuest, type InviteView } from '@/features/data';
-import type { Message } from '@/shared';
+import { ApiFetchError, apiPost, currentPersona, personaByHandle, useApi, useQuest, type InviteView } from '@/features/data';
+import { DEMO_CENTER, formatDemoTime, walkingMinutes, type Message } from '@/shared';
+import type { FriendAvailabilityResponse } from '@/shared/api';
 import { Button, cn } from '@/features/ui';
 import { ROUTES } from '@/features/fb/shell/nav';
 import { firstName } from './format';
@@ -25,6 +26,22 @@ export function InviteMessage({ message, invite, viewerId, mine, onAnswered }: {
   const status = invite?.status ?? 'pending';
   const canAnswer = !!invite && invite.toId === viewerId && status === 'pending' && !result;
   const from = invite?.from ? firstName(invite.from.name) : 'Your friend';
+
+  // "5:30 PM (in 25 min) · 9 min walk · $12": walking from the demo spot, like the Out Here map.
+  const nowMs = Date.now();
+  const startsIn = q ? Math.round((new Date(q.startsAt).getTime() - nowMs) / 60_000) : null;
+  const relative = startsIn === null ? ''
+    : startsIn > 0 && startsIn < 120 ? ` (in ${startsIn} min)`
+      : startsIn <= 0 && q && new Date(q.endsAt).getTime() > nowMs ? ' (now)' : '';
+  const details = q
+    ? [`${formatDemoTime(q.startsAt)}${relative}`, `${walkingMinutes(DEMO_CENTER, q.location)} min walk`, q.priceMax > 0 ? `$${q.priceMax}` : 'Free'].join(' · ')
+    : null;
+
+  // The sender's shared "I'm free" window, so the card says why it fits both of you. Only
+  // fetched once this tab's persona is the viewer (it changes on load when ?as= is set).
+  const ownPersona = personaByHandle(currentPersona())?.id === viewerId;
+  const avail = useApi<FriendAvailabilityResponse>(!mine && invite && ownPersona ? `/api/friends/${viewerId}/availability` : null);
+  const senderFree = avail.data?.items.find((a) => a.userId === invite?.fromId && new Date(a.endsAt).getTime() > nowMs) ?? null;
 
   const respond = async (s: 'accepted' | 'declined') => {
     if (!invite || busy) return;
@@ -56,6 +73,10 @@ export function InviteMessage({ message, invite, viewerId, mine, onAnswered }: {
           {q?.emoji ? `${q.emoji} ` : ''}{invite?.suggestionTitle ?? message.text}
         </p>
         {q && <p className="mt-0.5 text-[13px] text-fb-text-2">{q.venueName}</p>}
+        {details && <p className="mt-0.5 text-[13px] text-fb-text" data-testid="invite-details">{details}</p>}
+        {senderFree && (
+          <p className="mt-0.5 text-[13px] text-fb-text-2" data-testid="invite-fit">{from}&apos;s free till {formatDemoTime(senderFree.endsAt)}</p>
+        )}
         {seats !== null && (
           <p className={cn('mt-0.5 text-[13px] font-semibold', seats === 0 ? 'text-fb-text-2' : 'text-fb-green')} data-testid="invite-seats">
             {seats === 0 ? 'Full' : `${seats} ${seats === 1 ? 'seat' : 'seats'} left`}

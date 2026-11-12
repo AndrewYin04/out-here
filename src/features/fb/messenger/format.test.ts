@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Message } from '@/shared';
 import type { PersonCard, ThreadView } from '@/shared/api';
-import { groupMessages, mergeMessages, shortAgo, snippet, sortThreads, threadTitle } from './format';
+import { groupMessages, listedThreads, mergeMessages, shortAgo, snippet, sortThreads, threadTitle } from './format';
 
 const person = (id: string, name: string): PersonCard => ({ id, handle: id, name, avatarUrl: '', mutualFriendCount: 0, isFriend: true });
 const msg = (id: string, fromId: string, at: string, kind: Message['kind'] = 'text'): Message => ({
@@ -24,6 +24,13 @@ describe('messenger format', () => {
     expect(snippet(thread({ lastMessage: msg('1', 'a', '2026-11-12T10:00:00Z') }), 'a')).toBe('You: m1');
     expect(snippet(thread({ lastMessage: msg('1', 'm', '2026-11-12T10:00:00Z') }), 'a')).toBe('m1');
     expect(snippet(thread({ isGroup: true, lastMessage: msg('1', 'm', '2026-11-12T10:00:00Z') }), 'a')).toBe('Maya: m1');
+  });
+
+  it('hides chats with no messages unless they are the open one', () => {
+    const empty = thread({ id: 'empty' });
+    const real = thread({ id: 'real', lastMessage: msg('1', 'm', '2026-11-12T10:00:00Z') });
+    expect(listedThreads([empty, real]).map((t) => t.id)).toEqual(['real']);
+    expect(listedThreads([empty, real], 'empty').map((t) => t.id)).toEqual(['empty', 'real']);
   });
 
   it('sorts newest first and formats short times', () => {
