@@ -640,6 +640,13 @@ cut from the bottom of the current milestone, never from Out Here P0.
   the build.
 - All tests run against `out-here-dev`. `out-here-demo` changes only through
   `npm run seed:demo`.
+- **Deploys are from the CLI.** The Vercel project `out-here` is linked locally
+  (`.vercel/`) but **not** connected to GitHub, because the Vercel login's GitHub identity
+  cannot see AndrewYin04's repos. So pushes do not deploy.
+  - After each milestone push, run `vercel deploy --yes` (a preview, never `--prod`).
+  - Record the preview URL in `docs/PROGRESS.md` and on the board.
+  - Run the milestone's E2E against that URL.
+  - At handoff, the humans promote the final preview.
 - No `window.alert`, `confirm`, or `prompt` anywhere in the app. They hang Claude in
   Chrome.
 - If Chrome disconnects, post `blocked` once ("run /chrome → Reconnect") and continue
