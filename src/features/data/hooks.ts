@@ -3,10 +3,11 @@
 // channels, publishable key) when the server reports Supabase mode, else the SSE route
 // /api/realtime. Either way a message only says "something changed"; hooks refetch via the API.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Crew, Quest } from '@/shared';
 import type { FriendAvailabilityResponse, NotificationView, PostView } from '@/shared/api';
 import { apiFetch, currentPersona, initPersonaFromUrl, PERSONA_EVENT, setPersona as setPersonaRaw } from './client';
+import { FRESH_HEADER } from './fresh';
+import { subscribeChannels, subscribePresence, type ChannelHandler } from './realtime-client';
 import { PERSONAS, personaByHandle, type Persona } from './personas';
 
 // ---------- identity ----------
@@ -23,97 +24,27 @@ export function useViewer(): { viewer: Persona; handle: string; setPersona: (han
 }
 
 // ---------- realtime ----------
-export type RealtimeConfig = { mode: 'supabase'; url: string; key: string } | { mode: 'sse' };
-let configPromise: Promise<RealtimeConfig> | null = null;
-export function realtimeConfig(): Promise<RealtimeConfig> {
-  configPromise ??= fetch('/api/realtime/config').then((r) => r.json() as Promise<RealtimeConfig>).catch(() => ({ mode: 'sse' as const }));
-  return configPromise;
-}
+// Every hook below shares this tab's one connection (realtime-client.ts).
+export { realtimeConfig, type RealtimeConfig, type ChannelHandler } from './realtime-client';
 
-let supa: Promise<SupabaseClient> | null = null;
-function supabaseClient(url: string, key: string): Promise<SupabaseClient> {
-  supa ??= import('@supabase/supabase-js').then(({ createClient }) =>
-    createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }));
-  return supa;
-}
-
-export type ChannelHandler = (channel: string, payload: Record<string, unknown>) => void;
-
-/** Subscribes to realtime channels ("quest:<id>", "user:<id>", ...) while mounted. */
+/**
+ * Subscribes to realtime channels ("quest:<id>", "user:<id>", ...) while mounted. After a
+ * reconnect the handler is called once per channel with { resync: true }.
+ */
 export function useChannel(channels: readonly string[], handler: ChannelHandler): void {
   const ref = useRef(handler);
   useEffect(() => { ref.current = handler; });
   const key = [...new Set(channels.filter(Boolean))].sort().join(',');
   useEffect(() => {
     if (!key) return;
-    const names = key.split(',');
-    let closed = false;
-    let cleanup: () => void = () => {};
-    void realtimeConfig().then(async (cfg) => {
-      if (closed) return;
-      if (cfg.mode === 'supabase') {
-        const client = await supabaseClient(cfg.url, cfg.key);
-        if (closed) return;
-        const subs = names.map((name) => client.channel(name)
-          .on('broadcast', { event: 'update' }, (msg) => ref.current(name, (msg.payload ?? {}) as Record<string, unknown>))
-          .subscribe());
-        cleanup = () => { for (const s of subs) void client.removeChannel(s); };
-      } else {
-        const es = new EventSource(`/api/realtime?channels=${encodeURIComponent(key)}&as=${encodeURIComponent(currentPersona())}`);
-        es.onmessage = (e) => {
-          try {
-            const m = JSON.parse(e.data) as { channel: string; payload: Record<string, unknown> };
-            ref.current(m.channel, m.payload);
-          } catch { /* ignore malformed frames */ }
-        };
-        cleanup = () => es.close();
-      }
-    });
-    return () => { closed = true; cleanup(); };
+    return subscribeChannels(key.split(','), (c, p) => ref.current(c, p));
   }, [key]);
 }
 
 /** Ids of people online now. Supabase mode uses Presence; MemoryStore mode a heartbeat route. */
 export function useOnline(): Set<string> {
-  const { handle, viewer } = useViewer();
   const [ids, setIds] = useState<string[]>([]);
-  useEffect(() => {
-    let stop = false;
-    let cleanup: () => void = () => {};
-    void realtimeConfig().then(async (cfg) => {
-      if (stop) return;
-      if (cfg.mode === 'supabase') {
-        const client = await supabaseClient(cfg.url, cfg.key);
-        if (stop) return;
-        const ch = client.channel('presence:online', { config: { presence: { key: viewer.id } } });
-        ch.on('presence', { event: 'sync' }, () => {
-          const state = ch.presenceState<{ userId: string }>();
-          setIds([...new Set(Object.values(state).flat().map((p) => p.userId))]);
-        }).subscribe((status) => {
-          if (status === 'SUBSCRIBED') void ch.track({ userId: viewer.id });
-        });
-        cleanup = () => { void client.removeChannel(ch); };
-      } else {
-        const beat = () => apiFetch<{ userIds: string[] }>('/api/realtime/presence', { method: 'POST' })
-          .then((r) => { if (!stop) setIds(r.userIds); }).catch(() => {});
-        void beat();
-        const t = setInterval(beat, 15_000);
-        const es = new EventSource(`/api/realtime?channels=presence:online&as=${encodeURIComponent(handle)}`);
-        es.onmessage = (e) => {
-          try {
-            const m = JSON.parse(e.data) as { channel: string; payload: { userIds?: string[] } };
-            if (m.channel === 'presence:online' && Array.isArray(m.payload.userIds)) setIds(m.payload.userIds);
-          } catch { /* ignore */ }
-        };
-        cleanup = () => {
-          clearInterval(t);
-          es.close();
-          void apiFetch('/api/realtime/presence', { method: 'DELETE' }).catch(() => {});
-        };
-      }
-    });
-    return () => { stop = true; cleanup(); };
-  }, [handle, viewer.id]);
+  useEffect(() => subscribePresence(setIds), []);
   return useMemo(() => new Set(ids), [ids]);
 }
 
@@ -130,12 +61,13 @@ export function useApi<T>(path: string | null, channels: readonly string[] = [],
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(path !== null);
   const seq = useRef(0);
-  const refetch = useCallback(async () => {
+  /** fresh: read past the server's snapshot cache (used when a realtime message triggered it). */
+  const load = useCallback(async (fresh: boolean) => {
     if (!path) return;
     const n = ++seq.current;
     setLoading(true);
     try {
-      const d = await apiFetch<T>(path);
+      const d = await apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {});
       if (n === seq.current) { setData(d); setError(null); }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : String(e));
@@ -143,9 +75,10 @@ export function useApi<T>(path: string | null, channels: readonly string[] = [],
       if (n === seq.current) setLoading(false);
     }
   }, [path]);
-  useEffect(() => { void refetch(); }, [refetch, handle]);
+  const refetch = useCallback(() => load(true), [load]);
+  useEffect(() => { void load(false); }, [load, handle]);
   const derived = data && channelsOf ? channelsOf(data) : [];
-  useChannel([...channels, ...derived], () => { void refetch(); });
+  useChannel([...channels, ...derived], () => { void load(true); });
   return { data, error, loading, refetch };
 }
 

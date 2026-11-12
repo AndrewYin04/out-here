@@ -4,9 +4,9 @@
 import contentJson from '../../../supabase/seed-content.json';
 import placesJson from '../../../supabase/seed-places.json';
 import { floorToHour, floorToMinute, now, type ID } from '@/shared';
-import { rowMatches, type Backend, type Match } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
 import { CoreStore } from './core';
-import { emptyDb, fromRow, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
+import { emptyDb, fromRow, TABLE_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
 import { conflict, notFound } from './errors';
 import { buildSeed, PlacesZ, SeedContentZ } from './seed-build';
 
@@ -39,36 +39,20 @@ export class MemoryBackend implements Backend {
   /** Shallow copy: writes replace table arrays, so an earlier snapshot never changes under a reader. */
   async snapshot(): Promise<Db> { return { ...this.db }; }
 
-  private key<T extends TableKey>(table: T, row: RowOf<T>): string {
-    return PRIMARY_KEYS[table].map((k) => String((row as Record<string, unknown>)[k])).join('|');
-  }
-
   async insert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void> {
-    const list = this.db[table] as RowOf<T>[];
-    const existing = new Set(list.map((r) => this.key(table, r)));
-    for (const r of rows) {
-      const k = this.key(table, r);
-      if (existing.has(k)) throw conflict(`duplicate key in ${TABLE_NAMES[table]}`);
-      existing.add(k);
-    }
-    // replace the array so View snapshots taken earlier stay unchanged
-    (this.db[table] as RowOf<T>[]) = [...list, ...rows.map((r) => ({ ...r }))];
+    applyInsert(this.db, table, rows);
   }
 
   async upsert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void> {
-    const keys = new Map(rows.map((r) => [this.key(table, r), r]));
-    const kept = (this.db[table] as RowOf<T>[]).filter((r) => !keys.has(this.key(table, r)));
-    (this.db[table] as RowOf<T>[]) = [...kept, ...rows.map((r) => ({ ...r }))];
+    applyUpsert(this.db, table, rows);
   }
 
   async update<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<void> {
-    (this.db[table] as RowOf<T>[]) = (this.db[table] as RowOf<T>[]).map((r) =>
-      rowMatches(r as Record<string, unknown>, match as Record<string, unknown>) ? { ...r, ...patch } : r);
+    applyUpdate(this.db, table, match, patch);
   }
 
   async remove<T extends TableKey>(table: T, match: Match<T>): Promise<void> {
-    (this.db[table] as RowOf<T>[]) = (this.db[table] as RowOf<T>[]).filter((r) =>
-      !rowMatches(r as Record<string, unknown>, match as Record<string, unknown>));
+    applyRemove(this.db, table, match);
   }
 
   // Same rules as public.join_quest. JS runs this synchronously, so it is atomic in-process.

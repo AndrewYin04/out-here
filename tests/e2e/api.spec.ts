@@ -146,3 +146,12 @@ test('notifications, threads, groups, events and search respond for a persona', 
   const hangouts = await (await request.get('/api/groups/cheap-eats-south-bay/hangouts', { headers: alex })).json();
   expect(hangouts.quests.map((q: { id: string }) => q.id)).toContain(dumplings);
 });
+
+test('every route reports Server-Timing (total, table loads, queries, broadcasts)', async ({ request }) => {
+  const get = await request.get('/api/quests?lat=37.4847&lng=-122.1477', { headers: { ...alex, 'x-outhere-fresh': '1' } });
+  expect(get.status()).toBe(200);
+  expect(get.headers()['server-timing']).toMatch(/^total;dur=[\d.]+, loads;desc="\d+", queries;desc="\d+", broadcasts;desc="\d+"$/);
+  const bad = await request.post(`/api/quests/${dumplings}/join`, { headers: { 'x-persona': 'nobody-here' }, data: {} });
+  expect(bad.status()).toBe(400);
+  expect(bad.headers()['server-timing']).toContain('total;dur=');
+});

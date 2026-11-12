@@ -1,18 +1,24 @@
 // SupabaseStore: the same store logic over Supabase (server-only, service-role key).
-// Reads load the tables with supabase-js (paged, in parallel) into a short-lived snapshot;
-// writes are row inserts/updates/deletes; seats only move through the join_quest/leave_quest RPCs.
+// Reads load the tables with supabase-js (paged, in parallel). A route reads them once per request
+// (its working snapshot, see request-scope.ts) and applies its own writes to that copy, so a
+// mutation does one full read however many rows it writes. GETs that are not marked fresh may
+// share an 800 ms cache. Seats only move through the join_quest/leave_quest RPCs.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ID } from '@/shared';
-import type { Backend, Match } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
 import { CoreStore } from './core';
 import { emptyDb, fromRow, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
 import type { SupabaseEnv } from './env';
 import { conflict, HttpError, notFound } from './errors';
+import { currentScope } from './request-scope';
 
 const PAGE = 1000;
-const SNAPSHOT_TTL_MS = 800;
+export const SNAPSHOT_TTL_MS = 800;
+const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
-function fail(table: string, error: { message: string; code?: string } | null): void {
+type DbError = { message: string; code?: string } | null;
+
+function fail(table: string, error: DbError): void {
   if (!error) return;
   if (error.code === '23505') throw conflict(`duplicate key in ${table}`);
   throw new HttpError(502, `database error on ${table}: ${error.message}`);
@@ -21,21 +27,29 @@ function fail(table: string, error: { message: string; code?: string } | null): 
 export class SupabaseBackend implements Backend {
   readonly kind = 'supabase' as const;
   private client: SupabaseClient;
-  private cache: { at: number; db: Promise<Db> } | null = null;
+  /**
+   * Write generation. It is bumped when a write starts and again when the write resolves, so a
+   * load that ran at any moment during a write carries an older generation and is never served
+   * from the shared cache afterwards.
+   */
+  private gen = 0;
+  private cache: { gen: number; at: number; db: Promise<Db> } | null = null;
 
-  constructor(env: SupabaseEnv) {
-    this.client = createClient(env.url, env.serviceKey, {
+  constructor(env: SupabaseEnv | { client: SupabaseClient }) {
+    this.client = 'client' in env ? env.client : createClient(env.url, env.serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   }
 
   private async loadTable<T extends TableKey>(key: T): Promise<RowOf<T>[]> {
     const table = TABLE_NAMES[key];
-    const order = PRIMARY_KEYS[key].map((k) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`));
+    const order = PRIMARY_KEYS[key].map(snake);
     const rows: Record<string, unknown>[] = [];
+    const scope = currentScope();
     for (let from = 0; ; from += PAGE) {
       let q = this.client.from(table).select('*');
       for (const col of order) q = q.order(col, { ascending: true });
+      if (scope) scope.queries++;
       const { data, error } = await q.range(from, from + PAGE - 1);
       fail(table, error);
       rows.push(...((data ?? []) as Record<string, unknown>[]));
@@ -44,20 +58,58 @@ export class SupabaseBackend implements Backend {
     return rows.map((r) => fromRow(key, r));
   }
 
-  async snapshot(): Promise<Db> {
-    if (this.cache && Date.now() - this.cache.at < SNAPSHOT_TTL_MS) return this.cache.db;
-    const db = (async () => {
+  private load(): Promise<Db> {
+    const scope = currentScope();
+    if (scope) scope.loads++;
+    return (async () => {
       const out = emptyDb();
       const loaded = await Promise.all(TABLE_KEYS.map((k) => this.loadTable(k)));
       TABLE_KEYS.forEach((k, i) => { (out[k] as unknown[]) = loaded[i]; });
       return out;
     })();
-    this.cache = { at: Date.now(), db };
-    db.catch(() => { this.cache = null; });
-    return db;
   }
 
-  private invalidate() { this.cache = null; }
+  /** Loads every table and offers the result to the shared cache under the current generation. */
+  private loadAndCache(): Promise<Db> {
+    const entry = { gen: this.gen, at: Date.now(), db: this.load() };
+    this.cache = entry;
+    entry.db.catch(() => { if (this.cache === entry) this.cache = null; });
+    return entry.db;
+  }
+
+  /** The shared cache entry if no write happened since it started loading and it is recent. */
+  private shared(startedAfter = -Infinity): Promise<Db> {
+    const c = this.cache;
+    if (c && c.gen === this.gen && Date.now() - c.at < SNAPSHOT_TTL_MS && c.at >= startedAfter) return c.db;
+    return this.loadAndCache();
+  }
+
+  /**
+   * In a route: the request's working snapshot. It is loaded once and then kept current with the
+   * request's own writes. A fresh request only takes a load that began after it arrived (so it
+   * sees every write committed before it was sent); other requests may take any cached load.
+   * Outside a route: the shared cache.
+   */
+  async snapshot(): Promise<Db> {
+    const scope = currentScope();
+    if (!scope) return { ...(await this.shared()) };
+    scope.working ??= this.shared(scope.fresh ? scope.since : -Infinity).then((db) => ({ ...db }));
+    return { ...(await scope.working) };
+  }
+
+  /** Runs one database write, then applies it to the request's working snapshot. */
+  private async write(table: TableKey, run: () => PromiseLike<{ error: DbError }>, apply: (db: Db) => void): Promise<void> {
+    const scope = currentScope();
+    this.gen++;
+    try {
+      if (scope) scope.queries++;
+      const { error } = await run();
+      fail(TABLE_NAMES[table], error);
+    } finally {
+      this.gen++;
+    }
+    if (scope?.working) apply(await scope.working);
+  }
 
   private applyMatch<Q extends { eq: (c: string, v: unknown) => Q; in: (c: string, v: unknown[]) => Q }>(
     table: TableKey, q: Q, match: Record<string, unknown>,
@@ -72,32 +124,31 @@ export class SupabaseBackend implements Backend {
 
   async insert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void> {
     if (!rows.length) return;
-    this.invalidate();
-    const { error } = await this.client.from(TABLE_NAMES[table]).insert(rows.map((r) => toRow(table, r as Record<string, unknown>)));
-    fail(TABLE_NAMES[table], error);
+    await this.write(table,
+      () => this.client.from(TABLE_NAMES[table]).insert(rows.map((r) => toRow(table, r as Record<string, unknown>))),
+      (db) => applyInsert(db, table, rows, false));
   }
 
   async upsert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void> {
     if (!rows.length) return;
-    this.invalidate();
-    const onConflict = PRIMARY_KEYS[table].map((k) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)).join(',');
-    const { error } = await this.client.from(TABLE_NAMES[table])
-      .upsert(rows.map((r) => toRow(table, r as Record<string, unknown>)), { onConflict });
-    fail(TABLE_NAMES[table], error);
+    const onConflict = PRIMARY_KEYS[table].map(snake).join(',');
+    await this.write(table,
+      () => this.client.from(TABLE_NAMES[table]).upsert(rows.map((r) => toRow(table, r as Record<string, unknown>)), { onConflict }),
+      (db) => applyUpsert(db, table, rows));
   }
 
   async update<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<void> {
-    this.invalidate();
-    const q = this.client.from(TABLE_NAMES[table]).update(toRow(table, patch as Record<string, unknown>));
-    const { error } = await this.applyMatch(table, q, match as Record<string, unknown>);
-    fail(TABLE_NAMES[table], error);
+    await this.write(table, () => {
+      const q = this.client.from(TABLE_NAMES[table]).update(toRow(table, patch as Record<string, unknown>));
+      return this.applyMatch(table, q, match as Record<string, unknown>);
+    }, (db) => applyUpdate(db, table, match, patch));
   }
 
   async remove<T extends TableKey>(table: T, match: Match<T>): Promise<void> {
-    this.invalidate();
-    const q = this.client.from(TABLE_NAMES[table]).delete();
-    const { error } = await this.applyMatch(table, q, match as Record<string, unknown>);
-    fail(TABLE_NAMES[table], error);
+    await this.write(table, () => {
+      const q = this.client.from(TABLE_NAMES[table]).delete();
+      return this.applyMatch(table, q, match as Record<string, unknown>);
+    }, (db) => applyRemove(db, table, match));
   }
 
   private rpcError(error: { message: string }): never {
@@ -108,18 +159,45 @@ export class SupabaseBackend implements Backend {
     throw new HttpError(502, `seat update failed: ${m}`);
   }
 
+  /**
+   * Calls a seat RPC, then reads that quest row and its members back from the database into the
+   * working snapshot, so memberIds and the published memberCount come from after the commit.
+   */
+  private async seatRpc(fn: 'join_quest' | 'leave_quest', args: Record<string, unknown>, questId: ID): Promise<number> {
+    const scope = currentScope();
+    this.gen++;
+    let seats: number;
+    try {
+      if (scope) scope.queries++;
+      const { data, error } = await this.client.rpc(fn, args);
+      if (error) this.rpcError(error);
+      seats = Number(data);
+    } finally {
+      this.gen++;
+    }
+    if (scope?.working) {
+      scope.queries += 2;
+      const [q, m] = await Promise.all([
+        this.client.from(TABLE_NAMES.quests).select('*').eq('id', questId),
+        this.client.from(TABLE_NAMES.questMembers).select('*').eq('quest_id', questId),
+      ]);
+      fail(TABLE_NAMES.quests, q.error);
+      fail(TABLE_NAMES.questMembers, m.error);
+      const db = await scope.working;
+      const quests = ((q.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('quests', r));
+      const members = ((m.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('questMembers', r));
+      db.quests = [...db.quests.filter((x) => x.id !== questId), ...quests];
+      db.questMembers = [...db.questMembers.filter((x) => x.questId !== questId), ...members];
+    }
+    return seats;
+  }
+
   async joinQuest(questId: ID, userId: ID, withFriendId: ID | null): Promise<number> {
-    this.invalidate();
-    const { data, error } = await this.client.rpc('join_quest', { p_quest: questId, p_user: userId, p_with_friend: withFriendId });
-    if (error) this.rpcError(error);
-    return Number(data);
+    return this.seatRpc('join_quest', { p_quest: questId, p_user: userId, p_with_friend: withFriendId }, questId);
   }
 
   async leaveQuest(questId: ID, userId: ID): Promise<number> {
-    this.invalidate();
-    const { data, error } = await this.client.rpc('leave_quest', { p_quest: questId, p_user: userId });
-    if (error) this.rpcError(error);
-    return Number(data);
+    return this.seatRpc('leave_quest', { p_quest: questId, p_user: userId }, questId);
   }
 
   async uploadFile(bucket: 'uploads' | 'memories', path: string, bytes: Uint8Array, contentType: string): Promise<string> {

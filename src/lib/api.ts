@@ -3,7 +3,9 @@
 import { NextResponse } from 'next/server';
 import { z, ZodError, type ZodType } from 'zod';
 import { isAudience, type Audience, type Profile } from '@/shared';
-import { getStore, getViewer, HttpError, type DataStore } from '@/features/data/server';
+import {
+  flushOutbox, FRESH_HEADER, getStore, getViewer, HttpError, newScope, runInScope, type DataStore,
+} from '@/features/data/server';
 
 export type Ctx<P extends Record<string, string> = Record<string, string>> = { params: Promise<P> };
 
@@ -23,17 +25,41 @@ type Handler<P extends Record<string, string>> = (args: {
   req: Request; viewer: Profile; store: DataStore; params: P; url: URL;
 }) => Promise<unknown>;
 
-/** Wraps a handler: resolves the viewer (x-persona), params, and maps errors to JSON. */
+/**
+ * Wraps a handler: resolves the viewer (x-persona), params, and maps errors to JSON.
+ * Each call runs in a request scope (see features/data/request-scope.ts). Mutations, and GETs
+ * sent with x-outhere-fresh: 1 (refetches a realtime message triggered), read the database
+ * instead of the shared snapshot cache. Queued Supabase Broadcasts go out in one call before the
+ * response. The Server-Timing header reports total time, full table loads and queries.
+ */
 export function route<P extends Record<string, string> = Record<string, string>>(fn: Handler<P>) {
   return async (req: Request, ctx: Ctx<P>) => {
+    const started = performance.now();
+    const fresh = req.method !== 'GET' || req.headers.get(FRESH_HEADER) === '1';
+    const scope = newScope(fresh);
+    let res: Response;
+    let broadcasts = 0;
     try {
-      const viewer = await getViewer(req);
-      const params = ((await ctx?.params) ?? {}) as P;
-      const out = await fn({ req, viewer, store: getStore(), params, url: new URL(req.url) });
-      return out instanceof Response ? out : json(out);
+      res = await runInScope(scope, async () => {
+        try {
+          const viewer = await getViewer(req);
+          const params = ((await ctx?.params) ?? {}) as P;
+          const out = await fn({ req, viewer, store: getStore(), params, url: new URL(req.url) });
+          return out instanceof Response ? out : json(out);
+        } catch (err) {
+          return errorResponse(err);
+        } finally {
+          broadcasts = await flushOutbox(scope);
+        }
+      });
     } catch (err) {
-      return errorResponse(err);
+      res = errorResponse(err);
     }
+    const ms = (performance.now() - started).toFixed(1);
+    try {
+      res.headers.set('server-timing', `total;dur=${ms}, loads;desc="${scope.loads}", queries;desc="${scope.queries}", broadcasts;desc="${broadcasts}"`);
+    } catch { /* immutable headers (e.g. a proxied Response) */ }
+    return res;
   };
 }
 
