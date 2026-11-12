@@ -643,7 +643,12 @@ export class CoreStore {
     const v = await this.view();
     const q = v.questById.get(questId);
     if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
-    return v.questPostIds(questId).map((id) => v.postView(viewerId, v.postById.get(id)!));
+    // Strangers to the host see posts by the host, themselves and their own friends only, so the
+    // feed never names guests the guest list hides.
+    const open = v.canSeeQuestGuests(viewerId, q);
+    return v.questPostIds(questId).map((id) => v.postById.get(id)!)
+      .filter((p) => open || p.authorId === viewerId || p.authorId === q.hostId || v.areFriends(viewerId, p.authorId))
+      .map((p) => v.postView(viewerId, p));
   }
 
   /**
@@ -820,7 +825,8 @@ export class CoreStore {
     const q = i.questId ? v.questById.get(i.questId) : undefined;
     const { respondedAt: _r, ...invite } = i;
     void _r;
-    return { ...invite, from: v.person(viewerId, i.fromId), to: v.person(viewerId, i.toId), quest: q ? v.questFor(viewerId, q) : null };
+    // A plan the viewer may not see (Group or invite-only) is never described through an invite.
+    return { ...invite, from: v.person(viewerId, i.fromId), to: v.person(viewerId, i.toId), quest: q && v.canSeeQuest(viewerId, q) ? v.questFor(viewerId, q) : null };
   }
 
   async invites(viewerId: ID): Promise<{ incoming: InviteView[]; outgoing: InviteView[] }> {
@@ -848,7 +854,11 @@ export class CoreStore {
     let seatsLeft: number | null = null;
     if (body.questId) {
       const q = v.questById.get(body.questId);
-      if (!q || !v.isActiveQuest(q)) throw notFound('quest_not_found');
+      if (!q || !v.isActiveQuest(q) || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+      // An invite to an invite-only plan makes it visible, so only the host and members send them.
+      if (v.questVisibility(q) === 'friends' && q.hostId !== viewerId && !v.questMemberIds(q.id).includes(viewerId)) {
+        throw forbidden('only people going can invite to this plan');
+      }
       seatsLeft = v.seatsLeft(q);
     }
     const row: InviteRow = {

@@ -82,6 +82,13 @@ describe('validateDraft never trusts the model', () => {
     expect(delta).toBeLessThan(36 * 60_000);
   });
 
+  it('"now" starts this minute, so the plan is live at once; ZWJ emoji stay whole', async () => {
+    const ctx = await ctxFor('x');
+    const { draft } = validateDraft(raw({ startsInMinutes: 0, emoji: '👩‍💻🎉' }), ctx);
+    expect(Date.parse(draft.startsAt)).toBeLessThanOrEqual(NOW.getTime());
+    expect(draft.emoji).toBe('👩‍💻');
+  });
+
   it('strips prompt field names from user-facing text', async () => {
     const ctx = await ctxFor('x');
     const { draft, pitch } = validateDraft(raw({ pitch: 'I set priceMax to 0 and placeId to null.', bubbleText: 'Come thru bubbleText' }), ctx);

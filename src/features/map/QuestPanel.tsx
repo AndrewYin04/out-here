@@ -212,7 +212,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               {shown.seatsLeft === 0 ? 'Full' : 'Join'}
             </Button>
           )}
-          {!isHost && <ReportButton questId={questId} onReported={() => { onChanged(); onClose(); }} className="mx-auto mt-2" />}
+          {!isMember && <ReportButton questId={questId} onReported={() => { onChanged(); onClose(); }} className="mx-auto mt-2" />}
         </div>
       )}
     </section>

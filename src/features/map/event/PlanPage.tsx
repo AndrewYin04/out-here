@@ -255,7 +255,7 @@ export function PlanPage({ id }: { id: string }) {
         </div>
       </section>
 
-      {!isHost && (
+      {!isMember && (
         <div className="mt-4 flex justify-center">
           <ReportButton questId={id} onReported={() => setHidden(true)} />
         </div>

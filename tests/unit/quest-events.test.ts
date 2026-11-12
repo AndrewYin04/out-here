@@ -202,6 +202,31 @@ describe('plan page details', () => {
     expect((await store.questsNear(strangerTo(v, alex), SPOT, 2000)).map((q) => q.id)).toContain(quest.id);
   });
 
+  it('nobody can invite to, or read through an invite, a plan they may not see (review R1)', async () => {
+    const quest = await store.createQuest(alex, { ...base(), visibility: 'group', groupId: newGrads });
+    const v = await store.view();
+    const outsider = v.db.profiles.map((p) => p.id).find((id) => !v.groupRole(newGrads, id) && v.friendIds(id).size > 0)!;
+    const outsidersFriend = [...v.friendIds(outsider)][0];
+    await expect(store.createInvite(outsider, { toId: outsidersFriend, questId: quest.id, suggestionTitle: 'x', message: 'x' }))
+      .rejects.toMatchObject({ status: 404 });
+    // An invite-only plan: only people going can invite (an invite makes it visible).
+    const secret = await store.createQuest(alex, { ...base(), visibility: 'friends', inviteIds: [maya] });
+    const mayasFriend = [...v.friendIds(maya)].find((id) => id !== alex)!;
+    await expect(store.createInvite(maya, { toId: mayasFriend, questId: secret.id, suggestionTitle: 'x', message: 'x' }))
+      .rejects.toMatchObject({ status: 403 });
+  });
+
+  it('strangers to the host see only host, own and friends\' posts on the plan page (review R2)', async () => {
+    const quest = await store.createQuest(alex, { ...base(), visibility: 'community' });
+    await store.joinQuest(maya, quest.id);
+    await store.createPost(maya, { text: 'omw', audience: 'public', target: { type: 'quest', id: quest.id } });
+    const hostPost = await store.createPost(alex, { text: 'table by the window', audience: 'public', target: { type: 'quest', id: quest.id } });
+    const v = await store.view();
+    const stranger = strangerTo(v, alex);
+    expect((await store.questPosts(stranger, quest.id)).map((p) => p.id)).toEqual([hostPost.id]);
+    expect(await store.questPosts(maya, quest.id)).toHaveLength(2);
+  });
+
   it('posts on a plan follow the plan\'s visibility', async () => {
     const quest = await store.createQuest(alex, { ...base(), visibility: 'group', groupId: newGrads });
     const post = await store.createPost(alex, { text: 'Bringing cards', audience: 'public', target: { type: 'quest', id: quest.id } });

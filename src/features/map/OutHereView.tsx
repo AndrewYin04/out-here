@@ -189,6 +189,8 @@ export function OutHereView() {
     toast.show('Your plan is live on the map.');
   }, [questsApi, select, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
+  // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
+  const noSelect = useCallback(() => {}, []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
 
   return (
@@ -208,7 +210,7 @@ export function OutHereView() {
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
-          onSelect={select}
+          onSelect={creating ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
           onPickLocation={startCreate}

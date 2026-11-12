@@ -86,6 +86,13 @@ export function draftMessages(ctx: CreateQuestContext): MuseMessage[] {
 const FIELD_WORDS = /\b(placeId|startClock|startsInMinutes|durationMinutes|bubbleText|priceMax|walkMin|typicalCost|JSON)\b/g;
 const clean = (s: string) => s.replace(FIELD_WORDS, '').replace(/\s{2,}/g, ' ').trim();
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+/** First user-visible character, so ZWJ emoji (👩‍💻) and flags stay whole. */
+function firstGrapheme(s: string): string {
+  if (!s) return '';
+  const Seg = (Intl as unknown as { Segmenter?: new (l: string, o: { granularity: 'grapheme' }) => { segment: (t: string) => Iterable<{ segment: string }> } }).Segmenter;
+  if (Seg) for (const g of new Seg('en', { granularity: 'grapheme' }).segment(s)) return g.segment;
+  return [...s][0] ?? '';
+}
 const roundTo5 = (ms: number) => Math.ceil(ms / (5 * 60_000)) * 5 * 60_000;
 
 /** Turns a model (or mock) draft into a safe plan draft. Never throws. */
@@ -97,7 +104,8 @@ export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: 
   let start = roundTo5(nowMs + 30 * 60_000);
   const clock = parseClock(raw.startClock);
   if (clock) start = nextClock(ctx.now, clock).getTime();
-  else if (raw.startsInMinutes !== null && raw.startsInMinutes >= 0) start = roundTo5(nowMs + raw.startsInMinutes * 60_000);
+  else if (raw.startsInMinutes !== null && raw.startsInMinutes <= 0) start = Math.floor(nowMs / 60_000) * 60_000; // "now": live at once
+  else if (raw.startsInMinutes !== null) start = roundTo5(nowMs + raw.startsInMinutes * 60_000);
   // Plans are for today-ish: anything over 24 h out (or in the past) falls back to 30 min from now.
   if (start < nowMs - 60_000 || start > nowMs + 24 * 60 * 60_000) start = roundTo5(nowMs + 30 * 60_000);
   const duration = clamp(raw.durationMinutes ?? 60, 15, 360);
@@ -108,7 +116,7 @@ export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: 
   const title = clean(raw.title).slice(0, 120) || 'Hang out';
   const draft: MuseQuestDraft = {
     title,
-    emoji: [...raw.emoji.trim()].slice(0, 2).join('') || '✨',
+    emoji: firstGrapheme(raw.emoji.trim()) || '✨',
     category,
     description: clean(raw.description).slice(0, 400),
     venueName: place?.name ?? 'Dropped pin',

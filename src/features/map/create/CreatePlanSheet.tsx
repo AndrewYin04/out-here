@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, currentPersona, uploadImage, useApi } from '@/features/data';
 import { MuseLabel, MuseStepsLoading, OfflineLabel } from '@/features/outhere';
 import { Avatar, Button, Chip, IconButton, cn } from '@/features/ui';
-import type { LatLng, Quest, QuestCategory, QuestVisibility } from '@/shared';
+import { DEMO_TZ, type LatLng, type Quest, type QuestCategory, type QuestVisibility } from '@/shared';
 import type { GroupView, MuseCreateQuestResponse } from '@/shared/api';
 import type { FriendFace } from '../types';
 import { VISIBILITY_OPTIONS } from '../visibility';
@@ -40,6 +40,12 @@ export type CreatePlanSheetProps = {
   onClose: () => void;
   onPosted: (quest: Quest) => void;
 };
+
+/** "Tomorrow" when the start is not today in Menlo Park, else null. */
+function dayLabel(iso: string): string | null {
+  const day = (d: Date) => d.toLocaleDateString('en-US', { timeZone: DEMO_TZ });
+  return day(new Date(iso)) === day(new Date()) ? null : 'Tomorrow';
+}
 
 const sameSpot = (a: LatLng, b: LatLng) => Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
 
@@ -294,9 +300,11 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
               type="time"
               aria-label="Start time"
               value={clockValue(startsAt)}
+              aria-describedby="create-when-day"
               onChange={(e) => { const d = nextAtClock(e.target.value, new Date()); if (d) setStartsAt(d.toISOString()); }}
               className="h-8 rounded-btn border border-fb-divider bg-fb-surface px-2 text-[15px] text-fb-text outline-none focus:border-fb-blue"
             />
+            {dayLabel(startsAt) && <span id="create-when-day" data-testid="create-when-day" className="text-[13px] font-semibold text-fb-text-2">{dayLabel(startsAt)}</span>}
             <select
               aria-label="How long"
               value={duration}
