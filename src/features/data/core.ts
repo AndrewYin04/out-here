@@ -15,7 +15,7 @@ import type {
 } from '@/shared/api';
 import type { Backend } from './backend';
 import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
-import { badRequest, conflict, forbidden, notFound } from './errors';
+import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 
@@ -721,14 +721,17 @@ export class CoreStore {
     return this.inviteView(v, viewerId, i);
   }
 
-  async createInvite(viewerId: ID, body: { toId: ID; questId: ID | null; suggestionTitle: string; message: string }): Promise<Invite> {
+  /** Also returns the quest's seatsLeft (null without a quest), so the UI can warn when only one seat is left. */
+  async createInvite(viewerId: ID, body: { toId: ID; questId: ID | null; suggestionTitle: string; message: string }): Promise<Invite & { seatsLeft: number | null }> {
     const v = await this.view();
     const to = this.resolvePerson(v, body.toId);
     if (to.id === viewerId) throw badRequest('cannot invite yourself');
     if (!v.areFriends(viewerId, to.id)) throw forbidden('invites go to friends');
+    let seatsLeft: number | null = null;
     if (body.questId) {
       const q = v.questById.get(body.questId);
       if (!q || !v.isActiveQuest(q)) throw notFound('quest_not_found');
+      seatsLeft = v.seatsLeft(q);
     }
     const row: InviteRow = {
       id: uuid(), fromId: viewerId, toId: to.id, questId: body.questId, suggestionTitle: body.suggestionTitle,
@@ -742,11 +745,15 @@ export class CoreStore {
     await publish(`user:${to.id}`, { type: 'invite', id: row.id });
     const { respondedAt: _r, ...invite } = row;
     void _r;
-    return invite;
+    return { ...invite, seatsLeft };
   }
 
-  /** Accepting joins the invitee (and the inviter, if not yet in) atomically; a full quest is 409. */
-  async respondInvite(viewerId: ID, inviteId: ID, status: 'accepted' | 'declined'): Promise<{ invite: Invite; quest?: Quest }> {
+  /**
+   * Accepting joins the invitee, and the inviter too when both fit (one atomic join_quest).
+   * When only one seat is left, the invitee takes it alone (`joinedAlone: true`) and the inviter is notified.
+   * A quest with no seat left is 409 quest_full: the invite stays pending and the inviter's user channel still fires.
+   */
+  async respondInvite(viewerId: ID, inviteId: ID, status: 'accepted' | 'declined'): Promise<{ invite: Invite; quest?: Quest; joinedAlone?: boolean }> {
     const v = await this.view();
     const i = v.db.invites.find((x) => x.id === inviteId);
     if (!i || (i.toId !== viewerId && i.fromId !== viewerId)) throw notFound('invite_not_found');
@@ -755,18 +762,44 @@ export class CoreStore {
       if (i.status !== status) throw conflict('invite_already_answered');
       const { respondedAt: _x, ...same } = i;
       void _x;
-      return { invite: same };
+      if (status !== 'accepted' || !i.questId) return { invite: same };
+      // A repeated accept returns the same outcome as the first one.
+      const q = (await this.quest(viewerId, i.questId)).quest;
+      return { invite: same, quest: q, joinedAlone: !q.memberIds.includes(i.fromId) };
     }
     let quest: Quest | undefined;
+    let joinedAlone: boolean | undefined;
     if (status === 'accepted' && i.questId) {
-      const joined = await this.joinQuest(viewerId, i.questId, v.areFriends(viewerId, i.fromId) ? i.fromId : null);
-      quest = joined.quest;
+      const questId = i.questId;
+      const withFriend = v.areFriends(viewerId, i.fromId) ? i.fromId : null;
+      try {
+        try {
+          quest = (await this.joinQuest(viewerId, questId, withFriend)).quest;
+        } catch (e) {
+          // Not enough seats for both: the invitee takes the last seat alone.
+          if (!(e instanceof HttpError && e.message === 'quest_full') || !withFriend) throw e;
+          quest = (await this.joinQuest(viewerId, questId, null)).quest;
+        }
+      } catch (e) {
+        if (e instanceof HttpError && e.message === 'quest_full') await publish(`user:${i.fromId}`, { type: 'invite', id: inviteId });
+        throw e;
+      }
+      joinedAlone = !quest.memberIds.includes(i.fromId);
     }
     await this.backend.update('invites', { id: inviteId }, { status, respondedAt: iso() });
+    if (quest && joinedAlone) {
+      const after = await this.view();
+      const q = after.questById.get(quest.id);
+      // The host already gets a quest_join notification from joinQuest.
+      if (q && q.hostId !== i.fromId) {
+        await this.notify(after, i.fromId, 'quest_join', viewerId, 'quest', q.id,
+          `${firstName(after.profileById.get(viewerId))} took the last seat at ${q.title}.`);
+      }
+    }
     await publish(`user:${i.fromId}`, { type: 'invite', id: inviteId });
     const { respondedAt: _r, ...invite } = i;
     void _r;
-    return { invite: { ...invite, status }, ...(quest ? { quest } : {}) };
+    return { invite: { ...invite, status }, ...(quest ? { quest } : {}), ...(joinedAlone !== undefined ? { joinedAlone } : {}) };
   }
 
   // ---------- Out Here: crews, memories, daily, streak ----------

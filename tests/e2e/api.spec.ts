@@ -138,6 +138,33 @@ test('invite from alex to maya: accept auto-joins, last seats run out with 409',
   await request.post(`/api/quests/${dumplings}/leave`, { headers: alex, data: {} });
 });
 
+test('invite to the last seat: maya takes it alone, alex is told', async ({ request }) => {
+  const volleyball = seedId('quest', 'volleyball');
+  const q0 = await (await request.get(`/api/quests/${volleyball}`, { headers: alex })).json();
+  test.skip(q0.seatsLeft !== 1 || q0.viewerIsMember, 'needs the seeded volleyball quest with 1 seat left');
+  const inv = await request.post('/api/invites', {
+    headers: alex,
+    data: { toId: profileId('maya'), questId: volleyball, suggestionTitle: 'Last volleyball spot', message: 'Want it?' },
+  });
+  expect(inv.status()).toBe(200);
+  const { invite } = await inv.json();
+  expect(invite.seatsLeft).toBe(1);
+  const [a, b] = await Promise.all([1, 2].map(() =>
+    request.post(`/api/invites/${invite.id}/respond`, { headers: maya, data: { status: 'accepted' } })));
+  for (const r of [a, b]) {
+    expect(r.status()).toBe(200);
+    const body = await r.json();
+    expect(body.invite.status).toBe('accepted');
+    expect(body.joinedAlone).toBe(true);
+  }
+  const after = await (await request.get(`/api/quests/${volleyball}`, { headers: maya })).json();
+  expect(after.seatsLeft).toBe(0);
+  expect(after.viewerIsMember).toBe(true);
+  const out = await (await request.get('/api/invites', { headers: alex })).json();
+  expect(out.outgoing.find((i: { id: string }) => i.id === invite.id)?.status).toBe('accepted');
+  await request.post(`/api/quests/${volleyball}/leave`, { headers: maya, data: {} });
+});
+
 test('notifications, threads, groups, events and search respond for a persona', async ({ request }) => {
   for (const path of ['/api/notifications', '/api/threads', '/api/groups', '/api/events', '/api/search?q=dump', '/api/stories', '/api/profile/maya', '/api/friends/requests', '/api/friends/suggestions', '/api/friend-lists', '/api/crews', '/api/users', '/api/groups/cheap-eats-south-bay/hangouts']) {
     const res = await request.get(path, { headers: alex });
