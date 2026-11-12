@@ -88,10 +88,20 @@ export class MemoryBackend implements Backend {
     return Math.max(q.capacity - count, 0);
   }
 
-  async uploadFile(_bucket: 'uploads' | 'memories', path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+  async uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string> {
+    if (bucket === 'crew-photos') {
+      this.files.set(`crew-photos:${path}`, { bytes, contentType });
+      return path;
+    }
     const id = path.replace(/[^a-zA-Z0-9.-]/g, '_');
     this.files.set(id, { bytes, contentType });
     return `/api/uploads/${id}`;
+  }
+
+  async downloadCrewPhoto(id: ID): Promise<Blob> {
+    const file = this.files.get(`crew-photos:${id}`);
+    if (!file) throw notFound('photo_not_found');
+    return new Blob([new Uint8Array(file.bytes)], { type: file.contentType });
   }
 }
 

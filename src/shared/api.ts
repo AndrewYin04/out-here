@@ -6,10 +6,11 @@
 //
 // ---- Kit (Out Here) ----
 // GET  /api/quests?lat&lng&radiusM&viewerId          -> { quests: Quest[] }     (approxLocation unless member)
+// GET  /api/quests/mine                                           -> { plans: YourPlan[] }
 // POST /api/quests                     body: Omit<Quest,'id'|'memberIds'|'status'|'createdAt'|'approxLocation'> -> { quest }
 // POST /api/quests/:id/join            body: { userId, withFriendId? }  -> { quest, seatsLeft }   (409 if full)
 // POST /api/quests/:id/leave           body: { userId }                 -> { quest, seatsLeft }
-// POST /api/quests/:id/complete        body: { userId }                 -> { quest, crew }        (host only; creates/updates crew)
+// POST /api/quests/:id/complete        body: { userId? }                -> { quest, crew }        (attendee, after the start)
 // POST /api/availability               body: { userId, text, startsAt, endsAt, location } -> { availability }
 // GET  /api/friends/:userId/availability                                -> { items: (Availability & { friend: Profile })[] }
 // GET  /api/locations/friends          (viewer from x-persona)          -> { pins: FriendPin[] }   (canSee on audience; fuzzed when approximate; paused/expired hidden)
@@ -21,14 +22,15 @@
 // POST /api/invites                    body: { fromId, toId, questId, suggestionTitle, message } -> { invite }
 // POST /api/invites/:id/respond        body: { status: 'accepted'|'declined' } -> { invite, quest? } (accept auto-joins)
 // GET  /api/crews?userId                                                -> { crews: Crew[] }
-// POST /api/memories                   multipart: photo, crewId, questId, uploaderId -> { memory }
+// POST /api/memories                   multipart: photo, crewId, questId, uploaderId?, caption? -> { memory }
+// GET  /api/memories/:id/photo                                      -> image bytes (crew members only)
 // GET  /api/memories?crewId                                             -> { memories: Memory[] }
 // GET  /api/daily?date / POST /api/daily/entry                          -> DailyQuest / { entry }
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
 // POST /api/muse/regroup               body: { crewId, now? }           -> { suggestion: PlanSuggestion, message: string }
 // POST /api/muse/create-quest          body: { userId, text, location } -> { draft: Partial<Quest>, pitch: string }
-// POST /api/muse/caption               body: { questId, crewId }        -> { caption: string }
+// POST /api/muse/caption               body: { questId }                -> { caption: string }
 // POST /api/muse/daily                 body: { date }                   -> DailyQuest
 // POST /api/muse/verify-photo          body: { date, photoUrl }         -> { verified: boolean, note: string }
 // POST /api/muse/wrapped               body: { userId, month }          -> { cards: { title: string; body: string; stat?: string; photoUrl?: string }[] }
@@ -85,6 +87,8 @@ export type ApiError = { error: string };
 // ---- Kit ----
 export type QuestsQuery = { lat: number; lng: number; radiusM?: number; viewerId?: ID };
 export type QuestsResponse = { quests: Quest[] };
+export type YourPlan = { quest: Quest; members: PersonCard[]; walkMinutes: number; crewId: ID | null };
+export type YourPlansResponse = { plans: YourPlan[] };
 export type CreateQuestBody = Omit<Quest, 'id' | 'memberIds' | 'status' | 'createdAt' | 'approxLocation'>;
 export type QuestResponse = { quest: Quest };
 export type JoinQuestBody = { userId: ID; withFriendId?: ID };
@@ -118,7 +122,7 @@ export type MuseRegroupBody = { crewId: ID; now?: string };
 export type MuseRegroupResponse = { suggestion: PlanSuggestion; message: string };
 export type MuseCreateQuestBody = { userId: ID; text: string; location: LatLng };
 export type MuseCreateQuestResponse = { draft: Partial<Quest>; pitch: string };
-export type MuseCaptionBody = { questId: ID; crewId: ID };
+export type MuseCaptionBody = { questId: ID };
 export type MuseCaptionResponse = { caption: string };
 export type MuseDailyBody = { date: string };
 export type MuseVerifyPhotoBody = { date: string; photoUrl: string };

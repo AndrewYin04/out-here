@@ -2,6 +2,8 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { CalendarCheck } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
@@ -341,8 +343,11 @@ export function OutHereView() {
 
       {/* ImFreeButton is an unpositioned pill; place it above the map canvas, bottom centre. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-2">
           <ImFreeButton />
+          <Link href="/events?tab=going" className="inline-flex min-h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-sm font-semibold text-fb-text shadow-card hover:bg-fb-hover">
+            <CalendarCheck size={17} aria-hidden />Your plans
+          </Link>
         </div>
       </div>
       <PlanSheet />
