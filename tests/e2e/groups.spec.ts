@@ -107,7 +107,8 @@ test('Notifications page: Unread filter, click marks read and opens the post', a
   await expect(page.getByRole('heading', { name: 'Notifications', level: 1 })).toBeVisible();
   await expect(page.getByTestId('notification-row').first()).toBeVisible();
   await page.getByRole('tab', { name: 'Unread' }).click();
-  const unread = page.locator('[data-testid="notification-row"][data-unread="true"]');
+  // post rows only: the seed also has Out Here rows (quest invites and joins) that open the map
+  const unread = page.locator('[data-testid="notification-row"][data-unread="true"][data-href^="/posts/"]');
   const n = await unread.count();
   expect(n).toBeGreaterThan(0);
   // phone and desktop open different rows so both have one to open
