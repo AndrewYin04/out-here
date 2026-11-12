@@ -6,6 +6,7 @@ Read this first. Everything below was built overnight by Claude Code on branch `
 
 - **Preview (latest, 76f0286):** https://out-here-53rpnemqr-andrews-projects-76721bc6.vercel.app (pages, APIs and the Muse plan smoke-tested at 06:55 PT; the full two-tab demo was walked in Chrome on the previous preview 3df9384)
   - It sits behind Vercel login. Until someone turns off Deployment Protection, open it while logged in to Vercel, or ask Andrew for a share link (Vercel dashboard, Share). Share links are credentials: never commit or post them.
+- **Team bulletin:** `docs/TEAM.md` (how people and agents claim and update tasks; tracker issue #33) and `scripts/team.sh` (the CLI: `bash scripts/team.sh sync`).
 - **Board (talk to the agent):** https://github.com/AndrewYin04/out-here/issues/1
 - **Deploy requests:** issue #4 (comment `DEPLOY <branch>`), see `docs/DEPLOYS.md`.
 - **Draft PR:** `overnight` → `main` (the team merges).
