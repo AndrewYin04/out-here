@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
+import type { TreeSpot } from './trees';
 
 export type ActorKind = 'avatar' | 'pet';
 type Actor = {
@@ -35,7 +36,10 @@ export class WorldLayer implements CustomLayerInterface {
 
   private map: MapLibreMap | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
+  /** Trees and beacons: depth-tested against the 3D buildings. */
   private scene = new THREE.Scene();
+  /** Characters: drawn after a depth clear, so a building never hides you (as in Pokémon GO). */
+  private charScene = new THREE.Scene();
   private camera = new THREE.Camera();
   private actors = new Map<string, Actor>();
   private beacons = new Map<string, Beacon>();
@@ -48,6 +52,12 @@ export class WorldLayer implements CustomLayerInterface {
   private elapsed = 0;
   private full = new THREE.Matrix4();
   private tmp = new THREE.Vector4();
+  private trunkGeo = new THREE.CylinderGeometry(0.18, 0.26, 1, 6);
+  private canopyGeo = new THREE.IcosahedronGeometry(1, 0);
+  private trunkMat = new THREE.MeshStandardMaterial({ color: '#8A6A4F', roughness: 0.9 });
+  private canopyMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true });
+  private trunks: THREE.InstancedMesh | null = null;
+  private canopies: THREE.InstancedMesh | null = null;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
 
@@ -55,6 +65,10 @@ export class WorldLayer implements CustomLayerInterface {
     this.origin = origin;
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
     this.scene.add(new THREE.HemisphereLight('#ffffff', '#8d8d8d', 2.2));
+    this.charScene.add(new THREE.HemisphereLight('#ffffff', '#8d8d8d', 2.2));
+    const sun2 = new THREE.DirectionalLight('#ffffff', 1.6);
+    sun2.position.set(-40, 100, 60);
+    this.charScene.add(sun2);
     const sun = new THREE.DirectionalLight('#ffffff', 1.6);
     sun.position.set(-40, 100, 60);
     this.scene.add(sun);
@@ -76,14 +90,14 @@ export class WorldLayer implements CustomLayerInterface {
     if (this.actors.has(id)) return;
     const char = kind === 'pet' ? makePet(this.models, seed) : makeAvatar(this.models, seed);
     char.root.traverse((o) => { o.frustumCulled = false; });
-    this.scene.add(char.root);
+    this.charScene.add(char.root);
     this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0 });
   }
 
   removeActor(id: string) {
     const a = this.actors.get(id);
     if (!a) return;
-    this.scene.remove(a.char.root);
+    this.charScene.remove(a.char.root);
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
     this.actors.delete(id);
@@ -106,6 +120,34 @@ export class WorldLayer implements CustomLayerInterface {
     if (a.label && a.label !== el) a.label.style.visibility = 'hidden';
     a.label = el;
     a.labelLift = liftMeters;
+  }
+
+  /** Low-poly trees (two instanced meshes, so hundreds cost two draw calls). Real size, not zoom-scaled. */
+  setTrees(spots: TreeSpot[]) {
+    for (const m of [this.trunks, this.canopies]) { if (m) { this.scene.remove(m); m.dispose(); } }
+    this.trunks = null;
+    this.canopies = null;
+    if (spots.length === 0) return;
+    const trunks = new THREE.InstancedMesh(this.trunkGeo, this.trunkMat, spots.length);
+    const canopies = new THREE.InstancedMesh(this.canopyGeo, this.canopyMat, spots.length);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const greens = [new THREE.Color('#5DAE4B'), new THREE.Color('#6FBF55'), new THREE.Color('#4E9E45'), new THREE.Color('#82C35E')];
+    spots.forEach((t, i) => {
+      const o = offsetMeters(this.origin, t);
+      const h = t.height;
+      m.compose(new THREE.Vector3(o.east, h * 0.22, -o.north), q, new THREE.Vector3(h * 0.9, h * 0.44, h * 0.9));
+      trunks.setMatrixAt(i, m);
+      q.setFromEuler(new THREE.Euler(0, t.tone * Math.PI * 2, 0));
+      m.compose(new THREE.Vector3(o.east, h * 0.62, -o.north), q, new THREE.Vector3(h * 0.34, h * 0.42, h * 0.34));
+      canopies.setMatrixAt(i, m);
+      canopies.setColorAt(i, greens[Math.floor(t.tone * greens.length) % greens.length]);
+      q.identity();
+    });
+    for (const mesh of [trunks, canopies]) { mesh.frustumCulled = false; mesh.instanceMatrix.needsUpdate = true; this.scene.add(mesh); }
+    if (canopies.instanceColor) canopies.instanceColor.needsUpdate = true;
+    this.trunks = trunks;
+    this.canopies = canopies;
   }
 
   setBeacons(specs: BeaconSpec[]) {
@@ -149,6 +191,8 @@ export class WorldLayer implements CustomLayerInterface {
   onRemove() {
     for (const id of [...this.actors.keys()]) this.removeActor(id);
     this.setBeacons([]);
+    this.setTrees([]);
+    this.trunkGeo.dispose(); this.canopyGeo.dispose(); this.trunkMat.dispose(); this.canopyMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
     // The renderer shares MapLibre's context; dispose only three's own resources.
@@ -167,6 +211,8 @@ export class WorldLayer implements CustomLayerInterface {
     const zoom = map.getZoom();
     const scale = characterScale(zoom);
     const showChars = zoom >= this.minZoom;
+    if (this.trunks) this.trunks.visible = showChars;
+    if (this.canopies) this.canopies.visible = showChars;
     const m = this.originMerc.meterInMercatorCoordinateUnits();
     const model = new THREE.Matrix4()
       .makeTranslation(this.originMerc.x, this.originMerc.y, this.originMerc.z ?? 0)
@@ -218,6 +264,9 @@ export class WorldLayer implements CustomLayerInterface {
 
     renderer.resetState();
     renderer.render(this.scene, this.camera);
+    // This layer is the top one, so clearing depth here only affects the characters below.
+    renderer.clearDepth();
+    renderer.render(this.charScene, this.camera);
     map.triggerRepaint();
   }
 }

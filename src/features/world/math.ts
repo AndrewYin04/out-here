@@ -6,28 +6,40 @@ import { haversineMeters, walkingMinutesExact, type LatLng } from '@/shared';
 
 /** At or below this zoom the 3D view is flat, the same as the overhead map. */
 export const FLAT_ZOOM = 15;
-/** At or above this zoom the camera is fully tilted behind the avatar. */
+/** At this zoom the camera reaches STREET_PITCH. */
 export const STREET_ZOOM = 18.5;
 export const STREET_PITCH = 65;
-/** Zoom the 3D view flies to when it opens. */
-export const ENTER_ZOOM = 18.8;
-export const MAX_3D_ZOOM = 19.6;
-export const MAX_3D_PITCH = 70;
-/** Characters are hidden below this zoom; the 2D pins take over. */
+/** Zoomed in closer than street level, the camera drops lower toward the horizon. */
+export const CLOSE_ZOOM = 20;
+export const CLOSE_PITCH = 76;
+/** Zoom the 3D view eases to when it opens: close behind the avatar. */
+export const ENTER_ZOOM = 19.6;
+export const MAX_3D_ZOOM = 20.6;
+export const MAX_3D_PITCH = 78;
+/** Characters and trees are hidden below this zoom; the 2D pins take over. */
 export const CHARACTER_MIN_ZOOM = 15.8;
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
 
-/** Camera pitch for a zoom: 0 when zoomed out to the city, STREET_PITCH at street level. */
+/**
+ * Camera pitch for a zoom: 0 when zoomed out to the city, STREET_PITCH at street level, and
+ * lower still (CLOSE_PITCH) when zoomed right in behind the avatar.
+ */
 export function pitchForZoom(zoom: number): number {
-  const t = clamp01((zoom - FLAT_ZOOM) / (STREET_ZOOM - FLAT_ZOOM));
-  return Math.round(STREET_PITCH * smoothstep(t) * 10) / 10;
+  const p = zoom <= STREET_ZOOM
+    ? STREET_PITCH * smoothstep(clamp01((zoom - FLAT_ZOOM) / (STREET_ZOOM - FLAT_ZOOM)))
+    : STREET_PITCH + (CLOSE_PITCH - STREET_PITCH) * smoothstep(clamp01((zoom - STREET_ZOOM) / (CLOSE_ZOOM - STREET_ZOOM)));
+  return Math.round(p * 10) / 10;
 }
 
-/** How much bigger than life the characters are drawn, so they read at street zoom. */
+/**
+ * How much bigger than life the characters are drawn. Zoomed out they grow so they still read;
+ * zoomed in close they shrink toward a believable size next to the buildings (never below 5x).
+ */
 export function characterScale(zoom: number): number {
-  return Math.min(40, 9 * 2 ** Math.max(0, STREET_ZOOM - zoom));
+  if (zoom <= STREET_ZOOM) return Math.min(40, 9 * 2 ** (STREET_ZOOM - zoom));
+  return Math.max(5, 9 * 2 ** (-(zoom - STREET_ZOOM) * 0.5));
 }
 
 // ---- Angles (compass degrees: 0 = north, 90 = east) ----

@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { haversineMeters } from '@/shared';
 import {
   acceptFix, bearingDeg, characterScale, deltaDeg, fixHeading, lerpDeg, minutesLeft, moveMeters, normalizeDeg,
-  offsetMeters, pitchForZoom, stepToward, FLAT_ZOOM, STREET_PITCH, STREET_ZOOM, type GpsFix,
+  offsetMeters, pitchForZoom, stepToward, CLOSE_PITCH, CLOSE_ZOOM, FLAT_ZOOM, STREET_PITCH, STREET_ZOOM, type GpsFix,
 } from './math';
 
 const HQ = { lat: 37.4847, lng: -122.1477 };
 
 describe('pitchForZoom', () => {
-  it('is flat at city zoom and fully tilted at street zoom', () => {
+  it('is flat at city zoom, tilted at street zoom, lowest when close', () => {
     expect(pitchForZoom(12)).toBe(0);
     expect(pitchForZoom(FLAT_ZOOM)).toBe(0);
     expect(pitchForZoom(STREET_ZOOM)).toBe(STREET_PITCH);
-    expect(pitchForZoom(20)).toBe(STREET_PITCH);
+    expect(pitchForZoom(19.25)).toBeGreaterThan(STREET_PITCH);
+    expect(pitchForZoom(CLOSE_ZOOM)).toBe(CLOSE_PITCH);
+    expect(pitchForZoom(21)).toBe(CLOSE_PITCH);
   });
   it('rises smoothly in between', () => {
     const z = [15.5, 16, 16.5, 17, 17.5, 18].map(pitchForZoom);
@@ -27,6 +29,11 @@ describe('characterScale', () => {
     expect(characterScale(STREET_ZOOM)).toBe(9);
     expect(characterScale(17.5)).toBe(18);
     expect(characterScale(10)).toBe(40);
+  });
+  it('shrinks toward life size when zoomed in close, never below 5x', () => {
+    expect(characterScale(19.5)).toBeLessThan(9);
+    expect(characterScale(19.5)).toBeGreaterThan(5);
+    expect(characterScale(24)).toBe(5);
   });
 });
 

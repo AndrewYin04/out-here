@@ -11,6 +11,8 @@ import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
+import { applyCityTheme, tileSourceId } from './cityTheme';
+import { blockerTest, nearestOnLines, nearestOpen, placeTrees, type Area, type Street } from './trees';
 import {
   ARRIVE_METERS, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
@@ -38,10 +40,9 @@ type PetMode = 'follow' | 'front';
 type Walk = { questId: string; title: string; emoji: string; to: LatLng };
 type NearFriend = { id: string; label: string };
 
-const BUILDINGS_ID = 'oh-3d-buildings';
 /** Real walking speed (80 m/min) sped up for the demo walk. */
 const WALK_MPS = (80 / 60) * DEMO_WALK_SPEEDUP;
-const STICK_MPS = 14;
+const STICK_MPS = 9;
 const TURN_DPS = 120;
 const FRIEND_RADIUS_M = 600;
 const FRIEND_CAP = 12;
@@ -66,6 +67,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const heading = useRef(0);
   const camBearing = useRef(map.getBearing());
   const moved = useRef(false);
+  /** Inside a building or water? From the tiles around the avatar, refreshed with the trees. */
+  const blockedRef = useRef<((p: LatLng) => boolean) | null>(null);
+  /** The start position changed: the next tree refresh re-checks it against the buildings. */
+  const snapPending = useRef(true);
+  const homeRef = useRef(home);
+  homeRef.current = home;
   const followRef = useRef(false);
   /** While true, following also eases the zoom down to street level (the fly-in). */
   const entering = useRef(true);
@@ -136,6 +143,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   useEffect(() => {
     const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch() };
     let layer: WorldLayer | null = null;
+    let undoTheme: (() => void) | null = null;
     let cancelled = false;
     map.setMaxPitch(MAX_3D_PITCH);
     map.setMaxZoom(MAX_3D_ZOOM);
@@ -144,6 +152,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.touchZoomRotate.enableRotation();
     map.scrollZoom.enable({ around: 'center' });
     map.getContainer().setAttribute('data-view3d', '');
+    // Dev only: lets tests and debugging read the live map (never in a production build).
+    if (process.env.NODE_ENV !== 'production') (window as unknown as { __ohMap?: MapLibreMap }).__ohMap = map;
 
     let added = false;
     const add = () => {
@@ -154,20 +164,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       try { style = map.getStyle(); } catch { return; }
       if (!style?.layers?.length) return;
       added = true;
-      const buildingLayer = style.layers.find((l) => 'source-layer' in l && l['source-layer'] === 'building');
-      const source = buildingLayer && 'source' in buildingLayer ? buildingLayer.source : 'openmaptiles';
-      const firstSymbol = style.layers.find((l) => l.type === 'symbol')?.id;
-      if (!map.getLayer(BUILDINGS_ID) && map.getSource(source)) {
-        map.addLayer({
-          id: BUILDINGS_ID, type: 'fill-extrusion', source, 'source-layer': 'building', minzoom: 14.5,
-          paint: {
-            'fill-extrusion-color': '#DCE1E8',
-            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 8],
-            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-            'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16.5, 0.85],
-          },
-        }, firstSymbol);
-      }
+      // Real OSM buildings in 3D, green spaces, water, streets and sky (cityTheme.ts).
+      undoTheme = applyCityTheme(map);
       layer = new WorldLayer(pos.current);
       layer.minZoom = CHARACTER_MIN_ZOOM;
       map.addLayer(layer);
@@ -205,7 +203,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       map.off('rotatestart', detach);
       map.off('zoomstart', userZoom);
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
-      if (map.getLayer(BUILDINGS_ID)) map.removeLayer(BUILDINGS_ID);
+      undoTheme?.();
       layerRef.current = null;
       map.getContainer().removeAttribute('data-view3d');
       map.dragRotate.disable();
@@ -226,10 +224,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   }, [map]);
 
   // Home arrives after the first render: start the demo walk there if nothing moved yet.
+  // A home inside a building outline starts on the nearest open ground instead (the tree refresh
+  // repeats this once the buildings around it have loaded).
   useEffect(() => {
     if (!home || moved.current || sourceRef.current !== 'demo') return;
-    pos.current = home;
-    petPos.current = home;
+    pos.current = blockedRef.current ? nearestOpen(home, blockedRef.current) : home;
+    petPos.current = pos.current;
+    snapPending.current = true;
   }, [home]);
 
   // ---- Keyboard: arrows / WASD walk forward-back and turn ----
@@ -274,6 +275,75 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     layerRef.current?.setState('me', 'celebrate');
     setCheer(q ? `You’re in! ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in!');
   }, [quests, viewer.id]);
+
+  /** One step of free walking that slides along walls instead of entering a building. */
+  const tryMove = useCallback((p: LatLng, meters: number, bearing: number): LatLng => {
+    const next = moveMeters(p, meters, bearing);
+    const blocked = blockedRef.current;
+    if (!blocked || !blocked(next) || blocked(p)) return next; // already inside (GPS indoors): let them out
+    const r = (bearing * Math.PI) / 180;
+    const across = moveMeters(p, Math.abs(Math.sin(r) * meters), Math.sin(r) * meters >= 0 ? 90 : 270);
+    if (!blocked(across)) return across;
+    const along = moveMeters(p, Math.abs(Math.cos(r) * meters), Math.cos(r) * meters >= 0 ? 0 : 180);
+    return blocked(along) ? p : along;
+  }, []);
+
+  // ---- Trees: placed from the tiles around the avatar; again after moving 250 m or new tiles ----
+  useEffect(() => {
+    if (!ready) return;
+    let source: string | null = null;
+    let center: LatLng | null = null;
+    let dirty = true;
+    const onData = (e: { sourceId?: string; isSourceLoaded?: boolean }) => { if (e.sourceId === source && e.isSourceLoaded) dirty = true; };
+    map.on('sourcedata', onData);
+    const polys = (f: GeoJSON.Feature): number[][][][] =>
+      f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [];
+    const lines = (f: GeoJSON.Feature): number[][][] =>
+      f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [];
+    const refresh = () => {
+      const layer = layerRef.current;
+      source ??= tileSourceId(map);
+      if (!layer || !source) return;
+      const farFromLast = !center || haversineMeters(center, pos.current) > 250;
+      if (!farFromLast && !dirty && !snapPending.current) return;
+      snapPending.current = false;
+      dirty = false;
+      center = pos.current;
+      const q = (sourceLayer: string, classes: string[]) => map.querySourceFeatures(source!, {
+        sourceLayer, filter: ['match', ['get', 'class'], classes, true, false],
+      });
+      const areas: Area[] = [
+        ...q('landcover', ['wood']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 9 }))),
+        ...q('landcover', ['grass', 'wetland']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 24 }))),
+        ...q('landuse', ['park', 'cemetery']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 18 }))),
+        ...map.querySourceFeatures(source, { sourceLayer: 'park' }).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 18 }))),
+      ];
+      const streets: Street[] = [
+        ...q('transportation', ['minor', 'service']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 16, offset: 7 }))),
+        ...q('transportation', ['tertiary', 'secondary', 'primary']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 18, offset: 12 }))),
+      ];
+      const buildings = map.querySourceFeatures(source, { sourceLayer: 'building' }).flatMap((f) => polys(f));
+      const water = map.querySourceFeatures(source, { sourceLayer: 'water' }).flatMap((f) => polys(f));
+      // No trees on sports fields, playgrounds or in the water.
+      const blockers = [...buildings, ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water];
+      // You can't walk into a building or the bay. The demo walk starts on open ground.
+      blockedRef.current = blockerTest([...buildings, ...water]);
+      if (sourceRef.current === 'demo' && !moved.current) {
+        // Start on the nearest street or footpath (a home inside a campus courtyard reads as a
+        // rooftop from the low camera), and never inside a building.
+        const start = homeRef.current ?? DEMO_CENTER;
+        const roads = q('transportation', ['minor', 'tertiary', 'secondary']).flatMap((f) => lines(f));
+        const paths = q('transportation', ['service', 'path']).flatMap((f) => lines(f));
+        const onStreet = nearestOnLines(start, roads, 250) ?? nearestOnLines(start, paths, 150) ?? start;
+        pos.current = nearestOpen(onStreet, blockedRef.current);
+        petPos.current = pos.current;
+      }
+      layer.setTrees(placeTrees({ origin: DEMO_CENTER, center: pos.current, radiusM: 700, cap: 700, areas, streets, blockers }));
+    };
+    refresh();
+    const t = window.setInterval(refresh, 1500);
+    return () => { window.clearInterval(t); map.off('sourcedata', onData); };
+  }, [map, ready]);
 
   // ---- The frame loop: movement, the pet, friends, the camera ----
   useEffect(() => {
@@ -328,11 +398,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           moved.current = true;
         }
         if (turn) heading.current = normalizeDeg(heading.current + turn * TURN_DPS * dt);
-        if (fwd) { pos.current = moveMeters(pos.current, fwd * STICK_MPS * dt, heading.current); moving = true; }
+        if (fwd) { pos.current = tryMove(pos.current, fwd * STICK_MPS * dt, heading.current); moving = true; }
         if (mag > 0.15) {
           const dir = normalizeDeg(camBearing.current + (Math.atan2(s.x, -s.y) * 180) / Math.PI);
           heading.current = lerpDeg(heading.current, dir, 1 - Math.exp(-dt * 10));
-          pos.current = moveMeters(pos.current, STICK_MPS * mag * dt, heading.current);
+          pos.current = tryMove(pos.current, STICK_MPS * mag * dt, heading.current);
           moving = true;
         }
         const w = walkRef.current;
@@ -425,7 +495,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const pitch = entering.current ? pitchForZoom(z) : p0 + (pitchForZoom(z) - p0) * (1 - Math.exp(-dt * 8));
         camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
         const h = map.getContainer().clientHeight;
-        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, pitch, offset: [0, Math.round(h * 0.12)], duration: 0 });
+        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, pitch, offset: [0, Math.round(h * 0.2)], duration: 0 });
       } else if (!busy) {
         camBearing.current = map.getBearing();
         const p0 = map.getPitch();
@@ -435,7 +505,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk]);
+  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, tryMove]);
 
   // ---- GPS source ----
   const chooseSource = async (next: Source) => {
