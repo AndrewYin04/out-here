@@ -111,6 +111,17 @@ Versions on 2026-11-12: `next@15` resolves to 15.5.29, `@supabase/supabase-js` i
 2.119.0, `@playwright/test` is 1.65.0, and `@faker-js/faker` is 10.6.0 (ESM-only; pin
 it).
 
+**Map, in two steps.** One map stack: `maplibre-gl` with the OpenFreeMap Positron
+style above. No Leaflet, react-leaflet, or CARTO anywhere.
+
+1. M2: the overhead Menlo Park map centered on `DEMO_CENTER`, with quest pins and live
+   seat counts. MapLibre touches `window`, so the map component is client-only and
+   imports `maplibre-gl/dist/maplibre-gl.css`.
+2. M4, only after the M3 checkpoint (join works live on two devices): a tilted walking
+   view (pitch about 60) with 3D buildings, a `fill-extrusion` layer on the
+   OpenFreeMap `building` source-layer using `render_height`. It is the first thing
+   cut if M4 runs late.
+
 **Claude Code behaviour for an unattended Windows run** (https://code.claude.com/docs/en/):
 
 - **Platform.** Native Windows has no sandbox. Claude in Chrome does not work under
@@ -605,10 +616,11 @@ cut from the bottom of the current milestone, never from Out Here P0.
 | M1 | +0:45 | Full image generation, seed content JSON, `npm run seed` on dev, `seed:demo` on demo; contracts in `src/shared/` (kit types + FB types + `canSee`) | main |
 | M2 | +1:45 | FB-P0 shell, Feed, Profile, Friends, Notifications | builder **fb** |
 | M2 | +1:45 | Muse pipeline: parse (Ember) → candidates (code) → rank/explain (Spark) → validate, with `muse_runs` logging and fixtures | builder **muse** |
-| M2 | +1:45 | Out Here map tab (MapLibre + OpenFreeMap), Friends/Explore toggle, quest sheet, "I'm free" composer | builder **map** |
+| M2 | +1:45 | Out Here map tab (MapLibre + OpenFreeMap, overhead view), Friends/Explore toggle, quest pins with live seat counts, quest sheet, "I'm free" composer | builder **map** |
 | M3 | +2:45 | Integrate all three. Invites as notifications, Accept, and `join_quest`. Live seats over Broadcast in two tabs. Playwright `demo.spec.ts` drives the full flow with two personas. **P0 checkpoint on the preview URL with real Muse.** | main + e2e-verifier |
 | M4 | +3:45 | Group page Hangouts tab; FB-P1 Messenger (invites as messages), Events, Search | builder **fb** |
 | M4 | +3:45 | Kit P1: "We're done" → photo → crew album with Muse caption → "Do this again" | builder **memories** |
+| M4 | +3:45 | Tilted walking view with 3D buildings (section 2, "Map, in two steps"). Only after the M3 checkpoint passes; cut first if M4 runs late. | builder **map** |
 | M5 | until freeze | Kit P2 (Daily Quest with vision check, weekly streak, Wrapped), then FB-P2 (Marketplace, Reels), polish, and a reviewer pass on the full diff | builders + reviewer |
 | M6 | freeze → handoff | Fixes only. `seed:demo`. Final e2e on the preview URL. `docs/HANDOFF.md` and `docs/DEVPOST.md` per the kit, screenshots, README final, board `done`. | main |
 
