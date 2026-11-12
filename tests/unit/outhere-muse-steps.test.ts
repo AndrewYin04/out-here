@@ -60,7 +60,7 @@ describe('museSteps', () => {
 
   it('fallback and mock say so honestly', () => {
     expect(texts(make(), 'fallback')[3]).toMatch(/^Muse didn't answer in time/);
-    expect(texts(make(), 'mock')[3]).toMatch(/^Ranked offline \(mock\)/);
+    expect(texts(make(), 'mock')[3]).toMatch(/^Sorted offline by who's free/);
   });
 
   it('friends: none, two, many', () => {

@@ -56,14 +56,16 @@ type Props = {
   friends: Map<string, PersonCard>;
   /** First name -> when that friend's shared free window ends, from the plan's meta. */
   freeUntil?: Map<string, string>;
+  /** The plan's price from the plan answer (meta.prices), so the meta row is complete on first paint. */
+  priceMax?: number;
   showMuse: boolean;
   onJoined?: () => void;
 };
 
-export function SuggestionCard({ s, friends, freeUntil, showMuse, onJoined }: Props) {
+export function SuggestionCard({ s, friends, freeUntil, priceMax, showMuse, onJoined }: Props) {
   const quest = useQuest(s.questId);
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
-  const price = quest.data?.quest.priceMax;
+  const price = quest.data?.quest.priceMax ?? priceMax;
   const isMember = quest.data?.viewerIsMember ?? false;
   const people = s.friendIds.map((id) => friends.get(id)).filter((p): p is PersonCard => !!p);
 

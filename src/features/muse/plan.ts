@@ -49,6 +49,8 @@ export type PlanMeta = {
   friendsChecked: number;
   /** Friends free in the window: first name and end time only, from availability they shared with the viewer. */
   friendsFree: { firstName: string; freeUntil: string }[];
+  /** questId -> priceMax for the plans that fit, so the card's meta row needs no second fetch. */
+  prices: Record<string, number>;
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -108,6 +110,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     candidateCount: 0,
     friendsChecked: ctx.friends.length,
     friendsFree: [],
+    prices: {},
     dropped: [],
     issues: [],
     ...rest,
@@ -170,6 +173,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
         rankFallback: ranked.fallback,
         rankError: ranked.error,
         candidateCount: result.candidates.length,
+        prices: Object.fromEntries(result.candidates.map((c) => [c.questId, c.quest.priceMax])),
         friendsFree,
         dropped: result.dropped,
         issues: checked.issues,

@@ -117,14 +117,16 @@ function RuledOutItem({ row }: { row: RuledOutRow }) {
 }
 
 /**
- * What Muse did, open by default so a judge sees it without a tap: what it read, how many
- * plans and friends it checked, and the top reasons it ruled plans out. The rest opens on "more".
+ * What was checked and who did it, open by default so a judge sees it without a tap. Code
+ * counted the plans and friends, read the limits and ruled plans out (candidates.ts), so those
+ * lines carry no Muse label. Only the rank line says ✨ Muse, and only when the live model
+ * ranked and explained the picks. The other ruled-out rows open on "N more".
  */
 export function MuseWorkPanel({ work }: { work: MuseWork }) {
   const [open, setOpen] = useState(false);
   const { top, more, offTopic } = work.ruledOut;
-  const extra = more.length + offTopic;
-  const toggle = (
+  const hasDetails = more.length > 0 || offTopic > 0;
+  const toggle = hasDetails ? (
     <button
       type="button"
       aria-expanded={open}
@@ -132,15 +134,15 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
       onClick={() => setOpen((v) => !v)}
       className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
     >
-      {open ? 'Less' : extra > 0 ? `${extra} more` : 'Details'}
+      {open ? 'Less' : more.length > 0 ? `${more.length} more` : 'Details'}
       {open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
     </button>
-  );
+  ) : null;
 
   return (
-    <section data-testid="muse-work" aria-label="What Muse checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2.5 shadow-card">
+    <section data-testid="muse-work" aria-label="What was checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2.5 shadow-card">
       <p data-testid="muse-work-checked" className="text-[15px] font-semibold leading-5 text-fb-text">
-        <span className="text-fb-blue">✨ Muse</span> {work.checked.replace(/^Muse /, '')}
+        {work.checked}
         {work.fit && <span className="font-normal text-fb-text-2"> · {work.fit}</span>}
       </p>
       <p data-testid="muse-work-read" className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
@@ -152,6 +154,15 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
           {work.friends}
         </p>
       )}
+      <p
+        data-testid="muse-work-rank"
+        data-by={work.rankByMuse ? 'muse' : 'code'}
+        title={work.rank}
+        className={cn('mt-0.5 truncate text-[13px] leading-[18px]', work.rankByMuse ? 'font-semibold text-fb-text' : 'text-fb-text-2')}
+      >
+        {work.rankByMuse ? <span className="text-fb-blue">✨ Muse</span> : null}
+        {work.rankByMuse ? ` ${work.rank.replace(/^Muse /, '')}` : work.rank}
+      </p>
       {top.length > 0 ? (
         <div className="mt-1.5 border-t border-fb-divider pt-1.5">
           <div className="flex items-center justify-between gap-2">
@@ -164,16 +175,12 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
           </ul>
         </div>
       ) : (
-        <div className="mt-1 flex justify-end">{toggle}</div>
+        toggle && <div className="mt-1 flex justify-end">{toggle}</div>
       )}
-      {open && (
-        <div data-testid="muse-work-details" className="mt-1 flex flex-col gap-0.5 text-[13px] leading-[18px] text-fb-text-2">
-          {offTopic > 0 && <p>{offTopic} other{offTopic === 1 ? " wasn't" : "s weren't"} what you asked for</p>}
-          <p className="flex items-start gap-1.5">
-            <Check size={14} className="mt-0.5 shrink-0 text-fb-green" aria-hidden />
-            {work.rank}
-          </p>
-        </div>
+      {open && offTopic > 0 && (
+        <p data-testid="muse-work-details" className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+          {offTopic} other{offTopic === 1 ? " wasn't" : "s weren't"} what you asked for
+        </p>
       )}
     </section>
   );

@@ -7,7 +7,7 @@ import { rankStep, windowText } from './muse-steps';
 import type { PlanResponse, PlanResult } from './plan-api';
 
 export type MuseWork = {
-  /** "Muse checked 17 plans and 6 friends" */
+  /** "Checked 17 plans and 6 friends". Code did this count, so it carries no Muse label. */
   checked: string;
   /** "2 fit", or null when nothing was checked. */
   fit: string | null;
@@ -18,6 +18,8 @@ export type MuseWork = {
   ruledOut: RuledOut;
   /** How the picks were ranked: "Muse ranked 2 of 2 and explained why · 1.2 s". */
   rank: string;
+  /** True only when the live model ranked and explained the picks; only then does that line get ✨ Muse. */
+  rankByMuse: boolean;
 };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -55,8 +57,8 @@ export function museWork(plan: PlanResponse, source: PlanResult['museSource'], n
   const plansN = fitN + new Set(dropped.map((d) => d.questId)).size;
   const friendsN = plan.meta.friendsChecked;
   const checked = friendsN === undefined
-    ? `Muse checked ${plural(plansN, 'plan')}`
-    : `Muse checked ${plural(plansN, 'plan')} and ${plural(friendsN, 'friend')}`;
+    ? `Checked ${plural(plansN, 'plan')}`
+    : `Checked ${plural(plansN, 'plan')} and ${plural(friendsN, 'friend')}`;
   return {
     checked,
     fit: plansN > 0 ? `${fitN} fit` : null,
@@ -64,5 +66,6 @@ export function museWork(plan: PlanResponse, source: PlanResult['museSource'], n
     friends: friendsLine(plan),
     ruledOut: ruledOut(dropped, askLimits(plan.intent), topN),
     rank: rankStep(plan, source).text,
+    rankByMuse: source === 'muse' && fitN > 0,
   };
 }

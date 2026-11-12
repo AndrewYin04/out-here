@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
+import { withChip } from './chip-text';
 import { museWork } from './muse-work';
 import { MuseStepsLoading, MuseWorkPanel } from './MuseSteps';
 
@@ -100,7 +101,7 @@ export function PlanSheet({ className }: { className?: string }) {
   };
 
   const addChip = (c: string) => {
-    setText((prev) => (prev.trim() ? `${prev.trim().replace(/,$/, '')}, ${c}` : c));
+    setText((prev) => withChip(prev, c));
     inputRef.current?.focus();
   };
 
@@ -228,7 +229,7 @@ export function PlanSheet({ className }: { className?: string }) {
                   <>
                     <div className="flex flex-col gap-2">
                       {result.plan.suggestions.map((s, i) => (
-                        <SuggestionCard key={`${s.questId ?? s.title}-${i}`} s={s} friends={friendMap} freeUntil={freeUntil} showMuse={showMuse} />
+                        <SuggestionCard key={`${s.questId ?? s.title}-${i}`} s={s} friends={friendMap} freeUntil={freeUntil} priceMax={s.questId ? result.plan.meta?.prices?.[s.questId] : undefined} showMuse={showMuse} />
                       ))}
                     </div>
                   {summary && (

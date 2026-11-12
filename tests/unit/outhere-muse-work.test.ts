@@ -85,7 +85,7 @@ describe('museWork', () => {
 
   it('header counts each plan once (2 fit + 6 unique drops), plus the friends checked', () => {
     const w = museWork(make(), 'muse', NOW)!;
-    expect(w.checked).toBe('Muse checked 8 plans and 6 friends');
+    expect(w.checked).toBe('Checked 8 plans and 6 friends');
     expect(w.fit).toBe('2 fit');
     expect(w.read).toEqual(['food', '40 min', 'under $15', 'up to 25 min walk']);
     expect(w.friends).toBe('Free then: Maya till 11:58 AM, Liam till 12:38 PM');
@@ -96,7 +96,7 @@ describe('museWork', () => {
     expect(museWork(make({ friendsFree: [{ firstName: 'Maya', freeUntil: iso(58) }] }), 'muse', NOW)!.friends).toBe('Maya is free till 11:58 AM');
     expect(museWork(make({ friendsFree: [] }), 'muse', NOW)!.friends).toBe('None of your friends are free then');
     expect(museWork(make({ friendsFree: [], friendsChecked: 0 }), 'muse', NOW)!.friends).toBeNull();
-    expect(museWork(make({ friendsChecked: undefined }), 'muse', NOW)!.checked).toBe('Muse checked 8 plans');
+    expect(museWork(make({ friendsChecked: undefined }), 'muse', NOW)!.checked).toBe('Checked 8 plans');
   });
 
   it('not understood: nothing to show', () => {
@@ -104,6 +104,12 @@ describe('museWork', () => {
   });
 
   it('mock ranking says so', () => {
-    expect(museWork(make(), 'mock', NOW)!.rank).toMatch(/^Ranked offline \(mock\)/);
+    const w = museWork(make(), 'mock', NOW)!;
+    expect(w.rank).toMatch(/^Sorted offline by who's free, interests, walk/);
+    // ✨ Muse goes only on a line the live model wrote
+    expect(w.rankByMuse).toBe(false);
+    expect(museWork(make(), 'fallback', NOW)!.rankByMuse).toBe(false);
+    expect(museWork(make(), 'muse', NOW)!.rankByMuse).toBe(true);
+    expect(w.checked).not.toMatch(/Muse/);
   });
 });

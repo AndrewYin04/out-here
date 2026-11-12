@@ -81,8 +81,9 @@ export function rankStep(plan: PlanResponse, source: PlanResult['museSource']): 
   const ms = plan.meta.timings?.totalMs;
   // Under 0.1 s means a dev cache answered; "0.0 s" would read as fake, so leave it out.
   const secs = typeof ms === 'number' && ms >= 100 ? ` · ${(ms / 1000).toFixed(1)} s` : '';
-  if (source === 'mock') return { key: 'rank', text: `Ranked offline (mock): ${n} pick${n === 1 ? '' : 's'}${secs}`, tone: 'muted' };
-  if (source === 'fallback') return { key: 'rank', text: `Muse didn't answer in time, so sorted by time and distance${secs}`, tone: 'muted' };
+  // Mock and fallback picks come from explain.ts heuristicScore: free friends, interests, walk time.
+  if (source === 'mock') return { key: 'rank', text: `Sorted offline by who's free, interests, walk${secs}`, tone: 'muted' };
+  if (source === 'fallback') return { key: 'rank', text: `Muse didn't answer in time, so sorted by who's free, your interests and walk time${secs}`, tone: 'muted' };
   return { key: 'rank', text: `Muse ranked ${n} of ${fit} and explained why${secs}`, tone: 'ok' };
 }
 

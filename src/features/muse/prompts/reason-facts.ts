@@ -41,7 +41,7 @@ export type FactReasonOptions = { budgetMax?: number | null; windowEnd?: string 
  * A reason built only from checked candidate data. It prefers facts the card's meta row
  * (walk minutes, start time, price) does not already show: a free friend's bubble or shared
  * interest, the viewer's own interests by name, a friend already going, then the budget
- * headroom ("$8 under your $15 budget"). Returns '' when only meta-row facts remain, and
+ * ("Within your $15 budget"). Returns '' when only meta-row facts remain, and
  * the card then hides the reason line instead of printing a copy of the meta row.
  */
 export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): string {
@@ -57,7 +57,9 @@ export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): stri
   if (asked) return `It is the ${asked} you asked for.`;
   const budget = opts.budgetMax ?? null;
   if (budget !== null && budget > c.quest.priceMax) {
-    return `$${budget - c.quest.priceMax} under your $${budget} budget.`;
+    // Not "$8 under your $15": beside the card's "Up to $7" that read as a second price.
+    // The meta row already shows the price, so the reason names only the budget.
+    return `Within your $${budget} budget.`;
   }
   if (opts.windowEnd) {
     const spare = Math.floor((Date.parse(opts.windowEnd) - Date.parse(c.arriveAt)) / 60_000);

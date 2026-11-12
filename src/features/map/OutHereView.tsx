@@ -19,7 +19,9 @@ import type { FriendFace, MapContext, MapMode } from './types';
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 
 /** Seeded quests get a readable test id ("quest-pin-dumplings"); others use their id. */
-const KEY_BY_ID = new Map(DEMO_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
+/** How far a quest pin with its seat badge rises above its map point, plus a small gap. */
+const PIN_RISE = 64;
+const KEY_BY_ID =new Map(DEMO_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
 const testIdFor = (id: string) => `quest-pin-${KEY_BY_ID.get(id) ?? id}`;
 
 function useNow(intervalMs = 30_000): Date {
@@ -109,6 +111,7 @@ export function OutHereView() {
 
   // Muse filter answers: frame the kept pins and the viewer, clear of the top chips and the
   // I'm free button. Turning the filter off puts the camera back where it was.
+  const filterPillsRef = useRef<HTMLDivElement>(null);
   const savedCamera = useRef<{ center: [number, number]; zoom: number; bearing: number; pitch: number } | null>(null);
   const keepKey = filter.keep ? `${mode}:${[...filter.keep].sort().join(',')}` : '';
   const hasOrigin = !!ctx?.origin;
@@ -135,8 +138,17 @@ export function OutHereView() {
     const lats = pts.map((p) => p.lat);
     const lngs = pts.map((p) => p.lng);
     const desktop = window.matchMedia('(min-width: 768px)').matches;
+    // Keep every kept pin, which rises about 56 px above its point with its seat badge, below the
+    // filter pills. The pills are measured, since the why-line adds a row on wide screens.
+    const pills = filterPillsRef.current;
+    let pillsBottom = 0;
+    for (const el of Array.from(pills?.children ?? [])) {
+      if ((el as HTMLElement).dataset.testid === 'muse-filter-reasons') continue; // the tap-open list floats over the map
+      pillsBottom = Math.max(pillsBottom, el.getBoundingClientRect().bottom - map.getContainer().getBoundingClientRect().top);
+    }
+    const top = Math.max(desktop ? 130 : 120, pillsBottom + PIN_RISE);
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
-      padding: desktop ? { top: 130, bottom: 110, left: 90, right: 90 } : { top: 120, bottom: 170, left: 44, right: 44 },
+      padding: desktop ? { top, bottom: 110, left: 90, right: 90 } : { top, bottom: 170, left: 44, right: 44 },
       maxZoom: desktop ? 16 : 15.5,
       duration: 600,
     });
@@ -227,7 +239,7 @@ export function OutHereView() {
       </div>
 
       {filter.on && (
-        <div className="pointer-events-none absolute inset-x-4 top-[60px] z-[15] flex flex-col items-center gap-1">
+        <div ref={filterPillsRef} className="pointer-events-none absolute inset-x-4 top-[60px] z-[15] flex flex-col items-center gap-1">
           <p
             role="status"
             data-testid="muse-filter-status"
@@ -286,13 +298,15 @@ export function OutHereView() {
             </button>
           </p>
           {/* "Why these?" in one line, without a tap: Muse's own sentence when the live model
-              answered, else the first kept plan's reason. Tapping it opens the full list. */}
+              answered, else the first kept plan's reason. Tapping it opens the full list. Under
+              768 px it is left out: a third pill row covered the map and cut off mid-word, and
+              "Why these?" in the status pill opens the same list. */}
           {!whyOpen && !filter.loading && !filter.error && keptItems.length > 0 && (
             <button
               type="button"
               data-testid="muse-filter-why-line"
               onClick={() => setWhyOpen(true)}
-              className="pointer-events-auto flex max-w-full items-center gap-1 truncate rounded-pill bg-fb-surface px-3 py-1 text-left text-[13px] text-fb-text-2 shadow-card hover:bg-fb-hover md:max-w-[560px]"
+              className="pointer-events-auto hidden max-w-full items-center gap-1 truncate md:flex rounded-pill bg-fb-surface px-3 py-1 text-left text-[13px] text-fb-text-2 shadow-card hover:bg-fb-hover md:max-w-[560px]"
             >
               <span className="shrink-0 font-semibold text-fb-blue">{reasonLabel}</span>
               <span className="min-w-0 truncate">

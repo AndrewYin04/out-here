@@ -53,8 +53,8 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     expect(hasConcreteFact('It is the open plan nearby that fits your time best.', c)).toBe(false);
     expect(hasConcreteFact('It is the food plan that fits your time best.', candidate({ matchedActivities: ['food'] }))).toBe(false);
     expect(concreteReason('Good for boba fans.', c)).toBe('Good for boba fans.');
-    // budget headroom, never "4 min walk, $7, starts in 9 min" (the meta row says that)
-    expect(concreteReason('Fits your time best.', c, { budgetMax: 15 })).toBe('$8 under your $15 budget.');
+    // the budget only (the meta row shows the $7), never "4 min walk, $7, starts in 9 min"
+    expect(concreteReason('Fits your time best.', c, { budgetMax: 15 })).toBe('Within your $15 budget.');
     // the viewer's own interest by name beats the budget
     expect(factReason(candidate({ viewerInterests: ['boba', 'sketching'] }), { budgetMax: 15 }))
       .toBe('You listed boba and sketching in your interests.');
@@ -92,6 +92,6 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     expect(out.suggestions).toHaveLength(1);
     expect(out.suggestions[0].reason).toBe('You get there with 36 min of your free time left.');
     const budgeted = validate([s], [candidate()], ctx as never, { intent: { ...intent, budgetMax: 15 }, text: 'thirsty, under $15', now: NOW });
-    expect(budgeted.suggestions[0].reason).toBe('$8 under your $15 budget.');
+    expect(budgeted.suggestions[0].reason).toBe('Within your $15 budget.');
   });
 });
