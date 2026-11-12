@@ -6,7 +6,7 @@ import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
-import { InviteInbox } from './InviteInbox';
+
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanOpen, usePlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
@@ -37,7 +37,7 @@ function windowLabel(text: string): string {
   return m ? `${m[1]} minutes` : 'that time';
 }
 
-/** The "I'm free" composer and Muse's suggestions. Also hosts InviteInbox so invites work on this page. */
+/** The "I'm free" composer and Muse's suggestions. InviteInbox is mounted once, globally, in AppShell. */
 export function PlanSheet({ className }: { className?: string }) {
   const open = usePlanOpen();
   const { viewer } = useViewer();
@@ -103,7 +103,6 @@ export function PlanSheet({ className }: { className?: string }) {
 
   return (
     <>
-      <InviteInbox />
       {open && (
         <section
           aria-label="I'm free"
