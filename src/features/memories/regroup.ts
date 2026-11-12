@@ -155,3 +155,19 @@ export function validateRegroup(out: RegroupResult, ctx: RegroupContext): Regrou
   }
   return out;
 }
+
+/** Crew members who would still need a seat on this quest (the ones not already on it). */
+export function seatsNeeded(crewMemberIds: string[], questMemberIds: string[]): number {
+  const on = new Set(questMemberIds);
+  return crewMemberIds.filter((id) => !on.has(id)).length;
+}
+
+/** True when the whole crew fits: every member not already on the quest can take a seat. */
+export function crewFits(seatsLeft: number, crewMemberIds: string[], questMemberIds: string[]): boolean {
+  return seatsLeft >= seatsNeeded(crewMemberIds, questMemberIds);
+}
+
+/** Drops a leading emoji (and the space after it) so surfaces that add the quest emoji do not show it twice. */
+export function stripLeadingEmoji(title: string): string {
+  return title.replace(/^(?:\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}\u200d\ufe0f])+\s*/u, '').trim() || title;
+}

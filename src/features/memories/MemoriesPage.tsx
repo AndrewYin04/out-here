@@ -7,7 +7,7 @@ import type { Crew, Memory, PersonCard } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
-import type { RegroupResult } from './regroup';
+import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
 type CrewMeta = { crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null };
 type CrewRow = Crew & { meta: CrewMeta | null; memories: Memory[]; viewerId: string };
@@ -113,7 +113,7 @@ function CrewCard({ crew }: { crew: CrewRow }) {
       for (const m of friends) {
         try {
           await apiPost('/api/invites', {
-            toId: m.id, questId: result.suggestion.questId, suggestionTitle: result.suggestion.title, message: result.message,
+            toId: m.id, questId: result.suggestion.questId, suggestionTitle: stripLeadingEmoji(result.suggestion.title), message: result.message,
           });
           sent.push(m.name.split(' ')[0]);
         } catch { /* reported below as not sent */ }

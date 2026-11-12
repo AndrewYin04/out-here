@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commonInterests, mockRegroup, questMatches, RegroupValidationError, RegroupZ, validateRegroup, type RegroupContext } from './regroup';
+import { commonInterests, crewFits, mockRegroup, seatsNeeded, stripLeadingEmoji, questMatches, RegroupValidationError, RegroupZ, validateRegroup, type RegroupContext } from './regroup';
 
 const ctx: RegroupContext = {
   crewId: 'c1', crewName: 'Dumpling Crew', originTitle: 'Dumpling Den first try', lastHangoutText: '2026-11-05',
@@ -42,5 +42,24 @@ describe('regroup', () => {
     const out = mockRegroup({ ...ctx, candidates: [] });
     expect(out.suggestion.questId).toBeNull();
     expect(out.suggestion.title).toContain('Dumpling Den first try');
+  });
+
+  it('a 4-person crew does not fit a 2-seat quest, so the mock suggests the old hangout again', () => {
+    const crew = ['alex', 'maya', 'kai', 'zara'];
+    expect(seatsNeeded(crew, ['host1', 'maya'])).toBe(3);
+    expect(crewFits(2, crew, ['host1'])).toBe(false);
+    expect(crewFits(2, crew, ['host1', 'maya', 'kai'])).toBe(true);
+    const fitting = ctx.candidates.filter((c) => crewFits(c.seatsLeft, crew, []));
+    expect(fitting).toEqual([]);
+    const out = mockRegroup({ ...ctx, candidates: fitting });
+    expect(out.suggestion.questId).toBeNull();
+    expect(out.suggestion.reason).not.toMatch(/seats? left/);
+  });
+
+  it('strips a leading emoji from a suggestion title and keeps digits', () => {
+    expect(stripLeadingEmoji('🥟 Dumplings before the rush')).toBe('Dumplings before the rush');
+    expect(stripLeadingEmoji('🏃‍♀️ Easy run')).toBe('Easy run');
+    expect(stripLeadingEmoji('5K along the bay trail')).toBe('5K along the bay trail');
+    expect(stripLeadingEmoji('Board game night')).toBe('Board game night');
   });
 });

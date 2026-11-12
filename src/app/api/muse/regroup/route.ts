@@ -10,7 +10,7 @@ import { DEMO_CENTER, demoDate, formatDemoTime, minutesUntil, now as demoNow } f
 import { museJSON } from '@/features/muse';
 import { body, IdZ, route } from '@/lib/api';
 import {
-  commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupZ, regroupMessages, validateRegroup,
+  commonInterests, crewFits, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupZ, regroupMessages, validateRegroup,
   type RegroupCandidate, type RegroupContext,
 } from '@/features/memories/server';
 
@@ -78,11 +78,16 @@ export const POST = route(async ({ store, viewer, req }) => {
   const quests = await store.questsNear(viewer.id, center, 3000);
   const candidates: RegroupCandidate[] = quests
     .filter((q) => q.status === 'open' && !q.memberIds.includes(viewer.id))
-    .map((q) => {
+    .flatMap((q) => {
       const row = view.questById.get(q.id);
+      const seatsLeft = row ? view.seatsLeft(row) : Math.max(q.capacity - q.memberIds.length, 0);
+      // The whole crew must fit: a 4-person crew is never sent to a 2-seat plan.
+      return crewFits(seatsLeft, crew.memberIds, q.memberIds) ? [{ q, seatsLeft }] : [];
+    })
+    .map(({ q, seatsLeft }) => {
       return {
         questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt,
-        whenText: whenText(q.startsAt, at), seatsLeft: row ? view.seatsLeft(row) : Math.max(q.capacity - q.memberIds.length, 0),
+        whenText: whenText(q.startsAt, at), seatsLeft,
         priceMax: q.priceMax, tags: q.tags, matches: questMatches(q, wanted),
       };
     })
