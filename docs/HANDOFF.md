@@ -43,6 +43,10 @@ Two devices or two browser windows (each tab is its own persona): window A `…/
 
 ## Not done (team daytime list, in priority order)
 
+**New ideas from Andrew (Thu morning), not started:**
+- **"Click": agents that vet a match for you.** Like Boardy, but each person's own Muse agent represents them, and two agents talk to each other first about whether their people would be a good fit (interests, goals, what each is looking for, timing, dealbreakers). Only when both agents agree is an intro proposed to the two humans, who then each accept (double opt-in). The agent-to-agent conversation is the visible AI work: show a short "why your agents think you'd click" summary, and keep the transcript private to each side. Builds on the Muse Intros spec in MVP-BUILD-PLAN-itr-1.md (reach, trust path, score threshold, frequency cap).
+- **First-person "Pokémon Go" map view.** A character avatar for the viewer standing on the map, in a tilted 3D street-level view, that walks toward plans shown as landmark "stadiums" (quest venues as visible 3D markers you can see from a distance, with seat counts). Tapping a stadium opens the quest; walking (or tapping a direction) moves the avatar along the route, with the walk minutes counting down. Extends the planned 3D walking view (MapLibre pitch ~60 plus fill-extrusion buildings); never uses real GPS without consent, and the demo moves the avatar along a simulated route.
+
 **Gap found in the morning review:** there is no single place to see the plans you joined. Today you see it per plan (the quest panel says "You're going") or through notifications. Add a **"Your plans"** list: a button on the Out Here map and the Going tab on `/events`, listing every plan the viewer joined (time, place, who is going, Leave). About one builder slice.
 
 From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan:
