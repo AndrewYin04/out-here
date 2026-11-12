@@ -46,7 +46,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   // Live: bump the seat count when someone joins or leaves, and say who just joined.
   useEffect(() => {
     if (!shown) return;
-    if (prevSeats.current !== null && prevSeats.current !== shown.seatsLeft) bump(seatsRef.current);
+    if (prevSeats.current !== null && prevSeats.current !== shown.seatsLeft) bump(seatsRef.current, '', 1.2);
     prevSeats.current = shown.seatsLeft;
     const ids = new Set(shown.members.map((m) => m.id));
     const before = prevMembers.current;
@@ -149,7 +149,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               </li>
               <li className="flex items-center gap-2">
                 <Users size={18} className="text-fb-text-2" aria-hidden />
-                <span ref={seatsRef} data-testid="quest-seats" className={shown.seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
+                <span ref={seatsRef} data-testid="quest-seats" className={cn('origin-left', shown.seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2')}>
                   {shown.seatsLeft > 0 ? `${shown.seatsLeft} ${shown.seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
                 </span>
                 <span className="text-fb-text-2">· {q.capacity} max</span>

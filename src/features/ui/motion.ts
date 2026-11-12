@@ -34,13 +34,13 @@ export function squash(el: Element | null | undefined, base = '') {
 }
 
 /** A count changed live: grow past the target, then settle back. */
-export function bump(el: Element | null | undefined, base = '') {
+export function bump(el: Element | null | undefined, base = '', amount = 1.55) {
   if (!canAnimate(el)) return;
   el.animate(
     [
       { transform: `${base} scale(1)` },
-      { transform: `${base} scale(1.55)`, offset: 0.3 },
-      { transform: `${base} scale(0.92)`, offset: 0.6 },
+      { transform: `${base} scale(${amount})`, offset: 0.3 },
+      { transform: `${base} scale(${1 - (amount - 1) * 0.15})`, offset: 0.6 },
       { transform: `${base} scale(1)` },
     ],
     { duration: 650, easing: 'ease-out' },
@@ -57,8 +57,9 @@ function layer(): HTMLElement {
 
 /**
  * An avatar flies from one element to another along an arc, then the target squashes.
- * The arc: the outer box moves X linearly while the inner box moves Y with ease-out going up and
- * ease-in coming down, so the path curves the way a thrown object does.
+ * Driven frame by frame so it follows the target if the map pans mid-flight: x eases toward the
+ * target's live position, y adds a parabola on top (a thrown object's path), and the first 10%
+ * is a small anticipation dip before take-off.
  */
 export function flyAvatar(from: Element | null, to: Element | null, src: string, onLand?: () => void): boolean {
   if (!from || !to || !canAnimate(document.body)) return false;
@@ -68,35 +69,41 @@ export function flyAvatar(from: Element | null, to: Element | null, src: string,
   const size = 40;
   const x0 = a.left + a.width / 2 - size / 2;
   const y0 = a.top + a.height / 2 - size / 2;
-  const x1 = b.left + b.width / 2 - size / 2;
-  const y1 = b.top + b.height / 2 - size / 2;
-  const lift = Math.max(70, Math.abs(y1 - y0) * 0.35);
-  const peak = Math.min(y0, y1) - lift;
-  const duration = 720;
+  const lift = Math.max(80, Math.abs(b.top - a.top) * 0.4);
+  const duration = 760;
 
   const root = layer();
-  const outer = document.createElement('div');
-  outer.style.cssText = `position:absolute;left:0;top:0;transform:translateX(${x0}px);`;
-  const inner = document.createElement('img');
-  inner.src = src;
-  inner.alt = '';
-  inner.style.cssText = `display:block;width:${size}px;height:${size}px;border-radius:9999px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.3);object-fit:cover;background:#E2E5E9;transform:translateY(${y0}px);`;
-  outer.append(inner);
-  root.append(outer);
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = '';
+  img.style.cssText = `position:absolute;left:0;top:0;width:${size}px;height:${size}px;border-radius:9999px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.3);object-fit:cover;background:#E2E5E9;will-change:transform;transform:translate(${x0}px,${y0}px);`;
+  root.append(img);
 
-  outer.animate([{ transform: `translateX(${x0}px)` }, { transform: `translateX(${x1}px)` }], { duration, easing: 'linear', fill: 'forwards' });
-  const flight = inner.animate(
-    [
-      // Anticipation: a small dip and squash before take-off.
-      { transform: `translateY(${y0}px) scale(1)`, easing: 'ease-in' },
-      { transform: `translateY(${y0 + 6}px) scale(1.1, 0.9)`, offset: 0.08, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' },
-      { transform: `translateY(${peak}px) scale(1.05)`, offset: 0.5, easing: 'cubic-bezier(0.6, 0, 0.8, 0.3)' },
-      { transform: `translateY(${y1}px) scale(0.7)` },
-    ],
-    { duration, fill: 'forwards' },
-  );
-  flight.onfinish = () => { root.remove(); onLand?.(); };
-  flight.oncancel = () => root.remove();
+  const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+  const t0 = performance.now();
+  const frame = (now: number) => {
+    const raw = Math.min(1, (now - t0) / duration);
+    const r = to.getBoundingClientRect();
+    const x1 = r.left + r.width / 2 - size / 2;
+    const y1 = r.top + r.height / 2 - size / 2;
+    let x: number; let y: number; let sx = 1; let sy = 1;
+    if (raw < 0.1) {
+      // Anticipation: sink a little and squash before the jump.
+      const k = Math.sin((raw / 0.1) * Math.PI);
+      x = x0; y = y0 + 6 * k; sx = 1 + 0.12 * k; sy = 1 - 0.12 * k;
+    } else {
+      const t = (raw - 0.1) / 0.9;
+      const e = easeInOut(t);
+      x = x0 + (x1 - x0) * e;
+      y = y0 + (y1 - y0) * e - lift * 4 * t * (1 - t);
+      const s = 1.05 - 0.35 * t;
+      sx = s; sy = s;
+    }
+    img.style.transform = `translate(${x}px, ${y}px) scale(${sx}, ${sy})`;
+    if (raw < 1) requestAnimationFrame(frame);
+    else { root.remove(); onLand?.(); }
+  };
+  requestAnimationFrame(frame);
   return true;
 }
 
