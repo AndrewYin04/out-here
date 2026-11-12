@@ -1,16 +1,17 @@
 'use client';
 
-import { House, LayoutGrid, MapPin, MessageCircle, Search, Store, Users, UserGroup } from 'lucide-react';
+import { House, LayoutGrid, MapPin, Search, Store, Users, UserGroup } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { Badge, IconButton, IconLink, MenuLabel, MenuLink, MenuSeparator, Popover, cn } from '@/features/ui';
+import { IconButton, IconLink, MenuLabel, MenuLink, MenuSeparator, Popover, cn } from '@/features/ui';
 import { AccountMenu } from './AccountMenu';
 import { Wordmark } from './Brand';
 import { DestinationIcon, MORE_DESTINATIONS, PRIMARY_DESTINATIONS } from './destinations';
 import { CENTER_TABS, ROUTES, isActivePath, type CenterTabId } from './nav';
 import { useShellData } from './ShellDataProvider';
 import { NotificationsPopover } from '@/features/fb/notifications';
+import { MessengerPopover } from '@/features/fb/messenger';
 
 const TAB_ICONS: Record<CenterTabId, typeof House> = {
   home: House,
@@ -135,14 +136,7 @@ export function TopBar() {
         <div className="hidden md:block">
           <MenuGrid />
         </div>
-        <IconLink
-          label="Messenger"
-          href={ROUTES.messages}
-          active={isActivePath(pathname, ROUTES.messages)}
-          badge={<Badge count={messageCount} floating label={`${messageCount} unread chats`} />}
-        >
-          <MessageCircle size={20} aria-hidden />
-        </IconLink>
+        <MessengerPopover active={isActivePath(pathname, ROUTES.messages)} fallbackCount={messageCount} />
         {/* below 768 px Notifications lives in the bottom tab bar */}
         <div className="hidden md:block">
           <NotificationsPopover />

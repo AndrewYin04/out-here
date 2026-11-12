@@ -75,7 +75,8 @@ test.describe('desktop 1440', () => {
       await expect(page).toHaveURL((u) => u.pathname === path);
       await expect(page.getByTestId(`tab-${id}`)).toHaveAttribute('aria-current', 'page');
     }
-    await page.getByRole('link', { name: 'Messenger' }).first().click();
+    await page.getByTestId('messenger-button').click();
+    await page.getByTestId('see-all-messenger').click();
     await expect(page).toHaveURL(/\/messages$/);
     await page.getByTestId('notifications-bell').click();
     await page.getByTestId('notifications-panel').getByRole('link', { name: 'See all' }).click();
@@ -253,7 +254,8 @@ test.describe('mobile 390', () => {
     }
     await page.getByRole('link', { name: 'Search' }).click();
     await expect(page).toHaveURL(/\/search$/);
-    await page.getByRole('link', { name: 'Messenger' }).click();
+    await page.getByTestId('messenger-button').click();
+    await page.getByTestId('see-all-messenger').click();
     await expect(page).toHaveURL(/\/messages$/);
     expect(errors).toEqual([]);
   });
