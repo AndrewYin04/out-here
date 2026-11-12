@@ -39,3 +39,5 @@ Its own milestone deploys use the same command on the `overnight` branch.
 - Previews use the **demo** Supabase project's env vars (`DATA_TARGET=demo`). Don't point tests at it.
 - Env vars live in Vercel → out-here → Settings → Environment Variables (Production and Preview).
   Ask Andrew to add or change one; never put secrets in a comment.
+
+Planned replacement (after the overnight run): deploy on every push with GitHub Actions. See `docs/TODO.md`.
