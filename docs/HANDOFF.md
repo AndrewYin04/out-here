@@ -1,0 +1,62 @@
+# Handoff: Out Here MVP (freeze Thu Nov 12, 07:30 AM PT)
+
+Read this first. Everything below was built overnight by Claude Code on branch `overnight` and checked on the deployed preview with real Muse and the demo Supabase project.
+
+## Links
+
+- **Preview (latest verified):** https://out-here-hc5jvjft3-andrews-projects-76721bc6.vercel.app
+  - It sits behind Vercel login. Until someone turns off Deployment Protection, open it while logged in to Vercel, or ask Andrew for a share link (Vercel dashboard, Share). Share links are credentials: never commit or post them.
+- **Board (talk to the agent):** https://github.com/AndrewYin04/out-here/issues/1
+- **Deploy requests:** issue #4 (comment `DEPLOY <branch>`), see `docs/DEPLOYS.md`.
+- **Draft PR:** `overnight` → `main` (the team merges).
+
+## What works (verified end to end)
+
+**Facebook base** (fictional people with Muse-generated faces, measured Facebook tokens):
+- Shell: top bar, left nav, right rail with Contacts and online dots, mobile bottom bar, persona switcher (avatar menu or `?as=<handle>`).
+- Feed: composer above stories, stories viewer, posts with the 7 reactions, comments with one reply level, share, photo upload, audience picker, live Out Here card.
+- Profiles (cover, intro filtered by visibility, Posts/About/Friends/Photos), Friends (requests, suggestions, all friends, lists).
+- Groups with Discussion, Members, and a Hangouts tab of that group's Out Here plans with live seats.
+- Notifications page and bell popover with a live unread badge.
+
+**Out Here tab:**
+- MapLibre + OpenFreeMap map of Menlo Park with plan pins and live seat badges (Explore view) and a quest panel to join or leave.
+- Friends view ("Find My"): friends' avatar pins with status bubbles, People list by distance, friend card (profile, message, Want to hang?), and your own sharing settings (audience, exact or approximate, pause, edit bubble).
+- **The core loop:** "✨ I'm free" → type what you want → Muse (real API) picks plans that fit your time, walking distance, budget and free friends, explains why in plain words, and drafts the invite → invite a friend → the friend sees it live and accepts → seats update live on every screen.
+
+Muse in the loop: parse with `muse-ember-1.0`, rank and explain with `muse-ember-1.0` (Spark was 5.7-7.0 s; set `MUSE_RANK_ROLE=smart` to use Spark). Measured on Vercel: plan 2.1-4.3 s, Muse 1.0-2.6 s.
+
+## The demo (5 min + 3 min Q&A)
+
+**Reset first.** Run `npm run seed:demo` on Andrew's laptop within 10 minutes of going on stage, and again after every rehearsal. Story times are relative to the seed time (the dumpling plan starts 25 min after seeding; Maya is "on a long lunch" for 50 min). A rehearsal that joins or invites uses up the seats.
+
+Two devices or two browser windows (each tab is its own persona): window A `…/out-here?as=alex`, window B `…/out-here?as=maya`.
+
+1. **0:00-0:30, the problem.** "Alex moved to Menlo Park three weeks ago. He has 40 free minutes and nobody to spend them with. Plans die in the group chat."
+2. **0:30-1:15, Facebook he already uses.** On A, show Home briefly (the Out Here card says Maya is free and 16 plans are nearby), then the Out Here tab: the live map of plans with open seats. Toggle **Friends**: friends who share their location, with status bubbles. Maya's says she's craving dumplings.
+3. **1:15-2:45, Muse does the hard part.** Tap **✨ I'm free**, type "hungry, got like 40 min, under $15". Muse returns Dumplings before the rush with Maya and explains why (her bubble, shared interest, 9 min walk, $12, 2 seats left). Open **Why not others?**: ramen is 28 min away, sushi is $26. Tap **Invite Maya**: Muse drafted the message. Send.
+4. **2:45-3:30, live.** On B (Maya), the invite appears at once. Accept. Both maps flip the pin to **Full**; Alex's card says "Maya's in… leave by … for the 9 min walk".
+5. **3:30-5:00, why AI, why Facebook, safety.** Muse parses messy intent, matches against friends' real free time and bubbles, checks walking time, budget and seats in code, and only then explains; it cannot invent plans (it ranks only real candidates). Facebook already has the friends, Groups and Events; Out Here connects them in the moment. Safety: location sharing is opt-in by audience with approximate mode and pause; plans are at public venues; the browser never reads the database directly.
+
+## Not done (team daytime list, in priority order)
+
+From `docs/REVIEW-2026-11-12.md` (adversarial review, 134 findings) and the plan:
+1. **Demo reset button** (review B1): `resetStory(now)` + `POST /api/demo/reset` so the stage reset does not need the laptop.
+2. **Production**: in Vercel, turn off Deployment Protection (or share the link), then promote the verified preview to Production and give judges the production URL. Previews and Production both read the demo database right now (review D11 suggests previews read dev).
+3. **Muse Intros** (Boardy-style warm intros; full spec in the plan, "Muse Intros"; review B3 fixes the Alex-Jordan story).
+4. **Messenger** (`/messages` inbox and docked chats; invites as messages).
+5. Memories loop ("We're done" → photo → crew album → Do this again; review B7: any member can complete).
+6. 3D walking view, Events detail, Search, Marketplace, Reels, Daily Quest, streaks, Wrapped (cut first).
+7. `docs/POLISH.md`: 59 minor UI findings from the review agents.
+
+## Known issues
+
+- **The e2e suite is written for MemoryStore mode** (fresh seed per server start). Against a real database, specs collide on shared state (seats already taken, posts already reacted). Run with `E2E_EXPECT_TIMEOUT=15000`, reseed before each spec, or keep MemoryStore for CI. The core two-persona loop was verified by hand on the deployed preview.
+- Locally against `out-here-dev` (us-west-2), writes take 1-2.5 s because each mutation reloads the snapshot; on Vercel next to the demo database it is ~0.5 s.
+- Vercel previews need a login (Deployment Protection) until a human changes it.
+- Chrome extension sometimes loses its connection after a VS Code reload; reconnect in Claude Code with `/chrome`.
+
+## For the team's agents
+
+- Rules: `CLAUDE.md` and `.claude/rules/*`; master plan `MVP-BUILD-PLAN-itr-1.md`; current state `docs/PLAN.md`, `docs/PROGRESS.md`, `docs/DECISIONS.md`.
+- Facebook look: `docs/FB_SPEC.md` (measured from real facebook.com, read-only) and screenshots in `reference/fb/` on Andrew's laptop only (gitignored).
