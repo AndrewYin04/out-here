@@ -10,3 +10,4 @@
 - 2026-11-12 Thu 03:50 PT: Andrew: features must be adversarially reviewed for product quality as they are built (Find My, maps, 3D view, events, intros, ...). Added .claude/agents/product-critic.md and made ui-critic + product-critic mandatory for every user-facing slice (20-workflow). Also kept the one-off adversarial spec review (Andrew: current reviews are good).
 - 2026-11-12 Thu 03:55 PT: Andrew: "you have until 7:30 pm PT". Ambiguous vs his earlier ">24h". Covering both: demo-ready deployed build + draft handoff by Thu 19:30 PT, freeze Fri 07:30 PT, handoff 08:30 PT. Asked on the board.
 - 2026-11-12 Thu 04:00 PT: Andrew clarified: 7:30 AM PT Fri, not PM. freezeAt Fri 07:30 PT, handoff 08:30 PT; no Thu-evening deadline.
+- 2026-11-12 Thu 03:45 PT: Andrew: MVP freeze is THU 07:30 AM PT (~3.75h away), parallelize across agents. Re-plan: merge M2a by ~04:15; M2b with 6 parallel builders and 1 review round; integrate + deploy + demo e2e + HANDOFF by 07:15.

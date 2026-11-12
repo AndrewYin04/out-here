@@ -1,9 +1,10 @@
 {
   "runStart": "2026-11-12T02:05:00-08:00",
-  "freezeAt": "2026-11-13T07:30:00-08:00",
-  "handoffAt": "2026-11-13T08:30:00-08:00",
+  "freezeAt": "2026-11-12T07:30:00-08:00",
+  "handoffAt": "2026-11-12T07:30:00-08:00",
   "deadline": "2026-11-13T10:30:00-08:00",
   "deployedUrl": null,
-  "note": "Andrew confirmed (Thu ~04:00 PT): build until Fri 07:30 AM PT (freezeAt). Hard deadline: Devpost Fri 10:30 PT; agent edits stop 09:30 PT. Internal target: P0 checkpoint (M3) by Thu 13:00 PT.",
-  "freezeIsSoft": true
+  "note": "Andrew (Thu ~03:40 PT): MVP freeze THURSDAY 07:30 AM PT; parallelize across agents. MVP = Facebook clone (shell, feed, profile, friends, groups, notifications, messenger basics) + Out Here map with Find My friends layer + I am free -> Muse plan -> invite -> accept -> live seats, deployed, with HANDOFF.md. After the freeze the team takes over; Devpost Fri 10:30 PT.",
+  "freezeIsSoft": true,
+  "mvpFreezeAt": "2026-11-12T07:30:00-08:00"
 }

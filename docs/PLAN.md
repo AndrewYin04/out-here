@@ -1,19 +1,12 @@
-# Overnight plan (live)
+# Plan (live) — MVP freeze Thu Nov 12 07:30 AM PT
 
-Master plan: MVP-BUILD-PLAN-itr-1.md (section 7). Times are PT. Freeze Fri Nov 13 07:00, handoff 08:00, deadline 10:30.
-
-| # | Target (PT) | Work | State |
+| # | By (PT) | Work | State |
 |---|---|---|---|
-| S | Thu 03:30 | Phase S: hooks, agents, kit reconcile, scaffold, FB survey (unverified, no browser), preview pipeline | ✅ |
-| M1 | Thu 06:00 | Contracts, schema + migration (dev + demo), seed content (Muse), images (Muse), seed dev/demo | ✅ (images finishing) |
-| M2a | Thu 07:00 | Data layer (store, API, identity, realtime) · Muse pipeline · FB shell + UI kit | 🔨 |
-| M2b | Thu 10:00 | FB-P0 surfaces (feed, profile, friends, notifications, groups) · Out Here map tab | ⏳ |
-| M3 | Thu 13:00 (P0 checkpoint) | Integrate; invites, join_quest, live seats; demo.spec.ts; P0 checkpoint on preview with real Muse | ⏳ |
-| M4 | Thu 19:00 | Muse Intros (double opt-in, 2nd degree + groups, score ≥85) · Groups Hangouts, Messenger, Events, Search · memories loop · 3D walking view | ⏳ |
-| M5 | until freeze | Kit P2 (Daily Quest, streaks, Wrapped), FB-P2 (Marketplace, Reels), polish queue, judge-driven fixes | ⏳ |
-| M6 | Fri 07:30-08:30 | Fixes only, seed:demo, final e2e on preview, HANDOFF.md, DEVPOST.md, screenshots, README | ⏳ |
+| S | 03:30 | Phase S | ✅ |
+| M1 | 04:00 | Schema, seed, Muse content + images, dev+demo seeded | ✅ |
+| M2a | 04:15 | Data layer · Muse pipeline · FB shell + UI kit (merge what is committed) | 🔨 |
+| M2b | 06:30 | 6 parallel builders: feed · profile+friends · groups+notifications · Out Here map + Find My · I'm-free→plan→invite→live seats UI · Messenger. 1 review round each (e2e-verifier, reviewer, ui-critic, product-critic) | ⏳ |
+| M3 | 07:15 | Integrate on overnight, seed:demo, preview deploy, demo e2e (two personas), HANDOFF.md | ⏳ |
+| Freeze | 07:30 | MVP frozen; team takes over | ⏳ |
 
-## Next tasks
-1. Finish Phase S (workflow running: S1 docs, S3 scaffold, S4 FB survey).
-2. Commit Phase S, dry-run the builder → verifier → merge loop, deploy scaffold preview.
-3. M1 contracts + schema.
+Deferred to the team (daytime): Muse Intros, memories/crews, 3D walking view, Events/Search/Marketplace/Reels, Daily Quest/streaks/Wrapped.
