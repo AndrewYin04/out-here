@@ -642,6 +642,33 @@ cut from the bottom of the current milestone, never from Out Here P0.
    - Revert what does not, and log it under Known issues.
 5. Minor findings go to a `docs/POLISH.md` queue. M5 and spare time work through it.
 
+**Browser walkthrough (end of every milestone, main session, Claude in Chrome)**
+
+1. Open the milestone's preview URL in two Chrome tabs, `?as=alex` and `?as=maya`.
+2. Click through every flow the milestone touched the way a real user would, at
+   1440 px and resized to 390 px. This includes the demo loop once M3 exists.
+3. Screenshot each screen with `save_to_disk` into `.verify/walk/<milestone>/`.
+4. Compare the screenshots side by side with `reference/fb/` and `docs/FB_SPEC.md`.
+5. Record the main flow as a GIF into `docs/evidence/gifs/<milestone>.gif`.
+6. Every broken flow, dead control, or visible "doesn't look like Facebook" difference
+   becomes a task. Broken flows are fixed first, in this milestone. Looks go to
+   `docs/POLISH.md` with a screenshot path.
+7. If Chrome is disconnected, do the same with Playwright screenshots and say so in
+   `docs/PROGRESS.md`.
+
+**UI iteration loop (M5 and any spare time after a milestone)**
+
+1. Take the top 5 items of `docs/POLISH.md`, ordered by how visible they are on the demo
+   path.
+2. Fix them in one builder slice.
+3. Re-run `ui-critic` on the same screens, and do a Chrome walkthrough of them.
+4. Score the round as the count of `ui-critic` findings at major severity.
+5. Repeat until two rounds in a row have no major finding on the demo path. Then move to
+   the next surface: feed, profile, friends, groups, messenger, events, marketplace,
+   reels.
+6. Log each round's before and after screenshot paths and its score in
+   `docs/PROGRESS.md`, so the morning handoff shows the UI improving.
+
 **Milestone loop (end of every milestone)**
 
 - Run `judge` on the preview URL. Its top 3 changes become the first tasks of the next
