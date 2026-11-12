@@ -9,7 +9,7 @@ export type PlanResponse = MusePlan & {
     mode: 'mock' | 'live'; source: 'muse' | 'fallback' | 'mock'; contextSource: 'store' | 'seed';
     dropped: DroppedView[]; origin?: LatLng;
     // What Muse did, for the "Muse's work" steps. Optional so an older response still renders.
-    understood?: boolean; candidateCount?: number;
+    understood?: boolean; candidateCount?: number; friendsChecked?: number;
     friendsFree?: { firstName: string; freeUntil: string }[];
     models?: { parse: string; rank: string }; rankFallback?: boolean;
     timings?: { totalMs: number };

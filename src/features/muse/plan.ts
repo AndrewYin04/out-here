@@ -45,6 +45,8 @@ export type PlanMeta = {
   summaryIssue: string | null;
   budgetMs: number;
   candidateCount: number;
+  /** How many of the viewer's friends Muse checked for a free window that overlaps the ask. */
+  friendsChecked: number;
   /** Friends free in the window: first name and end time only, from availability they shared with the viewer. */
   friendsFree: { firstName: string; freeUntil: string }[];
   dropped: DroppedQuest[];
@@ -104,6 +106,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     summaryIssue: null,
     budgetMs,
     candidateCount: 0,
+    friendsChecked: ctx.friends.length,
     friendsFree: [],
     dropped: [],
     issues: [],

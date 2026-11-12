@@ -1,9 +1,11 @@
 'use client';
 
-import { Check, ChevronDown, ChevronUp, Loader2, Minus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Loader2, Minus, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
+import type { MuseWork } from './muse-work';
+import type { RuledOutRow } from './dropped';
 import { MuseLabel } from './SuggestionCard';
 
 const LOADING_STEP_MS = 600;
@@ -100,5 +102,79 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
         </ul>
       )}
     </div>
+  );
+}
+
+function RuledOutItem({ row }: { row: RuledOutRow }) {
+  return (
+    <li data-testid="ruled-out" data-reason={row.reason} className="flex min-w-0 gap-2 text-[13px] leading-[18px] text-fb-text-2">
+      <span aria-hidden className="w-4 shrink-0 text-center">{row.emoji}</span>
+      <span className="min-w-0">
+        <span className="font-semibold text-fb-text">{row.title}</span>: {row.text}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * What Muse did, open by default so a judge sees it without a tap: what it read, how many
+ * plans and friends it checked, and the top reasons it ruled plans out. The rest opens on "more".
+ */
+export function MuseWorkPanel({ work }: { work: MuseWork }) {
+  const [open, setOpen] = useState(false);
+  const { top, more, offTopic } = work.ruledOut;
+  const extra = more.length + offTopic;
+  const toggle = (
+    <button
+      type="button"
+      aria-expanded={open}
+      data-testid="muse-work-more"
+      onClick={() => setOpen((v) => !v)}
+      className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
+    >
+      {open ? 'Less' : extra > 0 ? `${extra} more` : 'Details'}
+      {open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+    </button>
+  );
+
+  return (
+    <section data-testid="muse-work" aria-label="What Muse checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2.5 shadow-card">
+      <p data-testid="muse-work-checked" className="text-[15px] font-semibold leading-5 text-fb-text">
+        <span className="text-fb-blue">✨ Muse</span> {work.checked.replace(/^Muse /, '')}
+        {work.fit && <span className="font-normal text-fb-text-2"> · {work.fit}</span>}
+      </p>
+      <p data-testid="muse-work-read" className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+        <span className="font-semibold text-fb-text">Read</span> {work.read.join(' · ')}
+      </p>
+      {work.friends && (
+        <p data-testid="muse-work-friends" className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] text-fb-text-2">
+          <Users size={13} aria-hidden className="shrink-0" />
+          {work.friends}
+        </p>
+      )}
+      {top.length > 0 ? (
+        <div className="mt-1.5 border-t border-fb-divider pt-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.02em] text-fb-text-2">Ruled out</span>
+            {toggle}
+          </div>
+          <ul data-testid="why-not" className="mt-0.5 flex flex-col gap-0.5">
+            {top.map((r) => <RuledOutItem key={r.questId} row={r} />)}
+            {open && more.map((r) => <RuledOutItem key={r.questId} row={r} />)}
+          </ul>
+        </div>
+      ) : (
+        <div className="mt-1 flex justify-end">{toggle}</div>
+      )}
+      {open && (
+        <div data-testid="muse-work-details" className="mt-1 flex flex-col gap-0.5 text-[13px] leading-[18px] text-fb-text-2">
+          {offTopic > 0 && <p>{offTopic} other{offTopic === 1 ? " wasn't" : "s weren't"} what you asked for</p>}
+          <p className="flex items-start gap-1.5">
+            <Check size={14} className="mt-0.5 shrink-0 text-fb-green" aria-hidden />
+            {work.rank}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }

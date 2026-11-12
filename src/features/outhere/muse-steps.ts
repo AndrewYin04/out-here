@@ -20,7 +20,7 @@ const SHORT: Record<DropReasonCode, string> = {
   not_open: 'other',
 };
 
-function windowText(plan: PlanResponse, now: Date): string | null {
+export function windowText(plan: PlanResponse, now: Date): string | null {
   const end = Date.parse(plan.intent.windowEnd);
   const start = Math.max(Date.parse(plan.intent.windowStart) || now.getTime(), now.getTime());
   if (!Number.isFinite(end) || end <= start) return null;
@@ -74,7 +74,7 @@ function plansStep(plan: PlanResponse): MuseStep {
   return { key: 'plans', text: `Checked ${total} plan${total === 1 ? '' : 's'}: ${parts.join(' · ')}`, tone: fit > 0 ? 'ok' : 'muted' };
 }
 
-function rankStep(plan: PlanResponse, source: PlanResult['museSource']): MuseStep {
+export function rankStep(plan: PlanResponse, source: PlanResult['museSource']): MuseStep {
   const fit = plan.meta.candidateCount ?? plan.suggestions.length;
   if (fit === 0) return { key: 'rank', text: 'Nothing left to rank', tone: 'muted' };
   const n = plan.suggestions.length;

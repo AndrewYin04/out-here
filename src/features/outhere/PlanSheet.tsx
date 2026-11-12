@@ -1,13 +1,12 @@
 'use client';
 
-import { ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
+import { SendHorizontal, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
-import { shownDrops } from './dropped';
-import { museSteps } from './muse-steps';
-import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
+import { museWork } from './muse-work';
+import { MuseStepsLoading, MuseWorkPanel } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen } from './plan-state';
@@ -48,7 +47,6 @@ export function PlanSheet({ className }: { className?: string }) {
   const [result, setResult] = useState<PlanResult | null>(null);
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [whyOpen, setWhyOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const seq = useRef(0);
   const inFlight = useRef<AbortController | null>(null);
@@ -85,7 +83,6 @@ export function PlanSheet({ className }: { className?: string }) {
     const mine = ++seq.current;
     setStatus('loading');
     setError(null);
-    setWhyOpen(false);
     setAsked(t);
     setPlanAsk(t);
     try {
@@ -111,8 +108,25 @@ export function PlanSheet({ className }: { className?: string }) {
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
-  const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
-  const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
+  // Read once per answer: phones show 2 ruled-out rows, wider screens 3.
+  const work = useMemo(() => {
+    if (!result?.plan.meta) return null;
+    const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+    return museWork(result.plan, result.museSource, new Date(), wide ? 3 : 2);
+  }, [result]);
+  const hasPicks = status === 'done' && !!result && result.plan.suggestions.length > 0;
+  // First name -> end of the free window Muse matched (meta.friendsFree carries no ids).
+  // A first name two free friends share is left out rather than guessed.
+  const freeUntil = useMemo(() => {
+    const out = new Map<string, string>();
+    const dup = new Set<string>();
+    for (const f of result?.plan.meta?.friendsFree ?? []) {
+      if (out.has(f.firstName)) dup.add(f.firstName);
+      out.set(f.firstName, f.freeUntil);
+    }
+    for (const n of dup) out.delete(n);
+    return out;
+  }, [result]);
 
   return (
     <>
@@ -122,7 +136,7 @@ export function PlanSheet({ className }: { className?: string }) {
           data-testid="plan-sheet"
           className={cn(
             'absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
-            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[78%]',
+            result && result.plan.suggestions.length > 0 ? 'max-h-[68%]' : 'max-h-[78%]',
             'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
@@ -160,7 +174,8 @@ export function PlanSheet({ className }: { className?: string }) {
                 <SendHorizontal size={20} aria-hidden />
               </button>
             </div>
-            <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+            {/* On phones the chips step aside while picks show, so a pick's Join stays on screen. */}
+            <div className={cn('-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]', hasPicks && 'max-md:hidden')}>
               {CHIPS.map((c) => (
                 <Chip key={c} onClick={() => addChip(c)} className="h-8 text-[13px]">{c}</Chip>
               ))}
@@ -194,48 +209,36 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
-                {steps.length > 0 && <MuseStepsDone steps={steps} showMuse={showMuse} />}
-                {summary && (
-                  <div data-testid="plan-summary" className="mb-3 px-1">
-                    {showMuse && <MuseLabel className="mb-1" />}
-                    {offline && <OfflineLabel className="mb-1" />}
-                    <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
-                  </div>
-                )}
+                {work && <MuseWorkPanel work={work} />}
                 {result.plan.suggestions.length === 0 ? (
-                  <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
-                    <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
-                    <p className="mt-1 text-[13px] text-fb-text-2">Try a longer window, or tap &quot;40 min&quot;.</p>
-                  </div>
+                  <>
+                  {summary && (
+                    <div data-testid="plan-summary" className={cn("px-1", result.plan.suggestions.length > 0 ? "mt-3" : "mb-3")}>
+                      {showMuse && <MuseLabel className="mb-1" />}
+                      {offline && <OfflineLabel className="mb-1" />}
+                      <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
+                    </div>
+                  )}
+                    <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
+                      <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
+                      <p className="mt-1 text-[13px] text-fb-text-2">Try a longer window, or tap &quot;40 min&quot;.</p>
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex flex-col gap-2">
-                    {result.plan.suggestions.map((s, i) => (
-                      <SuggestionCard key={`${s.questId ?? s.title}-${i}`} s={s} friends={friendMap} showMuse={showMuse} />
-                    ))}
-                  </div>
-                )}
-                {drops.length > 0 && (
-                  <div className="mt-3 rounded-card bg-fb-surface shadow-card">
-                    <button
-                      type="button"
-                      aria-expanded={whyOpen}
-                      onClick={() => setWhyOpen((v) => !v)}
-                      className="flex w-full items-center justify-between rounded-card px-3 py-2.5 text-[15px] font-semibold text-fb-text hover:bg-fb-hover"
-                    >
-                      Why not others?
-                      {whyOpen ? <ChevronUp size={18} aria-hidden /> : <ChevronDown size={18} aria-hidden />}
-                    </button>
-                    {whyOpen && (
-                      <ul data-testid="why-not" className="px-3 pb-3">
-                        {drops.map((d) => (
-                          <li key={d.questId} className="flex gap-2 py-1 text-[13px] text-fb-text-2">
-                            <span aria-hidden>{d.emoji}</span>
-                            <span><span className="font-semibold text-fb-text">{d.venueName}</span>: {d.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-2">
+                      {result.plan.suggestions.map((s, i) => (
+                        <SuggestionCard key={`${s.questId ?? s.title}-${i}`} s={s} friends={friendMap} freeUntil={freeUntil} showMuse={showMuse} />
+                      ))}
+                    </div>
+                  {summary && (
+                    <div data-testid="plan-summary" className={cn("px-1", result.plan.suggestions.length > 0 ? "mt-3" : "mb-3")}>
+                      {showMuse && <MuseLabel className="mb-1" />}
+                      {offline && <OfflineLabel className="mb-1" />}
+                      <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             )}

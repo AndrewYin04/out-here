@@ -285,6 +285,24 @@ export function OutHereView() {
               Show all
             </button>
           </p>
+          {/* "Why these?" in one line, without a tap: Muse's own sentence when the live model
+              answered, else the first kept plan's reason. Tapping it opens the full list. */}
+          {!whyOpen && !filter.loading && !filter.error && keptItems.length > 0 && (
+            <button
+              type="button"
+              data-testid="muse-filter-why-line"
+              onClick={() => setWhyOpen(true)}
+              className="pointer-events-auto flex max-w-full items-center gap-1 truncate rounded-pill bg-fb-surface px-3 py-1 text-left text-[13px] text-fb-text-2 shadow-card hover:bg-fb-hover md:max-w-[560px]"
+            >
+              <span className="shrink-0 font-semibold text-fb-blue">{reasonLabel}</span>
+              <span className="min-w-0 truncate">
+                {filter.source === 'muse' && filter.live && !filter.closest && filter.summary
+                  ? filter.summary
+                  : <><span className="font-semibold text-fb-text">{keptItems[0].name}</span>: {keptItems[0].reason}</>}
+              </span>
+              {keptItems.length > 1 && <span className="shrink-0 font-semibold text-fb-blue">+{keptItems.length - 1}</span>}
+            </button>
+          )}
           {whyOpen && keptItems.length > 0 && (
             <ul
               data-testid="muse-filter-reasons"
