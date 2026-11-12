@@ -160,6 +160,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.touchZoomRotate.enableRotation();
     map.scrollZoom.enable({ around: 'center' });
     map.getContainer().setAttribute('data-view3d', '');
+    // One camera: on every update (pinch, scroll, animation, the follow loop) the tilt comes from
+    // the zoom, so zooming out lifts the camera to the overhead map in one continuous motion.
+    // The HQ tour sets its own angles.
+    map.setTransformCameraUpdate((next) => (touring.current ? {} : { pitch: pitchForZoom(next.zoom) }));
     // Dev only: lets tests and debugging read the live map (never in a production build).
     if (process.env.NODE_ENV !== 'production') (window as unknown as { __ohMap?: MapLibreMap }).__ohMap = map;
 
@@ -214,6 +218,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       undoTheme?.();
       layerRef.current = null;
       map.getContainer().removeAttribute('data-view3d');
+      map.setTransformCameraUpdate(null);
       map.dragRotate.disable();
       map.touchZoomRotate.enable();
       map.touchZoomRotate.disableRotation();
@@ -561,9 +566,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       }
       if (now - lastSecond > 1000) { lastSecond = now; setSecond((n) => n + 1); }
 
-      // Camera: behind the avatar while following; the tilt always follows the zoom.
-      // Any camera call stops MapLibre's gestures, so leave the camera alone while the user is
-      // zooming (or panning, when not following), then ease the tilt to match the new zoom.
+      // Camera: behind the avatar while following. The tilt is set from the zoom on every camera
+      // update by transformCameraUpdate (setup effect), so it changes smoothly during a pinch or
+      // scroll. Any camera call stops MapLibre's gestures, so following waits out a user zoom.
       hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
       const busy = map.isZooming() || (!followRef.current && map.isMoving());
@@ -573,16 +578,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           z = reducedMotion() ? ENTER_ZOOM : zoom + (ENTER_ZOOM - zoom) * (1 - Math.exp(-dt * 2.2));
           if (Math.abs(ENTER_ZOOM - z) < 0.02) { z = ENTER_ZOOM; entering.current = false; }
         }
-        const p0 = map.getPitch();
-        const pitch = entering.current ? pitchForZoom(z) : p0 + (pitchForZoom(z) - p0) * (1 - Math.exp(-dt * 8));
         camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
         const h = map.getContainer().clientHeight;
-        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, pitch, offset: [0, Math.round(h * 0.2)], duration: 0 });
+        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, offset: [0, Math.round(h * 0.2)], duration: 0 });
       } else if (!busy) {
         camBearing.current = map.getBearing();
-        const p0 = map.getPitch();
-        const target = pitchForZoom(zoom);
-        if (Math.abs(p0 - target) > 0.5) map.setPitch(p0 + (target - p0) * (1 - Math.exp(-dt * 8)));
       }
     };
     raf = requestAnimationFrame(tick);
