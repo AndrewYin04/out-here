@@ -11,7 +11,7 @@ import {
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
+  RateHangoutBody, ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
 } from '@/shared/api';
 import type { Backend } from './backend';
 import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
@@ -19,6 +19,10 @@ import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
+import {
+  hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, myRatings,
+  promptEndedHangouts, promptRatings, rateHangout, ratingState,
+} from './ratings';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -505,7 +509,10 @@ export class CoreStore {
 
   // ---------- notifications ----------
   async notifications(viewerId: ID, limit = 50): Promise<{ notifications: NotificationView[]; unread: number }> {
-    const v = await this.view();
+    let v = await this.view();
+    // Hangouts whose end time passed without a "We're done" still ask their members for a rating.
+    // A failed prompt write (for example before migration 0004) never breaks the list.
+    if (await promptEndedHangouts(this, v, viewerId).catch(() => false)) v = await this.view();
     const mine = v.db.notifications.filter((n) => n.recipientId === viewerId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return { notifications: mine.slice(0, limit).map((n) => v.notificationView(viewerId, n)), unread: mine.filter((n) => !n.readAt).length };
   }
@@ -696,6 +703,8 @@ export class CoreStore {
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
     for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
+    // "How was <venue>?" for every member, once per member (stable ids, so a second complete is a no-op).
+    await promptRatings(this, after, after.questById.get(questId)!, memberIds);
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(crew) };
   }
 
@@ -954,4 +963,18 @@ export class CoreStore {
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
+
+  // ---------- Out Here: post-hangout rating (logic in ratings.ts) ----------
+  ratingState(viewerId: ID, questId: ID) { return ratingState(this, viewerId, questId); }
+  rateHangout(viewerId: ID, questId: ID, body: RateHangoutBody) { return rateHangout(this, viewerId, questId, body); }
+  hangoutRecap(viewerId: ID, questId: ID) { return hangoutRecap(this, viewerId, questId); }
+  myRatings(viewerId: ID) { return myRatings(this, viewerId); }
+  /** Server-only (Muse matching): the hang-again answers this user gave. Never send to a client. */
+  hangAgainSignals(userId: ID) { return hangAgainSignals(this, userId); }
+  /** Server-only (Muse matching): the hang-again answers others gave about this user. Never send to a client. */
+  hangAgainAbout(userId: ID) { return hangAgainAbout(this, userId); }
+  /** Server-only (Muse matching): 'one_no' if either said no, 'both_yes' if both said yes, else 'unknown'. */
+  mutualHangAgain(a: ID, b: ID) { return mutualHangAgain(this, a, b); }
+  /** Server-only (Muse matching): this user's ratings with highlights and private notes. */
+  hangoutRatings(userId: ID) { return hangoutRatings(this, userId); }
 }

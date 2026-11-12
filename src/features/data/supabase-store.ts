@@ -17,6 +17,7 @@ export const SNAPSHOT_TTL_MS = 10_000;
 /** Ordinary reads may serve a snapshot up to this old while one background reload runs. */
 export const SNAPSHOT_STALE_MS = 60_000;
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+const OPTIONAL_TABLES = new Set<TableKey>(['hangoutRatings', 'hangAgain']);
 
 type DbError = { message: string; code?: string } | null;
 
@@ -56,6 +57,9 @@ export class SupabaseBackend implements Backend {
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
     const first = await page(0, true);
+    // Rating tables arrive in migration 0004. Until a project has it, they read as empty
+    // instead of failing every snapshot load.
+    if (first.error && OPTIONAL_TABLES.has(key) && ['42P01', 'PGRST205'].includes(first.error.code ?? '')) return [];
     fail(table, first.error);
     const rows: Record<string, unknown>[] = [...((first.data ?? []) as Record<string, unknown>[])];
     const total = first.count ?? rows.length;

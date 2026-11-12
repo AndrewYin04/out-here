@@ -34,6 +34,8 @@ test('two attendees can find a joined hangout and share one crew album', async (
     await expect(alexPlan).toContainText('Going with Maya');
 
     await mayaPlan.getByRole('button', { name: 'We’re done' }).click();
+    // The rating questionnaire opens right after; this test covers the photo form on the card.
+    await maya.getByRole('dialog', { name: 'Rate your hangout' }).getByRole('button', { name: 'Close' }).click();
     const past = maya.getByRole('region', { name: 'Past plans' }).getByRole('article', { name: title });
     await expect(past.getByLabel('Take a photo together')).toBeVisible();
     const again = await request.post(`/api/quests/${quest.id}/complete`, { headers: as('alex'), data: {} });

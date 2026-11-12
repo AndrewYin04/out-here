@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { CalendarDays, Camera, Clock, Footprints, MapPin } from 'lucide-react';
+import { CalendarDays, Camera, Clock, Footprints, MapPin, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { apiPost, useApi, useViewer } from '@/features/data';
+import { apiFetch, apiPost, useApi, useViewer } from '@/features/data';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
-import { formatDemoTime, type CompleteQuestResponse, type YourPlan, type YourPlansResponse } from '@/shared';
+import { formatDemoTime, type CompleteQuestResponse, type HangoutRating, type YourPlan, type YourPlansResponse } from '@/shared';
 import { MemoryCapture } from './MemoryCapture';
+import { RateHangoutDialog } from './RateHangout';
+
+type RateTarget = { questId: string; crewId: string | null };
 
 const dateLabel = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/Los_Angeles', weekday: 'short', month: 'short', day: 'numeric',
@@ -23,6 +26,16 @@ function PlansList({ viewerId }: { viewerId: string }) {
   );
   const [time, setTime] = useState(Date.now);
   const [captureQuest, setCaptureQuest] = useState<string | null>(null);
+  const [rateTarget, setRateTarget] = useState<RateTarget | null>(null);
+  const [ratings, setRatings] = useState<Map<string, HangoutRating>>(new Map());
+  const [ratingsVersion, setRatingsVersion] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    apiFetch<{ ratings: HangoutRating[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
+      .then((r) => { if (alive) setRatings(new Map(r.ratings.map((x) => [x.questId, x]))); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [viewerId, ratingsVersion]);
   useEffect(() => {
     const timer = setInterval(() => setTime(Date.now()), 15_000);
     const refresh = () => { setTime(Date.now()); void refetch(); };
@@ -44,24 +57,29 @@ function PlansList({ viewerId }: { viewerId: string }) {
   const past = ({ quest }: YourPlan) => quest.status === 'done' || new Date(quest.endsAt).getTime() <= time;
   const upcoming = data.plans.filter((plan) => !past(plan));
   const finished = data.plans.filter(past).reverse();
+  const rate = { ratings, onRate: setRateTarget };
   return (
     <div className="space-y-6">
+      <RateHangoutDialog questId={rateTarget?.questId ?? null} crewId={rateTarget?.crewId ?? null}
+        onClose={() => setRateTarget(null)} onSaved={() => setRatingsVersion((n) => n + 1)} />
       {upcoming.length > 0 && <section aria-label="Upcoming plans" className="space-y-3">
         <h2 className="text-[17px] font-bold">Upcoming</h2>
-        {upcoming.map((plan) => <PlanCard key={plan.quest.id} {...{ plan, time, viewerId, refetch, captureQuest, setCaptureQuest }} finished={false} />)}
+        {upcoming.map((plan) => <PlanCard key={plan.quest.id} {...{ plan, time, viewerId, refetch, captureQuest, setCaptureQuest }} {...rate} finished={false} />)}
       </section>}
       {finished.length > 0 && <section aria-label="Past plans" className="space-y-3">
         <h2 className="text-[17px] font-bold">Past hangouts</h2>
-        {finished.map((plan) => <PlanCard key={plan.quest.id} {...{ plan, time, viewerId, refetch, captureQuest, setCaptureQuest }} finished />)}
+        {finished.map((plan) => <PlanCard key={plan.quest.id} {...{ plan, time, viewerId, refetch, captureQuest, setCaptureQuest }} {...rate} finished />)}
       </section>}
     </div>
   );
 }
 
-function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCaptureQuest }: {
+function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCaptureQuest, ratings, onRate }: {
   plan: YourPlan; time: number; viewerId: string; refetch: () => Promise<void>; finished: boolean;
   captureQuest: string | null; setCaptureQuest: (id: string | null) => void;
+  ratings: Map<string, HangoutRating>; onRate: (target: RateTarget) => void;
 }) {
+  const rating = ratings.get(plan.quest.id) ?? null;
   const { quest, members, walkMinutes } = plan;
   const showCapture = captureQuest === quest.id;
   const [completedCrew, setCompletedCrew] = useState<string | null>(null);
@@ -81,6 +99,8 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
       if (action === 'complete') {
         setCompletedCrew(result.crew.id);
         setCaptureQuest(quest.id);
+        // Right after "We're done": the questionnaire, which includes adding photos.
+        onRate({ questId: quest.id, crewId: result.crew.id });
       }
       await refetch();
     } catch (e) {
@@ -124,6 +144,9 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
         {finished && <>
           <Button variant="tint" icon={<Camera size={16} />} onClick={() => setCaptureQuest(showCapture ? null : quest.id)} aria-expanded={showCapture}>
             {showCapture ? 'Close photo form' : 'Add a photo'}
+          </Button>
+          <Button variant="secondary" icon={<Star size={16} />} onClick={() => onRate({ questId: quest.id, crewId })}>
+            {rating ? `Edit rating (${rating.score.toFixed(1)})` : 'Rate it'}
           </Button>
           {crewId && <Link href={`/memories#crew-${crewId}`} className="px-2 text-sm font-semibold text-fb-blue hover:underline">Open crew album</Link>}
         </>}

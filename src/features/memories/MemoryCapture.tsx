@@ -5,7 +5,7 @@ import { Camera, Sparkles } from 'lucide-react';
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
 import { Button } from '@/features/ui';
-import type { CompleteQuestResponse } from '@/shared';
+import type { CompleteQuestResponse, Memory } from '@/shared';
 
 const MAX_BYTES = 3_500_000;
 
@@ -27,8 +27,12 @@ async function preparePhoto(file: File): Promise<Blob> {
   throw new Error('Choose a smaller JPG, PNG, or WebP photo.');
 }
 
-export function MemoryCapture({ questId, crewId, onSaved }: {
-  questId: string; crewId: string | null; onSaved: (id: string) => void;
+/**
+ * Photo upload to the hangout's crew album. With `onMemory`, the form stays open after each save
+ * (the rating questionnaire collects several photos) and reports each saved memory.
+ */
+export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
+  questId: string; crewId: string | null; onSaved: (id: string) => void; onMemory?: (memory: Memory) => void;
 }) {
   const inputId = useId();
   const [photo, setPhoto] = useState<File | null>(null);
@@ -37,6 +41,7 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   const [pending, setPending] = useState<'save' | 'caption' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedCrew, setSavedCrew] = useState<string | null>(null);
+  const [inputKey, setInputKey] = useState(0);
 
   useEffect(() => {
     if (!photo) { setPreview(null); return; }
@@ -72,9 +77,13 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
       form.set('questId', questId);
       form.set('crewId', id);
       form.set('caption', caption);
-      await apiFetch('/api/memories', { method: 'POST', body: form });
-      setSavedCrew(id);
+      const { memory } = await apiFetch<{ memory: Memory }>('/api/memories', { method: 'POST', body: form });
       setPhoto(null);
+      if (onMemory) {
+        onMemory(memory);
+        setCaption('');
+        setInputKey((k) => k + 1);
+      } else setSavedCrew(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t save your photo.');
     } finally {
@@ -90,7 +99,7 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   return (
     <form className="mt-4 space-y-3 rounded-card bg-fb-bg p-3" onSubmit={save}>
       <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden />Take a photo together</label>
-      <input id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
+      <input key={inputKey} id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
         className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-surface file:px-3 file:py-2 file:font-semibold"
         onChange={(event) => { setPhoto(event.currentTarget.files?.[0] ?? null); setError(null); }} />
       {preview && (

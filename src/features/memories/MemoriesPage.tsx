@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Images, Sparkles } from 'lucide-react';
-import type { Crew, Memory, PersonCard } from '@/shared';
+import { Images, Sparkles, Star } from 'lucide-react';
+import type { Crew, HangoutRating, Memory, PersonCard, Quest } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
+import { RateHangoutDialog } from './RateHangout';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
 type CrewMeta = { crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null };
@@ -24,9 +25,35 @@ function MemoriesView({ handle }: { handle: string | null }) {
   const [crews, setCrews] = useState<CrewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [ratings, setRatings] = useState<Map<string, HangoutRating>>(new Map());
+  const [rateQuest, setRateQuest] = useState<{ questId: string; crewId: string | null } | null>(null);
   useChannel([`user:${viewer.id}`], (_channel, payload) => {
-    if (payload.type === 'memory' || payload.resync) setRefresh((value) => value + 1);
+    if (payload.type === 'memory' || payload.type === 'rating' || payload.resync) setRefresh((value) => value + 1);
   });
+
+  // /memories?rate=<questId> (the "How was it?" notification) opens the questionnaire.
+  useEffect(() => {
+    if (!handle) return;
+    const id = new URLSearchParams(window.location.search).get('rate');
+    if (id) setRateQuest({ questId: id, crewId: null });
+  }, [handle]);
+  const closeRating = useCallback(() => {
+    setRateQuest(null);
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('rate')) {
+      url.searchParams.delete('rate');
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!handle) return;
+    let alive = true;
+    apiFetch<{ ratings: (HangoutRating & { quest: Quest })[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
+      .then((r) => { if (alive) setRatings(new Map(r.ratings.map((x) => [x.questId, x]))); })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [handle, refresh]);
 
   useEffect(() => {
     if (!handle) return;
@@ -81,16 +108,23 @@ function MemoriesView({ handle }: { handle: string | null }) {
       )}
       {handle && crews && crews.length > 0 && (
         <div className="flex flex-col gap-3">
-          {crews.map((c) => <CrewCard key={c.id} crew={c} handle={handle} />)}
+          {crews.map((c) => (
+            <CrewCard key={c.id} crew={c} handle={handle} rating={ratings.get(c.originQuestId) ?? null}
+              onRate={() => setRateQuest({ questId: c.originQuestId, crewId: c.id })} />
+          ))}
         </div>
       )}
+      <RateHangoutDialog questId={rateQuest?.questId ?? null} crewId={rateQuest?.crewId ?? null} onClose={closeRating}
+        onSaved={() => setRefresh((value) => value + 1)} />
     </div>
   );
 }
 
 type SendState = { kind: 'idle' } | { kind: 'sending' } | { kind: 'sent'; text: string; href: string } | { kind: 'error'; text: string };
 
-function CrewCard({ crew, handle }: { crew: CrewRow; handle: string }) {
+function CrewCard({ crew, handle, rating, onRate }: {
+  crew: CrewRow; handle: string; rating: HangoutRating | null; onRate: () => void;
+}) {
   const members = useMemo(() => crew.meta?.members ?? [], [crew.meta]);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<(RegroupResult & { mock: boolean }) | null>(null);
@@ -178,6 +212,14 @@ function CrewCard({ crew, handle }: { crew: CrewRow; handle: string }) {
       {crew.memories[0]?.caption && (
         <p className="px-4 pt-2 text-[15px] text-fb-text">&ldquo;{crew.memories[0].caption}&rdquo;</p>
       )}
+
+      <div className="flex items-center gap-2 border-t border-fb-divider-soft px-4 pt-3">
+        <Star size={16} aria-hidden className={rating ? 'text-[#F7B928]' : 'text-fb-text-2'} fill={rating ? 'currentColor' : 'none'} />
+        <p className="min-w-0 flex-1 text-[15px] text-fb-text" data-testid="crew-rating">
+          {rating ? <>You rated it <strong className="font-semibold">{rating.score.toFixed(1)}</strong></> : 'How was it? Rate this hangout.'}
+        </p>
+        <Button variant="secondary" size="sm" onClick={onRate}>{rating ? 'Edit rating' : 'Rate it'}</Button>
+      </div>
 
       <div className="p-4">
         <Button variant="tint" block onClick={regroup} disabled={busy} icon={<Sparkles size={16} />}>

@@ -3,7 +3,7 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, HangoutRating, HangAgain,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -51,6 +51,8 @@ export type Db = {
   listings: Listing[];
   reels: Reel[];
   locationShares: LocationShare[];
+  hangoutRatings: HangoutRating[];
+  hangAgain: HangAgain[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -65,6 +67,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares',
+  hangoutRatings: 'hangout_ratings', hangAgain: 'hang_again',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -77,6 +80,8 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
   notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'],
+  // hangout_ratings' key is id, but (quest_id, rater_id) is unique and is what an upsert replaces.
+  hangoutRatings: ['questId', 'raterId'], hangAgain: ['questId', 'raterId', 'subjectId'],
 };
 
 export function emptyDb(): Db {
@@ -88,7 +93,7 @@ const camel = (s: string) => s.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpp
 const snake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 const TIME_KEYS = /(_at|^starts_at|^ends_at)$/;
-const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level']);
+const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level', 'score']);
 const JSON_KEYS = new Set(['field_visibility', 'hours', 'intent', 'output']);
 
 /** Postgres row (snake_case) -> Db row (camelCase). */
