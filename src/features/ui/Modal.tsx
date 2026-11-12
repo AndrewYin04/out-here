@@ -44,9 +44,12 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
       >
         <div className="relative flex h-[60px] shrink-0 items-center justify-center border-b border-fb-divider-soft px-14">
           <h2 id={titleId} className="truncate text-[20px] font-bold">{title}</h2>
-          <IconButton label="Close" size="md" onClick={onClose} className="absolute right-3 top-3">
-            <X size={20} aria-hidden />
-          </IconButton>
+          {/* IconButton carries `relative`; cn() does not merge, so the wrapper does the positioning. */}
+          <span className="absolute right-3 top-3 flex">
+            <IconButton label="Close" size="md" onClick={onClose}>
+              <X size={20} aria-hidden />
+            </IconButton>
+          </span>
         </div>
         <div className="overflow-y-auto p-4">{children}</div>
         {footer && <div className="shrink-0 border-t border-fb-divider-soft p-4">{footer}</div>}
