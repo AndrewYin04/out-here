@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, House, LayoutGrid, MapPin, MessageCircle, Search, Store, Users, UserGroup } from 'lucide-react';
+import { House, LayoutGrid, MapPin, MessageCircle, Search, Store, Users, UserGroup } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
@@ -10,6 +10,7 @@ import { Wordmark } from './Brand';
 import { DestinationIcon, MORE_DESTINATIONS, PRIMARY_DESTINATIONS } from './destinations';
 import { CENTER_TABS, ROUTES, isActivePath, type CenterTabId } from './nav';
 import { useShellData } from './ShellDataProvider';
+import { NotificationsPopover } from '@/features/fb/notifications';
 
 const TAB_ICONS: Record<CenterTabId, typeof House> = {
   home: House,
@@ -114,7 +115,7 @@ function MenuGrid() {
 /** 56 px white top bar: wordmark + search, center tabs, then menu, Messenger, notifications and account. */
 export function TopBar() {
   const pathname = usePathname() ?? '/';
-  const { notificationCount, messageCount } = useShellData();
+  const { messageCount } = useShellData();
   return (
     <header
       role="banner"
@@ -144,14 +145,7 @@ export function TopBar() {
         </IconLink>
         {/* below 768 px Notifications lives in the bottom tab bar */}
         <div className="hidden md:block">
-          <IconLink
-            label="Notifications"
-            href={ROUTES.notifications}
-            active={isActivePath(pathname, ROUTES.notifications)}
-            badge={<Badge count={notificationCount} floating label={`${notificationCount} new notifications`} />}
-          >
-            <Bell size={20} aria-hidden />
-          </IconLink>
+          <NotificationsPopover />
         </div>
         <AccountMenu />
       </div>
