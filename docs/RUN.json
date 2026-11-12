@@ -1,9 +1,10 @@
 {
   "runStart": "2026-11-12T02:05:00-08:00",
-  "freezeAt": "2026-11-13T07:00:00-08:00",
-  "handoffAt": "2026-11-13T08:00:00-08:00",
+  "freezeAt": "2026-11-13T07:30:00-08:00",
+  "handoffAt": "2026-11-13T08:30:00-08:00",
   "deadline": "2026-11-13T10:30:00-08:00",
   "deployedUrl": null,
-  "note": "Only hard deadline: Devpost submission 2026-11-13 10:30 PT. freezeAt/handoffAt are team targets: keep them unless the team moves them on the board; never work past 09:30 PT so humans can rehearse and submit.",
-  "freezeIsSoft": true
+  "note": "Andrew (Thu ~03:55 PT): \"you have until 7:30 pm PT\". Ambiguous (he earlier said the real freeze is >24h away). Plan: a complete demo-ready deployed build + draft HANDOFF/DEVPOST by demoReadyBy (Thu 19:30 PT); keep improving until freezeAt (Fri 07:30 PT). Hard deadline: Devpost Fri 10:30 PT; agent edits stop 09:30 PT.",
+  "freezeIsSoft": true,
+  "demoReadyBy": "2026-11-12T19:30:00-08:00"
 }
