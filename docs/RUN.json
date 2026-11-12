@@ -4,7 +4,6 @@
   "handoffAt": "2026-11-13T08:30:00-08:00",
   "deadline": "2026-11-13T10:30:00-08:00",
   "deployedUrl": null,
-  "note": "Andrew (Thu ~03:55 PT): \"you have until 7:30 pm PT\". Ambiguous (he earlier said the real freeze is >24h away). Plan: a complete demo-ready deployed build + draft HANDOFF/DEVPOST by demoReadyBy (Thu 19:30 PT); keep improving until freezeAt (Fri 07:30 PT). Hard deadline: Devpost Fri 10:30 PT; agent edits stop 09:30 PT.",
-  "freezeIsSoft": true,
-  "demoReadyBy": "2026-11-12T19:30:00-08:00"
+  "note": "Andrew confirmed (Thu ~04:00 PT): build until Fri 07:30 AM PT (freezeAt). Hard deadline: Devpost Fri 10:30 PT; agent edits stop 09:30 PT. Internal target: P0 checkpoint (M3) by Thu 13:00 PT.",
+  "freezeIsSoft": true
 }
