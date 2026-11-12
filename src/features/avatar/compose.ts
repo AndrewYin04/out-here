@@ -30,7 +30,9 @@ function areaAt(r: number, g: number, b: number): number {
 }
 
 /** Composite RGBA pixels: `shade` and `id` are the two passes (same size); returns a new buffer. */
-export function composePixels(shade: Uint8ClampedArray, id: Uint8ClampedArray, colors: Record<AreaName, [number, number, number]>): Uint8ClampedArray {
+export function composePixels(
+  shade: Uint8ClampedArray, id: Uint8ClampedArray, colors: Record<AreaName, [number, number, number]>, whiteLevel = WHITE_LEVEL,
+): Uint8ClampedArray {
   const out = new Uint8ClampedArray(shade.length);
   const tints = AREA_KEYS.map(([name]) => colors[name]);
   for (let i = 0; i < shade.length; i += 4) {
@@ -43,7 +45,7 @@ export function composePixels(shade: Uint8ClampedArray, id: Uint8ClampedArray, c
       continue;
     }
     const t = tints[area];
-    const f = Math.min(1.25, shade[i] / WHITE_LEVEL);
+    const f = Math.min(1.25, shade[i] / whiteLevel);
     out[i] = t[0] * f; out[i + 1] = t[1] * f; out[i + 2] = t[2] * f;
   }
   return out;
@@ -86,6 +88,34 @@ function loadPasses(body: string, framing: Framing) {
       .then(([s, i]) => ({ shade: pixelsOf(s), id: pixelsOf(i) }));
     p.catch(() => passes.delete(key));
     passes.set(key, p);
+  }
+  return p;
+}
+
+/** The flat (unlit) texture's area value: atlas-white paints areas 235, which maps to the colour itself. */
+const ATLAS_WHITE = 235;
+const textures = new Map<string, Promise<string>>();
+
+/**
+ * The look painted onto the character's 1024x1024 texture, as a PNG data URL, for the 3D
+ * third-person avatar: load the Kenney person GLB, then set its material's map to this image
+ * (flipY = false for glTF). Cached per look.
+ */
+export function renderLookTexture(look: AvatarLook): Promise<string> {
+  const key = lookKey(look);
+  let p = textures.get(key);
+  if (!p) {
+    p = Promise.all([loadImage(`/avatars/${look.body}/atlas-white.png`), loadImage(`/avatars/${look.body}/atlas-id.png`)])
+      .then(([w, i]) => {
+        const white = pixelsOf(w), id = pixelsOf(i);
+        const px = composePixels(white.data, id.data, lookColors(look), ATLAS_WHITE);
+        const c = document.createElement('canvas');
+        c.width = white.width; c.height = white.height;
+        c.getContext('2d')!.putImageData(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, white.width, white.height), 0, 0);
+        return c.toDataURL('image/png');
+      });
+    p.catch(() => textures.delete(key));
+    textures.set(key, p);
   }
   return p;
 }

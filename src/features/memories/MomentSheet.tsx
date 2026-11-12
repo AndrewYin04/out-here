@@ -6,8 +6,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ImageOff, X } from 'lucide-react';
 import type { PersonCard } from '@/shared';
-import { LookAvatarStack } from '@/features/avatar';
-import { cn, IconButton } from '@/features/ui';
+import { AvatarStack, cn, IconButton } from '@/features/ui';
 import { formatJourneyDay, formatStopTime, type JourneyStop } from './journey';
 import { RegroupPanel } from './RegroupPanel';
 import type { RegroupState } from './useRegroup';
@@ -105,7 +104,7 @@ export function MomentSheet(p: MomentSheetProps) {
               <div className="flex items-center gap-2">
                 <dt className="sr-only">Who was there</dt>
                 <dd className="flex min-w-0 items-center gap-2">
-                  <LookAvatarStack people={people} size={28} max={6} />
+                  <AvatarStack people={people.map((m) => ({ name: m.name, src: m.avatarUrl }))} size={28} max={6} />
                   <span className="truncate">{people.map((m) => m.name.split(' ')[0]).join(', ')}</span>
                 </dd>
               </div>
