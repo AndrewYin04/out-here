@@ -16,9 +16,14 @@ import type { FriendPin } from '@/shared/types';
 const MESSENGER_READY = false;
 import { distanceLine, firstName, floatingPanel, updatedAgo } from './useFindMy';
 
-export type FriendCardProps = { pin: FriendPin | null; onClose: () => void };
+export type FriendCardProps = {
+  pin: FriendPin | null;
+  onClose: () => void;
+  /** Muse filter on: why this friend was kept, shown at the top of the card. */
+  museReason?: { label: string; text: string } | null;
+};
 
-export function FriendCard({ pin, onClose }: FriendCardProps) {
+export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps) {
   const toast = useToast();
   const [composing, setComposing] = useState(false);
   const [message, setMessage] = useState('');
@@ -83,6 +88,13 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
   return (
     <Sheet open onClose={onClose} title={f.name} className={floatingPanel('right')}>
       <div data-testid="friend-card" className="flex flex-col gap-4">
+        {museReason && (
+          <p data-testid="friend-muse-reason" className="rounded-card bg-fb-blue-tint px-3 py-2 text-[13px] text-fb-text">
+            <span className="font-semibold text-fb-blue">{museReason.label}</span>
+            <span className="text-fb-text-2"> · </span>
+            {museReason.text}
+          </p>
+        )}
         <div className="flex items-center gap-3">
           <span className="rounded-full p-[3px] ring-[3px] ring-fb-green">
             <Avatar src={f.avatarUrl} name={f.name} size={60} decorative />
