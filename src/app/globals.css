@@ -4,27 +4,28 @@
    Tailwind 4 turns each --color-*, --radius-*, --shadow-* and --font-* into utilities,
    e.g. bg-fb-bg, text-fb-text-2, rounded-card, shadow-card. */
 @theme {
-  --color-fb-bg: #f0f2f5;
+  --color-fb-bg: #f2f4f7;
   --color-fb-surface: #ffffff;
   --color-fb-blue: #0866ff;
   --color-fb-blue-hover: #0861f2;
-  --color-fb-blue-tint: #ebf5ff;
-  --color-fb-text: #050505;
-  --color-fb-text-2: #65676b;
-  --color-fb-divider: #ced0d4;
-  --color-fb-divider-soft: #e4e6eb;
-  --color-fb-input: #f0f2f5;
+  --color-fb-link: #0064d1;
+  --color-fb-blue-tint: #ddedfe;
+  --color-fb-text: #080809;
+  --color-fb-text-2: #65686c;
+  --color-fb-divider: #d0d3d7;
+  --color-fb-divider-soft: #e2e5e9;
+  --color-fb-input: #f2f4f7;
   --color-fb-hover: rgba(0, 0, 0, 0.05);
   --color-fb-pressed: rgba(0, 0, 0, 0.1);
-  --color-fb-secondary-btn: #e4e6eb;
+  --color-fb-secondary-btn: #e2e5e9;
   --color-fb-secondary-btn-hover: #d8dadf;
-  --color-fb-green: #31a24c;
-  --color-fb-red: #e41e3f;
+  --color-fb-green: #24832c;
+  --color-fb-red: #dd2334;
   --color-fb-scrim: rgba(0, 0, 0, 0.4);
   --color-fb-skeleton: #e4e6eb;
 
-  --radius-card: 8px;
-  --radius-btn: 6px;
+  --radius-card: 12px;
+  --radius-btn: 8px;
   --radius-pill: 20px;
   --radius-sheet: 16px;
 
