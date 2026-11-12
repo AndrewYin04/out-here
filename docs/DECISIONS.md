@@ -11,3 +11,4 @@
 - 2026-11-12 Thu 03:55 PT: Andrew: "you have until 7:30 pm PT". Ambiguous vs his earlier ">24h". Covering both: demo-ready deployed build + draft handoff by Thu 19:30 PT, freeze Fri 07:30 PT, handoff 08:30 PT. Asked on the board.
 - 2026-11-12 Thu 04:00 PT: Andrew clarified: 7:30 AM PT Fri, not PM. freezeAt Fri 07:30 PT, handoff 08:30 PT; no Thu-evening deadline.
 - 2026-11-12 Thu 03:45 PT: Andrew: MVP freeze is THU 07:30 AM PT (~3.75h away), parallelize across agents. Re-plan: merge M2a by ~04:15; M2b with 6 parallel builders and 1 review round; integrate + deploy + demo e2e + HANDOFF by 07:15.
+- 2026-11-12 Thu 05:15 PT: Muse ranking switched to Ember by default (Spark minimal 5.7-7.0 s total vs Ember 2.5-3.3 s, same top pick, grounded reasons). MUSE_RANK_ROLE=smart switches back.
