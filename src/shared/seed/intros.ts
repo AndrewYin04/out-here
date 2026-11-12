@@ -3,10 +3,10 @@
 //
 // Demo story (checked against the seed friend graph in src/features/intros/rules.test.ts):
 // - alex and jordan are not friends; both know maya and both are in Bay Area Local Shows.
-//   Their texts overlap on local shows and product/design, so the mock agents score them ~91.
+//   Their texts overlap on local shows and product/design, three distinct facts, so the mock agents score them ~91.
 // - tess (maya's roommate) and ava (cheap-eats group) are in alex's reach but share little:
-//   Muse considers them and drops them below the bar (~59).
-// - yuki shares one design keyword (~67), still below the bar.
+//   Muse considers them and drops them below the bar (~55).
+// - yuki shares one design fact (~67), still below the bar.
 // - riley is dating-only and wants women or nonbinary people, so alex's dating request finds
 //   nobody ("No great match yet").
 import type { DatingPrefs, IntroKind, IntroKindSetting } from '../types';

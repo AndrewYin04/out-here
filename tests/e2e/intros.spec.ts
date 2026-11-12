@@ -69,6 +69,8 @@ test.describe('Muse Intros', () => {
       const note = notes.notifications.find((n) => n.type === 'intro');
       expect(note?.text).toContain('meet Alex');
       expect(note?.href).toMatch(/^\/intros#/);
+      // A rehearsal reset leaves no duplicate: exactly one intro notification on every pass.
+      expect(notes.notifications.filter((n) => n.type === 'intro')).toHaveLength(1);
 
       const jordan = await openAs(browser, 'jordan', width);
       const jCard = jordan.locator('[data-testid="intro-card"][data-handle="alex"]');
@@ -99,11 +101,47 @@ test.describe('Muse Intros', () => {
       await expect(ask.getByTestId('ask-answer')).toContainText('No great match yet', { timeout: 20_000 });
       await expect(alex.getByTestId('intro-card')).toHaveCount(1);
 
+      // Intro settings live behind the gear: switches and miles.
+      await alex.getByTestId('open-intro-settings').click();
+      const sheet = alex.getByRole('dialog', { name: 'Intro settings' });
+      await expect(sheet.getByRole('switch', { name: 'Friendship' })).toHaveAttribute('aria-checked', 'true');
+      await expect(sheet.getByRole('switch', { name: 'Pause intros' })).toHaveAttribute('aria-checked', 'false');
+      await expect(sheet.getByLabel('Max distance in miles')).toHaveValue('15');
+      await alex.screenshot({ path: `test-results/intros-settings-${width}.png` });
+      await alex.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+
       await alex.screenshot({ path: `test-results/intros-${width}.png`, fullPage: true });
       await jordan.screenshot({ path: `test-results/intros-jordan-${width}.png` });
+
+      // Open chat: Muse's note is a centred card from Muse, addressed to both, not a bubble from Jordan.
+      await card.getByRole('link', { name: 'Open chat' }).click();
+      await expect(alex).toHaveURL(/\/messages\?thread=/);
+      const museNote = alex.getByTestId('muse-note');
+      await expect(museNote).toBeVisible({ timeout: 20_000 });
+      await expect(museNote).toContainText('✨ Muse');
+      await expect(museNote).toContainText('Alex, meet Jordan. Jordan, meet Alex.');
+      await expect(museNote).toContainText(/First step idea: .+\((Starts in \d+ min|Today|Tomorrow|Happening now)/);
+      await expect(alex.getByTestId('bubble-theirs')).toHaveCount(0);
+      await alex.screenshot({ path: `test-results/intros-chat-${width}.png` });
       await alex.context().close();
       await jordan.context().close();
     }
+    await reset(request);
+  });
+
+  test('a decline is silent: the person who said yes keeps waiting', async ({ request }) => {
+    await reset(request);
+    const run = await (await request.post('/api/intros/run', { headers: as('alex'), data: {} })).json() as { intro: { id: string } | null };
+    const id = run.intro!.id;
+    expect((await request.post(`/api/intros/${id}/respond`, { headers: as('alex'), data: { accept: true } })).ok()).toBe(true);
+    expect((await request.post(`/api/intros/${id}/respond`, { headers: as('jordan'), data: { accept: false } })).ok()).toBe(true);
+    const a = await (await request.get('/api/intros', { headers: as('alex') })).json() as { intros: { id: string; state: string; closedText: string | null }[] };
+    const mine = a.intros.find((i) => i.id === id)!;
+    expect(mine.state).toBe('waiting');
+    expect(mine.closedText).toBeNull();
+    const j = await (await request.get('/api/intros', { headers: as('jordan') })).json() as { intros: { id: string; closedText: string | null }[] };
+    expect(j.intros.find((i) => i.id === id)!.closedText).toBe('You passed on this intro');
     await reset(request);
   });
 

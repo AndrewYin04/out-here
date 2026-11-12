@@ -59,6 +59,18 @@ function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   };
 }
 
+/**
+ * Muse's note that opens the pair's chat, addressed to both people, with the first step's time:
+ * "✨ Muse: Alex, meet Jordan. Jordan, meet Alex. You both know Maya. … First step idea:
+ * 🎸 Local-band show pregame at The Signal Room (Today 6:00 PM, 3 seats left)."
+ */
+export function museNote(v: View, i: Intro, nowMs: number): string {
+  const A = firstName(v.profileById.get(i.aId)); const B = firstName(v.profileById.get(i.bId));
+  const s = stepView(v, i, nowMs);
+  const detail = [s.when, s.seatsLeft !== null ? `${s.seatsLeft} ${s.seatsLeft === 1 ? 'seat' : 'seats'} left` : null].filter(Boolean).join(', ');
+  return `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary} First step idea: ${s.label}${detail ? ` (${detail})` : ''}.`;
+}
+
 export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()): IntroCardView | null {
   if (!visibleTo(i, viewerId)) return null;
   const isA = i.aId === viewerId;
@@ -67,9 +79,12 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
   let state: IntroCardView['state'] = 'new';
   let closedText: string | null = null;
   if (i.status === 'accepted') state = 'connected';
-  else if (i.status === 'declined') {
-    state = 'closed';
-    closedText = i.declinedBy === viewerId ? 'You passed on this intro' : "Didn't work out this time";
+  else if (i.status === 'declined' && i.declinedBy === viewerId) {
+    state = 'closed'; closedText = 'You passed on this intro';
+  } else if (i.status === 'declined') {
+    // Silent to the other side: the person who said yes keeps waiting until the intro expires,
+    // the same end every unanswered intro reaches, so a no never shows.
+    if (nowMs - Date.parse(i.createdAt) > INTRO_TTL_MS) { state = 'closed'; closedText = 'This intro expired'; } else state = 'waiting';
   } else if (i.status === 'expired' || isExpired(i, nowMs)) {
     state = 'closed'; closedText = 'This intro expired';
   } else if ((i.status === 'a_accepted' && isA) || (i.status === 'b_accepted' && !isA)) state = 'waiting';
@@ -226,7 +241,7 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
       // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
       const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
       const already = view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
-      if (!already) await store.sendMessage(viewerId, thread.id, `${opener} ${i.summary} First step idea: ${i.firstStep.text}.`, 'muse');
+      if (!already) await store.sendMessage(viewerId, thread.id, museNote(view, i, nowMs), 'muse');
       await store.updateIntro(i.id, { status: 'accepted', threadId: thread.id, decidedAt: now().toISOString() });
       await store.notifyIntro(otherId, viewerId, i.id,
         `✨ Muse: you and ${firstName(view.profileById.get(viewerId))} are connected. Muse started your chat.`);
@@ -272,7 +287,8 @@ export async function putIntroProfile(store: DataStore, viewerId: ID, patch: Int
 export async function resetIntros(store: DataStore, viewerId: ID): Promise<{ removed: number }> {
   const { view } = await store.museContext();
   const mine = view.db.intros.filter((i) => i.aId === viewerId || i.bId === viewerId);
-  await store.removeIntros(mine.map((i) => i.id));
+  // Also clears their notifications and Muse's note in the pair's chat, so a rehearsal leaves no duplicates.
+  await store.removeIntros(mine.map((i) => i.id), mine.flatMap((i) => (i.threadId ? [i.threadId] : [])));
   for (const i of mine) {
     await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
     await publish(`user:${i.bId}`, { type: 'intro', id: i.id });

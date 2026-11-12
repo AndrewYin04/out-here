@@ -129,6 +129,11 @@ describe('mock Click round and double opt-in', () => {
     expect(ra).toContain("You're looking for people to go to local shows with");
     expect(a.summary).toMatch(/^Your agents agree Jordan/);
     expect(a.summary).toMatch(/worth going to the .* together/);
+    // One fact, one mention: the summary names the kind and step, and no two reasons share a topic.
+    expect(a.summary).not.toMatch(/local bands|local shows|design/);
+    expect(a.reasons.filter((r) => /local (bands|shows)/.test(r))).toHaveLength(1);
+    expect(a.reasons.some((r) => r.startsWith('You both love'))).toBe(false);
+    expect(a.reasons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('B hears nothing until A accepts', async () => {
@@ -165,6 +170,8 @@ describe('mock Click round and double opt-in', () => {
     const msgs = await store.messages(alex, threadId);
     expect(msgs.at(-1)!.text.startsWith('✨ Muse: ')).toBe(true);
     expect(msgs.at(-1)!.kind).toBe('muse');
+    expect(msgs.at(-1)!.text).toMatch(/^✨ Muse: Alex, meet Jordan\. Jordan, meet Alex\./);
+    expect(msgs.at(-1)!.text).toMatch(/First step idea: .+ \((Starts in \d+ min|Today|Tomorrow|Happening now)[^)]*\)\.$/);
     expect((await listIntros(store, alex)).intros[0].state).toBe('connected');
   });
 
@@ -174,15 +181,31 @@ describe('mock Click round and double opt-in', () => {
     expect(r.message).toMatch(/^No great match yet/);
   });
 
-  it('a decline is silent: the other side sees "didn\'t work out"', async () => {
+  it('a decline is silent: the person who said yes keeps waiting', async () => {
     await resetIntros(store, alex);
     const r = await runIntroRound(store, alex);
     expect(r.intro?.other.handle).toBe('jordan');
     await respondIntro(store, alex, r.intro!.id, true);
     await respondIntro(store, jordan, r.intro!.id, false);
     const a = (await listIntros(store, alex)).intros[0];
-    expect(a.state).toBe('closed');
-    expect(a.closedText).toBe("Didn't work out this time");
+    expect(a.state).toBe('waiting');
+    expect(a.closedText).toBeNull();
+    const j = (await listIntros(store, jordan)).intros[0];
+    expect(j.closedText).toBe('You passed on this intro');
+    expect((await store.notifications(alex)).notifications.filter((x) => x.type === 'intro')).toHaveLength(1);
+  });
+
+  it('reset clears the intro notifications and Muse note, so a rehearsal leaves no duplicates', async () => {
+    for (let n = 0; n < 2; n++) {
+      await resetIntros(store, alex);
+      const r = await runIntroRound(store, alex);
+      await respondIntro(store, alex, r.intro!.id, true);
+    }
+    const intro = (await store.notifications(jordan)).notifications.filter((x) => x.type === 'intro');
+    expect(intro).toHaveLength(1);
+    await resetIntros(store, alex);
+    expect((await store.notifications(jordan)).notifications.filter((x) => x.type === 'intro')).toHaveLength(0);
+    expect((await store.notifications(alex)).notifications.filter((x) => x.type === 'intro')).toHaveLength(0);
   });
 });
 

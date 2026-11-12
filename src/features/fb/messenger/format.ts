@@ -28,6 +28,7 @@ export function threadTitle(t: ThreadView, viewerId: string): string {
 export function snippet(t: ThreadView, viewerId: string): string {
   const m = t.lastMessage;
   if (!m) return 'Say hi 👋';
+  if (m.kind === 'muse') return m.text;
   const body = m.kind === 'invite' ? `Sent an Out Here invite: ${m.text}` : m.text;
   if (m.fromId === viewerId) return `You: ${body}`;
   if (t.isGroup) {
@@ -93,6 +94,8 @@ export type MessageGroup = {
 };
 
 const SAME_GROUP_MS = 5 * 60_000;
+/** Invites and Muse notes always sit in their own group. */
+const STANDALONE = new Set<Message['kind']>(['invite', 'muse']);
 const DIVIDER_MS = 15 * 60_000;
 
 /**
@@ -106,7 +109,7 @@ export function groupMessages(messages: Message[], now: number = Date.now()): Me
     const gap = prev ? new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() : Infinity;
     const divider = gap >= DIVIDER_MS ? dividerLabel(m.createdAt, now) : null;
     const last = groups[groups.length - 1];
-    if (last && !divider && last.fromId === m.fromId && gap < SAME_GROUP_MS && m.kind !== 'invite' && last.messages[last.messages.length - 1].kind !== 'invite') {
+    if (last && !divider && last.fromId === m.fromId && gap < SAME_GROUP_MS && !STANDALONE.has(m.kind) && !STANDALONE.has(last.messages[last.messages.length - 1].kind)) {
       last.messages.push(m);
     } else {
       groups.push({ key: m.id, fromId: m.fromId, divider, messages: [m] });

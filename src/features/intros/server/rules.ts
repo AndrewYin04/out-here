@@ -105,24 +105,24 @@ const article = (s: string) => (/^[aeiou]/i.test(s) ? 'an' : 'a');
  * Where y's profile matches what someone is looking for. Public fields (interests, job, bio)
  * come first. y's own Intro settings are the last resort and are never quoted to the other side.
  */
-type Evidence = { you: string; they: (name: string) => string };
+type Evidence = { you: string; they: (name: string) => string; term: string };
 function evidence(y: Profile, yP: IntroProfile, keys: string[], kind: IntroKind): Evidence | null {
   const job = y.job ?? null;
   const yLooking = kindsOn(yP).map((k) => yP.kinds[k].lookingFor).filter(Boolean);
   const lowerJob = job ? `${article(job)} ${job.charAt(0).toLowerCase()}${job.slice(1)}` : '';
   const byJob = (): Evidence | null => (job && hit(keys, job)
-    ? { you: `you work as ${lowerJob}`, they: (n) => `${n} works as ${lowerJob}` } : null);
+    ? { you: `you work as ${lowerJob}`, they: (n) => `${n} works as ${lowerJob}`, term: job } : null);
   const byInterest = (): Evidence | null => {
     const i = y.interests.find((x) => hit(keys, x));
-    return i ? { you: `you're into ${i}`, they: (n) => `${n} is into ${i}` } : null;
+    return i ? { you: `you're into ${i}`, they: (n) => `${n} is into ${i}`, term: i } : null;
   };
   const byBio = (): Evidence | null => {
     const k = hit(keys, y.bio);
-    return k ? { you: `your bio mentions ${k}`, they: (n) => `${n}'s bio mentions ${k}` } : null;
+    return k ? { you: `your bio mentions ${k}`, they: (n) => `${n}'s bio mentions ${k}`, term: k } : null;
   };
   const byLooking = (): Evidence | null => {
     const l = yLooking.find((x) => hit(keys, x));
-    return l ? { you: `you're looking for ${l}`, they: (n) => `${n} is looking for something similar` } : null;
+    return l ? { you: `you're looking for ${l}`, they: (n) => `${n} is looking for something similar`, term: l } : null;
   };
   const order = kind === 'networking' ? [byJob, byInterest, byBio, byLooking] : [byInterest, byJob, byBio, byLooking];
   for (const f of order) { const e = f(); if (e) return e; }
@@ -136,12 +136,63 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * and judge is the neutral server-side form. A person's own looking-for text is quoted only to
  * them; the other side sees a public-level paraphrase.
  */
-export type SharedFact = { keyword: string; forA: string; forB: string; judge: string; looker: 'a' | 'b' | null };
+export type SharedFact = {
+  keyword: string; forA: string; forB: string; judge: string; looker: 'a' | 'b' | null;
+  /** Keywords of the underlying thing (an interest, a job): two facts sharing one are the same fact. */
+  topic: string[];
+};
 
-/** Facts in the order one side reads them: shared interests, then what that side is looking for, then the rest. */
+const sameTopic = (x: string[], y: string[]) => x.some((k) => y.includes(k));
+
+/** How many different underlying facts there are ("local bands" counted once however it is phrased). */
+export function distinctTopics(facts: SharedFact[]): number {
+  const groups: string[][] = [];
+  for (const f of facts) {
+    const g = groups.find((t) => sameTopic(t, f.topic));
+    if (g) g.push(...f.topic); else groups.push([...f.topic]);
+  }
+  return groups.length;
+}
+
+/**
+ * One reason per underlying fact, in the order one side reads them: what that side is looking
+ * for first (the most specific), then shared interests, then what the other side is looking for.
+ * A fact whose topic is already covered ("You both love local bands" after "You're looking for
+ * people to go to local shows with, and Jordan is into local bands") is dropped.
+ */
 export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
-  const rank = (f: SharedFact) => (f.looker === null ? 0 : f.looker === side ? 1 : 2);
-  return [...facts].sort((x, y) => rank(x) - rank(y)).map((f) => (side === 'a' ? f.forA : f.forB));
+  const rank = (f: SharedFact) => (f.looker === side ? 0 : f.looker === null ? 1 : 2);
+  const seen: string[][] = [];
+  const out: string[] = [];
+  for (const f of [...facts].sort((x, y) => rank(x) - rank(y))) {
+    if (seen.some((t) => sameTopic(t, f.topic))) continue;
+    seen.push(f.topic);
+    out.push(side === 'a' ? f.forA : f.forB);
+  }
+  return out;
+}
+
+/**
+ * Keeps model-written reasons that each restate a different code-found fact (by keyword overlap
+ * with that side's wording); a reason matching no fact, or a fact already used, is dropped.
+ */
+export function distinctReasons(reasons: string[], facts: SharedFact[], side: 'a' | 'b', names: string[]): string[] {
+  const skip = new Set(names.map((n) => n.toLowerCase()));
+  const kw = (t: string) => keywords(t).filter((k) => !skip.has(k));
+  const used: string[][] = [];
+  const out: string[] = [];
+  for (const r of reasons) {
+    const rk = kw(r);
+    let best: SharedFact | null = null; let bestN = 0;
+    for (const f of facts) {
+      const n = kw(side === 'a' ? f.forA : f.forB).filter((k) => rk.includes(k)).length;
+      if (n > bestN) { best = f; bestN = n; }
+    }
+    if (!best || bestN < 2 || used.some((t) => sameTopic(t, best.topic))) continue;
+    used.push(best.topic);
+    out.push(r);
+  }
+  return out;
 }
 
 /**
@@ -156,7 +207,7 @@ export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroPr
   for (const i of a.interests) {
     if (bInterests.has(i.toLowerCase())) {
       const t = `You both love ${i}`;
-      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, judge: `Both love ${i}`, looker: null });
+      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, judge: `Both love ${i}`, looker: null, topic: keywords(i) });
     }
   }
   // Evidence about y uses only the fields x is allowed to see (y always sees their own).
@@ -178,15 +229,19 @@ export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroPr
         forA: xIsA ? forX : forY, forB: xIsA ? forY : forX,
         judge: `${X} is looking for ${looking}; ${e.they(Y)}`,
         looker: xIsA ? 'a' : 'b',
+        topic: keywords(e.term),
       });
     }
   }
   return out;
 }
 
-/** Cheap code score used to shortlist pairs for the agents (and as the mock judge's score). */
-export function codeScore(facts: number): number {
-  return Math.min(97, 59 + 8 * Math.min(facts, 4));
+/**
+ * Cheap code score from the number of distinct shared facts, used to shortlist pairs for the
+ * agents and as the mock judge's score: 0 -> 55, 1 -> 67, 2 -> 79, 3 -> 91, 4+ -> 97.
+ */
+export function codeScore(distinctFacts: number): number {
+  return Math.min(97, 55 + 12 * distinctFacts);
 }
 
 // ---------- candidates ----------
@@ -220,7 +275,7 @@ export function candidatesFor(
     const trust = trustPathOf(v, viewerId, id);
     if (!trust) continue;
     const facts = sharedFacts(v, me, p, opts.viewerProfile);
-    out.push({ profile: p, kind, trust, facts, codeScore: codeScore(facts.length) });
+    out.push({ profile: p, kind, trust, facts, codeScore: codeScore(distinctTopics(facts)) });
   }
   return out.sort((x, y) => y.codeScore - x.codeScore || x.profile.id.localeCompare(y.profile.id));
 }

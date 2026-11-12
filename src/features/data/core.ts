@@ -925,5 +925,11 @@ export class CoreStore {
   async notifyIntro(recipientId: ID, actorId: ID, introId: ID, text: string): Promise<void> {
     await this.notify(await this.view(), recipientId, 'intro', actorId, 'intro', introId, text);
   }
-  async removeIntros(ids: ID[]): Promise<void> { if (ids.length) await this.backend.remove('intros', { id: ids }); }
+  /** Demo reset: the intros, their 'intro' notifications, and Muse's note in each pair's thread. */
+  async removeIntros(ids: ID[], threadIds: ID[] = []): Promise<void> {
+    if (!ids.length) return;
+    await this.backend.remove('notifications', { objectType: 'intro', objectId: ids });
+    if (threadIds.length) await this.backend.remove('messages', { threadId: threadIds, kind: 'muse' });
+    await this.backend.remove('intros', { id: ids });
+  }
 }

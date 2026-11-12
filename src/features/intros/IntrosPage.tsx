@@ -2,11 +2,11 @@
 // /intros: "Intros from Muse" inbox, "Ask Muse for an intro", and Intro settings.
 // Muse Intros are Boardy-style warm intros vetted by two agents ("Click"); see
 // src/features/intros/server for the rules. Everything here reads and writes through /api/intros.
-import { Pause, Play, RotateCcw, Sparkles } from 'lucide-react';
+import { RotateCcw, Settings, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { INTRO_KINDS, type IntroCardView, type IntroKind, type IntroProfile } from '@/shared';
 import { apiPost, useApi, useViewer } from '@/features/data';
-import { Button, Card, Skeleton, cn } from '@/features/ui';
+import { Button, Card, IconButton, Sheet, Skeleton, cn } from '@/features/ui';
 import { IntroCard, KIND_LABELS, MuseTag } from './IntroCard';
 
 type RoundResult = { intro: IntroCardView | null; considered: number; belowBar: number; capped: boolean; paused: boolean; message: string; none?: true };
@@ -66,63 +66,89 @@ function AskMuse({ onResult }: { onResult: (r: RoundResult) => void }) {
   );
 }
 
-function IntroSettings() {
+const KM_PER_MI = 1.609344;
+const MILE_OPTIONS = [2, 5, 10, 15, 25, 50];
+const nearestMiles = (km: number) =>
+  MILE_OPTIONS.reduce((best, m) => (Math.abs(m - km / KM_PER_MI) < Math.abs(best - km / KM_PER_MI) ? m : best), MILE_OPTIONS[0]);
+
+/** Facebook-style 36x20 switch. */
+function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
+      className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50', on ? 'bg-fb-blue' : 'bg-fb-divider')}>
+      <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left]', on ? 'left-[18px]' : 'left-0.5')} />
+    </button>
+  );
+}
+
+function IntroSettings({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data, refetch } = useApi<{ profile: IntroProfile }>('/api/intros/profile');
   const [draft, setDraft] = useState<IntroProfile | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const p = draft ?? data?.profile ?? null;
-  if (!p) return <Card padded><Skeleton className="h-24 w-full" /></Card>;
   const edit = (next: IntroProfile) => { setDraft(next); setSaved(null); };
-  const save = async (next: IntroProfile = p) => {
+  const save = async () => {
+    if (!p) return;
     setBusy(true);
     try {
       await apiPost('/api/intros/profile', {
-        kinds: next.kinds, paused: next.paused, maxKm: next.maxKm,
-        datingPrefs: next.kinds.dating.on ? (next.datingPrefs ?? { ageMin: 21, ageMax: 30, genders: ['man', 'woman', 'nonbinary'] }) : next.datingPrefs,
+        kinds: p.kinds, paused: p.paused, maxKm: p.maxKm,
+        datingPrefs: p.kinds.dating.on ? (p.datingPrefs ?? { ageMin: 21, ageMax: 30, genders: ['man', 'woman', 'nonbinary'] }) : p.datingPrefs,
       }, 'PUT');
       setDraft(null); setSaved('Saved'); await refetch();
     } catch (e) {
       setSaved(e instanceof Error ? `Couldn't save: ${e.message}` : "Couldn't save");
     } finally { setBusy(false); }
   };
+  const close = () => { setDraft(null); setSaved(null); onClose(); };
   return (
-    <Card padded as="section" aria-labelledby="intro-settings-title" className="space-y-3" data-testid="intro-settings">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="intro-settings-title" className="text-[17px] font-semibold text-fb-text">Intro settings</h2>
-        <Button size="sm" variant={p.paused ? 'primary' : 'secondary'} disabled={busy}
-          icon={p.paused ? <Play size={14} aria-hidden /> : <Pause size={14} aria-hidden />}
-          onClick={() => void save({ ...p, paused: !p.paused })}>
-          {p.paused ? 'Resume intros' : 'Pause intros'}
-        </Button>
-      </div>
-      {p.paused && <p className="text-[14px] text-fb-text-2">Intros are paused. Muse won&apos;t look for anyone until you resume.</p>}
-      {INTRO_KINDS.map((k) => (
-        <div key={k} className="space-y-1.5">
-          <label className="flex items-center gap-2 text-[15px] font-semibold text-fb-text">
-            <input type="checkbox" className="h-4 w-4 accent-fb-blue" checked={p.kinds[k].on}
-              onChange={(e) => edit({ ...p, kinds: { ...p.kinds, [k]: { ...p.kinds[k], on: e.target.checked } } })} />
-            {KIND_LABELS[k]}
-          </label>
-          {p.kinds[k].on && (
-            <input aria-label={`${KIND_LABELS[k]}: looking for`} value={p.kinds[k].lookingFor} maxLength={140} placeholder={PLACEHOLDERS[k]}
-              onChange={(e) => edit({ ...p, kinds: { ...p.kinds, [k]: { ...p.kinds[k], lookingFor: e.target.value } } })}
-              className="h-9 w-full rounded-btn bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus:ring-2 focus:ring-fb-blue" />
-          )}
+    <Sheet open={open} onClose={close} title="Intro settings"
+      footer={(
+        <div className="flex items-center gap-3">
+          <Button className="flex-1" onClick={() => void save()} disabled={busy || !draft} data-testid="save-intro-settings">
+            {busy ? 'Saving…' : 'Save'}
+          </Button>
+          {saved && <span className="text-[14px] text-fb-text-2" aria-live="polite">{saved}</span>}
         </div>
-      ))}
-      <label className="flex items-center gap-2 text-[14px] text-fb-text">
-        Max distance
-        <input type="number" min={1} max={500} value={p.maxKm} aria-label="Max distance in km"
-          onChange={(e) => edit({ ...p, maxKm: Math.max(1, Math.min(500, Number(e.target.value) || 1)) })}
-          className="h-8 w-20 rounded-btn bg-fb-input px-2 text-[15px]" /> km
-      </label>
-      <div className="flex items-center gap-3">
-        <Button onClick={() => void save()} disabled={busy || !draft}>{busy ? 'Saving…' : 'Save settings'}</Button>
-        {saved && <span className="text-[14px] text-fb-text-2" aria-live="polite">{saved}</span>}
-      </div>
-      <p className="text-[13px] text-fb-text-2">Muse only uses what you write here and what&apos;s public on your profile. Hookups are not something Muse does.</p>
-    </Card>
+      )}>
+      {!p ? <Skeleton className="h-24 w-full" /> : (
+        <div className="space-y-4" data-testid="intro-settings">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[15px] font-semibold text-fb-text">Pause intros</p>
+              <p className="text-[13px] text-fb-text-2">Muse won&apos;t look for anyone while this is on.</p>
+            </div>
+            <Switch on={p.paused} label="Pause intros" onChange={(v) => edit({ ...p, paused: v })} />
+          </div>
+          <hr className="border-fb-divider-soft" />
+          {INTRO_KINDS.map((k) => (
+            <div key={k} className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[15px] font-semibold text-fb-text">{KIND_LABELS[k]}</p>
+                <Switch on={p.kinds[k].on} label={KIND_LABELS[k]}
+                  onChange={(v) => edit({ ...p, kinds: { ...p.kinds, [k]: { ...p.kinds[k], on: v } } })} />
+              </div>
+              {p.kinds[k].on && (
+                <input aria-label={`${KIND_LABELS[k]}: looking for`} value={p.kinds[k].lookingFor} maxLength={140} placeholder={PLACEHOLDERS[k]}
+                  onChange={(e) => edit({ ...p, kinds: { ...p.kinds, [k]: { ...p.kinds[k], lookingFor: e.target.value } } })}
+                  className="h-10 w-full rounded-btn bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus:ring-2 focus:ring-fb-blue" />
+              )}
+            </div>
+          ))}
+          <hr className="border-fb-divider-soft" />
+          <label className="flex items-center justify-between gap-3 text-[15px] font-semibold text-fb-text">
+            How far away
+            <select value={nearestMiles(p.maxKm)} aria-label="Max distance in miles"
+              onChange={(e) => edit({ ...p, maxKm: Math.round(Number(e.target.value) * KM_PER_MI) })}
+              className="h-9 rounded-btn bg-fb-input px-2 text-[15px] font-normal text-fb-text">
+              {MILE_OPTIONS.map((m) => <option key={m} value={m}>Within {m} mi</option>)}
+            </select>
+          </label>
+          <p className="text-[13px] text-fb-text-2">Muse only uses what you write here and what&apos;s public on your profile. Hookups are not something Muse does.</p>
+        </div>
+      )}
+    </Sheet>
   );
 }
 
@@ -131,6 +157,7 @@ export function IntrosPage() {
   const { data, loading, refetch } = useApi<{ intros: IntroCardView[] }>('/api/intros', [`user:${viewer.id}`]);
   const [round, setRound] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | 'run' | 'reset'>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const intros = data?.intros ?? [];
 
   const runRound = async () => {
@@ -158,6 +185,9 @@ export function IntrosPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-[24px] font-bold text-fb-text">Intros from Muse</h1>
           <MuseTag />
+          <IconButton label="Intro settings" size="md" className="ml-auto" onClick={() => setSettingsOpen(true)} data-testid="open-intro-settings">
+            <Settings size={20} aria-hidden />
+          </IconButton>
         </div>
         <p className="text-[15px] text-fb-text-2">
           Your Muse agent talks with the other person&apos;s agent first. Muse only introduces when it&apos;s confident, and
@@ -187,7 +217,7 @@ export function IntrosPage() {
       </section>
 
       <AskMuse onResult={() => void refetch()} />
-      <IntroSettings />
+      <IntroSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

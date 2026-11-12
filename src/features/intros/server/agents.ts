@@ -8,7 +8,9 @@ import { z } from 'zod';
 import { museJSON } from '@/features/muse';
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
-import { codeScore, factsFor, firstName, introProfileOf, kindsOn, trustLabels, type Candidate, type SharedFact } from './rules';
+import {
+  codeScore, distinctReasons, distinctTopics, factsFor, firstName, introProfileOf, kindsOn, trustLabels, type Candidate, type SharedFact,
+} from './rules';
 
 const ROUTE = 'intros/click';
 const KIND_LABEL: Record<IntroKind, string> = { friendship: 'a new friend', networking: 'a coffee chat', dating: 'a date' };
@@ -156,7 +158,7 @@ export async function runClick(
     log.push({ agent: who, text: res.data.message.trim(), outcome: res.data.outcome.trim() });
   };
 
-  const fit = c.facts.length;
+  const fit = distinctTopics(c.facts);
   const aLooking = aOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
   const bLooking = bOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
   await say('a', `Pitch what ${aName} wants and why ${bName} might fit.`, {
@@ -192,14 +194,16 @@ export async function runClick(
     score: codeScore(fit),
     reasonsA: factsA.slice(0, 3),
     reasonsB: factsB.slice(0, 3),
+    // The summary and notes name the trust path, the kind and the first step; the shared facts
+    // live only in the reasons, so the card never says the same fact twice.
     summary: fit >= 2
-      ? `${trust[0] ?? 'You share a connection'}, and ${lower(c.facts[0].forA)}. Your agents think it's ${verb}.`
+      ? `${trust[0] ?? 'You share a connection'}, and both of your agents said yes to a ${kindNoun}. They think it's ${verb}.`
       : "Your agents talked it through and didn't find enough in common.",
     noteA: fit >= 2
-      ? `Your agents agree ${bName} is a strong ${kindNoun}: ${lower(factsA[0])}. They think it's ${verb}.`
+      ? `Your agents agree ${bName} is a strong ${kindNoun} for you, and they think it's ${verb}.`
       : "Your agents didn't find enough in common.",
     noteB: fit >= 2
-      ? `Your agents agree ${aName} is a strong ${kindNoun}: ${lower(factsB[0])}. They think it's ${verb}.`
+      ? `Your agents agree ${aName} is a strong ${kindNoun} for you, and they think it's ${verb}.`
       : "Your agents didn't find enough in common.",
   });
   const judged = await museJSON({
@@ -214,9 +218,10 @@ export async function runClick(
         content: [
           'You are Muse, judging whether two people on Facebook should get a warm one-to-one intro, like a trusted friend would.',
           'Score fit 0-100. 85+ only when you would bet on this intro. Never invent facts.',
-          'reasonsA: up to 3 reasons written to A as "you", naming B by first name, each restating one fact from factsForA. reasonsB: the mirror, from factsForB.',
+          'reasonsA: up to 3 reasons written to A as "you", naming B by first name, each restating a different fact from factsForA (never the same fact twice). reasonsB: the mirror, from factsForB.',
           'Never quote one person\'s private "looking for" text to the other person; keep the wording given for each side.',
-          'summary: one sentence to both ("you both ..."). noteA: 1-2 sentences to A on why your agents think A and B would click; noteB: the mirror.',
+          'summary: one sentence to both people naming the trust path and the kind. noteA: 1-2 sentences to A on why your agents think A and B would click; noteB: the mirror.',
+          'summary, noteA and noteB must not repeat any fact used in the reasons; name the kind and the first step instead.',
           `End noteA and noteB with what the first step is worth, tied to the kind, e.g. "${verb}".`,
         ].join(' '),
       },
@@ -238,8 +243,9 @@ export async function runClick(
   const clean = (rs: string[]) => rs.map((r) => r.trim()).filter(Boolean);
   return {
     score: j.score,
-    reasonsA: clean(j.reasonsA),
-    reasonsB: clean(j.reasonsB),
+    // Each reason must restate a different code-found fact; repeats and unfounded reasons are dropped.
+    reasonsA: distinctReasons(clean(j.reasonsA), c.facts, 'a', [aName, bName]),
+    reasonsB: distinctReasons(clean(j.reasonsB), c.facts, 'b', [aName, bName]),
     summary: j.summary.trim(),
     noteA: j.noteA.trim(),
     noteB: j.noteB.trim(),
