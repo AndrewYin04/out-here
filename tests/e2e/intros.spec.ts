@@ -109,12 +109,12 @@ test.describe('Muse Intros', () => {
       await expect(sheet.getByRole('switch', { name: 'Friendship' })).toHaveAttribute('aria-checked', 'true');
       await expect(sheet.getByRole('switch', { name: 'Pause intros' })).toHaveAttribute('aria-checked', 'false');
       await expect(sheet.getByLabel('Max distance in miles')).toHaveValue('15');
-      await alex.screenshot({ path: `test-results/intros-settings-${width}.png` });
+      await alex.screenshot({ path: `.verify/intros/intros-settings-${width}.png` });
       await alex.keyboard.press('Escape');
       await expect(sheet).toHaveCount(0);
 
-      await alex.screenshot({ path: `test-results/intros-${width}.png`, fullPage: true });
-      await jordan.screenshot({ path: `test-results/intros-jordan-${width}.png` });
+      await alex.screenshot({ path: `.verify/intros/intros-${width}.png`, fullPage: true });
+      await jordan.screenshot({ path: `.verify/intros/intros-jordan-${width}.png` });
 
       // Open chat: Muse's note is a centred card from Muse, addressed to both, not a bubble from Jordan.
       await card.getByRole('link', { name: 'Open chat' }).click();
@@ -125,7 +125,7 @@ test.describe('Muse Intros', () => {
       await expect(museNote).toContainText('Alex, meet Jordan. Jordan, meet Alex.');
       await expect(museNote).toContainText(/First step idea: .+\((Starts in \d+ min|Today|Tomorrow|Happening now)/);
       await expect(alex.getByTestId('bubble-theirs')).toHaveCount(0);
-      await alex.screenshot({ path: `test-results/intros-chat-${width}.png` });
+      await alex.screenshot({ path: `.verify/intros/intros-chat-${width}.png` });
       await alex.context().close();
       await jordan.context().close();
     }
@@ -144,6 +144,26 @@ test.describe('Muse Intros', () => {
     expect(mine.closedText).toBeNull();
     const j = await (await request.get('/api/intros', { headers: as('jordan') })).json() as { intros: { id: string; closedText: string | null }[] };
     expect(j.intros.find((i) => i.id === id)!.closedText).toBe('You passed on this intro');
+    await reset(request);
+  });
+
+  test('two accepts at once (a double click) connect once, with one Muse note', async ({ request }) => {
+    await reset(request);
+    const run = await (await request.post('/api/intros/run', { headers: as('alex'), data: {} })).json() as { intro: { id: string } | null };
+    const id = run.intro!.id;
+    const respond = (h: string) => request.post(`/api/intros/${id}/respond`, { headers: as(h), data: { accept: true } });
+    const aClicks = await Promise.all([respond('alex'), respond('alex')]);
+    expect(aClicks.every((r) => r.ok())).toBe(true);
+    const notes = await (await request.get('/api/notifications', { headers: as('jordan') })).json() as { notifications: { type: string }[] };
+    expect(notes.notifications.filter((n) => n.type === 'intro')).toHaveLength(1);
+    const bClicks = await Promise.all([respond('jordan'), respond('jordan')]);
+    const cards = await Promise.all(bClicks.map(async (r) => (await r.json()) as { intro: { state: string; threadId: string | null } }));
+    expect(cards.map((c) => c.intro.state)).toEqual(['connected', 'connected']);
+    const a = await (await request.get('/api/intros', { headers: as('alex') })).json() as { intros: { id: string; threadId: string | null }[] };
+    const threadId = a.intros.find((i) => i.id === id)!.threadId!;
+    const msgs = await (await request.get(`/api/threads/${threadId}/messages`, { headers: as('alex') })).json() as { messages?: { kind: string }[] } | { kind: string }[];
+    const list = Array.isArray(msgs) ? msgs : msgs.messages ?? [];
+    expect(list.filter((m) => m.kind === 'muse')).toHaveLength(1);
     await reset(request);
   });
 

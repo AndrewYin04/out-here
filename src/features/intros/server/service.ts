@@ -8,7 +8,8 @@ import {
   type ID, type Intro, type IntroCardView, type IntroKind, type IntroKindSetting, type IntroProfile, type IntroStepView,
 } from '@/shared';
 import { badRequest, notFound, publish, type DataStore, type View } from '@/features/data/server';
-import { runClick } from './agents';
+import { runClick, type ClickResult } from './agents';
+import { privacyGuard, privateTexts } from './privacy';
 import {
   AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, passesBar, SCORE_THRESHOLD,
   trustLabels, underWeeklyCap,
@@ -71,11 +72,59 @@ export function museNote(v: View, i: Intro, nowMs: number): string {
   return `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary} First step idea: ${s.label}${detail ? ` (${detail})` : ''}.`;
 }
 
+/** Fallback texts when a model-written note or summary quotes private settings. */
+const safeNote = (otherName: string) => `Your agents agree ${otherName} would be a good intro for you.`;
+const safeSummary = (trust: string | undefined) => `${trust ?? 'You share a connection'}, and both of your agents said yes.`;
+
+/**
+ * The privacy guard for what `viewerId` may read about `otherId` in intro `i`. On-request
+ * settings (`viewerIntro` for the viewer, `otherExtra` for the other side) add to the stored ones.
+ */
+function guardFor(
+  v: View, i: Pick<Intro, 'trustPath' | 'firstStep'>, viewerId: ID, otherId: ID,
+  over: { viewerIntro?: IntroProfile; otherExtra?: string[] } = {},
+) {
+  const viewer = v.profileById.get(viewerId); const other = v.profileById.get(otherId);
+  if (!viewer || !other) return null;
+  const stored = introProfileOf(v, viewerId);
+  return privacyGuard({
+    viewer, viewerIntro: over.viewerIntro ?? stored,
+    seenOther: v.profileFor(viewerId, other),
+    secrets: [...privateTexts(introProfileOf(v, otherId)), ...(over.otherExtra ?? [])],
+    extra: [...privateTexts(stored), ...trustLabels(v, i.trustPath), i.firstStep.text],
+  });
+}
+
+/**
+ * Rewrites one vetted result so neither side's text quotes the other side's private looking-for
+ * (review E4). A's settings may carry an on-request override, so they are passed in.
+ */
+function scrubResult(v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<Intro, 'trustPath' | 'firstStep'>, r: ClickResult): ClickResult {
+  const gA = guardFor(v, i, aId, bId, { viewerIntro: aIntro });
+  const gB = guardFor(v, i, bId, aId, { otherExtra: privateTexts(aIntro) });
+  if (!gA || !gB) return r;
+  const aName = firstName(v.profileById.get(aId)); const bName = firstName(v.profileById.get(bId));
+  return {
+    ...r,
+    reasonsA: gA.reasons(r.reasonsA),
+    reasonsB: gB.reasons(r.reasonsB),
+    // The summary goes to both people (Muse's note in their chat), so both guards apply.
+    summary: gA.leaks(r.summary) || gB.leaks(r.summary) ? safeSummary(trustLabels(v, i.trustPath)[0]) : r.summary,
+    noteA: gA.text(r.noteA, safeNote(bName)),
+    noteB: gB.text(r.noteB, safeNote(aName)),
+    logA: gA.log(r.logA, 'a'),
+    logB: gB.log(r.logB, 'b'),
+  };
+}
+
 export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()): IntroCardView | null {
   if (!visibleTo(i, viewerId)) return null;
   const isA = i.aId === viewerId;
   const other = v.profileById.get(isA ? i.bId : i.aId);
   if (!other) return null;
+  // Read-time guard too, for rows written before the write-time scrub existed.
+  const guard = guardFor(v, i, viewerId, other.id);
+  if (!guard) return null;
   let state: IntroCardView['state'] = 'new';
   let closedText: string | null = null;
   if (i.status === 'accepted') state = 'connected';
@@ -98,10 +147,10 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
     other: { id: other.id, handle: other.handle, firstName: firstName(other), avatarUrl: other.avatarUrl },
     trustPath: trustLabels(v, i.trustPath),
     mutuals,
-    summary: isA ? i.noteA : i.noteB,
-    reasons: isA ? i.reasons : (i.reasonsB ?? []),
+    summary: guard.text(isA ? i.noteA : i.noteB, safeNote(firstName(other))),
+    reasons: guard.reasons(isA ? i.reasons : (i.reasonsB ?? [])),
     step: stepView(v, i, nowMs),
-    myAgentLog: (isA ? i.agentLogA : i.agentLogB).map((t) => (t.agent === mySide
+    myAgentLog: guard.log(isA ? i.agentLogA : i.agentLogB, mySide).map((t) => (t.agent === mySide
       ? { mine: true, text: t.text }
       : { mine: false, text: t.outcome || 'replied' })),
     judgeLine: `Muse judge: ${i.score}/100, ${i.score >= SCORE_THRESHOLD ? 'above' : 'below'} the ${SCORE_THRESHOLD} bar`,
@@ -154,9 +203,11 @@ async function round(
   if (opts.source === 'auto') pool = pool.filter((c) => underWeeklyCap(view.db.intros, c.profile.id, nowMs));
   const shortlist = pool.slice(0, AGENT_SHORTLIST);
   const deadline = Date.now() + ROUND_BUDGET_MS;
+  // Candidates run in parallel and fail alone: one that errors or times out is skipped.
   const vetted = await Promise.all(shortlist.map(async (c) => {
     try {
-      return { c, r: await runClick(view, me, opts.profile, c, nowMs, deadline) };
+      const raw = await runClick(view, me, opts.profile, c, nowMs, deadline);
+      return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { trustPath: c.trust, firstStep: raw.firstStep }, raw) };
     } catch (err) {
       console.error('[intros] agent exchange failed:', String((err as Error)?.message ?? err).slice(0, 200));
       return null;
@@ -213,45 +264,60 @@ export async function requestIntro(store: DataStore, viewerId: ID, kind: IntroKi
   return round(store, viewerId, { kinds: [kind], source: 'request', profile });
 }
 
+/**
+ * Accept or pass. Each status change is one conditional update from the status this request
+ * read, so of two simultaneous requests (a double click, or both people at once) exactly one
+ * makes the change and does its side effects (notifying B, opening the chat, Muse's note);
+ * the other re-reads and returns the card as it now stands.
+ */
 export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, accept: boolean): Promise<{ intro: IntroCardView }> {
   const { view } = await store.museContext();
   const nowMs = now().getTime();
   const i = view.db.intros.find((x) => x.id === introId);
   if (!i || !visibleTo(i, viewerId)) throw notFound('intro_not_found');
+  const current = async () => {
+    const after = (await store.museContext()).view;
+    const updated = after.db.intros.find((x) => x.id === i.id) ?? i;
+    return { intro: cardFor(after, viewerId, updated, nowMs)! };
+  };
   const isA = i.aId === viewerId;
   if (!isOpen(i) || isExpired(i, nowMs)) return { intro: cardFor(view, viewerId, i, nowMs)! };
   const otherId = isA ? i.bId : i.aId;
   const a = view.profileById.get(i.aId); const b = view.profileById.get(i.bId);
+  const mine: Intro['status'] = isA ? 'a_accepted' : 'b_accepted';
   if (!accept) {
-    await store.updateIntro(i.id, { status: 'declined', declinedBy: viewerId, decidedAt: now().toISOString() });
-    // Silent to the other side: no realtime message, no notification.
-    await publish(`user:${viewerId}`, { type: 'intro', id: i.id });
-  } else {
-    const otherAccepted = (isA && i.status === 'b_accepted') || (!isA && i.status === 'a_accepted');
-    if (!otherAccepted) {
-      await store.updateIntro(i.id, { status: isA ? 'a_accepted' : 'b_accepted' });
+    if (await store.transitionIntro(i.id, i.status, { status: 'declined', declinedBy: viewerId, decidedAt: now().toISOString() })) {
+      // Silent to the other side: no realtime message, no notification.
+      await publish(`user:${viewerId}`, { type: 'intro', id: i.id });
+    }
+    return current();
+  }
+  if (i.status === mine) return current();   // a repeat yes while waiting for the other person
+  const otherAccepted = (isA && i.status === 'b_accepted') || (!isA && i.status === 'a_accepted');
+  if (!otherAccepted) {
+    if (await store.transitionIntro(i.id, i.status, { status: mine })) {
       await publish(`user:${viewerId}`, { type: 'intro', id: i.id });
       if (isA) {
         // Now B is asked, the way Boardy asks the second person once the first said yes.
         await store.notifyIntro(i.bId, i.aId, i.id, introNotice(firstName(a), trustLabels(view, i.trustPath)[0]));
         await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
       }
-    } else {
-      const thread = await store.openThread(viewerId, [otherId]);
-      // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
-      const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
-      const already = view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
-      if (!already) await store.sendMessage(viewerId, thread.id, museNote(view, i, nowMs), 'muse');
-      await store.updateIntro(i.id, { status: 'accepted', threadId: thread.id, decidedAt: now().toISOString() });
-      await store.notifyIntro(otherId, viewerId, i.id,
-        `✨ Muse: you and ${firstName(view.profileById.get(viewerId))} are connected. Muse started your chat.`);
-      await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
-      await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
     }
+    return current();
   }
-  const after = (await store.museContext()).view;
-  const updated = after.db.intros.find((x) => x.id === i.id) ?? i;
-  return { intro: cardFor(after, viewerId, updated, nowMs)! };
+  if (!(await store.transitionIntro(i.id, i.status, { status: 'accepted', decidedAt: now().toISOString() }))) return current();
+  // This request won the transition to accepted: it alone opens the chat and posts the note.
+  const thread = await store.openThread(viewerId, [otherId]);
+  // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
+  const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
+  const already = (await store.museContext()).view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
+  if (!already) await store.sendMessage(viewerId, thread.id, museNote(view, i, nowMs), 'muse');
+  await store.updateIntro(i.id, { threadId: thread.id });
+  await store.notifyIntro(otherId, viewerId, i.id,
+    `✨ Muse: you and ${firstName(view.profileById.get(viewerId))} are connected. Muse started your chat.`);
+  await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
+  await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
+  return current();
 }
 
 export async function getIntroProfile(store: DataStore, viewerId: ID): Promise<{ profile: IntroProfile }> {

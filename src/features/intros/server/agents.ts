@@ -5,7 +5,7 @@
 // the pair from the transcript and the code-found shared facts. Code enforces the bar afterwards.
 // Each side stores its own turns in full and the other agent's turns as one-line outcomes only.
 import { z } from 'zod';
-import { museJSON } from '@/features/muse';
+import { museJSON, MuseTimeoutError, type MuseJSONOptions, type MuseResult } from '@/features/muse';
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
 import {
@@ -13,6 +13,32 @@ import {
 } from './rules';
 
 const ROUTE = 'intros/click';
+/** Per-attempt cap for one agent turn or the judge (a live Ember turn is about 1-2 s). */
+export const INTRO_ATTEMPT_MS = 8_000;
+/** A retry starts only with at least this much of the round left. */
+export const MIN_RETRY_MS = 2_500;
+
+/** Timeouts and 5xx replies are worth one more try; bad input (4xx) is not. */
+export function isTransient(err: unknown): boolean {
+  if (err instanceof MuseTimeoutError) return true;
+  const s = (err as { status?: unknown })?.status;
+  return typeof s === 'number' && s >= 500;
+}
+
+/**
+ * One Muse call for an agent turn or the judge: on a timeout or a 5xx it tries once more, but
+ * only while the round deadline leaves MIN_RETRY_MS. The retry gets the time that is left.
+ */
+export async function museWithRetry<T>(opts: MuseJSONOptions<T>, deadline: number): Promise<MuseResult<T>> {
+  const call = () => museJSON({ ...opts, deadline, timeoutMs: opts.timeoutMs ?? INTRO_ATTEMPT_MS });
+  try {
+    return await call();
+  } catch (err) {
+    if (!isTransient(err) || deadline - Date.now() < MIN_RETRY_MS) throw err;
+    console.warn(`[intros] ${opts.schemaName} retrying after: ${String((err as Error)?.message ?? err).slice(0, 120)}`);
+    return call();
+  }
+}
 const KIND_LABEL: Record<IntroKind, string> = { friendship: 'a new friend', networking: 'a coffee chat', dating: 'a date' };
 
 // ---------- what each agent may see ----------
@@ -110,7 +136,6 @@ const AGENT_RULES = [
 
 const dialog = (log: AgentTurn[], me: 'a' | 'b') =>
   log.map((t) => (t.agent === me ? `You: ${t.text}` : `Their agent: ${t.text}`)).join('\n') || '(nothing yet)';
-const lower = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 /** Runs one agent-to-agent exchange plus the judge for viewer A and candidate B. */
 export async function runClick(
@@ -128,12 +153,12 @@ export async function runClick(
   const verb = stepVerb(c.kind, quest?.title ?? null);
   const aName = firstName(a); const bName = firstName(b);
   const log: AgentTurn[] = [];
-  const common = { model: 'fast' as const, effort: 'minimal' as const, route: ROUTE, userId: a.id, deadline };
+  const common = { model: 'fast' as const, effort: 'minimal' as const, route: ROUTE, userId: a.id };
 
   const say = async (who: 'a' | 'b', instruction: string, mock: { message: string; outcome: string }) => {
     const own = who === 'a' ? aOwn : bOwn;
     const other = who === 'a' ? aSeesB : bSeesA;
-    const res = await museJSON({
+    const res = await museWithRetry({
       ...common,
       schemaName: `intro_agent_${who}`,
       schema: TurnZ,
@@ -154,11 +179,14 @@ export async function runClick(
         },
       ],
       mock: () => mock,
-    });
+    }, deadline);
     log.push({ agent: who, text: res.data.message.trim(), outcome: res.data.outcome.trim() });
   };
 
   const fit = distinctTopics(c.facts);
+  // B's agent sees only public facts about A, so its own turns never restate A's looking-for text.
+  const sharedInterest = c.facts.find((f) => f.looker === null)?.keyword;
+  const overlap = sharedInterest ? `they both love ${sharedInterest}` : `${bName}'s profile fits what ${aName} is looking for`;
   const aLooking = aOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
   const bLooking = bOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
   await say('a', `Pitch what ${aName} wants and why ${bName} might fit.`, {
@@ -167,11 +195,11 @@ export async function runClick(
   });
   await say('b', `Respond for ${bName}: say what ${bName} is looking for, where the fit is real, and ask one question or raise one concern.`, fit >= 2
     ? {
-      message: `${bName}'s agent here. ${bName} wants ${bLooking}. Real overlap: ${lower(c.facts[0].judge)}. One question: when could they actually meet?`,
+      message: `${bName}'s agent here. ${bName} wants ${bLooking}. Real overlap: ${overlap}. One question: when could they actually meet?`,
       outcome: 'sees a real fit, asked about timing',
     }
     : {
-      message: `${bName}'s agent here. ${bName} wants ${bLooking}. Honestly I'm not seeing much overlap with ${aName} yet${fit === 1 ? ` beyond one thing: ${lower(c.facts[0].judge)}` : ''}.`,
+      message: `${bName}'s agent here. ${bName} wants ${bLooking}. Honestly I'm not seeing much overlap with ${aName} yet${fit === 1 ? ` beyond one thing: ${overlap}` : ''}.`,
       outcome: "isn't seeing much overlap",
     });
   await say('a', "Answer the other agent's question or concern, and propose the first step.", fit >= 2
@@ -206,7 +234,7 @@ export async function runClick(
       ? `Your agents agree ${aName} is a strong ${kindNoun} for you, and they think it's ${verb}.`
       : "Your agents didn't find enough in common.",
   });
-  const judged = await museJSON({
+  const judged = await museWithRetry({
     ...common,
     model: 'fast',
     schemaName: 'intro_judge',
@@ -238,7 +266,7 @@ export async function runClick(
       },
     ],
     mock: mockJudge,
-  });
+  }, deadline);
   const j = judged.data;
   const clean = (rs: string[]) => rs.map((r) => r.trim()).filter(Boolean);
   return {
