@@ -1,5 +1,9 @@
 import { z } from 'zod';
+import sharp from 'sharp';
 import { assertSelf, IdZ, query, readForm, readUpload, route } from '@/lib/api';
+import { HttpError } from '@/features/data/server';
+
+export const runtime = 'nodejs';
 
 // GET /api/memories?crewId -> { memories } (crew members only)
 export const GET = route(async ({ store, viewer, url }) => {
@@ -15,9 +19,19 @@ export const POST = route(async ({ store, viewer, req }) => {
   const uploader = form.get('uploaderId');
   assertSelf(viewer, typeof uploader === 'string' ? uploader : undefined);
   const file = await readUpload(form.get('photo'));
-  const photoUrl = await store.uploadFile(viewer.id, 'memories', file);
+  let bytes: Buffer;
+  try {
+    bytes = await sharp(file.bytes, { limitInputPixels: 40_000_000 })
+      .rotate().resize(1600, 1600, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 }).toBuffer();
+  } catch {
+    throw new HttpError(400, 'Choose a supported photo, such as a JPG, PNG, or WebP.');
+  }
   const caption = form.get('caption');
   return {
-    memory: await store.addMemory(viewer.id, { crewId, questId, photoUrl, caption: typeof caption === 'string' ? caption.slice(0, 500) : '' }),
+    memory: await store.addMemory(viewer.id, {
+      crewId, questId, file: { bytes, contentType: 'image/jpeg' },
+      caption: typeof caption === 'string' ? caption.trim().slice(0, 500) : '',
+    }),
   };
 });

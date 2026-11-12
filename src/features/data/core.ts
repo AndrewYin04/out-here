@@ -2,7 +2,7 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId,
+  demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId, seedId, walkingMinutes,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
@@ -11,7 +11,7 @@ import {
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView,
+  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
 } from '@/shared/api';
 import type { Backend } from './backend';
 import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
@@ -590,6 +590,20 @@ export class CoreStore {
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((q) => v.questFor(viewerId, q));
   }
 
+  async yourPlans(viewerId: ID): Promise<YourPlan[]> {
+    const v = await this.view();
+    const viewer = this.resolvePerson(v, viewerId);
+    const joined = new Set(v.db.questMembers.filter((m) => m.userId === viewerId).map((m) => m.questId));
+    const crews = new Map(v.db.crews.filter((c) => v.crewMemberIds(c.id).includes(viewerId))
+      .map((c) => [c.originQuestId, c.id]));
+    return v.db.quests.filter((q) => joined.has(q.id))
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((q) => ({
+        quest: v.questFor(viewerId, q), members: v.people(viewerId, v.questMemberIds(q.id)),
+        walkMinutes: walkingMinutes(viewer.home, q.location), crewId: crews.get(q.id) ?? null,
+      }));
+  }
+
   async quest(viewerId: ID, questId: ID): Promise<QuestDetail> {
     const v = await this.view();
     const q = v.questById.get(questId);
@@ -619,6 +633,7 @@ export class CoreStore {
     const after = await this.view();
     const q = after.questById.get(id)!;
     await publish(`quest:${id}`, { seatsLeft: after.seatsLeft(q), memberCount: after.questMemberIds(id).length });
+    await publish(`user:${viewerId}`, { type: 'quest', id });
     return after.questFor(viewerId, q);
   }
 
@@ -634,6 +649,7 @@ export class CoreStore {
     await publish(`quest:${questId}`, { seatsLeft, memberCount: memberIds.length });
     const joined = memberIds.filter((m) => !wasMember.includes(m));
     for (const m of joined) {
+      await publish(`user:${m}`, { type: 'quest', id: questId });
       await this.notify(after, q.hostId, 'quest_join', m, 'quest', questId,
         `${firstName(after.profileById.get(m))} joined ${q.title}.`);
     }
@@ -647,6 +663,7 @@ export class CoreStore {
     const seatsLeft = await this.backend.leaveQuest(questId, viewerId);
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft, memberCount: after.questMemberIds(questId).length });
+    await publish(`user:${viewerId}`, { type: 'quest', id: questId });
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), seatsLeft };
   }
 
@@ -654,28 +671,32 @@ export class CoreStore {
     const v = await this.view();
     const q = v.questById.get(questId);
     if (!q) throw notFound('quest_not_found');
-    if (q.hostId !== viewerId) throw forbidden('only the host can complete a quest');
     const memberIds = v.questMemberIds(questId);
+    if (!memberIds.includes(viewerId)) throw forbidden('only attendees can complete a hangout');
+    if (q.status !== 'done' && new Date(q.startsAt) > now()) throw conflict('This hangout has not started yet.');
     const t = iso();
-    await this.backend.update('quests', { id: questId }, { status: 'done' });
     // shared prefs: quest tags plus interests at least two members share
     const counts = new Map<string, number>();
     for (const m of memberIds) for (const i of new Set(v.profileById.get(m)?.interests ?? [])) counts.set(i, (counts.get(i) ?? 0) + 1);
     const shared = [...counts].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([i]) => i);
     const sharedPrefs = [...new Set([...q.tags, ...shared])].slice(0, 8);
-    let crew = v.db.crews.find((c) => c.originQuestId === questId);
-    if (crew) {
-      await this.backend.update('crews', { id: crew.id }, { lastHangoutAt: t, sharedPrefs });
-    } else {
-      crew = { id: uuid(), name: `${q.title} crew`, originQuestId: questId, sharedPrefs, lastHangoutAt: t, createdAt: t } satisfies CrewRow;
-      await this.backend.insert('crews', [crew]);
+    const existingCrew = v.db.crews.find((c) => c.originQuestId === questId);
+    const crew = existingCrew ?? {
+      id: seedId('hangout-crew', questId), name: `${q.title} crew`, originQuestId: questId,
+      sharedPrefs, lastHangoutAt: t, createdAt: t,
+    } satisfies CrewRow;
+    if (!existingCrew) {
+      // A stable ID and upserts let two attendees complete at once or retry an interrupted write.
+      await this.backend.upsert('crews', [crew]);
     }
     const existing = v.crewMemberIds(crew.id);
-    const add = memberIds.filter((m) => !existing.includes(m));
-    if (add.length) await this.backend.insert('crewMembers', add.map((userId) => ({ crewId: crew!.id, userId })));
+    const add = memberIds.filter((userId) => !existing.includes(userId));
+    if (add.length) await this.backend.upsert('crewMembers', add.map((userId) => ({ crewId: crew.id, userId })));
+    if (q.status !== 'done') await this.backend.update('quests', { id: questId }, { status: 'done' });
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
-    return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(after.db.crews.find((c) => c.id === crew!.id)!) };
+    for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
+    return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(crew) };
   }
 
   // ---------- Out Here: availability ----------
@@ -835,15 +856,32 @@ export class CoreStore {
     return v.db.memories.filter((m) => m.crewId === crewId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async addMemory(viewerId: ID, body: { crewId: ID; questId: ID; photoUrl: string; caption?: string }): Promise<Memory> {
+  async addMemory(viewerId: ID, body: { crewId: ID; questId: ID; caption: string; file: { bytes: Uint8Array; contentType: string } }): Promise<Memory> {
     const v = await this.view();
-    if (!v.crewMemberIds(body.crewId).includes(viewerId)) throw forbidden('crew members only');
-    const m: Memory = { id: uuid(), crewId: body.crewId, questId: body.questId, uploaderId: viewerId, photoUrl: body.photoUrl, caption: body.caption ?? '', createdAt: iso() };
+    const crew = v.db.crews.find((c) => c.id === body.crewId);
+    if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
+    const quest = v.questById.get(body.questId);
+    if (!quest || crew.originQuestId !== quest.id || quest.status !== 'done') throw badRequest('Choose a completed hangout for this album.');
+    const id = uuid();
+    await this.backend.uploadFile('crew-photos', id, body.file.bytes, body.file.contentType);
+    const m: Memory = {
+      id, crewId: crew.id, questId: quest.id, uploaderId: viewerId,
+      photoUrl: `/api/memories/${id}/photo`, caption: body.caption, createdAt: iso(),
+    };
     await this.backend.insert('memories', [m]);
     for (const member of v.crewMemberIds(body.crewId)) {
       if (member !== viewerId) await publish(`user:${member}`, { type: 'memory', id: m.id });
     }
     return m;
+  }
+
+  async memoryPhoto(viewerId: ID, id: ID): Promise<Blob> {
+    const v = await this.view();
+    const memory = v.db.memories.find((m) => m.id === id);
+    if (memory?.photoUrl !== `/api/memories/${id}/photo` || !v.crewMemberIds(memory.crewId).includes(viewerId)) {
+      throw notFound('photo_not_found');
+    }
+    return this.backend.downloadCrewPhoto(id);
   }
 
   async daily(date: string = demoDate()): Promise<DailyQuest> {
