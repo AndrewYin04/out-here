@@ -17,6 +17,11 @@ export type FilterResult = {
   total: number;
   /** "mock" when MUSE_MOCK or no key: the deterministic stand-in answered. */
   mode: 'live' | 'mock';
+  /**
+   * True when nothing matched, so code kept the closest few plans (or friends) instead of an
+   * empty map. The reasons are then plain facts (start time, walk), not Muse's picks.
+   */
+  closest: boolean;
 };
 
 /** Quests starting later than this are not filter candidates (the band pregame starts at +240). */
@@ -25,6 +30,13 @@ export const FILTER_MAX_WALK_MIN = 25;
 export const FILTER_MAX_KEEP = 8;
 export const FILTER_TIMEOUT_MS = 6_000;
 export const FILTER_CACHE_MS = 120_000;
+/** With no ask and this many candidates or fewer there is no crowd to cut: every one stays. */
+export const FILTER_SMALL_SET = 5;
+/** When nothing matches, the closest this many stay on the map. */
+export const FILTER_CLOSEST = 3;
+/** No candidate in the normal window: look this far (walk) and this late (start) for the closest plans. */
+export const FILTER_WIDE_WALK_MIN = 45;
+export const FILTER_WIDE_WINDOW_MIN = 12 * 60;
 
 export type QuestCandidate = {
   id: ID; title: string; emoji: string; category: string; venueName: string; tags: string[];
@@ -72,7 +84,7 @@ const sameish = (a: string, b: string) => norm(a) === norm(b) || phraseIn(a, b) 
 
 // ---------- candidates ----------
 
-export function questCandidates(ctx: StorePlanContext): QuestCandidate[] {
+export function questCandidates(ctx: StorePlanContext, windowMin = FILTER_WINDOW_MIN, maxWalk = FILTER_MAX_WALK_MIN): QuestCandidate[] {
   const now = ctx.now.getTime();
   const out: QuestCandidate[] = [];
   for (const q of ctx.quests) {
@@ -82,9 +94,9 @@ export function questCandidates(ctx: StorePlanContext): QuestCandidate[] {
     if (seatsLeft <= 0) continue;
     if (Date.parse(q.endsAt) <= now) continue;
     const startsInMin = Math.round((Date.parse(q.startsAt) - now) / 60_000);
-    if (startsInMin > FILTER_WINDOW_MIN) continue;
+    if (startsInMin > windowMin) continue;
     const walk = walkingMinutes(ctx.location, q.location);
-    if (walk > FILTER_MAX_WALK_MIN) continue;
+    if (walk > maxWalk) continue;
     out.push({
       id: q.id, title: q.title, emoji: q.emoji, category: q.category, venueName: q.venueName, tags: q.tags,
       priceMax: q.priceMax, startsInMin, walkMinutes: walk, seatsLeft,
@@ -236,7 +248,10 @@ function heuristicKeep(scored: Scored[], strongOnly: boolean): Scored[] {
 
 function summaryFor(mode: FilterMode, kept: number, total: number, text: string): string {
   const what = mode === 'explore' ? 'plans' : 'friends';
-  if (!kept) return `Nothing nearby matches${text ? ` "${text}"` : ' your interests'} right now.`;
+  if (!kept) {
+    if (mode === 'friends' && !total) return 'No friends are sharing a status or free time right now.';
+    return `Nothing nearby matches${text ? ` "${text}"` : ' your interests'} right now.`;
+  }
   return `Kept ${kept} of ${total} ${what}${text ? ` for "${text}"` : ' that match your interests'}.`;
 }
 
@@ -256,15 +271,70 @@ export function validateKeep(raw: { id: string; reason: string }[], allowed: Map
 
 export type FilterInput = { ctx: StorePlanContext; mode: FilterMode; text: string };
 
+const questFact = (q: QuestCandidate) => `${startsLabel(q.startsInMin)} · ${q.walkMinutes} min walk`;
+
+/**
+ * Nothing matched: the closest FILTER_CLOSEST plans by walk (then start), or the best-scored
+ * friends, so the filter never empties a map that has something on it.
+ */
+export function closestKeep(mode: FilterMode, quests: QuestCandidate[], friends: FriendCandidate[], scored: Scored[]): FilterKeep[] {
+  if (mode === 'explore') {
+    return [...quests]
+      .sort((a, b) => a.walkMinutes - b.walkMinutes || a.startsInMin - b.startsInMin || a.id.localeCompare(b.id))
+      .slice(0, FILTER_CLOSEST)
+      .map((q) => ({ id: q.id, kind: 'quest' as const, reason: questFact(q) }));
+  }
+  const byId = new Set(friends.map((f) => f.id));
+  return scored.filter((s) => byId.has(s.id)).slice(0, FILTER_CLOSEST).map((s) => ({ id: s.id, kind: 'friend' as const, reason: s.reason }));
+}
+
+function closestResult(mode: FilterMode, keep: FilterKeep[], total: number, text: string, live: boolean): FilterResult {
+  const near = mode === 'explore' ? `here are the ${keep.length} closest plans` : `here are ${keep.length} friends sharing right now`;
+  return {
+    keep,
+    summary: `Nothing matches${text ? ` "${text}"` : ' your interests'} right now, so ${near}.`,
+    source: 'muse', total, mode: live ? 'live' : 'mock', closest: true,
+  };
+}
+
+/** Never return an empty keep while there are candidates. */
+function ensureKept(out: FilterResult, quests: QuestCandidate[], friends: FriendCandidate[], scored: Scored[], mode: FilterMode, text: string): FilterResult {
+  if (out.keep.length > 0 || out.total === 0) return out;
+  const keep = closestKeep(mode, quests, friends, scored);
+  return keep.length ? { ...closestResult(mode, keep, out.total, text, out.mode === 'live'), source: out.source } : out;
+}
+
 export async function runMuseFilter({ ctx, mode, text }: FilterInput): Promise<FilterResult> {
   const quests = mode === 'explore' ? questCandidates(ctx) : [];
   const friends = mode === 'friends' ? friendCandidates(ctx) : [];
   const scored = mode === 'explore' ? scoreQuests(ctx, quests, text) : scoreFriends(ctx, friends, text);
   const kind: FilterKeep['kind'] = mode === 'explore' ? 'quest' : 'friend';
   const total = mode === 'explore' ? quests.length : friends.length;
-  const allowed = new Map<ID, string>((mode === 'explore' ? quests : friends).map((c) => [c.id, scored.find((s) => s.id === c.id)?.reason ?? '']));
+  const allowed = new Map<ID, string>(
+    mode === 'explore'
+      ? quests.map((q) => [q.id, scored.find((s) => s.id === q.id)?.reason || questFact(q)])
+      : friends.map((f) => [f.id, scored.find((s) => s.id === f.id)?.reason ?? '']),
+  );
   const mock = isMockMode();
-  if (!total) return { keep: [], summary: summaryFor(mode, 0, 0, text), source: 'muse', total: 0, mode: mock ? 'mock' : 'live' };
+  const hasText = text.trim().length > 0;
+  if (!total) {
+    // Nothing in the normal window: widen the walk and start limits and show the closest plans.
+    const wide = mode === 'explore' ? questCandidates(ctx, FILTER_WIDE_WINDOW_MIN, FILTER_WIDE_WALK_MIN) : [];
+    const keep = closestKeep(mode, wide, [], []);
+    if (keep.length) return closestResult(mode, keep, 0, text, !mock);
+    return { keep: [], summary: summaryFor(mode, 0, 0, text), source: 'muse', total: 0, mode: mock ? 'mock' : 'live', closest: false };
+  }
+  if (!hasText && total <= FILTER_SMALL_SET) {
+    // A short list is not the crowd the filter is for: keep every candidate, best match first.
+    const rank = new Map(scored.map((s, i) => [s.id, i]));
+    const ids = [...allowed.keys()].sort((a, b) => (rank.get(a) ?? 1e9) - (rank.get(b) ?? 1e9));
+    const what = mode === 'explore' ? 'plans' : 'friends';
+    return {
+      keep: ids.map((id) => ({ id, kind, reason: allowed.get(id) || 'nearby' })),
+      summary: `Only ${total} ${what} nearby right now, so all of them stay.`,
+      source: 'muse', total, mode: mock ? 'mock' : 'live', closest: false,
+    };
+  }
 
   try {
     const res = await museJSON<MuseFilterOut>({
@@ -284,10 +354,11 @@ export async function runMuseFilter({ ctx, mode, text }: FilterInput): Promise<F
       },
     });
     const keep = validateKeep(res.data.keep, allowed, kind);
-    return { keep, summary: res.data.summary.trim() || summaryFor(mode, keep.length, total, text), source: 'muse', total, mode: res.mock ? 'mock' : 'live' };
+    const out: FilterResult = { keep, summary: res.data.summary.trim() || summaryFor(mode, keep.length, total, text), source: 'muse', total, mode: res.mock ? 'mock' : 'live', closest: false };
+    return ensureKept(out, quests, friends, scored, mode, text);
   } catch (err) {
     reportFallback({ route: 'muse/filter', step: 'filter', error: String((err as Error)?.message ?? err), userId: ctx.viewer.id });
-    return fallbackFilter(scored, kind, mode, total, text);
+    return ensureKept(fallbackFilter(scored, kind, mode, total, text), quests, friends, scored, mode, text);
   }
 }
 
@@ -297,7 +368,7 @@ export function fallbackFilter(scored: Scored[], kind: FilterKeep['kind'], mode:
   return {
     keep: kept.map((s) => ({ id: s.id, kind, reason: s.reason })),
     summary: summaryFor(mode, kept.length, total, text),
-    source: 'fallback', total, mode: 'live',
+    source: 'fallback', total, mode: 'live', closest: false,
   };
 }
 

@@ -3,10 +3,10 @@
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
 import type { Map as MapLibreMap } from 'maplibre-gl';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { ImFreeButton, MuseLabel, PlanSheet, useMuseFilter, usePlanAsk, usePlanSuggestions } from '@/features/outhere';
+import { ImFreeButton, MuseLabel, PlanSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanSuggestions } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
@@ -78,9 +78,69 @@ export function OutHereView() {
     return visible.filter((q) => keep.has(q.id) || q.memberIds.includes(persona.id) || q.id === selectedId);
   }, [mode, visible, filter.keep, persona.id, selectedId]);
   const friendKeep = mode === 'friends' ? filter.keep : null;
-  const allFriendPins = friendPins.data?.pins ?? [];
+  const allFriendPins = useMemo(() => friendPins.data?.pins ?? [], [friendPins.data]);
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
+  // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
+  const reasonLabel = filter.closest ? 'Closest' : filter.source === 'fallback' ? 'Quick match' : filter.live ? '✨ Muse' : 'Muse (offline)';
+  const reasonFor = useCallback((id: string) => {
+    const text = filter.on ? filter.reasons.get(id) : undefined;
+    return text ? { label: reasonLabel, text } : null;
+  }, [filter.on, filter.reasons, reasonLabel]);
+  const [whyOpen, setWhyOpen] = useState(false);
+  useEffect(() => { if (!filter.on) setWhyOpen(false); }, [filter.on]);
+  const keptItems = useMemo(() => {
+    if (!filter.keep) return [];
+    if (mode === 'explore') {
+      const byId = new Map(visible.map((q) => [q.id, q]));
+      return [...filter.reasons].flatMap(([id, reason]) => {
+        const q = byId.get(id);
+        return q ? [{ id, icon: q.emoji, name: q.title, reason }] : [];
+      });
+    }
+    const byId = new Map(allFriendPins.map((p) => [p.friend.id, p]));
+    return [...filter.reasons].flatMap(([id, reason]) => {
+      const p = byId.get(id);
+      return p ? [{ id, icon: p.bubble.emoji ?? '', name: p.friend.name, reason }] : [];
+    });
+  }, [filter.keep, filter.reasons, mode, visible, allFriendPins]);
+
+  // Muse filter answers: frame the kept pins and the viewer, clear of the top chips and the
+  // I'm free button. Turning the filter off puts the camera back where it was.
+  const savedCamera = useRef<{ center: [number, number]; zoom: number; bearing: number; pitch: number } | null>(null);
+  const keepKey = filter.keep ? `${mode}:${[...filter.keep].sort().join(',')}` : '';
+  const hasOrigin = !!ctx?.origin;
+  const friendPinsReady = allFriendPins.length > 0;
+  useEffect(() => {
+    if (!map) return;
+    if (!filter.on) {
+      const cam = savedCamera.current;
+      savedCamera.current = null;
+      if (cam) map.easeTo({ ...cam, duration: 500 });
+      return;
+    }
+    if (!filter.keep || filter.keep.size === 0) return;
+    const keep = filter.keep;
+    const pts: LatLng[] = mode === 'explore'
+      ? shown.filter((q) => keep.has(q.id)).map((q) => q.location)
+      : allFriendPins.filter((p) => keep.has(p.friend.id)).map((p) => p.location);
+    if (pts.length === 0) return;
+    if (ctx?.origin) pts.push(ctx.origin);
+    if (!savedCamera.current) {
+      const c = map.getCenter();
+      savedCamera.current = { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
+    }
+    const lats = pts.map((p) => p.lat);
+    const lngs = pts.map((p) => p.lng);
+    const desktop = window.matchMedia('(min-width: 768px)').matches;
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
+      padding: desktop ? { top: 130, bottom: 110, left: 90, right: 90 } : { top: 120, bottom: 170, left: 44, right: 44 },
+      maxZoom: desktop ? 16 : 15.5,
+      duration: 600,
+    });
+    // shown, the friend pins and the origin are read when an answer arrives; keepKey triggers it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, filter.on, keepKey, hasOrigin, friendPinsReady]);
   // Friends mode: the faces of friends who joined each plan, shown on its pin.
   const friendFaces = useMemo(() => {
     if (mode !== 'friends' || !ctx) return null;
@@ -165,11 +225,12 @@ export function OutHereView() {
       </div>
 
       {filter.on && (
-        <div className="pointer-events-none absolute inset-x-4 top-[60px] z-10 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-4 top-[60px] z-[15] flex flex-col items-center gap-1">
           <p
             role="status"
             data-testid="muse-filter-status"
             data-source={filter.source ?? (filter.loading ? 'loading' : 'error')}
+            data-closest={filter.closest ? 'true' : undefined}
             className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-1.5 rounded-pill bg-fb-surface px-3 py-1 text-center text-[13px] text-fb-text-2 shadow-card"
           >
             {filter.loading ? (
@@ -178,17 +239,43 @@ export function OutHereView() {
               <span>Muse filter is unavailable, showing everything</span>
             ) : (
               <>
-                {/* ✨ Muse only on live model output, as in PlanSheet; mock answers carry no label. */}
-                {filter.source === 'muse' && filter.live && <MuseLabel className="py-0" />}
+                {/* ✨ Muse only on live model picks, as in PlanSheet; mock and closest-plan answers carry no label. */}
+                {filter.source === 'muse' && filter.live && !filter.closest && <MuseLabel className="py-0" />}
                 <span>
-                  {filter.source === 'fallback'
-                    ? 'Muse is busy, showing a quick match'
-                    : shownCount === 0
-                      ? 'Nothing matches right now'
-                      : mode === 'explore'
-                        ? `Muse is showing ${shown.length} of ${visible.length} plans`
-                        : `Muse is showing ${shownFriends} of ${allFriendPins.length} friends`}
+                  {filter.keep?.size === 0 || shownCount === 0
+                    ? filter.summary || 'Nothing matches right now'
+                    : filter.closest
+                      ? mode === 'explore'
+                        ? `Nothing matches, here are the ${filter.keep?.size ?? 0} closest plans`
+                        : `Nothing matches, here are ${filter.keep?.size ?? 0} friends sharing now`
+                      : filter.source === 'fallback'
+                        ? 'Muse is busy, showing a quick match'
+                        : mode === 'explore'
+                          ? `Muse is showing ${shown.length} of ${visible.length} plans`
+                          : `Muse is showing ${shownFriends} of ${allFriendPins.length} friends`}
                 </span>
+                {keptItems.length > 0 && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <button
+                      type="button"
+                      data-testid="muse-filter-why"
+                      aria-expanded={whyOpen}
+                      onClick={() => setWhyOpen((v) => !v)}
+                      className="font-semibold text-fb-blue hover:underline"
+                    >
+                      {whyOpen ? 'Hide why' : 'Why these?'}
+                    </button>
+                  </>
+                )}
+                {(filter.closest || filter.keep?.size === 0) && !ask && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <button type="button" data-testid="muse-filter-ask" onClick={() => setPlanOpen(true)} className="font-semibold text-fb-blue hover:underline">
+                      Tell Muse what you&apos;re up for
+                    </button>
+                  </>
+                )}
               </>
             )}
             <span aria-hidden>·</span>
@@ -196,12 +283,41 @@ export function OutHereView() {
               Show all
             </button>
           </p>
+          {whyOpen && keptItems.length > 0 && (
+            <ul
+              data-testid="muse-filter-reasons"
+              className="pointer-events-auto max-h-[38vh] w-full max-w-[360px] overflow-y-auto rounded-card bg-fb-surface p-1 shadow-popover"
+            >
+              {keptItems.map((it) => (
+                <li key={it.id}>
+                  <button
+                    type="button"
+                    data-testid="muse-filter-reason-item"
+                    onClick={() => {
+                      setWhyOpen(false);
+                      if (mode === 'explore') select(it.id);
+                      else window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id: it.id } }));
+                    }}
+                    className="flex w-full items-start gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-fb-hover"
+                  >
+                    <span className="w-6 shrink-0 text-center text-[18px] leading-6" aria-hidden>{it.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold leading-5 text-fb-text">{it.name}</span>
+                      <span className="block text-[13px] leading-4 text-fb-text-2">
+                        <span className="font-semibold text-fb-blue">{reasonLabel}</span> · {it.reason}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} />
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
           <PeopleButton map={map} />
           {visible.length > 0 && (
             <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
@@ -244,6 +360,7 @@ export function OutHereView() {
           now={now}
           onClose={() => select(null)}
           onChanged={refetchAll}
+          museReason={mode === 'explore' ? reasonFor(selectedId) : null}
         />
       )}
     </div>

@@ -64,6 +64,42 @@ test.describe('Muse filter', () => {
     expect(errors).toEqual([]);
   });
 
+  test('kept plans fit on screen, reasons show in the list and on the quest sheet', async ({ page }) => {
+    await openMap(page);
+    await page.getByTestId('muse-filter-toggle').click();
+    const status = page.getByTestId('muse-filter-status');
+    await expect(status).toContainText(/Muse is showing \d+ of \d+ plans/, { timeout: 15_000 });
+    // The camera refits to the kept pins: every one is inside the map after the 600 ms ease.
+    const mapBox = (await page.getByTestId('out-here-map').boundingBox())!;
+    await expect.poll(async () => {
+      const boxes = await questPins(page).evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
+      return boxes.every((b) => b.x >= mapBox.x && b.y >= mapBox.y && b.x + b.width <= mapBox.x + mapBox.width && b.y + b.height <= mapBox.y + mapBox.height);
+    }, { timeout: 5_000 }).toBe(true);
+
+    await page.getByTestId('muse-filter-why').click();
+    const items = page.getByTestId('muse-filter-reason-item');
+    await expect(items.first()).toBeVisible();
+    await expect(page.getByTestId('muse-filter-reasons')).toContainText('dumplings');
+    await expect(page.getByTestId('muse-filter-reasons')).toContainText(/\d+ min walk/);
+    await page.screenshot({ path: `test-results/musefilter-why-${page.viewportSize()!.width}.png` });
+    await page.getByTestId('muse-filter-why').click();
+
+    await page.getByTestId('quest-pin-dumplings').click();
+    await expect(page.getByTestId('quest-muse-reason')).toContainText(/dumplings/, { timeout: 10_000 });
+    await page.screenshot({ path: `test-results/musefilter-sheet-${page.viewportSize()!.width}.png` });
+  });
+
+  test('Maya: the filter never empties her map', async ({ page }) => {
+    await page.goto('/out-here?as=maya');
+    await expect.poll(() => questPins(page).count(), { timeout: 20_000 }).toBeGreaterThan(3);
+    await page.getByTestId('muse-filter-toggle').click();
+    const status = page.getByTestId('muse-filter-status');
+    await expect(status).toContainText(/Muse is showing \d+ of \d+ plans|closest plans/, { timeout: 15_000 });
+    await expect(status).not.toContainText('Nothing matches right now');
+    await expect.poll(() => questPins(page).count()).toBeGreaterThan(0);
+    await page.screenshot({ path: `test-results/musefilter-maya-${page.viewportSize()!.width}.png` });
+  });
+
   test('Friends view with the filter on shows Maya', async ({ page }) => {
     await openMap(page, '&mode=friends');
     await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
@@ -74,6 +110,11 @@ test.describe('Muse filter', () => {
     await expect(page.getByTestId('friend-pin')).toHaveCount(1);
     await expect(page.locator('[data-testid="friend-pin"][data-handle="maya"]')).toHaveCount(1);
     await page.screenshot({ path: `test-results/musefilter-friends-${page.viewportSize()!.width}.png` });
+    await page.locator('[data-testid="friend-pin"][data-handle="maya"]').click();
+    await expect(page.getByTestId('friend-muse-reason')).toContainText(/Maya: you both like/);
+    await page.screenshot({ path: `test-results/musefilter-friend-card-${page.viewportSize()!.width}.png` });
+    await page.getByRole('button', { name: 'Close' }).first().click();
+    await expect(page.getByTestId('friend-card')).toHaveCount(0);
     await page.getByTestId('muse-filter-show-all').click();
     const friendMarkers = page.locator('[data-testid="friend-pin"], [data-testid="friend-cluster"]');
     await expect.poll(() => friendMarkers.count()).toBeGreaterThan(1);

@@ -14,6 +14,7 @@ type FilterResponse = {
   source: 'muse' | 'fallback';
   total: number;
   mode: 'live' | 'mock';
+  closest?: boolean;
   cached: boolean;
 };
 
@@ -30,6 +31,8 @@ export type MuseFilter = {
   loading: boolean;
   /** How many candidates Muse chose from. */
   total: number;
+  /** Nothing matched, so the closest few plans (or friends) were kept instead. */
+  closest: boolean;
   error: boolean;
 };
 
@@ -82,6 +85,7 @@ export function useMuseFilter(mode: MuseFilterMode, text: string | null): MuseFi
     live: current?.mode === 'live',
     loading: on && !current && !error,
     total: current?.total ?? 0,
+    closest: current?.closest ?? false,
     error: on && error && !current,
   };
 }

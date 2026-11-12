@@ -54,6 +54,38 @@ describe('muse filter: mock mode', () => {
     expect(out.keep[0]!.kind).toBe('friend');
   });
 
+  it('maya, explore, no text: a short list is kept whole, never emptied', async () => {
+    const ctx = await ctxFor(maya);
+    const total = questCandidates(ctx).length;
+    const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThanOrEqual(5);
+    expect(out.keep).toHaveLength(total);
+    expect(out.closest).toBe(false);
+    expect(out.keep.every((k) => k.reason.length > 0)).toBe(true);
+  });
+
+  it('kai, explore, no candidates in the window: keeps the closest plans from a wider search', async () => {
+    const ctx = await ctxFor(profileId('kai'));
+    const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
+    expect(out.keep.length).toBeGreaterThan(0);
+    expect(out.keep.length).toBeLessThanOrEqual(3);
+    expect(out.closest).toBe(true);
+    expect(out.summary).toMatch(/closest plans/);
+  });
+
+  it('an ask that matches nothing keeps the 3 closest plans, labelled closest', async () => {
+    const ctx = await ctxFor(alex);
+    const out = await runMuseFilter({ ctx, mode: 'explore', text: 'scuba diving' });
+    expect(out.closest).toBe(true);
+    expect(out.keep).toHaveLength(3);
+    const walks = new Map(questCandidates(ctx).map((q) => [q.id, q.walkMinutes]));
+    const kept = out.keep.map((k) => walks.get(k.id)!);
+    const others = [...walks].filter(([id]) => !out.keep.some((k) => k.id === id)).map(([, w]) => w);
+    expect(Math.max(...kept)).toBeLessThanOrEqual(Math.min(...others));
+    expect(out.keep[0]!.reason).toMatch(/min walk$/);
+  });
+
   it('is deterministic', async () => {
     const a = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
     const b = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
@@ -102,6 +134,14 @@ describe('muse filter: live mode', () => {
     expect(out.source).toBe('muse');
     expect(out.mode).toBe('live');
     expect(out.keep).toEqual([{ id: dumplings, kind: 'quest', reason: 'you like dumplings, 9 min walk' }]);
+  });
+
+  it('an empty keep from Muse becomes the closest plans', async () => {
+    setMuseTransport(async () => ({ content: JSON.stringify({ keep: [], summary: 'Nothing.' }), usage: { promptTokens: 1, completionTokens: 1 } }));
+    const out = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
+    expect(out.closest).toBe(true);
+    expect(out.keep).toHaveLength(3);
+    expect(out.mode).toBe('live');
   });
 
   it('falls back to code ranking when Muse fails, and does not cache the fallback', async () => {

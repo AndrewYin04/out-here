@@ -22,6 +22,8 @@ export type FriendsLayerProps = {
   viewer: Profile | null;
   /** Muse filter: show only these friends' pins. Omitted or null shows every friend. */
   keepIds?: ReadonlySet<string> | null;
+  /** Muse filter: the reason row for a kept friend's card. */
+  reasonFor?: ((friendId: string) => { label: string; text: string } | null) | null;
 };
 
 type MapLib = typeof import('maplibre-gl');
@@ -99,7 +101,7 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
 
 type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
 
-export function FriendsLayer({ map, viewer, keepIds = null }: FriendsLayerProps) {
+export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: FriendsLayerProps) {
   const lib = useMapLib();
   const tick = useViewTick(map);
   const { data } = useFriendPins();
@@ -244,7 +246,7 @@ export function FriendsLayer({ map, viewer, keepIds = null }: FriendsLayerProps)
           </button>
         </MapMarker>
       ))}
-      <FriendCard pin={openPin} onClose={closeCard} />
+      <FriendCard pin={openPin} onClose={closeCard} museReason={openPin && reasonFor ? reasonFor(openPin.friend.id) : null} />
     </>
   );
 }
