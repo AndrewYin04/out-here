@@ -16,6 +16,7 @@
       "Bash(git checkout:*)",
       "Bash(git branch:*)",
       "Bash(git merge:*)",
+      "Bash(gh pr merge:*)",
       "Bash(git rebase:*)",
       "Bash(git stash:*)",
       "Bash(git fetch:*)",
@@ -54,7 +55,29 @@
       "Bash(TZ=America/Los_Angeles date:*)",
       "Bash(lsof:*)",
       "WebSearch",
-      "mcp__Claude_Browser"
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npm i *)",
+      "Bash(npm ci*)",
+      "Bash(npx playwright *)",
+      "Bash(npx tsc *)",
+      "Bash(npx supabase *)",
+      "Bash(npx create-next-app@15 *)",
+      "Bash(node --env-file=.env.local *)",
+      "Bash(node scripts/*)",
+      "Bash(node .claude/hooks/*)",
+      "Bash(vercel deploy --yes*)",
+      "Bash(vercel ls*)",
+      "Bash(vercel inspect*)",
+      "Bash(git push origin overnight*)",
+      "Bash(git push -u origin overnight*)",
+      "Bash(gh issue comment *)",
+      "Bash(gh pr view *)",
+      "Bash(bash scripts/board.sh *)",
+      "Bash(bash scripts/deploy-requests.sh *)",
+      "Bash(curl -s *)",
+      "mcp__claude-in-chrome",
+      "Workflow"
     ],
     "deny": [
       "Read(./.env)",
@@ -72,7 +95,6 @@
       "Bash(git push --delete:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean:*)",
-      "Bash(gh pr merge:*)",
       "Bash(gh repo delete:*)",
       "Bash(gh repo edit:*)",
       "Bash(gh issue delete:*)",
@@ -87,7 +109,83 @@
       "Bash(npm install -g:*)",
       "Bash(brew:*)",
       "Bash(supabase db reset:*)",
-      "Bash(supabase projects delete:*)"
+      "Bash(supabase projects delete:*)",
+      "PowerShell(cat .env:*)",
+      "PowerShell(cat .env.local:*)",
+      "PowerShell(git push --force:*)",
+      "PowerShell(git push -f:*)",
+      "PowerShell(git push --force-with-lease:*)",
+      "PowerShell(git push origin main:*)",
+      "PowerShell(git push origin HEAD:main:*)",
+      "PowerShell(git push --delete:*)",
+      "PowerShell(git reset --hard:*)",
+      "PowerShell(git clean:*)",
+      "PowerShell(gh repo delete:*)",
+      "PowerShell(gh repo edit:*)",
+      "PowerShell(gh issue delete:*)",
+      "PowerShell(gh issue close:*)",
+      "PowerShell(gh secret:*)",
+      "PowerShell(rm -rf /:*)",
+      "PowerShell(rm -rf ~:*)",
+      "PowerShell(rm -rf ..:*)",
+      "PowerShell(sudo:*)",
+      "PowerShell(npm publish:*)",
+      "PowerShell(npm i -g:*)",
+      "PowerShell(npm install -g:*)",
+      "PowerShell(brew:*)",
+      "PowerShell(supabase db reset:*)",
+      "PowerShell(supabase projects delete:*)",
+      "Bash(vercel deploy --prod*)",
+      "PowerShell(vercel deploy --prod*)",
+      "PowerShell(Get-Content .env*)",
+      "Bash(vercel env pull*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/no-prompt.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/log-failures.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/log-failures.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

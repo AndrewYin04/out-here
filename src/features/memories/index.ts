@@ -1,0 +1,7 @@
+// Barrel for the memories area: the Memories page (client) and the pure regroup logic the
+// /api/muse/regroup route uses (no node-only imports, safe on both sides).
+export { MemoriesPage } from './MemoriesPage';
+export {
+  commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
+} from './regroup';
+export type { RegroupCandidate, RegroupContext, RegroupMember, RegroupResult, RegroupSuggestion } from './regroup';

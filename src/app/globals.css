@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* Facebook-style tokens. Values come from docs/FB_SPEC.md section 1 (unverified baseline).
+   Tailwind 4 turns each --color-*, --radius-*, --shadow-* and --font-* into utilities,
+   e.g. bg-fb-bg, text-fb-text-2, rounded-card, shadow-card. */
+@theme {
+  --color-fb-bg: #f2f4f7;
+  --color-fb-surface: #ffffff;
+  --color-fb-blue: #0866ff;
+  --color-fb-blue-hover: #0861f2;
+  --color-fb-link: #0064d1;
+  --color-fb-blue-tint: #ddedfe;
+  --color-fb-text: #080809;
+  --color-fb-text-2: #65686c;
+  --color-fb-divider: #d0d3d7;
+  --color-fb-divider-soft: #e2e5e9;
+  --color-fb-input: #f2f4f7;
+  --color-fb-hover: rgba(0, 0, 0, 0.05);
+  --color-fb-pressed: rgba(0, 0, 0, 0.1);
+  --color-fb-secondary-btn: #e2e5e9;
+  --color-fb-secondary-btn-hover: #d8dadf;
+  --color-fb-green: #24832c;
+  --color-fb-red: #dd2334;
+  --color-fb-scrim: rgba(0, 0, 0, 0.4);
+  --color-fb-skeleton: #e4e6eb;
+
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 20px;
+  --radius-sheet: 16px;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-topbar: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-popover: 0 12px 28px rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI Historic", "Segoe UI", Helvetica, Arial,
+    sans-serif;
+
+  --text-fb-body: 15px;
+  --text-fb-body--line-height: 20px;
+  --text-fb-meta: 13px;
+  --text-fb-meta--line-height: 16px;
+  --text-fb-rail: 17px;
+  --text-fb-rail--line-height: 22px;
+  --text-fb-title: 24px;
+  --text-fb-title--line-height: 28px;
+
+  --animate-shimmer: fb-shimmer 1.4s ease-in-out infinite;
+  --animate-toast-in: fb-toast-in 160ms ease-out;
+}
+
+@keyframes fb-shimmer {
+  0% { opacity: 1; }
+  50% { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+
+@keyframes fb-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-fb-bg);
+  color: var(--color-fb-text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 20px;
+}
+
+/* One focus style for every interactive element: a 2 px blue ring. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-fb-blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
