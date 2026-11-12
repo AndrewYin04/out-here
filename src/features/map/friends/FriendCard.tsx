@@ -1,6 +1,7 @@
 'use client';
 // A friend's Find My card: name, place, distance and walking time, the 3-part status bubble,
-// and Want to hang?. The hang composer shows what the invite proposes (a quest or place picked
+// and three actions: Want to hang?, View profile (/profile/<handle>) and Message
+// (/messages?to=<handle>). The hang composer shows what the invite proposes (a quest or place picked
 // from the friend's bubble, free window and walking time) before it is sent.
 import { Clock, Footprints, Hand, MapPin, MessageCircle, Send, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,13 +13,6 @@ import type { FriendPin } from '@/shared/types';
 import { distanceLine, firstName, floatingPanel, updatedAgo } from './useFindMy';
 
 export type FriendCardProps = { pin: FriendPin | null; onClose: () => void };
-
-/**
- * View profile and Message land on /profile/<handle> and /messages?to=<handle>. Both pages are
- * loading skeletons on this base, so the buttons stay hidden until those slices are merged.
- * The integrator flips this to true then.
- */
-export const CARD_LINKS_READY = false;
 
 export function FriendCard({ pin, onClose }: FriendCardProps) {
   const toast = useToast();
@@ -124,16 +118,14 @@ export function FriendCard({ pin, onClose }: FriendCardProps) {
             <Button variant="primary" block icon={<Hand size={16} aria-hidden />} onClick={() => setComposing(true)} aria-expanded={composing}>
               Want to hang?
             </Button>
-            {CARD_LINKS_READY && (
-              <div className="grid grid-cols-2 gap-2">
-                <LinkButton href={`/profile/${f.handle}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
-                  View profile
-                </LinkButton>
-                <LinkButton href={`/messages?to=${f.handle}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
-                  Message
-                </LinkButton>
-              </div>
-            )}
+            <div className="grid grid-cols-2 gap-2">
+              <LinkButton href={`/profile/${encodeURIComponent(f.handle)}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
+                View profile
+              </LinkButton>
+              <LinkButton href={`/messages?to=${encodeURIComponent(f.handle)}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
+                Message
+              </LinkButton>
+            </div>
           </div>
         )}
 

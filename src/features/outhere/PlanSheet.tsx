@@ -53,6 +53,15 @@ export function PlanSheet({ className }: { className?: string }) {
   const friends = useApi<{ friends: PersonCard[] }>(open ? '/api/friends' : null);
   const friendMap = useMemo(() => new Map((friends.data?.friends ?? []).map((f) => [f.id, f])), [friends.data]);
 
+  // /out-here?free=1 (the Feed's "I'm free" button) opens the sheet with the empty composer
+  // focused. It never submits. The param is dropped so a reload or Back does not reopen it.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('free') !== '1') return;
+    url.searchParams.delete('free');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    setPlanOpen(true);
+  }, []);
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
