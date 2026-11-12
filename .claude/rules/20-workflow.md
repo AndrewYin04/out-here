@@ -43,6 +43,7 @@ Use them for parallel, well-scoped work, not for things you can do in a few tool
   - `e2e-verifier`: runs `npm run test:e2e` plus one exploratory two-persona flow against `out-here-dev`, and tries to refute "this works".
   - `reviewer`: reviews the slice's diff for crashes on empty data, join races, time math, location leaks, secrets in client code, dead buttons, and `window.alert`.
   - `ui-critic`: Playwright screenshots at 390 and 1440 px compared with `docs/FB_SPEC.md` and `reference/fb/`; returns the 5 most visible differences from real Facebook.
+  - `product-critic`: uses the just-built feature as a real young adult would (two personas, 1440 and 390 px) and compares it with the product it imitates: Facebook via `reference/fb/` screenshots and FB_SPEC copy and wording, Find My for friend locations, Boardy for intros, smooth maps for the Out Here and 3D walking views. It returns what feels fake, confusing, low quality, or AI-decorative.
   - `judge`: scores the preview URL against the four Devpost criteria, once per milestone.
 - **Explorer** (Explore): look up library APIs/version compatibility (MapLibre GL JS API, Supabase realtime API, Next 15 route handler signatures).
 - **Muse evaluator**: run the Muse fixtures against the real API, report failures, propose prompt fixes.
@@ -56,7 +57,7 @@ Use them for parallel, well-scoped work, not for things you can do in a few tool
 
 ## Self-review loop (every builder slice, before merge)
 1. The builder finishes. The main session runs the checks on the builder's branch.
-2. Run `e2e-verifier`, `reviewer`, and (UI slices) `ui-critic` on that branch in parallel in one Workflow.
+2. Run `e2e-verifier`, `reviewer`, and, for every user-facing feature slice, `ui-critic` and `product-critic` on that branch in parallel in one Workflow. This is how every feature is reviewed as it is built: Find My, the Out Here map and 3D walking view, the Muse plan, invites and live seats, Intros, Memories, Events, Messenger, and the rest. `ui-critic` compares with `reference/fb/` screenshots (the read-only Facebook survey); when they are missing, it compares with `docs/FB_SPEC.md` and says so.
 3. Turn every blocker and major finding into a fix task for the same builder, re-briefed with the findings. Reproduce each bug before fixing it.
 4. Repeat steps 2 and 3 until a round returns no blocker or major, with **at most 3 rounds**. After round 3, merge what passes, revert what does not, and log it under Known issues.
 5. Minor findings go to the `docs/POLISH.md` queue.
