@@ -24,6 +24,8 @@ const BOX_W = 46;
 const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
+/** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
+const PHONE_RESULTS_SHEET = 0.5;
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
 const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
@@ -202,7 +204,9 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       const ref = pins.current.get(id)!;
       const lw = labelWidth(ref.label.textContent ?? '');
       const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
-      const fits = taken.length < maxLabels
+      // While a plan shows, dimmed pins drop their labels so the "✨ Muse pick" pills have room.
+      const fits = !ref.root.hasAttribute('data-dimmed')
+        && taken.length < maxLabels
         && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
         && !taken.some((t) => overlaps(t, lb));
       const show = fits || id === selectedRef.current;
@@ -341,9 +345,10 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     const h = map.getContainer().clientHeight;
     const padding = isDesktop()
       ? { top: 90, bottom: 70, left: 460, right: 90 }
-      // The phone sheet covers up to 78% of the map; keep the picks in the strip above it.
-      : { top: 64, bottom: Math.max(0, Math.min(Math.round(h * 0.78) + 8, h - 64 - 70)), left: 40, right: 40 };
-    map.fitBounds(b, { padding, maxZoom: 16, duration: 600 });
+      // With results the phone sheet drops to a peek of 50% of the map (PlanSheet); fit the
+      // picks, their pills and labels in the space above it, 24 px clear of the sheet edge.
+      : { top: 72, bottom: Math.max(0, Math.min(Math.round(h * PHONE_RESULTS_SHEET) + 24 + BOX_BOTTOM + LABEL_H, h - 72 - 90)), left: 48, right: 48 };
+    map.fitBounds(b, { padding, maxZoom: isDesktop() ? 16 : 15.5, duration: 600 });
     schedule();
     // quests/origin/fitTo are read at the moment a plan arrives; picksKey and fitKey trigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps

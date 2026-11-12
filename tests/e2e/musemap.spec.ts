@@ -25,6 +25,20 @@ test.describe("Muse picks on the map", () => {
     // a dimmed pin is not a pick
     await expect(dimmed.first().getByTestId("muse-pick")).toHaveCount(0);
 
+    // no reason line repeats the card's meta row ("4 min walk, $7, starts in 9 min")
+    for (const r of await page.getByTestId("suggestion-reason").allTextContents()) {
+      expect(r).not.toMatch(/min walk|starts in/);
+    }
+    // every pick and its pill sit fully above the plan sheet, after the fit animation
+    await page.waitForTimeout(900);
+    const sheet = await page.getByTestId("plan-sheet").boundingBox();
+    for (const pill of await page.getByTestId("muse-pick").all()) {
+      const box = await pill.boundingBox();
+      if (!box || !sheet) continue;
+      if ((page.viewportSize()?.width ?? 1440) < 768) expect(box.y + box.height + 40).toBeLessThanOrEqual(sheet.y);
+    }
+    await page.screenshot({ path: test.info().outputPath("plan.png") });
+
     await page.getByRole("button", { name: "Close" }).click();
     await expect(page.getByTestId("muse-pick")).toHaveCount(0);
     await expect(page.locator("[data-dimmed]")).toHaveCount(0);

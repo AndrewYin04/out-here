@@ -108,7 +108,8 @@ export function PlanSheet({ className }: { className?: string }) {
           aria-label="I'm free"
           data-testid="plan-sheet"
           className={cn(
-            'absolute inset-x-0 bottom-0 z-30 flex max-h-[78%] flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
+            'absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
+            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[78%]',
             'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
