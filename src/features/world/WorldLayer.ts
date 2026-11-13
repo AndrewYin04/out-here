@@ -42,6 +42,8 @@ type Actor = {
   /** Jolly's sparkle trail on the ground, and whether his thinking effect is on. */
   sparkles: SparkleWake | null;
   processing: 'off' | 'pending' | 'success' | 'fade';
+  /** A warm golden glow behind Jolly, so he stands out from grey streets. */
+  halo: THREE.Sprite | null;
 };
 export type BeaconSpec = {
   id: string; pos: LatLng; color: string; height: number; strong: boolean;
@@ -65,6 +67,25 @@ const GOLD = '#F5B800';
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
+/** Jolly's halo: warm gold in the middle, fading out (drawn additively behind him). */
+function haloTexture(): THREE.Texture {
+  if (typeof document === 'undefined') return new THREE.Texture();
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (g) {
+    const grad = g.createRadialGradient(32, 32, 4, 32, 32, 31);
+    grad.addColorStop(0, 'rgba(255, 214, 120, 0.75)');
+    grad.addColorStop(0.45, 'rgba(255, 190, 80, 0.38)');
+    grad.addColorStop(1, 'rgba(255, 170, 60, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** A soft round shadow: dark in the middle, fading to nothing at the edge. */
 function shadowTexture(): THREE.Texture {
   if (typeof document === 'undefined') return new THREE.Texture();
@@ -73,9 +94,9 @@ function shadowTexture(): THREE.Texture {
   const g = c.getContext('2d');
   if (g) {
     const grad = g.createRadialGradient(32, 32, 2, 32, 32, 31);
-    grad.addColorStop(0, 'rgba(10, 20, 35, 0.42)');
-    grad.addColorStop(0.55, 'rgba(10, 20, 35, 0.22)');
-    grad.addColorStop(1, 'rgba(10, 20, 35, 0)');
+    grad.addColorStop(0, 'rgba(40, 22, 8, 0.66)');
+    grad.addColorStop(0.5, 'rgba(40, 22, 8, 0.38)');
+    grad.addColorStop(1, 'rgba(40, 22, 8, 0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
   }
@@ -127,6 +148,8 @@ export class WorldLayer implements CustomLayerInterface {
   private trailPos = new THREE.Vector3();
   private trailAnchor = new THREE.Vector3();
   private shadowGeo = new THREE.PlaneGeometry(1, 1);
+  private haloCenter = new THREE.Vector3();
+  private haloMat = new THREE.SpriteMaterial({ map: haloTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .85 });
   private shadowMat = new THREE.MeshBasicMaterial({
     map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
@@ -146,13 +169,18 @@ export class WorldLayer implements CustomLayerInterface {
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
     const m=this.originMerc.meterInMercatorCoordinateUnits();
     this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
-    this.scene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    this.charScene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    const sun2 = new THREE.DirectionalLight('#FFF2D9', 2.4);
-    sun2.position.set(-5,8,7);
+    // Golden hour: a warm sky fill and a low golden sun from the south-west.
+    this.scene.add(new THREE.HemisphereLight('#FFE6BD', '#B9A27A', .85));
+    this.charScene.add(new THREE.HemisphereLight('#FFE6BD', '#B9A27A', .85));
+    const sun2 = new THREE.DirectionalLight('#FFC86E', 3.1);
+    sun2.position.set(-6,5,6);
     this.charScene.add(sun2);
-    const sun = new THREE.DirectionalLight('#FFF2D9', 2.4);
-    sun.position.set(-5,8,7);
+    // A soft cool back light outlines the characters against the warm street.
+    const rim = new THREE.DirectionalLight('#BFD8FF', 1.4);
+    rim.position.set(5,4,-7);
+    this.charScene.add(rim);
+    const sun = new THREE.DirectionalLight('#FFC86E', 2.9);
+    sun.position.set(-6,5,6);
     this.scene.add(sun);
   }
 
@@ -187,7 +215,14 @@ export class WorldLayer implements CustomLayerInterface {
       shadow.frustumCulled = false;
       this.scene.add(shadow);
     }
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, hidden: false, sparkles, processing: 'off' });
+    let halo: THREE.Sprite | null = null;
+    if (kind === 'pet') {
+      halo = new THREE.Sprite(this.haloMat);
+      halo.renderOrder = -1;
+      halo.frustumCulled = false;
+      this.charScene.add(halo);
+    }
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, hidden: false, sparkles, processing: 'off', halo });
   }
 
   removeActor(id: string) {
@@ -197,6 +232,7 @@ export class WorldLayer implements CustomLayerInterface {
     if(a.trail){this.charScene.remove(a.trail.object);a.trail.dispose();}
     if (a.sparkles) { this.charScene.remove(a.sparkles.object); a.sparkles.dispose(); }
     if (a.shadow) this.scene.remove(a.shadow);
+    if (a.halo) this.charScene.remove(a.halo);
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
     this.actors.delete(id);
@@ -399,6 +435,7 @@ export class WorldLayer implements CustomLayerInterface {
     this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
+    this.haloMat.map?.dispose(); this.haloMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
     this.standGeo.dispose(); this.floorGeo.dispose(); this.seatGeo.dispose(); this.standMat.dispose(); this.seatMat.dispose();
@@ -448,7 +485,19 @@ export class WorldLayer implements CustomLayerInterface {
         a.shadow.position.set(o.east, 0.04, -o.north);
         // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
         const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;
-        a.shadow.scale.set(s * foot, s * foot, 1);
+        // Cast by the low golden sun (south-west): stretched and pushed toward the north-east.
+        const k = s * foot * (a.boost || 1);
+        a.shadow.scale.set(k * 1.15, k * 1.5, 1);
+        a.shadow.rotation.z = Math.PI / 4;
+        // Just above the street surface (the city kit's road and kerb tiles stand ~0.2 m proud).
+        a.shadow.position.set(o.east + .32 * k, 0.26, -o.north - .32 * k);
+      }
+      if (a.halo) {
+        // Behind Jolly, centred on his body, scaled with him; it makes him read against grey streets.
+        a.halo.visible = showChars && !a.hidden;
+        if (a.char.getEffectCenter) { a.char.getEffectCenter(this.haloCenter); a.halo.position.copy(this.haloCenter); }
+        const hs = s * 1.75 * (a.boost || 1);
+        a.halo.scale.set(hs, hs, 1);
       }
       if (a.trail) {
         if (showChars) {

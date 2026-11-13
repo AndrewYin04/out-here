@@ -28,11 +28,11 @@ const PAINT: [string, PaintProp, PaintValue][] = [
   ['building', 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.5, 1, 16.5, 0]],
 ];
 
-const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF1D8', intensity: 0.48, position: [1.4, 215, 38] };
+const LIGHT: LightSpecification = { anchor: 'map', color: '#FFC977', intensity: 0.56, position: [1.4, 215, 52] };
 const SKY: SkySpecification = {
-  'sky-color': '#8ED4F0',
-  'horizon-color': '#D7EAF0',
-  'fog-color': '#D7EAF0',
+  'sky-color': '#7FC8EE',
+  'horizon-color': '#FFE0AE',
+  'fog-color': '#FFE6C2',
   'sky-horizon-blend': 0.55,
   'horizon-fog-blend': 0.5,
   'fog-ground-blend': 0.55,
