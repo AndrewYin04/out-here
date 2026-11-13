@@ -140,6 +140,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   /** While true, following also eases the zoom down to street level (the fly-in). */
   const entering = useRef(true);
   const [follow, setFollowState] = useState(false);
+  /** Where a scroll or trackpad pinch is taking the zoom; the follow loop eases there around you. */
+  const zoomGoal = useRef<number | null>(null);
   const setFollow = useCallback((v: boolean) => { followRef.current = v; setFollowState(v); }, []);
   const keys = useRef(new Set<string>());
   const stick = useRef({ x: 0, y: 0 });
@@ -367,12 +369,27 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const zoomEnd = () => {
       if (!entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
     };
+    // Scroll and trackpad pinch while following: zoom around your character, eased every frame by
+    // the follow loop. MapLibre's own scroll zoom pivots on the screen center (you sit below it) and
+    // fights the follow camera, which reads as choppy.
+    const wheel = (e: WheelEvent) => {
+      if (!followRef.current || touring.current || chatOpen.current) return;
+      e.preventDefault(); e.stopPropagation();
+      entering.current = false;
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      const rate = e.ctrlKey ? 0.012 : 0.0028; // a trackpad pinch sends small deltas with ctrlKey
+      const from = zoomGoal.current ?? map.getZoom();
+      zoomGoal.current = Math.max(map.getMinZoom(), Math.min(MAX_3D_ZOOM, from - Math.max(-120, Math.min(120, px)) * rate));
+    };
+    const wheelHost = map.getContainer();
+    wheelHost.addEventListener('wheel', wheel, { capture: true, passive: false });
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
     map.on('zoomstart', userZoom);
     map.on('zoomend', zoomEnd);
 
     return () => {
+      wheelHost.removeEventListener('wheel', wheel, { capture: true });
       cancelled = true;
       unsubLooks?.();
       map.off('load', add);
@@ -1028,6 +1045,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const busy = map.isZooming() || (!followRef.current && map.isMoving());
       if (followRef.current && !busy) {
         let z = zoom;
+        if (zoomGoal.current != null) {
+          const goal = zoomGoal.current;
+          z = reducedMotion() ? goal : zoom + (goal - zoom) * (1 - Math.exp(-dt * 12));
+          if (Math.abs(goal - z) < 0.003) { z = goal; zoomGoal.current = null; }
+          // Zoomed out to city level by scroll: hand over to the 2D map.
+          if (z < EXIT_3D_ZOOM) { zoomGoal.current = null; onZoomOutRef.current?.(); }
+        }
         if (entering.current) {
           z = reducedMotion() ? ENTER_ZOOM : zoom + (ENTER_ZOOM - zoom) * (1 - Math.exp(-dt * 2.2));
           if (Math.abs(ENTER_ZOOM - z) < 0.02) { z = ENTER_ZOOM; entering.current = false; }
@@ -1036,6 +1060,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const h = map.getContainer().clientHeight;
         compose(pos.current.lng, pos.current.lat, z, camBearing.current, 0, Math.round(h * 0.2));
       } else if (!busy) {
+        zoomGoal.current = null;
         previousCamera = null;
         camBearing.current = map.getBearing();
       }
