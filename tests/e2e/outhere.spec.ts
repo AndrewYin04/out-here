@@ -180,7 +180,7 @@ test.describe("Out Here plan sheet", () => {
     await expect(draft).not.toHaveValue("");
     await draft.fill("Dumplings at Dumpling Den in 25? 2 seats left");
     await top.getByRole("button", { name: "Send invite" }).dblclick();
-    await expect(top.getByRole("button", { name: "Invite sent to Maya" })).toBeVisible();
+    await expect(top.getByTestId("waiting-for-friend")).toContainText("Waiting for Maya");
 
     // exactly one invite, even after a double-click
     const inv = await maya.request.get("/api/invites", { headers: { "x-persona": "maya" } });

@@ -293,10 +293,25 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         // With a friend: one main action, "Go with Maya" (join + Muse's invite). Without: Join.
         if (lead && s.questId) return (
           <div className="mt-3">
-            <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null || (!isMember && seats === 0)}
-              onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
-              {sent || busy === 'invite' ? `Invite sent to ${lead.name.split(' ')[0]}` : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
-            </Button>
+            {sent ? (
+              // No dead stop: say what happens next. Their answer swaps this for Let's go.
+              <div data-testid="waiting-for-friend" aria-live="polite" className="flex items-center gap-3 rounded-btn bg-fb-blue-tint px-3 py-2">
+                <span className="relative shrink-0">
+                  <Avatar src={lead.avatarUrl} name={lead.name} size={32} decorative />
+                  <span aria-hidden className="absolute -right-0.5 -top-0.5 size-3 animate-ping rounded-full bg-fb-blue" />
+                  <span aria-hidden className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-fb-blue ring-2 ring-white" />
+                </span>
+                <span className="min-w-0 flex-1 text-[14px] leading-5 text-fb-text">
+                  <span className="block font-semibold">Waiting for {lead.name.split(' ')[0]}…</span>
+                  <span className="block text-[13px] text-fb-text-2">{isMember ? 'Your seat is held. ' : ''}Let’s go shows up the moment {lead.name.split(' ')[0]} answers.</span>
+                </span>
+              </div>
+            ) : (
+              <Button block disabled={busy !== null || (!isMember && seats === 0)}
+                onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
+                {busy === 'invite' ? `Sending to ${lead.name.split(' ')[0]}…` : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
+              </Button>
+            )}
             {!sent && (
               <div className="mt-1.5 flex justify-center gap-4 text-[13px] font-semibold text-fb-text-2">
                 <button type="button" className="hover:underline" onClick={() => openInvite(lead)}>Edit invite first</button>

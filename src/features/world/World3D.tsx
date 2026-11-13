@@ -169,16 +169,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const petPos = useRef<LatLng>(start);
   const petAlt = useRef(1.7);
   const [hello, setHello] = useState(true);
-  const [showReason, setShowReason] = useState(false);
   const [cheer, setCheer] = useState<string | null>(null);
   // The hello starts once the street view is on screen, not behind the loading veil.
   useEffect(() => { if (!settled) return; const t = window.setTimeout(() => setHello(false), 7000); return () => window.clearTimeout(t); }, [settled]);
-  useEffect(() => {
-    setShowReason(false);
-    if (plan.state !== 'done' || !plan.topReason) return;
-    const t = window.setTimeout(() => setShowReason(true), 6000);
-    return () => window.clearTimeout(t);
-  }, [plan.state, plan.summary, plan.topReason]);
   useEffect(() => {
     if (!cheer) return;
     const t = window.setTimeout(() => setCheer(null), 3500);
@@ -190,7 +183,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     : plan.state === 'loading'
       ? { text: 'Checking who’s free and what fits…', tone: 'plain', pending: true }
       : plan.state === 'done' && planOpen
-        ? { text: clip(showReason && plan.topReason ? plan.topReason : (plan.summary || plan.topTitle || 'Here’s what I found.'), 150), tone: plan.live ? 'muse' : 'plain' }
+        // The sheet below carries the summary and the reasons; Muse says each thing once.
+        ? { text: plan.topTitle ? 'Here’s what fits 👇' : 'Nothing fits that yet. Try a longer time 👇', tone: plan.live ? 'muse' : 'plain' }
         : plan.state === 'error' && planOpen
           ? { text: plan.error ?? 'I couldn’t make a plan right now.', tone: 'plain' }
           : planOpen
@@ -995,8 +989,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         ))}
       </div>
 
-      {/* Building names at Meta HQ: while touring or looking from a distance. */}
-      {(tour || map.getZoom() <= 18.3) && (
+      {/* Building names at Meta HQ: only on the campus tour (they crowd the plan cards otherwise). */}
+      {tour && (
         <div className="absolute inset-0 overflow-hidden">
           {hqLabels.map((l) => (
             <div key={l.id} ref={(el) => layerRef.current?.bindAnchor(l.id, l.pos, l.altitude, el)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
@@ -1027,8 +1021,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <button type="button" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="shrink-0 font-semibold text-[#8AB4FF] hover:underline">End tour</button>
           </div>
         )}
-        {/* One walk bar: while you walk, the countdown below says who you're walking with. */}
-        {together.plan && !walk && (
+        {/* One walk bar, only once someone is actually walking to your plan. Before that there is
+            nothing to share yet; while you walk, the countdown below says who you're walking with. */}
+        {together.plan && !walk && together.walkers.length > 0 && (
           <div role="status" data-testid="walk-together" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text shadow-popover">
             <span aria-hidden>👥</span>
             <span className="min-w-0 truncate">

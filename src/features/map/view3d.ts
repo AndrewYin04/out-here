@@ -14,12 +14,12 @@ export function shouldEnter3d(zoom: number, center: LatLng, me: LatLng): boolean
 }
 
 /**
- * The view Out Here opens on: ?view= first (demo links, tests), then this tab's last choice, then
- * 3D (the "Pokémon Go" landing). Automated browsers default to the 2D map so the map specs keep
- * their overhead camera; they open 3D with ?view=3d.
+ * The view Out Here opens on: ?view= first (demo links, tests), else the 2D map. The map explains
+ * "plans near you" at a glance; 3D is the walk, entered with Let's go or the 3D button, so a
+ * reload never drops you back into a street view you left.
  */
 export function initialView(param: string | null, saved: string | null, automated: boolean): MapView {
+  void saved; void automated;
   if (param === '3d' || param === 'map') return param;
-  if (saved === '3d' || saved === 'map') return saved;
-  return automated ? 'map' : '3d';
+  return 'map';
 }

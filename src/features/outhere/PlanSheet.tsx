@@ -105,7 +105,11 @@ function Row({ children, label }: { children: React.ReactNode; label: string }) 
  * The one "I'm free" button. It also shows your status ("Free till 3:49"), so status and Muse
  * live in one place: tapping it opens the composer, where you can ask Muse or just set free/busy.
  */
-export function ImFreeButton({ className }: { className?: string }) {
+export function ImFreeButton({ className, quiet = false }: {
+  className?: string;
+  /** A plan is up next: show as a white status chip so its Let's go is the only blue button. */
+  quiet?: boolean;
+}) {
   const open = usePlanOpen();
   const together = useTogetherId();
   const { status } = useMyStatus();
@@ -119,12 +123,13 @@ export function ImFreeButton({ className }: { className?: string }) {
       data-status={status.kind}
       data-testid="im-free"
       className={cn(
-        'oh-press inline-flex h-12 animate-pop-in items-center gap-2 rounded-full bg-fb-blue px-5 text-[17px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover active:brightness-95',
+        'oh-press inline-flex animate-pop-in items-center gap-2 rounded-full font-semibold shadow-popover active:brightness-95',
+        quiet ? 'h-11 bg-fb-surface px-4 text-[15px] text-fb-text hover:bg-fb-hover' : 'h-12 bg-fb-blue px-5 text-[17px] text-white hover:bg-fb-blue-hover',
         className,
       )}
     >
       {label ? (
-        <><StatusDot s={status} className="size-3 ring-2 ring-white" />{label}</>
+        <><StatusDot s={status} className={cn('size-3', !quiet && 'ring-2 ring-white')} />{label}</>
       ) : (
         <><span aria-hidden>✨</span> I&apos;m free</>
       )}

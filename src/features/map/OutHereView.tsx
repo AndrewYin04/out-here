@@ -62,6 +62,8 @@ function setQuestParam(id: string | null, key: 'quest' | 'listing' = 'quest') {
   window.history.replaceState(window.history.state, '', url.toString());
 }
 
+const ZOOM_INTO_3D = false;
+
 export function OutHereView() {
   const { viewer: persona } = useViewer();
   const now = useNow();
@@ -316,8 +318,10 @@ export function OutHereView() {
   meRef.current = ctx?.origin ?? DEMO_CENTER;
   const busyRef = useRef(false);
   busyRef.current = !!creating || placing || !!hostAt;
+  // Pinching into 3D near you is off: 3D is the walk (Let's go) or the 3D button, never a surprise
+  // while you zoom in on a pin. Flip ZOOM_INTO_3D to bring the gesture back.
   useEffect(() => {
-    if (!map || view !== 'map' || unsupported) return;
+    if (!ZOOM_INTO_3D || !map || view !== 'map' || unsupported) return;
     let hand = false;
     const start = (e: { originalEvent?: unknown }) => { if (e.originalEvent) hand = true; };
     const end = () => {
@@ -581,7 +585,7 @@ export function OutHereView() {
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
           <PeopleButton map={map} />
-          {visible.length > 0 && (
+          {visible.length > 0 && !show3d && (
             <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
             </p>
@@ -629,16 +633,17 @@ export function OutHereView() {
               : filter.on ? 'top-24' : 'top-[60px]'
             : 'bottom-[136px] md:bottom-auto',
         )}>
-          <BothFreeNudge className="pointer-events-auto w-full" />
+          {tools && <BothFreeNudge className="pointer-events-auto w-full" />}
         </div>
       )}
 
-      {mode === 'explore' && (
+      {/* Off the stage (docs: cleanup plan): Marketplace pickups show with ?tools=1. */}
+      {tools && mode === 'explore' && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating ? undefined : openListing(id))} />
       )}
 
       {/* Muse found something the viewer is looking for: above the bottom row. */}
-      {find && !creating && !placing && !sheetOpen && !listingId && !selectedId && !walkingNow && (
+      {tools && find && !creating && !placing && !sheetOpen && !listingId && !selectedId && !walkingNow && (
         <div className="pointer-events-none absolute inset-x-3 bottom-[88px] z-20 flex justify-center max-md:bottom-[152px]">
           <MuseFindCard
             key={find.listingId}
@@ -654,8 +659,8 @@ export function OutHereView() {
       {!sheetOpen && !creating && !placing && !walkingNow && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
           <div className="pointer-events-auto flex items-center gap-2">
-            <ImFreeButton />
-            {!unsupported && (
+            <ImFreeButton quiet={!!upNext} />
+            {tools && !unsupported && (
               <MarketMenu
                 wants={wants}
                 onWantsChanged={() => { void wantsApi.refetch(); }}

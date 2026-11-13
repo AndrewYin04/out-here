@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApi, type QuestDetail } from '@/features/data';
-import { Avatar, burst, cn, flash, useToast } from '@/features/ui';
+import { Avatar, burst, cn, flash, useDemoTools, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
 import type { PersonCard } from '@/shared/api';
 import { saveToAlbum } from './together-api';
@@ -56,6 +56,8 @@ function Moment({ quest, viewer, walkers, onClose }: {
   const sheetRef = useRef<HTMLElement>(null);
   const capsuleRef = useRef<HTMLDivElement>(null);
   const candidRef = useRef<HTMLInputElement>(null);
+  // One photo path on stage (Make the memory → group selfie); the candid 📸 is a ?tools=1 extra.
+  const tools = useDemoTools();
 
   // Who's here: you, plus everyone going whose walk says they're within a minute.
   const people: Person[] = useMemo(() => {
@@ -112,11 +114,11 @@ function Moment({ quest, viewer, walkers, onClose }: {
             {here.slice(0, 5).map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={20} decorative className="ring-2 ring-white" />)}
           </span>
         </div>
-        <button type="button" aria-label="Take a candid photo" title="Candid photo (goes to the shared album)" disabled={uploading}
+        {tools && <button type="button" aria-label="Take a candid photo" title="Candid photo (goes to the shared album)" disabled={uploading}
           onClick={() => candidRef.current?.click()}
           className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-secondary-btn text-fb-text hover:brightness-95 disabled:opacity-50">
           <Camera size={18} aria-hidden />
-        </button>
+        </button>}
         <button type="button" data-testid="together-make-memory" onClick={goMemory}
           className={cn('oh-press flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-fb-blue px-4 text-[14px] font-semibold text-white hover:bg-fb-blue-hover', nudge && 'animate-pulse')}>
           <Sparkles size={16} aria-hidden />Make the memory
