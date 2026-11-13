@@ -239,7 +239,7 @@ export function buildHq(data: HqData, origin: LatLng, assets?:SceneryAssets): Hq
   }
   for (const plaza of data.plazas) {
     const g = plaza.rings[0].length > 3 ? flatGeometry(plaza.rings.map((r) => toLocal(origin, r)), 0.06) : null;
-    if (g) group.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#F6EBD8', roughness: 1, side: THREE.DoubleSide }))));
+    if (g) group.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#ECEAE4', roughness: 1, side: THREE.DoubleSide }))));
   }
 
   // The campus's mapped trees, on the rooftop park where they stand on it.
