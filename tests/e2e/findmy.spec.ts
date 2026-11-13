@@ -121,12 +121,12 @@ for (const width of [390, 1440]) {
       await page.screenshot({ path: `test-results/findmy-outhere-${width}.png` });
     });
 
-    test('Want to hang? with Maya proposes Dumpling Den from her bubble before sending', async ({ page }) => {
+    test('Want to hang? with Maya proposes boba from her bubble before sending', async ({ page }) => {
       await openMap(page, 'alex', width);
       await openPeople(page);
       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
       const card = page.getByTestId('friend-card');
-      await expect(card).toContainText('craving dumplings');
+      await expect(card).toContainText('free after class');
       if (width > 800) {
         const box = await page.getByRole('dialog').boundingBox();
         expect(box!.x + box!.width).toBeLessThanOrEqual(width - 12);
@@ -134,13 +134,13 @@ for (const width of [390, 1440]) {
       }
       await card.getByRole('button', { name: 'Want to hang?' }).click();
       const s = page.getByTestId('hang-suggestion');
-      await expect(s).toContainText('Dumpling Den');
+      await expect(s).toContainText('Bobalicious Corner');
       await expect(s).toContainText('seats left');
-      await expect(page.getByTestId('hang-reason')).toContainText("Maya's craving dumplings");
-      await expect(page.getByLabel('Message to Maya')).toHaveValue(/Dumpling Den/);
+      await expect(page.getByTestId('hang-reason')).toContainText(/Maya's (free after class|down for boba)/);
+      await expect(page.getByLabel('Message to Maya')).toHaveValue(/Bobalicious Corner/);
       await page.screenshot({ path: `test-results/findmy-hang-${width}.png` });
       await page.getByRole('button', { name: 'Send invite' }).click();
-      await expect(page.getByText(/Invite sent to Maya: 🥟/)).toBeVisible();
+      await expect(page.getByText(/Invite sent to Maya: 🧋/)).toBeVisible();
     });
 
     test('sharing settings open from the map', async ({ page }) => {
@@ -166,7 +166,7 @@ test.describe('two personas, live', () => {
     try {
       await openMap(a, 'alex', 1440);
       const mayaPin = a.locator('[data-testid="friend-pin"][data-handle="maya"]');
-      await expect(mayaPin).toHaveAttribute('aria-label', /craving dumplings/);
+      await expect(mayaPin).toHaveAttribute('aria-label', /free after class/);
 
       await openMap(b, 'maya', 1440);
       await editStatus(b);
