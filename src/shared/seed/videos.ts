@@ -53,12 +53,11 @@ export const ALEX_WATCH_HISTORY: readonly [string, number, number][] = [
 ];
 
 /**
- * Maya's watch history for the thrift demo: she watched the denim shoulder-bag Reel twice and a
- * thrift outfit Reel, so the pop-up's Y2K denim bag is her Muse pick (the jacket is Alex's).
- * No denim-jacket videos: with those, live Muse picked Bea's $25 denim jacket over the bag.
+ * Maya's watch history for the thrift demo: she watched the denim shoulder-bag Reel twice, so
+ * the pop-up's Y2K denim bag is her Muse pick (the jacket is Alex's). No vintage or thrift topics:
+ * with those, live Muse picked a denim or track jacket for her instead of the bag.
  */
 export const MAYA_WATCH_HISTORY: readonly [string, number, number][] = [
   ['reel-denim-bag-styling', 58, 3],
   ['reel-denim-bag-styling', 55, 20],
-  ['reel-thrift-outfit-40', 45, 30],
 ];
