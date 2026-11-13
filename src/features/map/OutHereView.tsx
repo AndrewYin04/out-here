@@ -558,7 +558,7 @@ export function OutHereView() {
       {/* Right-side stack: 3D / Map, back to you, your plans, post a plan. */}
       {!unsupported && !creating && !walkingNow && (
         <div role="group" aria-label="Map controls"
-          className={cn('absolute right-3 z-20 flex flex-col overflow-hidden rounded-[22px] bg-fb-surface shadow-popover', sheetOpen ? 'max-md:hidden md:bottom-6' : 'bottom-24 max-md:bottom-[150px]')}>
+          className={cn('absolute right-3 z-20 flex flex-col overflow-hidden rounded-[22px] bg-fb-surface shadow-popover', sheetOpen ? 'max-md:hidden md:bottom-6' : 'bottom-24 max-md:bottom-[150px]', selectedId && 'max-md:hidden')}>
           <button type="button" data-testid={view === '3d' ? 'view-map' : 'view-3d'} aria-label={view === '3d' ? 'Flat map' : '3D street view'} title={view === '3d' ? 'Flat map' : '3D street view'}
             onClick={() => setView(view === '3d' ? 'map' : '3d')}
             className="flex size-12 items-center justify-center text-[15px] font-bold text-fb-text hover:bg-fb-hover">
