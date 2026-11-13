@@ -55,7 +55,7 @@ export const POST = route(async ({ req, viewer }) => {
       const walkMinutes = walkingMinutes(context.location, q.location);
       return [{
         questId: d.questId, title: d.title, venueName: q.venueName, emoji: q.emoji, reason: d.reason,
-        text: dropText(d.reason, { walkMinutes, priceMax: q.priceMax, budgetMax }),
+        text: dropText(d.reason, { walkMinutes, priceMax: q.priceMax, budgetMax, startsInMin: Math.round((Date.parse(q.startsAt) - now.getTime()) / 60_000) }),
       }];
     });
     // x-muse-source: "fallback" when code answered because a live model step failed, else "muse"

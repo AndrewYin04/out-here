@@ -11,7 +11,8 @@ import { museJSON, MuseTimeoutError, type MuseJSONOptions, type MuseResult } fro
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
 import {
-  codeScore, distinctTopics, factsFor, firstName, introProfileOf, keywords, lookingForOf, orderedFacts, trustLabels, type Candidate, type SharedFact,
+  codeScore, distinctTopics, factsFor, firstName, introProfileOf, keywords, lookingForOf, orderedFacts, planReasonFacts, trustLabels,
+  type Candidate, type SharedFact,
 } from './rules';
 
 const ROUTE = 'intros/click';
@@ -229,8 +230,12 @@ export async function runClick(
   };
 
   const fit = distinctTopics(c.facts);
+  // For a plan, the reasons are one of each kind (why B fits it with a quote, a topic Group,
+  // logistics) instead of every shared fact (review P6); the score still uses every fact.
+  const typed = anchor ? planReasonFacts(v, a, b, anchor, c.facts, nowMs) : [];
+  const shown = typed.length ? typed : c.facts;
   // For a plan: the code-found line that ties B to it, which A's agent opens with.
-  const planWhy = c.facts.find((f) => f.plan)?.forA ?? '';
+  const planWhy = shown.find((f) => f.plan)?.forA ?? '';
   // B's agent sees only public facts about A, so its own turns never restate A's looking-for text.
   const sharedInterest = c.facts.find((f) => f.looker === null)?.keyword;
   const overlap = sharedInterest ? `they both love ${sharedInterest}` : `${bName}'s profile fits what ${aName} is looking for`;
@@ -266,8 +271,8 @@ export async function runClick(
     ? { message: `Yes, ${bName} would be glad to meet ${aName}. That first step sounds right.`, outcome: 'said yes, the first step works' }
     : { message: `I'd pass for now. Not enough in common to make it worth ${bName}'s time.`, outcome: 'passed for now' });
 
-  const factsA = factsFor(c.facts, 'a');
-  const factsB = factsFor(c.facts, 'b');
+  const factsA = factsFor(shown, 'a');
+  const factsB = factsFor(shown, 'b');
   const numbered = (fs: string[]) => fs.map((f, n) => `${n + 1}. ${f}`).join('\n') || '(none)';
   const kindNoun = c.kind === 'dating' ? 'date' : c.kind === 'networking' ? 'coffee chat' : 'friend match';
   const mockJudge = (): Judge => ({
@@ -302,7 +307,7 @@ export async function runClick(
           'Never quote or paraphrase one person\'s private "looking for" text, or what their agent said they want, to the other person.',
           'summary: one sentence to both people naming the trust path and the kind. noteA: 1-2 sentences to A on why your agents think A and B would click; noteB: the mirror.',
           'summary, noteA and noteB must not repeat any fact used in the reasons; name the kind and the first step instead.',
-          'When the first step is a plan A asked company for, the lines that say why B fits that plan (they end with "a fit for <plan>" or "that\'s what <plan> is about") must come first in factsA and factsB if they are real; without one, score below 85.',
+          'When the first step is a plan A asked company for, line 1 of factsA and of factsB says why B fits that plan (a shared interest in what the plan is about, often quoting a post); it must come first if it is real; without it, score below 85. The other lines are different kinds of fact (a Group, the timing and walk): keep their order.',
           `End noteA and noteB with what the first step is worth, tied to the kind, e.g. "${verb}".`,
         ].join(' '),
       },
@@ -323,8 +328,8 @@ export async function runClick(
   const j = judged.data;
   // The reasons are the accepted facts in code's wording for that side; unknown numbers are dropped.
   // For a plan, the reason tying B to it always reads first.
-  const planA = c.facts.filter((f) => f.plan).map((f) => f.forA);
-  const planB = c.facts.filter((f) => f.plan).map((f) => f.forB);
+  const planA = shown.filter((f) => f.plan).map((f) => f.forA);
+  const planB = shown.filter((f) => f.plan).map((f) => f.forB);
   const reasonsA = planFirst(pickFacts(factsA, j.factsA), planA);
   const reasonsB = planFirst(pickFacts(factsB, j.factsB), planB);
   return {

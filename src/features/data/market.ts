@@ -95,9 +95,14 @@ function withPickup(l: Listing): Listing {
   return { ...l, pickupUntil: l.pickupUntil ?? null, pickupLabel: l.pickupLabel ?? null, pickupSpot: l.pickupSpot ?? null };
 }
 
-/** The listing without the exact spot, for the plain Marketplace routes. */
-export function publicListing(l: Listing): Listing {
-  return { ...withPickup(l), pickupSpot: null };
+/**
+ * A listing for the plain Marketplace routes (grid and item page), with the same rule as the
+ * map (mapListingFor): the exact place and pickup spot only for the seller and a buyer whose
+ * hold the seller accepted; everyone else gets the ~200 m fuzzed area (review R2). Without a
+ * pickup window the row's point is the seller's home, so it is never sent exact to others.
+ */
+export function publicListing(v: View, viewerId: ID, l: Listing, at: Date = now()): Listing {
+  return mapListingFor(v, viewerId, withPickup(l), at).listing;
 }
 
 function findListing(v: View, id: ID): Listing {

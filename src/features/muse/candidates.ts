@@ -89,7 +89,7 @@ const CATEGORY_ALIASES: Record<string, Quest['category'][]> = {
   music: ['music'], 'live music': ['music'], concert: ['music'], show: ['music'], band: ['music'], bands: ['music'],
   games: ['games'], gaming: ['games'], art: ['art'], study: ['study'], studying: ['study'],
   outdoors: ['outdoors'], outside: ['outdoors'], sports: ['sports'], sport: ['sports'],
-  thrift: ['thrift'], thrifting: ['thrift'], food: ['food'],
+  thrift: ['thrift'], thrifting: ['thrift'], vintage: ['thrift'], 'closet sale': ['thrift'], secondhand: ['thrift'], food: ['food'],
 };
 
 const singular = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);

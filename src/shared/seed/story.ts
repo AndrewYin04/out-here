@@ -32,6 +32,10 @@ export type QuestSpec = {
   checkedIn?: number;
   /** When set, this person hosts, and the plan is skipped if they are not in the seed content. */
   hostHandle?: string;
+  /** The exact meeting spot, shared only with people on the plan (Muse reveals it on join). */
+  meetSpot?: string;
+  /** The general area everyone sees before joining ("Belle Haven, near Ivy Dr"). */
+  areaLabel?: string;
 };
 
 /** People never pre-seated in upcoming quests: the demo driver joins live, Maya via invite. */
@@ -182,6 +186,14 @@ export const DEMO_AVAILABILITY: AvailabilitySpec[] = [
   { handle: null, friendSlot: 0, text: 'down for boba or a walk later', startsInMin: 60, endsInMin: 180, nearPlace: 'Gallery 1600' },
   { handle: null, friendSlot: 1, text: 'board games tonight?', startsInMin: 150, endsInMin: 300, nearPlace: 'Ravenswood Board Game Cafe' },
   { handle: null, friendSlot: 2, text: 'working from the coffee place, can take a food break', startsInMin: -30, endsInMin: 90, nearPlace: 'El Camino Coffee Works' },
+  // The closet sale story (closet-sale.ts): people in Alex's intro reach who are free near the
+  // sale (30-150 min from now at Ivy Commons), so "Find someone to go with" has a real pool on a
+  // fresh seed. Jordan and Bea clear the 85 bar; Grace (thrifting only) is considered and falls
+  // below it. Each window ends before the bouldering intro (starts in 100), so other plans'
+  // candidate pools stay as they were.
+  { handle: 'jordan', text: 'around Belle Haven for the next hour or so, down to browse a sale', startsInMin: -10, endsInMin: 90, nearPlace: 'Gallery 1600' },
+  { handle: 'bea', text: 'day off, hunting for vintage', startsInMin: -10, endsInMin: 90, nearPlace: 'Bobalicious Corner' },
+  { handle: 'grace', text: 'free before volleyball', startsInMin: -5, endsInMin: 90, nearPlace: 'Ravenswood Board Game Cafe' },
 ];
 
 export type PastHangoutSpec = {

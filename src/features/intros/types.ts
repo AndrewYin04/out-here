@@ -18,6 +18,11 @@ export type IntroPlanView = {
   /** True when the quest has enough open seats for everyone not yet on it. */
   canHold: boolean;
   options: IntroPlanOption[];
+  /**
+   * Muse's reveal once both are on the plan: "It's on. Exact spot: Ivy Commons, side gate on
+   * Ivy Dr: .... 9 min walk for you, starts in 30 min." Null before that.
+   */
+  reveal: string | null;
 };
 
 /**

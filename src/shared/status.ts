@@ -2,6 +2,7 @@
 // Busy is simply "no window now or later": there is no busy row, so a Busy person gives
 // friends' agents nothing to read and no reason.
 import { formatDemoTime } from './demo';
+import { walkingMinutesExact } from './geo';
 
 export type FreeStatus =
   | { kind: 'free'; until: string }
@@ -89,4 +90,43 @@ export function rankFreeFriends(
     if (group.every((g) => ok(g, f.id))) group.push(f.id);
   }
   return { ranked, group };
+}
+
+// ---- Walking to a plan: one origin rule for the intro card, the chat and the plan sheet ----
+
+/** The walk cap for a plan Muse says fits, the same 25 min Muse plans use. */
+export const PLAN_WALK_MIN = 25;
+
+type Spot = { lat: number; lng: number };
+
+/**
+ * Where someone walks to a plan from when they are free for it: the nearest of their shared
+ * availability windows that overlaps the plan (from `at` on) and is within PLAN_WALK_MIN of
+ * `planAt` on foot. Null when no window fits.
+ */
+export function freeSpotForPlan(
+  windows: readonly (Window & { location: Spot })[], plan: Window, planAt: Spot, at: Date,
+): { location: Spot; walkMin: number } | null {
+  let best: { location: Spot; walkMin: number } | null = null;
+  for (const a of windows) {
+    if (Date.parse(a.endsAt) <= at.getTime() || !overlapWindow(a, plan, at)) continue;
+    const walkMin = walkingMinutesExact(a.location, planAt);
+    if (walkMin > PLAN_WALK_MIN) continue;
+    if (!best || walkMin < best.walkMin) best = { location: a.location, walkMin };
+  }
+  return best;
+}
+
+/**
+ * Whole walking minutes to a plan: from the window that makes the person free for it, else from
+ * home. `dest` is the plan's point as this person may see it (exact for members, the ~200 m area
+ * otherwise), so every screen that shows this person a walk shows the same number.
+ */
+export function walkToPlanMinutes(
+  windows: readonly (Window & { location: Spot })[], home: Spot | null | undefined,
+  plan: Window & { location: Spot }, dest: Spot, at: Date,
+): number | null {
+  const free = freeSpotForPlan(windows, plan, plan.location, at);
+  const from = free?.location ?? home;
+  return from ? Math.max(1, Math.round(walkingMinutesExact(from, dest))) : null;
 }

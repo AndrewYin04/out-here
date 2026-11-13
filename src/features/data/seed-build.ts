@@ -7,7 +7,9 @@ import { fuzzLocation, offsetPoint } from '../../shared/geo';
 import { deriveFriendGraph, friendAdjacency, inFriendGraph, LOCAL_CIRCLES } from '../../shared/seed/graph';
 import { mulberry32, profileId, seedId, shuffled } from '../../shared/seed/ids';
 import { DAILY_PROMPTS, DEMO_AVAILABILITY, NEVER_PRESEATED } from '../../shared/seed/story';
-import { SEED_PAST_HANGOUTS, SEED_QUESTS } from '../../shared/seed/comics';
+import {
+  SEED_PAST_HANGOUTS, SEED_QUESTS, STORY_NO_REACT, STORY_POST_KEYS, THRIFT_AREA, THRIFT_LISTING_ID, THRIFT_MEET_SPOT, THRIFT_QUEST,
+} from '../../shared/seed/thrift';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
 import { SEED_INTRO_PROFILES } from '../../shared/seed/intros';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
@@ -457,8 +459,10 @@ export function buildSeed(
     });
     // reaction rows from counts: friends of the author and group members first, then anyone
     const rng = mulberry32(5000 + pi);
-    const close = everyone.filter((h) => h !== p.authorHandle && (areFriends(h, p.authorHandle) || (group !== null && groupMembers.get(group)!.includes(h))));
-    const pool = [...shuffled(close, rng), ...shuffled(everyone.filter((h) => h !== p.authorHandle && !close.includes(h)), rng)];
+    // On the story's posts the demo drivers never pre-react, so Alex's Like on stage is his own.
+    const canReact = (h: string) => h !== p.authorHandle && !(STORY_POST_KEYS.includes(p.id) && STORY_NO_REACT.includes(h));
+    const close = everyone.filter((h) => canReact(h) && (areFriends(h, p.authorHandle) || (group !== null && groupMembers.get(group)!.includes(h))));
+    const pool = [...shuffled(close, rng), ...shuffled(everyone.filter((h) => canReact(h) && !close.includes(h)), rng)];
     const reactors: string[] = [];
     let k = 0;
     for (const type of REACTION_TYPES) {
@@ -566,6 +570,19 @@ export function buildSeed(
       lat: at.lat, lng: at.lng, pickup_label: p.label, pickup_spot: p.spot,
       pickup_until: iso(addMin(demoNow, p.openMin)), created_at: iso(addMin(demoNow, -p.listedMinAgo)),
     });
+  }
+  // The closet sale (thrift.ts) is also a pickup listing at the sale, open about 2 h: the map
+  // shows Belle Haven, and the exact spot goes to the buyer once Leah accepts their hold.
+  {
+    const row = t.listings.find((r) => r.id === THRIFT_LISTING_ID);
+    const sale = SEED_QUESTS.find((q) => q.key === THRIFT_QUEST.key);
+    const place = sale && placeByName.get(sale.placeName);
+    if (row && sale && place) {
+      Object.assign(row, {
+        lat: place.lat, lng: place.lng, pickup_label: THRIFT_AREA, pickup_spot: THRIFT_MEET_SPOT,
+        pickup_until: iso(addMin(demoNow, 120)), created_at: iso(addMin(demoNow, -25)),
+      });
+    } else warnings.push('closet sale listing: listing or place missing, not on the map');
   }
   if (has('alex')) {
     t.muse_wants.push({

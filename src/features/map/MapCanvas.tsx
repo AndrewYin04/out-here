@@ -1,14 +1,14 @@
 'use client';
 // The MapLibre map (client-only; loaded with next/dynamic ssr:false). Quest pins and the
 // viewer's dot are DOM markers, so they stay visible even when the vector tiles never load.
-import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // MapLibre finds its worker next to its own module URL, which the bundler rewrites. Point it at
 // the worker file the bundler emits as a static asset instead.
 setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
 import { useEffect, useRef, useState } from 'react';
-import type { ID, LatLng, Quest } from '@/shared';
+import { offsetPoint, type ID, type LatLng, type Quest } from '@/shared';
 import { bump, dropIn, squash } from '@/features/ui';
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
@@ -19,6 +19,20 @@ export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const FRAME_SW: [number, number] = [-122.168, 37.468];
 const FRAME_NE: [number, number] = [-122.134, 37.497];
 const TILE_TIMEOUT_MS = 8000;
+/** The general area around a plan the viewer has not joined (its pin is fuzzed about this much). */
+const AREA_RADIUS_M = 200;
+
+/** A 48-sided polygon approximating a circle of `meters` around `c`, as GeoJSON. */
+function circlePolygon(c: LatLng, meters: number) {
+  const ring = Array.from({ length: 49 }, (_, i) => {
+    const p = offsetPoint(c, meters, (i % 48) * 7.5);
+    return [p.lng, p.lat];
+  });
+  return {
+    type: 'FeatureCollection' as const,
+    features: [{ type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [ring] } }],
+  };
+}
 const PIN = 40;
 /** Collision box of a pin around its point: circle plus seat badge, and the label when shown. */
 const BOX_W = 46;
@@ -520,6 +534,33 @@ export default function MapCanvas({
     me.current = marker;
     return () => { marker.remove(); if (me.current === marker) me.current = null; };
   }, [origin]);
+
+  // A selected plan the viewer has not joined is drawn with its ~200 m area, like a Marketplace
+  // pickup: the pin is only the area's centre until Muse shares the exact spot on join.
+  const areaOf = (() => {
+    const q = selectedId ? quests.find((x) => x.id === selectedId) : undefined;
+    return q && !(viewerId && q.memberIds.includes(viewerId)) ? q.location : null;
+  })();
+  const areaKey = areaOf ? `${areaOf.lat},${areaOf.lng}` : '';
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const SRC = 'plan-area';
+    const draw = () => {
+      if (!map.isStyleLoaded()) return;
+      const data = areaOf ? circlePolygon(areaOf, AREA_RADIUS_M) : { type: 'FeatureCollection' as const, features: [] };
+      const src = map.getSource(SRC) as GeoJSONSource | undefined;
+      if (src) { src.setData(data); return; }
+      map.addSource(SRC, { type: 'geojson', data });
+      map.addLayer({ id: `${SRC}-fill`, type: 'fill', source: SRC, paint: { 'fill-color': '#0866FF', 'fill-opacity': 0.12 } });
+      map.addLayer({ id: `${SRC}-line`, type: 'line', source: SRC, paint: { 'line-color': '#0866FF', 'line-opacity': 0.5, 'line-width': 1.5, 'line-dasharray': [2, 2] } });
+    };
+    draw();
+    map.on('style.load', draw);
+    map.on('load', draw);
+    return () => { map.off('style.load', draw); map.off('load', draw); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- areaKey stands for areaOf
+  }, [areaKey]);
 
   // Keep the selected pin in view beside the panel (desktop) or above the sheet (phones);
   // clear the padding when the panel closes.

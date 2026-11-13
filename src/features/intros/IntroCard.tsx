@@ -1,5 +1,5 @@
 'use client';
-import { CalendarClock, Check, ChevronDown, Lock, MapPin, MessageCircle, Sparkles, Ticket, X } from 'lucide-react';
+import { CalendarClock, Check, ChevronDown, Footprints, Lock, MapPin, MessageCircle, Sparkles, Ticket, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import type { IntroKind } from '@/shared';
@@ -126,9 +126,27 @@ function MusePlan({ intro, onPlan }: { intro: IntroCardData; onPlan: (id: string
       <p className="flex items-center gap-1 text-[12px] font-semibold text-[#6b3fd4]"><Sparkles size={12} aria-hidden /> Muse, in your chat</p>
       <p className="mt-0.5 text-[15px] text-fb-text" data-testid="muse-ask">{plan.ask.replace(/ Tap .*$/, '')}</p>
       {plan.held ? (
-        <p className="mt-1 flex items-center gap-1 text-[14px] font-semibold text-fb-green" data-testid="seats-held">
-          <Check size={16} aria-hidden /> Seats held for you and {intro.other.firstName}
-        </p>
+        <>
+          <p className="mt-1 flex items-center gap-1 text-[14px] font-semibold text-fb-green" data-testid="seats-held">
+            <Check size={16} aria-hidden /> Seats held for you and {intro.other.firstName}
+          </p>
+          {plan.reveal && (
+            // The exact spot, shared once both of you are on the plan (like a Marketplace seller
+            // sharing the address after accepting).
+            <div className="mt-2 flex flex-col gap-2 rounded-btn bg-fb-surface px-3 py-2 sm:flex-row sm:items-center" data-testid="intro-reveal">
+              <p className="min-w-0 flex-1 text-[14px] text-fb-text">
+                <span className="font-semibold text-[#6b3fd4]">✨ Muse</span>
+                <span className="text-fb-text-2"> · </span>
+                📍 {plan.reveal}
+              </p>
+              {plan.questId && (
+                <LinkButton href={`/out-here?go=${encodeURIComponent(plan.questId)}`} size="sm" icon={<Footprints size={14} aria-hidden />} data-testid="intro-go">
+                  Go
+                </LinkButton>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="mt-2 flex flex-wrap gap-2">
           {plan.questId && (

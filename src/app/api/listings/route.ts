@@ -15,5 +15,5 @@ const CreateZ = z.object({
 
 // GET  /api/listings -> { listings }   (the Marketplace grid; never carries the exact pickup spot)
 // POST /api/listings body CreateListingBody -> { listing: MapListing }   (publishes listings:new)
-export const GET = route(async ({ store }) => ({ listings: await store.listings() }));
+export const GET = route(async ({ store, viewer }) => ({ listings: await store.listings(viewer.id) }));
 export const POST = route(async ({ store, viewer, req }) => store.createListing(viewer.id, await body(req, CreateZ)));

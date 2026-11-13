@@ -119,7 +119,12 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   const isHost = q?.hostId === viewerId;
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
   const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
-  const walk = walkLabel(walkMinutes);
+  // One walk rule for the sheet, the intro card and Muse's chat (QuestDetail.walkMinutes): from
+  // the free window that fits this plan, else home. The map's number is the fallback.
+  const walkMin = shown?.walkMinutes ?? walkMinutes;
+  const walk = walkLabel(walkMin ?? undefined);
+  // Before joining, a plan with a named area shows only the area, like a Marketplace pickup.
+  const place = q && !isMember && shown?.areaLabel ? shown.areaLabel : q?.venueName;
   const listingId = q?.tags.map((t) => LISTING_TAG.exec(t)?.[1]).find(Boolean) ?? null;
 
   return (
@@ -142,7 +147,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
             <>
               <h2 className="text-[20px] font-bold leading-6">{q.title}</h2>
               <p className="mt-0.5 flex items-center gap-1 text-fb-meta text-fb-text-2">
-                <MapPin size={14} aria-hidden /> {q.venueName}
+                <MapPin size={14} aria-hidden /> <span data-testid="quest-place">{place}</span>
               </p>
               <VisibilityChip quest={q} groupName={shown?.group?.name} className="mt-1" />
             </>
@@ -241,7 +246,16 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
             </div>
 
             {!isMember && (
-              <p className="mt-3 text-fb-meta text-fb-text-2">Pin shows the area. The exact spot is shared after you join.</p>
+              <p className="mt-3 text-fb-meta text-fb-text-2" data-testid="quest-area-note">
+                Pin shows the general area{shown.areaLabel ? ` (${shown.areaLabel})` : ''}. ✨ Muse shares the exact spot after you join.
+              </p>
+            )}
+            {isMember && shown.meetSpot && (
+              <p className="mt-3 rounded-card bg-fb-blue-tint px-3 py-2 text-fb-meta text-fb-text" data-testid="quest-exact-spot">
+                <span className="font-semibold text-fb-blue">✨ Muse</span>
+                <span className="text-fb-text-2"> · </span>
+                📍 Exact spot unlocked: {shown.meetSpot}
+              </p>
             )}
             <Link
               href={`/out-here/plan/${q.id}`}
@@ -272,7 +286,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
             <>
               {q.status !== 'done' && (
                 <Button variant="primary" block icon={<Footprints size={18} />} data-testid="quest-lets-go" onClick={() => { onClose(); letsGo(questId); }}>
-                  {walkMinutes != null ? `Let’s go · ${walkMinutes} min walk` : 'Let’s go'}
+                  {walkMin != null ? `Let’s go · ${walkMin} min walk` : 'Let’s go'}
                 </Button>
               )}
               {isHost ? (

@@ -45,6 +45,16 @@ export type QuestDetail = {
   /** Posts on the plan's page. */
   postCount: number;
   group: { slug: string; name: string } | null;
+  /**
+   * The viewer's walk to the plan: from the availability window that makes them free for it,
+   * else from home, to the point they may see. The intro card and Muse's chat note use the same
+   * rule (walkToPlanMinutes), so the numbers agree. Null without a home or window.
+   */
+  walkMinutes: number | null;
+  /** The exact spot, for the host and members only ("Ivy Commons, side gate on Ivy Dr: ..."). */
+  meetSpot: string | null;
+  /** The general area shown before joining, when the plan has one ("Belle Haven, near Ivy Dr"). */
+  areaLabel: string | null;
 };
 
 /** How many plans one person can post in a rolling 24 hours. */
@@ -656,6 +666,9 @@ export class CoreStore {
       hereCount: here.length, viewerCheckedIn: here.includes(viewerId), isLive: v.isQuestLive(q),
       postCount: v.questPostIds(q.id).length,
       group: g ? { slug: g.slug, name: g.name } : null,
+      walkMinutes: v.walkToPlan(viewerId, q),
+      meetSpot: v.meetSpotFor(viewerId, q),
+      areaLabel: v.areaLabelFor(q),
     };
   }
 
@@ -1216,9 +1229,11 @@ export class CoreStore {
   }
 
   // ---------- marketplace / reels ----------
-  async listings(): Promise<Listing[]> {
+  async listings(viewerId: ID): Promise<Listing[]> {
     const v = await this.view();
-    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicListing);
+    const at = now();
+    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((l) => publicListing(v, viewerId, l, at));
   }
 
   async listing(viewerId: ID, id: ID): Promise<ListingResponse> {
@@ -1232,7 +1247,7 @@ export class CoreStore {
     const plan = q ? {
       questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt, endsAt: q.endsAt, seatsLeft: v.seatsLeft(q),
     } : null;
-    return { listing: publicListing(l), seller: v.person(viewerId, l.sellerId)!, plan };
+    return { listing: publicListing(v, viewerId, l), seller: v.person(viewerId, l.sellerId)!, plan };
   }
 
   async reels(): Promise<Reel[]> {

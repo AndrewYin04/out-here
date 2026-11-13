@@ -11,14 +11,15 @@
       "hometown": "Sacramento, CA",
       "currentCity": "Menlo Park, CA",
       "job": "Junior product analyst at a small health-tech startup",
-      "bio": "3 weeks into a new job in Menlo Park, still hunting for dumpling spots and local bands here 🥟",
+      "bio": "3 weeks into a new job in Menlo Park, still hunting for dumpling spots, local bands and a good denim jacket 🥟",
       "interests": [
         "dumplings",
         "local bands",
         "trying new food",
         "running",
-        "comics",
-        "zines"
+        "thrifting",
+        "vintage",
+        "band tees"
       ],
       "budgetMax": 15,
       "circles": [
@@ -68,12 +69,12 @@
       "job": "Freelance graphic designer",
       "bio": "freelance designer in Redwood City making gig posters and hunting vinyl at Willow Thrift Co.",
       "interests": [
-        "comics",
+        "vintage",
         "indie music",
         "local bands",
         "vinyl",
         "thrifting",
-        "zines"
+        "band tees"
       ],
       "budgetMax": 20,
       "circles": [
@@ -1106,7 +1107,8 @@
       "bio": "lab researcher, volleyball nights and thrifting on sundays",
       "interests": [
         "volleyball",
-        "thrifting"
+        "thrifting",
+        "vintage"
       ],
       "budgetMax": 15,
       "circles": [
@@ -1466,32 +1468,32 @@
       "avatar": "/seed/people/noor.webp"
     },
     {
-      "handle": "theo",
-      "name": "Theo Nakamura",
-      "pronouns": "he/him",
-      "age": 26,
-      "school": "UC Santa Cruz",
-      "major": "Literature",
-      "gradYear": 2022,
-      "hometown": "Fresno, CA",
+      "handle": "leah",
+      "name": "Leah Moreno",
+      "pronouns": "she/her",
+      "age": 22,
+      "school": "San José State University",
+      "major": "Graphic Design",
+      "gradYear": 2026,
+      "hometown": "Stockton, CA",
       "currentCity": "Menlo Park, CA",
-      "job": "Bookstore shift lead",
-      "bio": "Collector of small-press comics, slowly running out of shelf space. Moving to a smaller place this month.",
+      "job": "Recent grad, starting a design job in Seattle next week",
+      "bio": "Just graduated and moving to Seattle, so my closet has to shrink. Denim jackets, band tees and sneakers looking for new homes 🧥",
       "interests": [
-        "comics",
-        "small-press publishing",
-        "board games",
-        "coffee"
+        "vintage",
+        "thrifting",
+        "denim",
+        "sneakers"
       ],
       "budgetMax": 20,
       "circles": [],
       "isDemoUser": false,
-      "avatar": "/seed/people/theo.webp",
+      "avatar": "/seed/people/leah.webp",
       "home": {
         "lat": 37.4779,
         "lng": -122.1436
       },
-      "joinedDaysAgo": 400
+      "joinedDaysAgo": 300
     }
   ],
   "groups": [
@@ -1543,7 +1545,7 @@
         "grace",
         "will",
         "elle",
-        "theo"
+        "leah"
       ]
     },
     {
@@ -9473,13 +9475,13 @@
     },
     {
       "id": "p301",
-      "authorHandle": "theo",
+      "authorHandle": "leah",
       "target": {
         "type": "group",
         "slug": "menlo-park-new-grads"
       },
       "audience": "public",
-      "text": "Clearing out my comics before I move 📚 Night Courier #1–12 plus 30 more indie issues, $60 for the box on Marketplace. Doing an open house today at Inkwell Comics Café in about half an hour, come flip through even if you don't buy anything. It's on Out Here if you want to join.",
+      "text": "Closet sale today, come try stuff on 🧥 I graduated and I’m moving to Seattle, so vintage denim jackets, band tees and sneakers all go, $5–25 each. Everything is on Marketplace. It’s on Out Here too: join or hold something and Muse shares the exact spot.",
       "image": "/seed/listings/l31.webp",
       "hoursAgo": 0.4,
       "reactions": {
@@ -9493,25 +9495,25 @@
       },
       "comments": [
         {
-          "authorHandle": "sage",
-          "text": "is Night Courier the one with the bike messenger? I'll swing by",
+          "authorHandle": "bea",
+          "text": "saving a denim jacket for me?? 👀 what sizes",
           "minutesAfter": 8,
           "replies": [
             {
-              "authorHandle": "theo",
-              "text": "that's the one, issue 7 is the best",
+              "authorHandle": "leah",
+              "text": "mostly M and L, one S. come try them on",
               "minutesAfter": 12
             }
           ]
         },
         {
-          "authorHandle": "alex",
-          "text": "been meaning to get into indie comics, is Night Courier a good place to start?",
+          "authorHandle": "june",
+          "text": "any band tees from local bands? asking for a friend (me)",
           "minutesAfter": 15,
           "replies": [
             {
-              "authorHandle": "theo",
-              "text": "perfect place to start, come by and flip through #1",
+              "authorHandle": "leah",
+              "text": "a few! the faded gig tees are $8",
               "minutesAfter": 18
             }
           ]
@@ -9525,8 +9527,8 @@
         "type": "profile"
       },
       "audience": "public",
-      "text": "Zine swap at El Camino Coffee Works last week, left with more zines than I brought! Also: Night Courier is the best indie comics run I've found in years, a bike messenger in a city that never sleeps 📖",
-      "image": null,
+      "text": "Thrift walk at Willow Thrift Co. last week, traded two band tees for a corduroy jacket that fits like it was made for me. Vintage denim is the one thing my closet always has room for 🧥",
+      "image": "/seed/events/willow-thrift-walk.webp",
       "hoursAgo": 190,
       "reactions": {
         "like": 5,
@@ -9539,8 +9541,8 @@
       },
       "comments": [
         {
-          "authorHandle": "sage",
-          "text": "that swap was so good, same time next month?",
+          "authorHandle": "bea",
+          "text": "that thrift walk was so good, same time next month?",
           "minutesAfter": 40,
           "replies": []
         }
@@ -11484,14 +11486,14 @@
     },
     {
       "id": "l31",
-      "sellerHandle": "theo",
-      "title": "Box of indie comics: Night Courier #1–12 + 30 more",
-      "priceUsd": 60,
+      "sellerHandle": "leah",
+      "title": "Closet clean-out: vintage denim jackets, band tees, sneakers, $5–25 each",
+      "priceUsd": 5,
       "condition": "used - good",
-      "category": "Books & comics",
-      "description": "Night Courier #1–12 (complete first run) plus about 30 more small-press issues: Paper Lanterns, Static Garden, Moth & Engine and a few one-shots. All bagged, a couple with creased corners. $60 for the box, or pick singles at the open house. Open house today at Inkwell Comics Café, come flip through.",
+      "category": "Clothing",
+      "description": "Graduated and moving to Seattle, so the closet goes. Two vintage denim jackets (M and L), a corduroy jacket (S), a stack of band tees from local shows, and three pairs of sneakers (sizes 7 to 9). $5–25 each. Closet sale today in Belle Haven: come try things on. The map shows the area; Muse shares the exact spot once you join the sale on Out Here or I accept your hold.",
       "image": "/seed/listings/l31.webp",
-      "hoursAgo": 1
+      "hoursAgo": 0.5
     }
   ]
 }

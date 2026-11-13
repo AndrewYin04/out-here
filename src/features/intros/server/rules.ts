@@ -2,7 +2,7 @@
 // quality bar and the weekly cap. Pure functions over one store snapshot (View), so the unit
 // tests and the routes agree. The model never decides who is in reach or whether the bar is met.
 import {
-  haversineMeters, INTRO_KINDS, overlapWindow, walkingMinutesExact,
+  freeSpotForPlan, haversineMeters, INTRO_KINDS, PLAN_WALK_MIN,
   type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type LatLng, type Profile, type TrustPath,
 } from '@/shared';
 import { interestsMatchingQuest } from '@/features/muse';
@@ -161,10 +161,13 @@ export function sharedRuns(mine: string, theirs: string): string[] {
   const t = new Set(splitWords(theirs).filter(isTopicWord).map(stem));
   const out: string[] = []; let run: string[] = [];
   const flush = () => { const r = run.join(' '); if (r && !out.includes(r)) out.push(r); run = []; };
-  for (const w of splitWords(mine)) {
-    if (isTopicWord(w) && t.has(stem(w))) run.push(w); else flush();
+  // A comma or semicolon ends a run: "local shows, thrift runs" is two topics, not one.
+  for (const part of mine.split(/[,;]/)) {
+    for (const w of splitWords(part)) {
+      if (isTopicWord(w) && t.has(stem(w))) run.push(w); else flush();
+    }
+    flush();
   }
-  flush();
   return out;
 }
 
@@ -357,9 +360,25 @@ export function codeScore(distinctFacts: number): number {
 }
 
 // ---------- plan-anchored intros ("find someone to go to THIS plan with") ----------
+const TZ = 'America/Los_Angeles';
+const dayKey = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ });
+
+/** "Starts in 25 min", "Today 5:45 PM", "Tomorrow 10:00 AM", "Sat 2:00 PM"; minutes rounded to 5. */
+export function relativeWhen(startsAt: string, nowMs: number): string {
+  const ms = Date.parse(startsAt);
+  const mins = Math.round((ms - nowMs) / 60_000);
+  if (mins <= 0) return 'Happening now';
+  if (mins < 60) return `Starts in ${Math.max(5, Math.round(mins / 5) * 5)} min`;
+  const rounded = Math.round(ms / 300_000) * 300_000;
+  const time = new Date(rounded).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
+  const day = dayKey(rounded);
+  if (day === dayKey(nowMs)) return `Today ${time}`;
+  if (day === dayKey(nowMs + 86_400_000)) return `Tomorrow ${time}`;
+  return `${new Date(rounded).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })} ${time}`;
+}
 type QuestRow = View['db']['quests'][number];
 /** The walk cap for a plan-anchored candidate, the same 25 min Muse plans use. */
-export const PLAN_WALK_MIN = 25;
+export { PLAN_WALK_MIN };
 
 /** A plan anyone could still join: open or live, and not over. */
 export const isJoinablePlan = (q: QuestRow | undefined, nowMs: number): q is QuestRow =>
@@ -372,24 +391,17 @@ export const isJoinablePlan = (q: QuestRow | undefined, nowMs: number): q is Que
  * foot. The nearest such window wins. Null when they are busy then or too far away.
  */
 export function freeForPlan(v: View, userId: ID, q: QuestRow, nowMs: number): { location: LatLng; walkMin: number } | null {
-  const at = new Date(nowMs);
-  let best: { location: LatLng; walkMin: number } | null = null;
-  for (const a of v.db.availability) {
-    if (a.userId !== userId || Date.parse(a.endsAt) <= nowMs) continue;
-    if (!overlapWindow(a, q, at)) continue;
-    const walkMin = walkingMinutesExact(a.location, q.location);
-    if (walkMin > PLAN_WALK_MIN) continue;
-    if (!best || walkMin < best.walkMin) best = { location: a.location, walkMin };
-  }
-  return best;
+  return freeSpotForPlan(v.db.availability.filter((a) => a.userId === userId), q, q.location, new Date(nowMs));
 }
 
-/** Whole walking minutes to the plan: from the window that makes them free for it, else from home. */
+/**
+ * Whole walking minutes to the plan for `userId`: from the window that makes them free for it,
+ * else from home, to the point they may see (exact once they are on it, the area before). The
+ * plan sheet (QuestDetail.walkMinutes), the intro card and Muse's chat note all use this, so
+ * one person never sees two different walks for one plan.
+ */
 export function walkToPlan(v: View, userId: ID, q: QuestRow, nowMs: number): number | null {
-  const free = freeForPlan(v, userId, q, nowMs);
-  if (free) return Math.max(1, Math.round(free.walkMin));
-  const home = v.profileById.get(userId)?.home;
-  return home ? Math.max(1, Math.round(walkingMinutesExact(home, q.location))) : null;
+  return v.walkToPlan(userId, q, new Date(nowMs));
 }
 
 /**
@@ -461,6 +473,72 @@ export function askFacts(v: View, a: Profile, b: Profile, ask: string, kind: Int
   }];
 }
 
+/**
+ * The reasons a plan-anchored intro shows, one per kind of fact so no two read alike (review P6):
+ *   1. why b fits the plan, quoting what b posted about it when there is something to quote
+ *      ('You both love vintage and thrifting. Jordan posted: "Clothing swap at Willow Thrift Co. ..."');
+ *   2. a Group of b's about the plan's topic ("Jordan is in Peninsula Thrift Walks");
+ *   3. logistics from the same walk rule the plan sheet uses ("Starts in 30 min, a 9 min walk for
+ *      you. Muse checked Jordan is free then too").
+ * Facts that do not tie to the plan (a shared love of local bands) are left out. A's side never
+ * hears where B is; B's side never hears what A typed. Empty when nothing ties b to the plan.
+ */
+export function planReasonFacts(v: View, a: Profile, b: Profile, q: QuestRow, facts: SharedFact[], nowMs: number): SharedFact[] {
+  const pf = facts.filter((f) => f.plan);
+  if (!pf.length) return [];
+  const plan = `${q.emoji} ${q.title}`;
+  const A = firstName(a); const B = firstName(b);
+  const out: SharedFact[] = [];
+  // 1. The topic, with a quote. A fact from planFacts reads "You both love X, ..." when both like X.
+  const terms = [...new Set(pf.map((f) => f.keyword))];
+  const both = pf.filter((f) => f.forA?.startsWith('You both love')).map((f) => f.keyword);
+  const bOnly = terms.filter((t) => !both.includes(t));
+  const quote = (x: Profile, y: Profile) => {
+    for (const t of terms) { const c = citationOf(v, x, y, t); if (c) return c; }
+    return null;
+  };
+  const qa = quote(a, b); const qb = quote(b, a);
+  const head = (who: 'a' | 'b') => {
+    if (both.length && !bOnly.length) return `You both love ${joinWords(both)}`;
+    if (both.length) return `You both love ${joinWords(both)}${who === 'a' ? `, and ${B} is into ${joinWords(bOnly)} too` : ''}`;
+    return who === 'a' ? `${B} is into ${joinWords(terms)}, a fit for ${plan}` : `${A} wants company for ${plan}, and you're into ${joinWords(terms)}`;
+  };
+  out.push({
+    keyword: terms[0],
+    forA: qa ? `${head('a')}. ${qa}` : both.length ? `${head('a')}, and that's what ${plan} is about` : head('a'),
+    forB: qb ? `${head('b')}. ${qb}` : both.length ? `${head('b')}, and that's what ${plan} is about` : head('b'),
+    looker: null, topic: pf.flatMap((f) => f.topic), plan: true,
+  });
+  // 2. A public Group about the plan's topic that the other person is in (shared Groups are the trust path already).
+  const planKeys = questKeywords(q);
+  const topicGroup = (x: Profile, other: Profile) => {
+    const mine = new Set(v.groupIdsOf(other.id));
+    for (const g of v.groupIdsOf(x.id)) {
+      const row = v.groupById.get(g);
+      if (!row || mine.has(g) || row.privacy !== 'public') continue;
+      if (hit(planKeys, `${row.name} ${row.tags.join(' ')} ${row.description}`)) return row;
+    }
+    return null;
+  };
+  const gb = topicGroup(b, a); const ga = topicGroup(a, b);
+  if (gb || ga) {
+    out.push({
+      keyword: 'group', forA: gb ? `${B} is in ${gb.name}` : null, forB: ga ? `${A} is in ${ga.name}` : null,
+      looker: null, topic: [`group:${(gb ?? ga)!.id}`],
+    });
+  }
+  // 3. Logistics, from the walk rule every screen uses.
+  const when = relativeWhen(q.startsAt, nowMs);
+  const wa = walkToPlan(v, a.id, q, nowMs); const wb = walkToPlan(v, b.id, q, nowMs);
+  out.push({
+    keyword: 'when',
+    forA: `${when}${wa !== null ? `, a ${wa} min walk for you` : ''}. Muse checked ${B} is free then too`,
+    forB: `${when}${wb !== null ? `, a ${wb} min walk from where you said you're free` : ''}, and ${A} is going`,
+    looker: null, topic: ['logistics'],
+  });
+  return out;
+}
+
 // ---------- candidates ----------
 export type Candidate = {
   profile: Profile; kind: IntroKind; trust: TrustPath; facts: SharedFact[]; codeScore: number;
@@ -509,9 +587,13 @@ export function candidatesFor(
     const pf = q ? planFacts(v, me, p, q) : [];
     for (const kind of eligible) {
       if (q && best && best.score >= SCORE_THRESHOLD) break;
-      // Plan facts go first, so they replace a generic shared interest on the same topic; the
-      // viewer's typed ask adds a fact without replacing what they saved.
-      const facts = [...pf, ...(opts.ask ? askFacts(v, me, p, opts.ask, kind) : []), ...sharedFacts(v, me, p, kind, opts.viewerProfile)];
+      // Plan facts go first, so they replace a generic shared interest on the same topic. The
+      // viewer's typed ask adds a fact only on a topic nothing else covers: "You asked for someone
+      // into thrifting, and Jordan is into thrifting" would push the cited "You both love
+      // thrifting. Jordan posted: ..." off the card (review R3).
+      const base = [...pf, ...sharedFacts(v, me, p, kind, opts.viewerProfile)];
+      const asked = opts.ask ? askFacts(v, me, p, opts.ask, kind).filter((f) => !base.some((x) => sameTopic(x.topic, f.topic))) : [];
+      const facts = [...base, ...asked];
       const score = codeScore(distinctTopics(facts));
       if (!best || score > best.score) best = { kind, facts, score };
     }

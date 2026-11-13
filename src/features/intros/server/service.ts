@@ -13,15 +13,16 @@ import { rankSteps, runClick, stepOf, type ClickResult } from './agents';
 import { privacyGuard, privateTexts } from './privacy';
 import {
   AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, isJoinablePlan, kindsOn, lookingForOf, passesBar,
-  SCORE_THRESHOLD, trustLabels, underWeeklyCap, walkToPlan,
+  relativeWhen, SCORE_THRESHOLD, trustLabels, underWeeklyCap, walkToPlan,
 } from './rules';
+
+export { relativeWhen };
 
 type QuestRow = View['db']['quests'][number];
 
 export const MUSE_PREFIX = '✨ Muse: ';
 /** Whole-round budget for live Muse calls (3 pairs run in parallel, 5 calls each). */
 const ROUND_BUDGET_MS = 40_000;
-const TZ = 'America/Los_Angeles';
 
 const isOpen = (i: Intro) => i.status === 'proposed' || i.status === 'a_accepted' || i.status === 'b_accepted';
 const isExpired = (i: Intro, nowMs: number) => isOpen(i) && nowMs - Date.parse(i.createdAt) > INTRO_TTL_MS;
@@ -35,21 +36,6 @@ function visibleTo(i: Intro, viewerId: ID): boolean {
   return true;
 }
 
-const dayKey = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ });
-
-/** "Starts in 25 min", "Today 5:45 PM", "Tomorrow 10:00 AM", "Sat 2:00 PM"; minutes rounded to 5. */
-export function relativeWhen(startsAt: string, nowMs: number): string {
-  const ms = Date.parse(startsAt);
-  const mins = Math.round((ms - nowMs) / 60_000);
-  if (mins <= 0) return 'Happening now';
-  if (mins < 60) return `Starts in ${Math.max(5, Math.round(mins / 5) * 5)} min`;
-  const rounded = Math.round(ms / 300_000) * 300_000;
-  const time = new Date(rounded).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
-  const day = dayKey(rounded);
-  if (day === dayKey(nowMs)) return `Today ${time}`;
-  if (day === dayKey(nowMs + 86_400_000)) return `Tomorrow ${time}`;
-  return `${new Date(rounded).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })} ${time}`;
-}
 
 function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   const q = i.firstStep.questId ? v.db.quests.find((x) => x.id === i.firstStep.questId) : undefined;
@@ -134,6 +120,28 @@ export function anchoredNote(v: View, i: Intro, nowMs: number, result: PlanJoin)
 }
 
 /**
+ * Muse's reveal once both people are on the plan, like a Marketplace seller sharing the address
+ * after accepting: the exact spot (members only, View.meetSpotFor), each walk from the same rule
+ * the plan sheet uses, and the start. Null until both are on it.
+ *   for a viewer: "It's on. Exact spot: Ivy Commons, side gate on Ivy Dr: .... 9 min walk for you, starts in 30 min."
+ *   for the chat: "It's on. Exact spot: .... Starts in 30 min."
+ */
+export function revealText(v: View, i: Intro, nowMs: number, viewerId?: ID): string | null {
+  const q = i.firstStep.questId ? v.db.quests.find((x) => x.id === i.firstStep.questId) : undefined;
+  if (!q || q.status === 'done' || Date.parse(q.endsAt) <= nowMs || notYetOn(v, i).length) return null;
+  const spot = v.meetSpotFor(viewerId ?? i.aId, q);
+  if (!spot) return null;
+  const when = relativeWhen(q.startsAt, nowMs);
+  const lower = when.charAt(0).toLowerCase() + when.slice(1);
+  if (viewerId) {
+    const w = walkToPlan(v, viewerId, q, nowMs);
+    return `It's on. Exact spot: ${spot}.${w !== null ? ` ${w} min walk for you,` : ''} ${w !== null ? lower : when}.`;
+  }
+  // The chat note just before this one already gave each walk.
+  return `It's on. Exact spot: ${spot}. ${when}.`;
+}
+
+/**
  * Both people join a plan-anchored intro's plan through join_quest (one atomic seat each), called
  * only by the request that won the move to accepted, so each joins at most once. Not enough seats
  * for everyone not yet on it means nobody joins ('full'); a join that loses a race undoes the
@@ -190,6 +198,7 @@ export function planView(v: View, i: Intro, nowMs: number, viewerId?: ID): Intro
     seatsNeeded: need,
     canHold: live && need > 0 && (s.seatsLeft ?? 0) >= need,
     options: planOptions(v, i, nowMs),
+    reveal: live && need === 0 ? revealText(v, i, nowMs, viewerId) : null,
   };
 }
 
@@ -412,7 +421,7 @@ async function round(
     const others = considered - choices.length;
     return {
       intro: null, choices, considered, belowBar: others, capped: false, paused: false,
-      message: `Muse found ${choices.length} people${forPlan}. Pick one and Muse asks them.`,
+      message: `Muse found ${choices.length} people${forPlan}.${others > 0 ? ` ${others} other ${others === 1 ? 'person was' : 'people were'} considered and fell below the bar.` : ''} Pick one and Muse asks only them.`,
     };
   }
   const row = rowOf(best);
@@ -540,6 +549,9 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
   if (!already) {
     const fresh = joinResult ? (await store.museContext()).view : view;
     await store.sendMessage(viewerId, thread.id, joinResult ? anchoredNote(fresh, i, nowMs, joinResult) : museNote(view, i, nowMs), 'muse');
+    // Both are on the plan now: Muse shares the exact spot in the pair's chat.
+    const reveal = joinResult === 'joined' ? revealText(fresh, i, nowMs) : null;
+    if (reveal) await store.sendMessage(viewerId, thread.id, `${MUSE_PREFIX}${reveal}`, 'muse');
   }
   await store.updateIntro(i.id, { threadId: thread.id });
   await store.notifyIntro(otherId, viewerId, i.id,
@@ -573,6 +585,8 @@ export async function planIntro(store: DataStore, viewerId: ID, introId: ID, act
       const s = stepView(after, i, nowMs);
       await store.sendMessage(viewerId, i.threadId,
         `${MUSE_PREFIX}Done, ${viewerName} asked me to hold it: ${names} are both going to ${s.label} (${s.when}). It's on both your Out Here maps. See you there!`, 'muse');
+      const reveal = revealText(after, i, nowMs);
+      if (reveal) await store.sendMessage(viewerId, i.threadId, `${MUSE_PREFIX}${reveal}`, 'muse');
     }
   } else {
     const pick = plan.options.find((o) => o.questId === act.questId);

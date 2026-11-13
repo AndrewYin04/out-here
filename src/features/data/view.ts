@@ -1,7 +1,7 @@
 // Read-side helpers over one snapshot of the tables: indexes, visibility and view models.
 // Every view model that leaves the server is built here, so canSee is applied in one place.
 import {
-  canSee, canSeeQuest, audienceListId, now, REACTION_TYPES, type QuestVisibility,
+  canSee, canSeeQuest, audienceListId, now, REACTION_TYPES, SEED_MEET_SPOTS, walkToPlanMinutes, type QuestVisibility,
   type Audience, type Comment, type ID, type Post, type Profile, type ProfileField, type Quest,
   type ReactionCounts, type ReactionType, type Group, type Event, type FriendList, type Crew,
   type Thread, type Message, type Notification, type GroupRole, type RsvpStatus,
@@ -307,6 +307,24 @@ export class View {
   canSeeQuestGuests(viewerId: ID, q: QuestRow): boolean {
     return q.hostId === viewerId || this.questMemberIds(q.id).includes(viewerId) || this.areFriends(viewerId, q.hostId);
   }
+  /**
+   * The exact meeting spot, for the host and people on the plan only (null for everyone else):
+   * a seeded spot ("Ivy Commons, side gate on Ivy Dr: ..."), else the venue and its street.
+   */
+  meetSpotFor(viewerId: ID, q: QuestRow): string | null {
+    if (q.hostId !== viewerId && !this.questMemberIds(q.id).includes(viewerId)) return null;
+    const seeded = SEED_MEET_SPOTS.get(q.id);
+    if (seeded) return seeded.meetSpot;
+    const place = q.placeId ? this.db.places.find((x) => x.id === q.placeId) : undefined;
+    return place?.address ? `${q.venueName}, ${place.address}` : q.venueName;
+  }
+  /** Whole walking minutes to the plan for this person (one rule for every screen; see walkToPlanMinutes). */
+  walkToPlan(userId: ID, q: QuestRow, at: Date = now()): number | null {
+    const dest = q.hostId === userId || this.questMemberIds(q.id).includes(userId) ? q.location : q.approxLocation;
+    return walkToPlanMinutes(this.db.availability.filter((a) => a.userId === userId), this.profileById.get(userId)?.home, q, dest, at);
+  }
+  /** The general area shown before joining ("Belle Haven, near Ivy Dr"), when the plan has one. */
+  areaLabelFor(q: QuestRow): string | null { return SEED_MEET_SPOTS.get(q.id)?.areaLabel ?? null; }
   questCheckinIds(questId: ID): ID[] { return (this.questCheckinsBy.get(questId) ?? []).map((c) => c.userId); }
   /** Posts on a plan's page, newest first. */
   questPostIds(questId: ID): ID[] {

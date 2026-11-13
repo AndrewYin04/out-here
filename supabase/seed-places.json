@@ -973,14 +973,14 @@
       }
     },
     {
-      "name": "Inkwell Comics Café",
-      "category": "cafe",
+      "name": "Willow Court Apartments",
+      "category": "park",
       "address": "Ivy Dr",
       "lat": 37.479662,
       "lng": -122.145999,
       "priceLevel": 1,
-      "typicalCostUsd": 5,
-      "description": "Coffee counter with long tables and shelves of small-press comics. Open table events most days.",
+      "typicalCostUsd": 0,
+      "description": "Fictional apartment complex off Ivy Dr with a public-facing courtyard, benches and bike racks. Residents hold pop-up sales and clothing swaps here.",
       "hours": {
         "mon": [
           [
