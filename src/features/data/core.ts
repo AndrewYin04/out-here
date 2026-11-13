@@ -1152,7 +1152,9 @@ export class CoreStore {
     const crew = v.db.crews.find((c) => c.id === body.crewId);
     if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
     const quest = v.questById.get(body.questId);
-    if (!quest || crew.originQuestId !== quest.id || quest.status !== 'done') throw badRequest('Choose a completed hangout for this album.');
+    // Done, or about to start (the photo can be taken up to EARLY_PHOTO_MS early, see completeQuest).
+    const photoOpen = !!quest && (quest.status === 'done' || new Date(quest.startsAt).getTime() - now().getTime() <= EARLY_PHOTO_MS);
+    if (!quest || crew.originQuestId !== quest.id || !photoOpen) throw badRequest('Choose a completed hangout for this album.');
     const id = uuid();
     await this.backend.uploadFile('crew-photos', id, body.file.bytes, body.file.contentType);
     const m: Memory = {

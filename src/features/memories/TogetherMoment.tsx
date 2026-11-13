@@ -15,7 +15,7 @@ import { arrivalWait, emitMemorySaved, requestRating } from './arrival';
 
 type Walker = { id: string; name: string; avatarUrl: string; minutesAway: number };
 type Stage = 'arrived' | 'camera' | 'review' | 'saving' | 'saved';
-type Person = { id: string; name: string; avatarUrl: string; here: boolean; minutes: number | null; you: boolean };
+type Person = { id: string; name: string; avatarUrl: string; here: boolean; minutes: number | null; you: boolean; coming: boolean };
 
 const first = (n: string) => n.split(' ')[0] ?? n;
 const FEELINGS = [
@@ -69,12 +69,25 @@ function Moment({ quest, viewer, walkers, onClose }: {
     const list = members.map((m) => {
       const w = byId.get(m.id);
       const you = m.id === viewer.id;
-      return { id: m.id, name: m.name, avatarUrl: m.avatarUrl, you, here: you || (!!w && w.minutesAway <= 1), minutes: w ? w.minutesAway : null };
+      return { id: m.id, name: m.name, avatarUrl: m.avatarUrl, you, here: you || (!!w && w.minutesAway <= 1), minutes: w ? w.minutesAway : null, coming: you || !!w };
     });
-    if (!list.some((p) => p.you)) list.unshift({ id: viewer.id, name: viewer.name, avatarUrl: viewer.avatarUrl ?? '', you: true, here: true, minutes: 0 });
+    if (!list.some((p) => p.you)) list.unshift({ id: viewer.id, name: viewer.name, avatarUrl: viewer.avatarUrl ?? '', you: true, here: true, minutes: 0, coming: true });
     return list.sort((a, b) => Number(b.here) - Number(a.here) || Number(b.you) - Number(a.you));
   }, [detail.data, walkers, viewer]);
   const here = people.filter((p) => p.here);
+  // Everyone on the way: you plus each person sharing their walk here. People who never set off
+  // (no walk to follow) don't hold the photo up.
+  const onTheWay = people.filter((p) => p.coming && !p.here);
+  const allHere = onTheWay.length === 0;
+  const [dontWait, setDontWait] = useState(false);
+  // The group selfie opens by itself the moment the last person arrives (once).
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || early || stage !== 'arrived' || !allHere || here.length < 2) return;
+    opened.current = true;
+    const t = window.setTimeout(() => setStage('camera'), 1600);
+    return () => window.clearTimeout(t);
+  }, [allHere, here.length, stage, early]);
 
   // Confetti when you arrive, and again each time someone else gets there.
   const lastCount = useRef(0);
@@ -158,7 +171,14 @@ function Moment({ quest, viewer, walkers, onClose }: {
         {stage === 'arrived' && (
           <div className="flex items-center gap-3 animate-step-in">
             <div className="min-w-0 flex-1">
-              <h2 className="text-[22px] font-extrabold text-fb-text">{here.length > 1 ? 'You made it!' : 'You’re here!'} <span aria-hidden>🎉</span></h2>
+              <h2 className="text-[22px] font-extrabold text-fb-text">
+                {allHere && here.length > 1 ? 'You all made it!' : 'You made it!'} <span aria-hidden>🎉</span>
+              </h2>
+              {!allHere && (
+                <p data-testid="together-waiting" className="text-[13px] font-semibold text-fb-text-2">
+                  Waiting for {onTheWay.map((p) => `${first(p.name)}${p.minutes != null ? ` · ${Math.max(1, p.minutes)}m` : ''}`).join(', ')}. The group selfie opens when everyone’s here.
+                </p>
+              )}
               <ul className="mt-2 flex gap-3 overflow-x-auto pb-1" aria-label="Who's here">
                 {people.map((p) => (
                   <li key={p.id} className="flex w-12 shrink-0 flex-col items-center gap-0.5">
@@ -177,10 +197,17 @@ function Moment({ quest, viewer, walkers, onClose }: {
               </ul>
               {early && <p className="text-[13px] text-fb-text-2">You’re early. The photo opens closer to the start.</p>}
             </div>
-            <button type="button" data-testid="together-selfie" disabled={early} onClick={() => setStage('camera')}
-              className="oh-press flex h-12 shrink-0 items-center gap-1.5 rounded-[14px] bg-fb-blue px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(8,102,255,.35)] disabled:opacity-50">
-              <Camera size={18} aria-hidden />Selfie
-            </button>
+            {allHere || dontWait ? (
+              <button type="button" data-testid="together-selfie" disabled={early} onClick={() => setStage('camera')}
+                className="oh-press flex h-12 shrink-0 animate-pop-in items-center gap-1.5 rounded-[14px] bg-fb-blue px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(8,102,255,.35)] disabled:opacity-50">
+                <Camera size={18} aria-hidden />Selfie
+              </button>
+            ) : (
+              <button type="button" data-testid="together-dont-wait" onClick={() => setDontWait(true)}
+                className="shrink-0 text-[13px] font-semibold text-fb-text-2 hover:underline">
+                Don&rsquo;t wait
+              </button>
+            )}
           </div>
         )}
 
