@@ -91,13 +91,13 @@ function FirstStep({ intro }: { intro: IntroCardData }) {
   return (
     <div className="flex flex-col gap-2 rounded-btn bg-fb-input px-3 py-2 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-fb-text-2">Suggested first step</p>
+        <p className="text-[13px] font-semibold text-fb-text-2" data-testid="first-step-title">{s.anchored ? 'The plan' : 'Suggested first step'}</p>
         <p className="text-[15px] text-fb-text" data-testid="first-step">{s.label}</p>
         {meta && <p className="text-[13px] text-fb-text-2" data-testid="first-step-when">{meta}</p>}
       </div>
       {s.href && (
         <LinkButton href={s.href} variant="secondary" size="sm" icon={<MapPin size={14} aria-hidden />}>
-          {intro.state === 'connected' ? 'Plan it together' : 'See on map'}
+          {intro.state === 'connected' && !s.anchored ? 'Plan it together' : 'See on map'}
         </LinkButton>
       )}
     </div>

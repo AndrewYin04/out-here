@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
 import { PostCard } from '@/features/fb/feed';
-import { Avatar, Button, Card, EmptyState, Skeleton, useToast } from '@/features/ui';
+import { Avatar, Button, Card, EmptyState, LinkButton, Skeleton, useToast } from '@/features/ui';
 import { formatDemoTime, type LatLng } from '@/shared';
 import type { PersonCard, PostView } from '@/shared/api';
 import { priceLabel, startsLabel } from '../format';
@@ -186,6 +186,9 @@ export function PlanPage({ id }: { id: string }) {
               <Button data-testid="plan-join" disabled={busy || d.seatsLeft === 0} onClick={() => act('join')}>
                 {d.seatsLeft === 0 ? 'Full' : 'Join'}
               </Button>
+            )}
+            {q.status !== 'done' && Date.parse(q.endsAt) > now.getTime() && (
+              <LinkButton href={`/intros?quest=${encodeURIComponent(q.id)}`} variant="tint" data-testid="plan-find-someone">Find someone to go with ✨</LinkButton>
             )}
             {isMember && checkinOpen && (
               d.viewerCheckedIn ? (

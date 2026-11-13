@@ -161,6 +161,8 @@ const dialog = (log: AgentTurn[], me: 'a' | 'b') =>
 /** Runs one agent-to-agent exchange plus the judge for viewer A and candidate B. */
 export async function runClick(
   v: View, a: Profile, aIntro: IntroProfile, c: Candidate, nowMs: number, deadline: number,
+  /** The plan A asked for company for: it is the first step, and both agents talk about it. */
+  anchor?: QuestRow,
 ): Promise<ClickResult> {
   const b = c.profile;
   const bIntro = introProfileOf(v, b.id);
@@ -169,7 +171,7 @@ export async function runClick(
   const aSeesB = publicBrief(v, a.id, b, c);
   const bSeesA = publicBrief(v, b.id, a, c);
   const trust = trustLabels(v, c.trust);
-  const step = pickFirstStep(v, a, b, c.facts, nowMs);
+  const step: FirstStep = anchor ? { ...stepOf(anchor), anchored: true } : pickFirstStep(v, a, b, c.facts, nowMs);
   const quest = step.questId ? v.db.quests.find((q) => q.id === step.questId) ?? null : null;
   const verb = stepVerb(c.kind, quest?.title ?? null);
   const aName = firstName(a); const bName = firstName(b);
@@ -193,7 +195,9 @@ export async function runClick(
             `Your person (private to you): ${JSON.stringify(own)}`,
             `Public facts about the other person: ${JSON.stringify(other)}`,
             `How they are connected: ${trust.join('; ')}`,
-            `A possible first step nearby: ${step.text}`,
+            step.anchored
+              ? `The plan ${aName} wants company for (the first step): ${step.text}`
+              : `A possible first step nearby: ${step.text}`,
             `Conversation so far:\n${dialog(log, who)}`,
             `Your turn: ${instruction}`,
           ].join('\n'),
@@ -211,8 +215,10 @@ export async function runClick(
   const aLooking = aOwn.lookingFor || KIND_LABEL[c.kind];
   const bLooking = bOwn.lookingFor || KIND_LABEL[c.kind];
   await say('a', `Pitch what ${aName} wants and why ${bName} might fit.`, {
-    message: `Hi, I'm ${aName}'s agent. ${aName} is new around here and looking for ${aLooking}, and is into ${a.interests.slice(0, 3).join(', ')}. Is ${bName} looking for anything like that?`,
-    outcome: `pitched what ${aName} is looking for`,
+    message: step.anchored
+      ? `Hi, I'm ${aName}'s agent. ${aName} is going to ${step.text} and wants company: someone for ${aLooking}. ${aName} is into ${a.interests.slice(0, 3).join(', ')}. Would ${bName} be up for it?`
+      : `Hi, I'm ${aName}'s agent. ${aName} is new around here and looking for ${aLooking}, and is into ${a.interests.slice(0, 3).join(', ')}. Is ${bName} looking for anything like that?`,
+    outcome: step.anchored ? `asked if ${bName} wants to come along to the plan` : `pitched what ${aName} is looking for`,
   });
   await say('b', `Respond for ${bName}: say what ${bName} is looking for, where the fit is real, and ask one question or raise one concern.`, fit >= 2
     ? {
@@ -225,7 +231,9 @@ export async function runClick(
     });
   await say('a', "Answer the other agent's question or concern, and propose the first step.", fit >= 2
     ? {
-      message: `On timing: ${step.text} works for ${aName}. ${trust[0] ?? 'They have a mutual connection'}, so it's a warm intro, not a cold one.`,
+      message: step.anchored
+        ? `On timing: ${step.text} is the plan, and it fits ${bName}'s day. ${trust[0] ?? 'They have a mutual connection'}, so it's a warm intro, not a cold one.`
+        : `On timing: ${step.text} works for ${aName}. ${trust[0] ?? 'They have a mutual connection'}, so it's a warm intro, not a cold one.`,
       outcome: 'answered on timing and suggested a first step',
     }
     : {

@@ -2,11 +2,11 @@
 // /intros: "Intros from Muse" inbox, "Ask Muse for an intro", and Intro settings.
 // Muse Intros are Boardy-style warm intros vetted by two agents ("Click"); see
 // src/features/intros/server for the rules. Everything here reads and writes through /api/intros.
-import { RotateCcw, Settings, Sparkles } from 'lucide-react';
-import { useState } from 'react';
-import { INTRO_KINDS, type IntroKind, type IntroProfile } from '@/shared';
+import { MapPin, RotateCcw, Settings, Sparkles, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { formatDemoTime, INTRO_KINDS, type IntroKind, type IntroProfile } from '@/shared';
 import type { IntroCardData, IntroPlanAction } from './types';
-import { apiPost, useApi, useViewer } from '@/features/data';
+import { apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
 import { Button, Card, IconButton, Sheet, Skeleton, cn } from '@/features/ui';
 import { IntroCard, KIND_LABELS, MuseTag } from './IntroCard';
 
@@ -32,7 +32,10 @@ function KindPicker({ value, onChange, name }: { value: IntroKind; onChange: (k:
   );
 }
 
-function AskMuse({ onResult }: { onResult: (r: RoundResult) => void }) {
+/** The plan an intro request is for, from /intros?quest=<id> ("Find someone to go with" on a plan). */
+type PlanFor = { id: string; label: string; when: string };
+
+function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult) => void; plan: PlanFor | null; onClearPlan: () => void }) {
   const [kind, setKind] = useState<IntroKind>('friendship');
   const [lookingFor, setLookingFor] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,7 +43,7 @@ function AskMuse({ onResult }: { onResult: (r: RoundResult) => void }) {
   const ask = async () => {
     setBusy(true); setAnswer(null);
     try {
-      const r = await apiPost<RoundResult>('/api/intros/request', { kind, lookingFor });
+      const r = await apiPost<RoundResult>('/api/intros/request', { kind, lookingFor, ...(plan ? { questId: plan.id } : {}) });
       setAnswer(r.intro ? `Muse found someone: meet ${r.intro.other.firstName}. Their card is below.` : r.message);
       onResult(r);
     } catch (e) {
@@ -50,15 +53,28 @@ function AskMuse({ onResult }: { onResult: (r: RoundResult) => void }) {
   return (
     <Card padded as="section" aria-labelledby="ask-muse-title" className="space-y-3" data-testid="ask-muse">
       <div className="flex items-center justify-between">
-        <h2 id="ask-muse-title" className="text-[17px] font-semibold text-fb-text">Ask Muse for an intro</h2>
+        <h2 id="ask-muse-title" className="text-[17px] font-semibold text-fb-text">{plan ? 'Find someone to go with' : 'Ask Muse for an intro'}</h2>
         <MuseTag />
       </div>
+      {plan && (
+        <div className="flex items-center gap-2 rounded-btn bg-fb-blue-tint px-3 py-2" data-testid="ask-plan">
+          <MapPin size={16} className="shrink-0 text-fb-blue" aria-hidden />
+          <p className="min-w-0 flex-1 text-[14px] text-fb-text">
+            <span className="font-semibold">{plan.label}</span>
+            <span className="text-fb-text-2"> · {plan.when}</span>
+            <span className="block text-[13px] text-fb-text-2">Muse only asks people who are free then and within a 25 min walk. If you both say yes, you both join.</span>
+          </p>
+          <button type="button" onClick={onClearPlan} aria-label="Not for this plan" className="shrink-0 rounded-full p-1 text-fb-text-2 hover:bg-fb-hover">
+            <X size={16} aria-hidden />
+          </button>
+        </div>
+      )}
       <KindPicker value={kind} onChange={setKind} name="Intro kind" />
       {kind === 'dating' && <p className="text-[13px] text-fb-text-2">Dating intros only happen between two people who both opted into Dating and fit each other&apos;s preferences.</p>}
       <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); void ask(); }}>
         <label className="sr-only" htmlFor="ask-looking">What are you looking for?</label>
         <input id="ask-looking" value={lookingFor} onChange={(e) => setLookingFor(e.target.value)} maxLength={140}
-          placeholder={PLACEHOLDERS[kind]}
+          placeholder={plan ? 'e.g. someone who likes comics' : PLACEHOLDERS[kind]}
           className="h-10 w-full min-w-0 shrink-0 rounded-pill bg-fb-input sm:w-auto sm:flex-1 px-4 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus:ring-2 focus:ring-fb-blue" />
         <Button type="submit" disabled={busy} icon={<Sparkles size={16} aria-hidden />}>{busy ? 'Muse is looking…' : 'Ask Muse'}</Button>
       </form>
@@ -160,6 +176,13 @@ export function IntrosPage() {
   const [busy, setBusy] = useState<null | 'run' | 'reset'>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const intros = data?.intros ?? [];
+  // "Find someone to go with ✨" on a plan links here with ?quest=<id>; the ask is pre-filled with it.
+  const [planId, setPlanId] = useState<string | null>(null);
+  useEffect(() => { setPlanId(new URLSearchParams(window.location.search).get('quest')); }, []);
+  const planData = useApi<QuestDetail>(planId ? `/api/quests/${encodeURIComponent(planId)}` : null).data;
+  const pq = planData && planData.quest.id === planId ? planData.quest : null;
+  const planFor: PlanFor | null = pq ? { id: pq.id, label: `${pq.emoji} ${pq.title} at ${pq.venueName}`, when: formatDemoTime(pq.startsAt) } : null;
+  const clearPlan = () => { setPlanId(null); window.history.replaceState(null, '', '/intros'); };
 
   const runRound = async () => {
     setBusy('run'); setRound(null);
@@ -210,6 +233,9 @@ export function IntrosPage() {
         {round && <p className="text-[14px] text-fb-text" data-testid="round-result" aria-live="polite">{round}</p>}
       </Card>
 
+      {/* Asked from a plan: the pre-filled ask comes first, above the inbox. */}
+      {planFor && <AskMuse key={planFor.id} onResult={() => void refetch()} plan={planFor} onClearPlan={clearPlan} />}
+
       <section aria-label="Your intros" className="space-y-3">
         {loading && !data && <Card padded><Skeleton className="h-40 w-full" /></Card>}
         {data && intros.length === 0 && (
@@ -221,7 +247,7 @@ export function IntrosPage() {
         {intros.map((i) => <IntroCard key={i.id} intro={i} onRespond={respond} onPlan={plan} />)}
       </section>
 
-      <AskMuse onResult={() => void refetch()} />
+      {!planFor && <AskMuse onResult={() => void refetch()} plan={null} onClearPlan={clearPlan} />}
       <IntroSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );

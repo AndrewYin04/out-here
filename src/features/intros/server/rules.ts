@@ -2,9 +2,10 @@
 // quality bar and the weekly cap. Pure functions over one store snapshot (View), so the unit
 // tests and the routes agree. The model never decides who is in reach or whether the bar is met.
 import {
-  haversineMeters, INTRO_KINDS,
-  type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type Profile, type TrustPath,
+  haversineMeters, INTRO_KINDS, overlapWindow, walkingMinutesExact,
+  type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type LatLng, type Profile, type TrustPath,
 } from '@/shared';
+import { interestsMatchingQuest } from '@/features/muse';
 import type { View } from '@/features/data/server';
 
 export const SCORE_THRESHOLD = 85;
@@ -270,12 +271,75 @@ export function codeScore(distinctFacts: number): number {
   return Math.min(97, 55 + 12 * distinctFacts);
 }
 
+// ---------- plan-anchored intros ("find someone to go to THIS plan with") ----------
+type QuestRow = View['db']['quests'][number];
+/** The walk cap for a plan-anchored candidate, the same 25 min Muse plans use. */
+export const PLAN_WALK_MIN = 25;
+
+/** A plan anyone could still join: open or live, and not over. */
+export const isJoinablePlan = (q: QuestRow | undefined, nowMs: number): q is QuestRow =>
+  !!q && (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs;
+
+/**
+ * Where `userId` would walk to `q` from, when they are free for it: one of their shared
+ * availability windows (their Free status) overlaps the plan's startsAt..endsAt, using the same
+ * overlapWindow as "who's free when you are", and that window's spot is within PLAN_WALK_MIN on
+ * foot. The nearest such window wins. Null when they are busy then or too far away.
+ */
+export function freeForPlan(v: View, userId: ID, q: QuestRow, nowMs: number): { location: LatLng; walkMin: number } | null {
+  const at = new Date(nowMs);
+  let best: { location: LatLng; walkMin: number } | null = null;
+  for (const a of v.db.availability) {
+    if (a.userId !== userId || Date.parse(a.endsAt) <= nowMs) continue;
+    if (!overlapWindow(a, q, at)) continue;
+    const walkMin = walkingMinutesExact(a.location, q.location);
+    if (walkMin > PLAN_WALK_MIN) continue;
+    if (!best || walkMin < best.walkMin) best = { location: a.location, walkMin };
+  }
+  return best;
+}
+
+/** Whole walking minutes to the plan: from the window that makes them free for it, else from home. */
+export function walkToPlan(v: View, userId: ID, q: QuestRow, nowMs: number): number | null {
+  const free = freeForPlan(v, userId, q, nowMs);
+  if (free) return Math.max(1, Math.round(free.walkMin));
+  const home = v.profileById.get(userId)?.home;
+  return home ? Math.max(1, Math.round(walkingMinutesExact(home, q.location))) : null;
+}
+
+/**
+ * Interests of b (as a may see them) that match the plan's tags, title or category. Each is a
+ * concrete reason for this intro: Jordan likes comics and this is a comics open house. When a
+ * likes it too it reads "You both love comics, and that's what 🦸 Comic open house is about";
+ * otherwise A reads "Jordan is into comics, a fit for 🦸 Comic open house" and B reads that A
+ * wants company for a plan about something B likes. The topic is the interest's keywords, so the
+ * generic "You both love comics" fact is replaced, not repeated.
+ */
+export function planFacts(v: View, a: Profile, b: Profile, q: QuestRow): SharedFact[] {
+  const plan = `${q.emoji} ${q.title}`;
+  const quest = { ...q, memberIds: [] };
+  const bSeen = v.profileFor(a.id, b).interests;
+  const aLikes = new Set(interestsMatchingQuest(v.profileFor(b.id, a).interests, quest).map((i) => i.toLowerCase()));
+  const A = firstName(a); const B = firstName(b);
+  return interestsMatchingQuest(bSeen, quest).map((i) => {
+    const both = aLikes.has(i.toLowerCase());
+    const shared = `You both love ${i}, and that's what ${plan} is about`;
+    return {
+      keyword: i.toLowerCase(),
+      forA: both ? shared : `${B} is into ${i}, a fit for ${plan}`,
+      forB: both ? shared : `${A} wants company for ${plan}, and you're into ${i}`,
+      looker: null,
+      topic: keywords(i).length ? keywords(i) : [i.toLowerCase()],
+    };
+  });
+}
+
 // ---------- candidates ----------
 export type Candidate = { profile: Profile; kind: IntroKind; trust: TrustPath; facts: SharedFact[]; codeScore: number };
 
 /** Who can be introduced to the viewer for `kinds` right now (consent, reach, distance, cooldown). */
 export function candidatesFor(
-  v: View, viewerId: ID, opts: { kinds: IntroKind[]; nowMs: number; viewerProfile?: IntroProfile },
+  v: View, viewerId: ID, opts: { kinds: IntroKind[]; nowMs: number; viewerProfile?: IntroProfile; quest?: QuestRow },
 ): Candidate[] {
   const me = v.profileById.get(viewerId);
   if (!me) return [];
@@ -285,10 +349,15 @@ export function candidatesFor(
     .filter((i) => (i.aId === viewerId || i.bId === viewerId) && opts.nowMs - Date.parse(i.createdAt) < REINTRO_COOLDOWN_MS)
     .map((i) => (i.aId === viewerId ? i.bId : i.aId)));
   const pendingFriend = (other: ID) => v.friendship(viewerId, other) !== null;
+  // A plan-anchored request: only people who could go to it (see it, not already on it, free
+  // for its window and within the walk cap of it).
+  const q = opts.quest;
+  const planMembers = new Set(q ? v.questMemberIds(q.id) : []);
+  const couldGo = (id: ID) => !q || (!planMembers.has(id) && v.canSeeQuest(id, q) && !!freeForPlan(v, id, q, opts.nowMs));
   const out: Candidate[] = [];
   for (const id of reach) {
     const p = v.profileById.get(id);
-    if (!p || recent.has(id) || pendingFriend(id)) continue;
+    if (!p || recent.has(id) || pendingFriend(id) || !couldGo(id)) continue;
     const theirs = introProfileOf(v, id);
     if (theirs.paused) continue;
     const kinds = opts.kinds.filter((k) => theirs.kinds[k]?.on && myP.kinds[k]?.on);
@@ -305,7 +374,8 @@ export function candidatesFor(
     // as friends, and a friendship intro never borrows their coffee-chat wants.
     let best: { kind: IntroKind; facts: SharedFact[]; score: number } | null = null;
     for (const kind of eligible) {
-      const facts = sharedFacts(v, me, p, kind, opts.viewerProfile);
+      // Plan facts go first, so they replace a generic shared interest on the same topic.
+      const facts = [...(q ? planFacts(v, me, p, q) : []), ...sharedFacts(v, me, p, kind, opts.viewerProfile)];
       const score = codeScore(distinctTopics(facts));
       if (!best || score > best.score) best = { kind, facts, score };
     }

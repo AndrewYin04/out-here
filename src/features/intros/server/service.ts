@@ -12,9 +12,11 @@ import type { IntroCardData, IntroPlanAction, IntroPlanOption, IntroPlanView } f
 import { rankSteps, runClick, stepOf, type ClickResult } from './agents';
 import { privacyGuard, privateTexts } from './privacy';
 import {
-  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, lookingForOf, passesBar, SCORE_THRESHOLD,
-  trustLabels, underWeeklyCap,
+  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, isJoinablePlan, kindsOn, lookingForOf, passesBar,
+  SCORE_THRESHOLD, trustLabels, underWeeklyCap, walkToPlan,
 } from './rules';
+
+type QuestRow = View['db']['quests'][number];
 
 export const MUSE_PREFIX = '✨ Muse: ';
 /** Whole-round budget for live Muse calls (3 pairs run in parallel, 5 calls each). */
@@ -51,13 +53,16 @@ export function relativeWhen(startsAt: string, nowMs: number): string {
 
 function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   const q = i.firstStep.questId ? v.db.quests.find((x) => x.id === i.firstStep.questId) : undefined;
-  if (!q) return { label: i.firstStep.text, when: null, href: null, seatsLeft: null };
-  const live = (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs;
+  const anchored = !!i.firstStep.anchored;
+  if (!q) return { label: i.firstStep.text, when: null, href: null, seatsLeft: null, anchored };
+  // A full plan is still on (the pair may be the ones who filled it); only done or over ends it.
+  const live = q.status !== 'done' && Date.parse(q.endsAt) > nowMs;
   return {
     label: `${q.emoji} ${q.title} at ${q.venueName}`,
     when: live ? relativeWhen(q.startsAt, nowMs) : 'This plan has ended',
     href: live ? `/out-here?quest=${encodeURIComponent(q.id)}` : null,
     seatsLeft: live ? v.seatsLeft(q) : null,
+    anchored,
   };
 }
 
@@ -93,6 +98,57 @@ export function museAsk(v: View, i: Intro, nowMs: number): string {
 export function museNote(v: View, i: Intro, nowMs: number): string {
   const A = firstName(v.profileById.get(i.aId)); const B = firstName(v.profileById.get(i.bId));
   return `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary} ${museAsk(v, i, nowMs)}`;
+}
+
+export type PlanJoin = 'joined' | 'full' | 'gone';
+
+/**
+ * Muse's note for a plan-anchored intro once both said yes. Joined: it names the plan, the time
+ * and each person's walk. Full or gone: the intro still connects, and Muse says the plan filled
+ * up and offers the next plan that fits both of them.
+ */
+export function anchoredNote(v: View, i: Intro, nowMs: number, result: PlanJoin): string {
+  const A = firstName(v.profileById.get(i.aId)); const B = firstName(v.profileById.get(i.bId));
+  const head = `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary}`;
+  const q = v.db.quests.find((x) => x.id === i.firstStep.questId);
+  if (result === 'joined' && q) {
+    const s = stepView(v, i, nowMs);
+    const wa = walkToPlan(v, i.aId, q, nowMs); const wb = walkToPlan(v, i.bId, q, nowMs);
+    const walk = wa !== null && wb !== null ? ` It's about a ${wa} min walk for ${A} and ${wb} min for ${B}.` : '';
+    return `${head} You're both going to ${s.label} (${s.when}).${walk} I saved both your seats, and it's on both your Out Here maps.`;
+  }
+  const label = q ? `${q.emoji} ${q.title} at ${q.venueName}` : i.firstStep.text;
+  const next = planOptions(v, i, nowMs)[0];
+  const then = next
+    ? `Next one that fits you both: ${next.label} (${next.when}, ${seatsText(next.seatsLeft)} left). Tap Pick another time on your intro.`
+    : 'Want me to find another plan? Tap Pick a time on your intro.';
+  return `${head} ${label} ${result === 'full' ? 'filled up' : 'is no longer happening'} before you both said yes. ${then}`;
+}
+
+/**
+ * Both people join a plan-anchored intro's plan through join_quest (one atomic seat each), called
+ * only by the request that won the move to accepted, so each joins at most once. Not enough seats
+ * for everyone not yet on it means nobody joins ('full'); a join that loses a race undoes the
+ * other one, so the pair never ends up split.
+ */
+async function joinAnchored(store: DataStore, i: Intro, nowMs: number): Promise<PlanJoin> {
+  const { view } = await store.museContext();
+  const q = view.db.quests.find((x) => x.id === i.firstStep.questId);
+  if (!q || q.status === 'done' || Date.parse(q.endsAt) <= nowMs) return 'gone';
+  const need = notYetOn(view, i);
+  if (need.length === 0) return 'joined';
+  if (view.seatsLeft(q) < need.length) return 'full';
+  const joined: ID[] = [];
+  for (const id of need) {
+    try {
+      await store.joinQuest(id, q.id);
+      joined.push(id);
+    } catch (err) {
+      for (const j of joined) await store.leaveQuest(j, q.id).catch(() => undefined);
+      return (err as { status?: number })?.status === 409 ? 'full' : 'gone';
+    }
+  }
+  return 'joined';
 }
 
 /** The pair's chat name, so the chat header shows Muse is in it: "Alex, Jordan + Muse". */
@@ -244,12 +300,12 @@ export type RoundResult = {
   message: string;
 };
 
-const introNotice = (otherName: string, trust: string | undefined) =>
-  `✨ Muse has an intro for you: meet ${otherName}.${trust ? ` ${trust}.` : ''}`;
+const introNotice = (otherName: string, trust: string | undefined, step?: Intro['firstStep']) =>
+  `✨ Muse has an intro for you: meet ${otherName}${step?.anchored ? ` to go to ${step.text}` : ''}.${trust ? ` ${trust}.` : ''}`;
 
 /** One vetting round for the viewer. auto rounds obey the weekly cap; requests do not. */
 async function round(
-  store: DataStore, viewerId: ID, opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile },
+  store: DataStore, viewerId: ID, opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile; quest?: QuestRow },
 ): Promise<RoundResult> {
   const { view } = await store.museContext();
   const me = view.profileById.get(viewerId);
@@ -261,14 +317,14 @@ async function round(
     return { ...empty, capped: true, message: 'Muse already made your intro this week. Muse takes its time to find someone great.' };
   }
   const kinds = opts.kinds.filter((k) => opts.profile.kinds[k]?.on);
-  let pool = candidatesFor(view, viewerId, { kinds, nowMs, viewerProfile: opts.profile });
+  let pool = candidatesFor(view, viewerId, { kinds, nowMs, viewerProfile: opts.profile, quest: opts.quest });
   if (opts.source === 'auto') pool = pool.filter((c) => underWeeklyCap(view.db.intros, c.profile.id, nowMs));
   const shortlist = pool.slice(0, AGENT_SHORTLIST);
   const deadline = Date.now() + ROUND_BUDGET_MS;
   // Candidates run in parallel and fail alone: one that errors or times out is skipped.
   const vetted = await Promise.all(shortlist.map(async (c) => {
     try {
-      const raw = await runClick(view, me, opts.profile, c, nowMs, deadline);
+      const raw = await runClick(view, me, opts.profile, c, nowMs, deadline, opts.quest);
       return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { kind: c.kind, trustPath: c.trust, firstStep: raw.firstStep }, raw) };
     } catch (err) {
       console.error('[intros] agent exchange failed:', String((err as Error)?.message ?? err).slice(0, 200));
@@ -282,10 +338,13 @@ async function round(
     .sort((x, y) => y.r.score - x.r.score);
   const best = passing[0];
   const considered = vetted.filter(Boolean).length;
+  const forPlan = opts.quest ? ` for ${opts.quest.emoji} ${opts.quest.title}` : '';
   if (!best) {
     return {
       ...empty, considered, belowBar: considered,
-      message: considered
+      message: opts.quest && !considered
+        ? `No great match yet${forPlan}. Nobody Muse could introduce you to is free then and close enough to walk.`
+        : considered
         ? `No great match yet. Muse considered ${considered} ${considered === 1 ? 'person' : 'people'}, but nobody was a strong enough match.`
         : 'No great match yet. Muse only introduces when it\'s confident.',
     };
@@ -300,13 +359,13 @@ async function round(
   };
   await store.insertIntro(row);
   // Only A hears now. B is asked after A says yes.
-  await store.notifyIntro(viewerId, row.bId, row.id, introNotice(firstName(best.c.profile), trustLabels(view, row.trustPath)[0]));
+  await store.notifyIntro(viewerId, row.bId, row.id, introNotice(firstName(best.c.profile), trustLabels(view, row.trustPath)[0], row.firstStep));
   await publish(`user:${viewerId}`, { type: 'intro', id: row.id });
   const after = (await store.museContext()).view;
   const others = considered - 1;
   return {
     intro: cardFor(after, viewerId, row, nowMs), considered, belowBar: others, capped: false, paused: false,
-    message: `Muse found someone. ${others > 0 ? `${others} other ${others === 1 ? 'person was' : 'people were'} considered but not a strong enough match.` : ''}`.trim(),
+    message: `Muse found someone${forPlan}. ${others > 0 ? `${others} other ${others === 1 ? 'person was' : 'people were'} considered but not a strong enough match.` : ''}`.trim(),
   };
 }
 
@@ -317,13 +376,27 @@ export async function runIntroRound(store: DataStore, viewerId: ID, kind?: Intro
   return round(store, viewerId, { kinds: kind ? [kind] : kindsOn(profile), source: 'auto', profile });
 }
 
-/** "Ask Muse for an intro": still must clear the bar, else "No great match yet". */
-export async function requestIntro(store: DataStore, viewerId: ID, kind: IntroKind, lookingFor: string): Promise<RoundResult> {
+/**
+ * "Ask Muse for an intro": still must clear the bar, else "No great match yet". With a questId
+ * ("find someone to go to THIS plan with") only people free for the plan, within walking
+ * distance of it and not already on it are considered; the plan is the first step, and on double
+ * accept both people join it.
+ */
+export async function requestIntro(
+  store: DataStore, viewerId: ID, kind: IntroKind, lookingFor: string, questId?: ID | null,
+): Promise<RoundResult> {
   const { view } = await store.museContext();
   const base = introProfileOf(view, viewerId);
+  let quest: QuestRow | undefined;
+  if (questId) {
+    const q = view.db.quests.find((x) => x.id === questId);
+    if (!q || !view.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    if (!isJoinablePlan(q, now().getTime())) throw conflict('This plan is over or full.');
+    quest = q;
+  }
   // The request counts as opting into that kind for this search only; settings stay as they are.
   const profile: IntroProfile = { ...base, kinds: { ...base.kinds, [kind]: { on: true, lookingFor: lookingFor.trim() || base.kinds[kind].lookingFor } } };
-  return round(store, viewerId, { kinds: [kind], source: 'request', profile });
+  return round(store, viewerId, { kinds: [kind], source: 'request', profile, quest });
 }
 
 /**
@@ -361,14 +434,16 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
       await publish(`user:${viewerId}`, { type: 'intro', id: i.id });
       if (isA) {
         // Now B is asked, the way Boardy asks the second person once the first said yes.
-        await store.notifyIntro(i.bId, i.aId, i.id, introNotice(firstName(a), trustLabels(view, i.trustPath)[0]));
+        await store.notifyIntro(i.bId, i.aId, i.id, introNotice(firstName(a), trustLabels(view, i.trustPath)[0], i.firstStep));
         await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
       }
     }
     return current();
   }
   if (!(await store.transitionIntro(i.id, i.status, { status: 'accepted', decidedAt: now().toISOString() }))) return current();
-  // This request won the transition to accepted: it alone opens the chat and posts the note.
+  // This request won the transition to accepted: it alone opens the chat, seats a plan-anchored
+  // pair (join_quest broadcasts quest:<id> with the seats) and posts the note.
+  const joinResult = i.firstStep.anchored && i.firstStep.questId ? await joinAnchored(store, i, nowMs) : null;
   // The pair's own chat, named so Muse shows as the third person in it; a rehearsal reuses it.
   const name = threadNameFor(view, i);
   const existing = view.db.threads.find((t) => t.name === name && (() => {
@@ -379,7 +454,10 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
   // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
   const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
   const already = (await store.museContext()).view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
-  if (!already) await store.sendMessage(viewerId, thread.id, museNote(view, i, nowMs), 'muse');
+  if (!already) {
+    const fresh = joinResult ? (await store.museContext()).view : view;
+    await store.sendMessage(viewerId, thread.id, joinResult ? anchoredNote(fresh, i, nowMs, joinResult) : museNote(view, i, nowMs), 'muse');
+  }
   await store.updateIntro(i.id, { threadId: thread.id });
   await store.notifyIntro(otherId, viewerId, i.id,
     `✨ Muse: you and ${firstName(view.profileById.get(viewerId))} are connected. Muse started your chat.`);
