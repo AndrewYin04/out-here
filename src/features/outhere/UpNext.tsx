@@ -1,8 +1,9 @@
 'use client';
 // The next plan stays on the map with a leave-time reminder and a way to start the 3D walk.
-import { ChevronDown, ChevronUp, Footprints, MapPin } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, Footprints, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useViewer } from '@/features/data';
+import { requestSelfie } from '@/features/memories';
 import { Avatar, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
 
@@ -74,6 +75,10 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, arrived, q.id]);
 
+  // Arriving: the 3D view opens the selfie dialog itself. If it was closed, this reopens it
+  // (one photo prompt, not two); without the 3D view, See plan is the way in.
+  const takePhoto = () => { if (!requestSelfie(q.id)) onSee(q.id); };
+
   const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
   const leave = arrived ? `You’re here 🎉 ${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
     : walking ? `On your way · ${plan.walkMinutes} min walk`
@@ -120,10 +125,16 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => onSee(q.id)}
-              className="oh-press h-10 w-full rounded-btn bg-fb-secondary-btn text-[14px] font-semibold text-fb-text">
-              See plan
-            </button>
+            <div className="flex gap-2">
+              <button type="button" data-testid="up-next-photo-btn" onClick={takePhoto}
+                className="oh-press inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover">
+                <Camera size={18} aria-hidden />Take a photo together
+              </button>
+              <button type="button" onClick={() => onSee(q.id)}
+                className="oh-press h-10 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
+                See plan
+              </button>
+            </div>
           )}
         </div>
       )}

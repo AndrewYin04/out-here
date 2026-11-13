@@ -2,7 +2,7 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  demoDate, EARLY_PHOTO_MS, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
   type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
@@ -784,7 +784,8 @@ export class CoreStore {
     if (!q) throw notFound('quest_not_found');
     const memberIds = v.questMemberIds(questId);
     if (!memberIds.includes(viewerId)) throw forbidden('only attendees can complete a hangout');
-    if (q.status !== 'done' && new Date(q.startsAt) > now()) throw conflict('This hangout has not started yet.');
+    const started = new Date(q.startsAt) <= now();
+    if (q.status !== 'done' && new Date(q.startsAt).getTime() - now().getTime() > EARLY_PHOTO_MS) throw conflict('This hangout has not started yet.');
     const t = iso();
     // shared prefs: quest tags plus interests at least two members share
     const counts = new Map<string, number>();
@@ -803,7 +804,8 @@ export class CoreStore {
     const existing = v.crewMemberIds(crew.id);
     const add = memberIds.filter((userId) => !existing.includes(userId));
     if (add.length) await this.backend.upsert('crewMembers', add.map((userId) => ({ crewId: crew.id, userId })));
-    if (q.status !== 'done') await this.backend.update('quests', { id: questId }, { status: 'done' });
+    // Early (EARLY_PHOTO_MS): the crew forms now, but the plan stays open for whoever is still on the way.
+    if (q.status !== 'done' && started) await this.backend.update('quests', { id: questId }, { status: 'done' });
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
     for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
