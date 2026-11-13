@@ -12,7 +12,7 @@ import {
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
+  RateHangoutBody, ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
 import type { Backend } from './backend';
 import { pairSignals } from './matching';
@@ -21,9 +21,13 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import {
-  addMuseWant, createListing, mapListing, mapListings, markSold, museWants, publicListing, releaseHold, removeMuseWant, requestHold, respondHold,
+  addMuseWant, createListing, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold,
 } from './market';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
+import {
+  hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, mutualHangAgainMany, myRatings,
+  promptEndedHangouts, promptRatings, rateHangout, ratingState,
+} from './ratings';
 import { postWalkStep, walkers } from './walkers';
 
 const PAGE = 10;
@@ -540,7 +544,10 @@ export class CoreStore {
 
   // ---------- notifications ----------
   async notifications(viewerId: ID, limit = 50): Promise<{ notifications: NotificationView[]; unread: number }> {
-    const v = await this.view();
+    let v = await this.view();
+    // Hangouts whose end time passed without a "We're done" still ask their members for a rating.
+    // A failed prompt write (for example before migration 0004) never breaks the list.
+    if (await promptEndedHangouts(this, v, viewerId).catch(() => false)) v = await this.view();
     const mine = v.db.notifications.filter((n) => n.recipientId === viewerId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return { notifications: mine.slice(0, limit).map((n) => v.notificationView(viewerId, n)), unread: mine.filter((n) => !n.readAt).length };
   }
@@ -809,6 +816,13 @@ export class CoreStore {
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
     for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
+    // "How was <venue>?" for every member, once per member (stable ids, so a second complete is a no-op).
+    // The quest is already done here, so a failed prompt (for example a database without
+    // 0004_hangout_ratings.sql, whose notifications check rejects 'hangout_rate') must not turn
+    // "We're done" into a 500. promptEndedHangouts retries it on the next notifications read.
+    await promptRatings(this, after, after.questById.get(questId)!, memberIds).catch((err: unknown) => {
+      console.warn('[ratings] rating prompt failed:', String((err as Error)?.message ?? err).slice(0, 200));
+    });
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(crew) };
   }
 
@@ -1216,16 +1230,19 @@ export class CoreStore {
   }
 
   // ---------- marketplace / reels ----------
-  async listings(): Promise<Listing[]> {
+  /** The Marketplace grid. Location and pickupSpot follow listingFor: exact only for the seller and an accepted buyer. */
+  async listings(viewerId: ID): Promise<Listing[]> {
     const v = await this.view();
-    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicListing);
+    const at = now();
+    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((l) => listingFor(v, viewerId, l, at));
   }
 
   async listing(viewerId: ID, id: ID): Promise<{ listing: Listing; seller: PersonCard }> {
     const v = await this.view();
     const l = v.db.listings.find((x) => x.id === id);
     if (!l) throw notFound('listing_not_found');
-    return { listing: publicListing(l), seller: v.person(viewerId, l.sellerId)! };
+    return { listing: listingFor(v, viewerId, l, now()), seller: v.person(viewerId, l.sellerId)! };
   }
 
   async reels(): Promise<Reel[]> {
@@ -1262,4 +1279,20 @@ export class CoreStore {
   postWalkStep(viewerId: ID, questId: ID, location: LatLng) { return postWalkStep(this, viewerId, questId, location); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
+
+  // ---------- Out Here: post-hangout rating (logic in ratings.ts) ----------
+  ratingState(viewerId: ID, questId: ID) { return ratingState(this, viewerId, questId); }
+  rateHangout(viewerId: ID, questId: ID, body: RateHangoutBody) { return rateHangout(this, viewerId, questId, body); }
+  hangoutRecap(viewerId: ID, questId: ID) { return hangoutRecap(this, viewerId, questId); }
+  myRatings(viewerId: ID) { return myRatings(this, viewerId); }
+  /** Server-only (Muse matching): the hang-again answers this user gave. Never send to a client. */
+  hangAgainSignals(userId: ID) { return hangAgainSignals(this, userId); }
+  /** Server-only (Muse matching): the hang-again answers others gave about this user. Never send to a client. */
+  hangAgainAbout(userId: ID) { return hangAgainAbout(this, userId); }
+  /** Server-only (Muse matching): 'one_no' if either said no, 'both_yes' if both said yes, else 'unknown'. */
+  mutualHangAgain(a: ID, b: ID) { return mutualHangAgain(this, a, b); }
+  /** Server-only (Muse matching): mutualHangAgain(viewerId, id) for each id, in one pass. */
+  mutualHangAgainMany(viewerId: ID, otherIds: ID[]) { return mutualHangAgainMany(this, viewerId, otherIds); }
+  /** Server-only (Muse matching): this user's ratings with highlights and private notes. */
+  hangoutRatings(userId: ID) { return hangoutRatings(this, userId); }
 }

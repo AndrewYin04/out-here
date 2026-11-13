@@ -120,6 +120,17 @@ export interface DataStore {
   postWalkStep: CoreStore['postWalkStep'];
   hangInvite: CoreStore['hangInvite'];
   hangSuggestion: CoreStore['hangSuggestion'];
+  // post-hangout rating (docs/HANGOUT_RATINGS.md)
+  ratingState: CoreStore['ratingState'];
+  rateHangout: CoreStore['rateHangout'];
+  hangoutRecap: CoreStore['hangoutRecap'];
+  myRatings: CoreStore['myRatings'];
+  /** Server-only, for Muse matching. Never return these to a client: they hold private answers. */
+  hangAgainSignals: CoreStore['hangAgainSignals'];
+  hangAgainAbout: CoreStore['hangAgainAbout'];
+  mutualHangAgain: CoreStore['mutualHangAgain'];
+  mutualHangAgainMany: CoreStore['mutualHangAgainMany'];
+  hangoutRatings: CoreStore['hangoutRatings'];
 }
 
 const g = globalThis as unknown as { __outhereSupabaseStore?: { key: string; store: DataStore } };
