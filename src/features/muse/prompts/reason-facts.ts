@@ -1,6 +1,5 @@
 // The rank prompt asks every reason to cite one concrete fact from the candidate data. Code
 // checks that it did; a reason with no fact is replaced by one built from candidate data.
-import { formatDemoTime } from '../../../shared';
 import type { PlanCandidate } from '../candidates';
 
 /** Phrases that say nothing specific about this plan. A reason made only of these is replaced. */
@@ -40,7 +39,7 @@ export type FactReasonOptions = {
   budgetMax?: number | null; windowEnd?: string | null;
   /** When the free window starts (ISO): with windowEnd it gives "your 15 min". */
   windowStart?: string | null;
-  /** The plan's clock, for "starts in 9 min"; without it the start time is named instead. */
+  /** The plan's clock. Accepted for callers; the fit reason no longer repeats the start time. */
   now?: Date | null;
 };
 
@@ -68,30 +67,31 @@ export function statusPhrase(firstName: string, line: string | null | undefined)
   return said ?? (wants ? `${firstName} ${wants}` : null);
 }
 
-/** "4 min walk, starts in 9 min, $7 of your $15": the concrete fit for a pick with no friend. */
+/**
+ * "Fits inside your 40 min, $8 under your $15": the concrete fit for a pick with no friend. The
+ * card's meta row already shows the walk, the start and the price, so this names only what that
+ * row does not: the trip fits the window, and what the plan leaves of the budget. '' when the
+ * trip does not fit a window (the budget alone is never a reason).
+ */
 function fitReason(c: PlanCandidate, opts: FactReasonOptions): string {
-  const parts = [`${c.travelMinutes} min walk`];
-  const now = opts.now?.getTime();
-  const startsIn = now !== undefined ? Math.round((Date.parse(c.quest.startsAt) - now) / 60_000) : null;
-  parts.push(startsIn !== null && startsIn > 0 && startsIn <= 90 ? `starts in ${startsIn} min` : `starts ${formatDemoTime(c.quest.startsAt)}`);
-  const budget = opts.budgetMax ?? null;
-  const price = c.quest.priceMax === 0 ? 'free' : `$${c.quest.priceMax}`;
-  parts.push(budget !== null && budget >= c.quest.priceMax && c.quest.priceMax > 0 ? `${price} of your $${budget}` : price);
   const start = Date.parse(opts.windowStart ?? '');
   const end = Date.parse(opts.windowEnd ?? '');
-  if (Number.isFinite(end) && Date.parse(c.arriveAt) <= end) {
-    const mins = Number.isFinite(start) && end > start ? Math.round((end - start) / 60_000) : null;
-    return `Fits before your ${mins !== null && mins <= 120 ? `${mins} min is` : `free time is`} up: ${parts.join(', ')}.`;
-  }
-  return `${parts.join(', ')}.`;
+  if (!Number.isFinite(end) || Date.parse(c.arriveAt) > end) return '';
+  const mins = Number.isFinite(start) && end > start ? Math.round((end - start) / 60_000) : null;
+  const fits = mins !== null && mins <= 120 ? `Fits inside your ${mins} min` : 'Fits your free time';
+  const budget = opts.budgetMax ?? null;
+  if (budget === null || budget < c.quest.priceMax) return `${fits}.`;
+  const left = budget - c.quest.priceMax;
+  const money = c.quest.priceMax === 0 ? `costs nothing of your $${budget}` : left === 0 ? `uses exactly your $${budget}` : `$${left} under your $${budget}`;
+  return `${fits}, ${money}.`;
 }
 
 /**
  * A reason built only from checked candidate data: a free friend's bubble (paraphrased) or shared
  * interest, the viewer's own interests by name, a friend already going, the activity asked for.
- * With none of those it names the concrete fit ("Fits before your 15 min is up: 4 min walk,
- * starts in 9 min, $7 of your $15"), never the budget alone. Returns '' only when there is no
- * window and nothing else to cite.
+ * With none of those it names the concrete fit ("Fits inside your 15 min, $8 under your $15"),
+ * never a fact the card's meta row shows and never the budget alone. Returns '' only when
+ * nothing is left to cite.
  */
 export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): string {
   const f = c.friendOverlap[0];
@@ -105,7 +105,8 @@ export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): stri
   if (m) return `Your friend ${m.firstName} is already going.`;
   const asked = c.matchedActivities.find((a) => !broad.has(a.trim().toLowerCase()));
   if (asked) return `It is the ${asked} you asked for.`;
-  if (opts.windowEnd || opts.budgetMax != null) return fitReason(c, opts);
+  const fit = opts.windowEnd ? fitReason(c, opts) : '';
+  if (fit) return fit;
   const tags = c.quest.tags.filter((t) => !broad.has(t.trim().toLowerCase())).slice(0, 2);
   if (tags.length > 0) return `For people into ${tags.join(' and ')}.`;
   return '';

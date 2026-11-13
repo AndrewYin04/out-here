@@ -76,8 +76,11 @@ test("Muse's reasoning is visible on the plan sheet without a tap", async ({ pag
 
   await page.screenshot({ path: `${SHOTS}/plan-${phone ? 390 : 1440}.png` });
 
-  // The first pick's Join / Invite buttons stay on screen with the panel open.
-  await expect(pick.getByRole("button", { name: /^(Join|Invite [A-Z]\w*)$/ }).first()).toBeInViewport({ ratio: 1 });
+  // The first pick's main action (Join, or "Go with Maya" when a friend is matched) stays on screen with the panel open.
+  await expect(pick.getByRole("button", { name: /^(Join|Go with [A-Z]\w*|Invite [A-Z]\w*)$/ }).first()).toBeInViewport({ ratio: 1 });
+  // What the pick says it is, no fact twice: Maya's "likely down" pill is on the card, so the
+  // pre-check line waits behind "See all".
+  await expect(page.getByTestId("precheck-line")).toHaveCount(0);
 
   // "N more" reveals exactly N more ruled-out rows, then the off-topic count.
   const more = page.getByTestId("muse-work-more");
@@ -153,6 +156,9 @@ test("a shorter ask explains the pick that dropped out first, and the map strip 
   await box.fill("hungry, 40 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("suggestion").first()).toContainText("Dumplings before the rush", { timeout: 15_000 });
+  // The composer folded after the ask: tapping what was asked opens it again, focused.
+  await page.getByTestId("picked-ask").click();
+  await expect(box).toBeFocused();
   await box.fill("hungry, 15 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("muse-work-read")).toContainText("15 min", { timeout: 15_000 });

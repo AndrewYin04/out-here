@@ -53,10 +53,10 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     expect(hasConcreteFact('It is the open plan nearby that fits your time best.', c)).toBe(false);
     expect(hasConcreteFact('It is the food plan that fits your time best.', candidate({ matchedActivities: ['food'] }))).toBe(false);
     expect(concreteReason('Good for boba fans.', c)).toBe('Good for boba fans.');
-    // no friend and no named interest: walk, start and price against the ask
+    // no friend and no named interest: the window and the budget left, never the meta row's walk, start or price
     const ask = { budgetMax: 15, windowStart: at(0), windowEnd: at(15), now: NOW };
-    expect(concreteReason('Fits your time best.', c, ask)).toBe('Fits before your 15 min is up: 4 min walk, starts in 9 min, $7 of your $15.');
-    expect(factReason(c, { budgetMax: 15 })).toBe('4 min walk, starts 10:09 AM, $7 of your $15.');
+    expect(concreteReason('Fits your time best.', c, ask)).toBe('Fits inside your 15 min, $8 under your $15.');
+    expect(factReason(c, { budgetMax: 15 })).toBe('For people into boba and sketching.');
     expect(factReason(c, ask)).not.toBe('Within your $15 budget.');
     // the viewer's own interest by name comes first
     expect(factReason(candidate({ viewerInterests: ['boba', 'sketching'] }), ask))
@@ -96,8 +96,8 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     const ctx = { quests: [quest], friends: [], location: LOC, viewer: { id: 'alex' }, knownPeople: [] };
     const out = validate([s], [candidate()], ctx as never, { intent, text: 'thirsty', now: NOW });
     expect(out.suggestions).toHaveLength(1);
-    expect(out.suggestions[0].reason).toBe('Fits before your 40 min is up: 4 min walk, starts in 9 min, $7.');
+    expect(out.suggestions[0].reason).toBe('Fits inside your 40 min.');
     const budgeted = validate([s], [candidate()], ctx as never, { intent: { ...intent, budgetMax: 15 }, text: 'thirsty, under $15', now: NOW });
-    expect(budgeted.suggestions[0].reason).toBe('Fits before your 40 min is up: 4 min walk, starts in 9 min, $7 of your $15.');
+    expect(budgeted.suggestions[0].reason).toBe('Fits inside your 40 min, $8 under your $15.');
   });
 });

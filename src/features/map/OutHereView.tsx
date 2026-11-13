@@ -488,8 +488,9 @@ export function OutHereView() {
         </>
       )}
 
-      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). */}
-      {!selectedId && (
+      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). With
+          the Muse filter on it waits: it sat on top of the filter's status and "Why these?" pills. */}
+      {!selectedId && !filter.on && (
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
           <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, ChevronDown, ChevronUp, Loader2, Minus, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { cn } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
 import type { MuseWork } from './muse-work';
@@ -120,15 +120,18 @@ function RuledOutItem({ row }: { row: RuledOutRow }) {
 }
 
 /**
- * What was checked and who did it, open by default so a judge sees it without a tap. Code
+ * What was checked and who did it, open by default so a judge sees it without a tap, and short
+ * enough that the first pick's button stays on screen at 390 x 844: the "Checked N plans and M
+ * friends" header, what was read, how the picks were ranked, and up to 3 ruled-out rows. Code
  * counted the plans and friends and ruled plans out (candidates.ts), so those lines carry no
  * Muse label. The read line says ✨ Muse when the live model parsed the words, and the rank line
- * when the live model ranked and explained the picks. The other ruled-out rows open on "N more".
+ * when the live model ranked and explained the picks. "See all" opens the rest: who is free, the
+ * other ruled-out rows, the off-topic count, and `details` (the friends' Muse pre-check).
  */
-export function MuseWorkPanel({ work }: { work: MuseWork }) {
+export function MuseWorkPanel({ work, details }: { work: MuseWork; details?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const { top, more, offTopic } = work.ruledOut;
-  const hasDetails = more.length > 0 || offTopic > 0;
+  const hasDetails = more.length > 0 || offTopic > 0 || !!work.friends || !!details;
   const toggle = hasDetails ? (
     <button
       type="button"
@@ -137,18 +140,23 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
       onClick={() => setOpen((v) => !v)}
       className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
     >
-      {open ? 'Less' : more.length > 0 ? `${more.length} more` : 'Details'}
+      {open ? 'Less' : more.length > 0 ? `See all · ${more.length} more` : 'See all'}
       {open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
     </button>
   ) : null;
 
   return (
-    <section data-testid="muse-work" aria-label="What was checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2.5 shadow-card">
-      <p data-testid="muse-work-checked" className="text-[15px] font-semibold leading-5 text-fb-text">
+    <section data-testid="muse-work" aria-label="What was checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2 shadow-card">
+      <p data-testid="muse-work-checked" className="truncate text-[15px] font-semibold leading-5 text-fb-text">
         {work.checked}
         {work.fit && <span className="font-normal text-fb-text-2"> · {work.fit}</span>}
       </p>
-      <p data-testid="muse-work-read" data-by={work.readByMuse ? 'muse' : 'code'} className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+      <p
+        data-testid="muse-work-read"
+        data-by={work.readByMuse ? 'muse' : 'code'}
+        title={[work.read.join(' · '), work.walkDefault].filter(Boolean).join(' · ')}
+        className="mt-0.5 text-[13px] leading-[18px] text-fb-text-2"
+      >
         {work.readByMuse
           ? <span className="font-semibold text-fb-blue">✨ Muse read:</span>
           : <span className="font-semibold text-fb-text">Read</span>}
@@ -156,12 +164,6 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
         {/* The walk cap is code's default when the ask named none: muted, and not part of what was read. */}
         {work.walkDefault && <span data-testid="muse-work-walk-default"> · {work.walkDefault}</span>}
       </p>
-      {work.friends && (
-        <p data-testid="muse-work-friends" className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] text-fb-text-2">
-          <Users size={13} aria-hidden className="shrink-0" />
-          {work.friends}
-        </p>
-      )}
       <p
         data-testid="muse-work-rank"
         data-by={work.rankByMuse ? 'muse' : 'code'}
@@ -172,7 +174,7 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
         {work.rankByMuse ? ` ${work.rank.replace(/^Muse /, '')}` : work.rank}
       </p>
       {top.length > 0 ? (
-        <div className="mt-1.5 border-t border-fb-divider pt-1.5">
+        <div className="mt-1.5 border-t border-fb-divider pt-1">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[12px] font-semibold uppercase tracking-[0.02em] text-fb-text-2">Ruled out</span>
             {toggle}
@@ -190,6 +192,13 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
           {offTopic} other{offTopic === 1 ? " wasn't" : "s weren't"} what you asked for
         </p>
       )}
+      {open && work.friends && (
+        <p data-testid="muse-work-friends" className="mt-1 flex items-center gap-1.5 text-[13px] leading-[18px] text-fb-text-2">
+          <Users size={13} aria-hidden className="shrink-0" />
+          {work.friends}
+        </p>
+      )}
+      {open && details}
     </section>
   );
 }

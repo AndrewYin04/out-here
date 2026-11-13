@@ -118,7 +118,7 @@ export function ImFreeButton({ className }: { className?: string }) {
  * "Checked with 6 friends · Maya's likely down". Names only friends who came back likely down;
  * everyone else stays unnamed, so nobody's no is shown.
  */
-function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Map<string, PersonCard> }) {
+function PrecheckLine({ plan, friends, className }: { plan: PlanResult['plan']; friends: Map<string, PersonCard>; className?: string }) {
   const checked = plan.meta?.friendsChecked ?? 0;
   if (checked === 0) return null;
   const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
@@ -126,7 +126,7 @@ function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Ma
   const who = down.length === 0 ? 'no one free for this yet'
     : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
   return (
-    <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
+    <p data-testid="precheck-line" className={cn('text-[13px] text-fb-text-2', className ?? 'mb-3 px-1')}>
       ✨ Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
     </p>
   );
@@ -189,6 +189,14 @@ export function PlanSheet({ className }: { className?: string }) {
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
 
   const ask = composeAsk(moods, text, duration);
+  /** The folded composer opens again with the text box focused and the cursor at the end. */
+  const reopenComposer = () => {
+    setPickersOpen(true);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  };
   const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   /** Just show I'm free / Update status: your status only, no Muse. */
@@ -294,12 +302,16 @@ export function PlanSheet({ className }: { className?: string }) {
           {/* After an ask the whole top folds into one line, so Muse's results get the sheet. */}
           {!pickersOpen && status !== 'idle' ? (
             <div className="flex shrink-0 items-center gap-2 px-4 pb-3" data-testid="picked-summary">
-              {myStatus.status.kind !== 'busy' && <StatusDot s={myStatus.status} />}
-              <p className="min-w-0 flex-1 truncate text-[14px] text-fb-text">
-                {myStatus.status.kind !== 'busy' && <span className="font-semibold">{freeStatusLabel(myStatus.status)} · </span>}
-                <span className="text-fb-text-2">{asked}</span>
-              </p>
-              <button type="button" onClick={() => { setPickersOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }}
+              {/* Tapping what you asked, or Change, reopens the composer with the text box focused. */}
+              <button type="button" data-testid="picked-ask" onClick={reopenComposer} aria-label={`Edit your ask: ${asked}`}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-btn py-1 text-left hover:bg-fb-hover">
+                {myStatus.status.kind !== 'busy' && <StatusDot s={myStatus.status} />}
+                <span className="min-w-0 flex-1 truncate text-[14px] text-fb-text">
+                  {myStatus.status.kind !== 'busy' && <span className="font-semibold">{freeStatusLabel(myStatus.status)} · </span>}
+                  <span className="text-fb-text-2">{asked}</span>
+                </span>
+              </button>
+              <button type="button" onClick={reopenComposer}
                 className="oh-press h-8 shrink-0 rounded-pill bg-fb-secondary-btn px-3 text-[13px] font-semibold text-fb-text">
                 Change
               </button>
@@ -375,8 +387,11 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
-                {work && <MuseWorkPanel work={work} />}
-                <PrecheckLine plan={result.plan} friends={friendMap} />
+                {/* The pre-check line names the same friends as each card's "likely down" pill, so
+                    with the panel it sits behind "See all"; the pick's button stays on screen. */}
+                {work
+                  ? <MuseWorkPanel work={work} details={<PrecheckLine plan={result.plan} friends={friendMap} className="mt-1 leading-[18px]" />} />
+                  : <PrecheckLine plan={result.plan} friends={friendMap} />}
                 {result.plan.suggestions.length === 0 ? (
                   <>
                   {summary && (
