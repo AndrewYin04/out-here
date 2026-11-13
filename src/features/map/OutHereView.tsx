@@ -519,8 +519,9 @@ export function OutHereView() {
         </>
       )}
 
-      {/* Up next (your next plan), else "You and Maya are both free": under the toggle. */}
-      {!selectedId && !creating && (
+      {/* Up next (your next plan), else "You and Maya are both free": under the toggle. Hidden while
+          a sheet is open, which already shows the plan (one next step on screen at a time). */}
+      {!selectedId && !creating && !sheetOpen && (
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
           {upNext ? (
             <UpNextCard
