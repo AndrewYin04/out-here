@@ -529,7 +529,9 @@ export function OutHereView() {
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
       {!selectedId && !creating && !sheetOpen && upNext && (
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
+        // Below the Muse filter status and the Friends chip, so neither is ever covered.
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
+          mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
           <UpNextCard
             key={upNext.quest.id}
             plan={upNext}
