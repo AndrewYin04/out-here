@@ -8,8 +8,8 @@
 // that the viewer could not have seen elsewhere (their own settings, their own profile, the other
 // person's profile as the viewer sees it, the trust path, the first step). Words are compared
 // lowercased, split at hyphens and slashes, with plurals folded ("gigs" = "gig").
-import type { AgentTurn, IntroProfile, Profile } from '@/shared';
-import { kindsOn, stem } from './rules';
+import type { AgentTurn, IntroKind, IntroProfile, Profile } from '@/shared';
+import { lookingForOf, mutualLine, stem } from './rules';
 
 const STOP = new Set([
   'the', 'and', 'for', 'with', 'about', 'some', 'more', 'into', 'from', 'that', 'this', 'who', 'you', 'your',
@@ -61,10 +61,13 @@ export type PrivacyGuard = {
  * The guard for what `viewer` may read about `other`. `viewerIntro` is the viewer's own settings
  * (with an on-request override if any); `secrets` is the other side's private looking-for text.
  * `seenOther` is the other profile as the viewer may see it; `extra` is other visible text
- * (the viewer's stored settings, trust labels, the first step).
+ * (the viewer's stored settings, trust labels, the first step). `kind` and `otherKindText` (what the
+ * other side wrote for this intro's kind) let a leaking reason be rewritten as the kind's shared-want
+ * line; without them a leaking reason falls back to a shared interest or is dropped.
  */
 export function privacyGuard(opts: {
   viewer: Profile; viewerIntro: IntroProfile; seenOther: Profile; secrets: string[]; extra?: string[];
+  kind?: IntroKind; otherKindText?: string;
 }): PrivacyGuard {
   const { viewer, viewerIntro, seenOther, secrets } = opts;
   const mine = privateTexts(viewerIntro);
@@ -77,32 +80,32 @@ export function privacyGuard(opts: {
   const seenWords = new Set(visible.flatMap(tokens));
   const rareWords = [...new Set(secrets.flatMap(tokens))].filter((w) => content(w) && !COMMON.has(w) && !seenWords.has(w));
 
+  // A whole secret the viewer also wrote somewhere ("someone into local shows" inside their own
+  // "someone into local shows and dumplings") gives nothing away when quoted back to them.
+  const visibleLow = visible.map((t) => t.toLowerCase());
+  const wholeSecrets = secrets.map((s) => s.toLowerCase()).filter((s) => s.length >= 6 && !visibleLow.some((t) => t.includes(s)));
   const leaks = (text: string) => {
     if (!text) return false;
     const low = text.toLowerCase();
-    if (secrets.some((s) => s.length >= 6 && low.includes(s.toLowerCase()))) return true;
+    if (wholeSecrets.some((s) => low.includes(s))) return true;
     const have = new Set(bigrams(text));
     if (secretPhrases.some((b) => have.has(b))) return true;
     const ws = new Set(tokens(text));
     return rareWords.some((w) => ws.has(w));
   };
 
-  /** "You're both looking for people into local shows", from words both sides wrote. */
+  /**
+   * The replacement for a leaking reason: the intro kind's shared-want line ("You're both open to
+   * coffee chats about design"), built from topic words both sides wrote for this kind, or else a
+   * shared public interest. Null (the reason is dropped) when neither exists.
+   */
   const sharedReason = (): string | null => {
-    const theirs = new Set(secrets.flatMap(tokens).filter(content));
-    for (const k of kindsOn(viewerIntro)) {
-      const ws = words(viewerIntro.kinds[k].lookingFor);
-      // Longest run of consecutive content words the other side also used, in the viewer's spelling.
-      let best: string[] = []; let run: string[] = [];
-      for (const w of ws) {
-        const t = tokens(w)[0] ?? '';
-        if (content(t) && theirs.has(t)) { run.push(w); if (run.length > best.length) best = [...run]; } else run = [];
-      }
-      if (best.length) return `You're both looking for people into ${best.join(' ')}`;
-    }
+    const mineText = opts.kind ? lookingForOf(viewerIntro, opts.kind) : '';
+    const line = opts.kind && mineText && opts.otherKindText ? mutualLine(opts.kind, mineText, opts.otherKindText) : null;
+    if (line) return line;
     const otherInterests = new Set(seenOther.interests.map((i) => i.toLowerCase()));
     const i = viewer.interests.find((x) => otherInterests.has(x.toLowerCase()));
-    return i ? `You're both into ${i}` : null;
+    return i ? `You both love ${i}` : null;
   };
 
   return {

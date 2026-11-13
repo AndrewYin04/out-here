@@ -1,8 +1,9 @@
 'use client';
-import { Check, ChevronDown, Lock, MapPin, MessageCircle, Sparkles, X } from 'lucide-react';
+import { CalendarClock, Check, ChevronDown, Lock, MapPin, MessageCircle, Sparkles, Ticket, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import type { IntroCardView, IntroKind } from '@/shared';
+import type { IntroKind } from '@/shared';
+import type { IntroCardData, IntroPlanAction } from './types';
 import { Avatar, Button, Card, LinkButton, cn } from '@/features/ui';
 
 export const KIND_LABELS: Record<IntroKind, string> = { friendship: 'Friendship', networking: 'Coffee chat', dating: 'Dating' };
@@ -21,7 +22,7 @@ export function MuseTag({ className }: { className?: string }) {
 }
 
 /** "You both know Maya · You're both in Bay Area Local Shows", with a small mutual-friend avatar stack. */
-function TrustLine({ intro }: { intro: IntroCardView }) {
+function TrustLine({ intro }: { intro: IntroCardData }) {
   return (
     <div className="mt-0.5 flex items-center gap-1.5">
       {intro.mutuals.length > 0 && (
@@ -45,7 +46,7 @@ function TrustLine({ intro }: { intro: IntroCardView }) {
   );
 }
 
-function Actions({ intro, busy, respond }: { intro: IntroCardView; busy: null | 'accept' | 'pass'; respond: (accept: boolean) => void }) {
+function Actions({ intro, busy, respond }: { intro: IntroCardData; busy: null | 'accept' | 'pass'; respond: (accept: boolean) => void }) {
   const name = intro.other.firstName;
   if (intro.state === 'new') {
     return (
@@ -84,7 +85,7 @@ function Actions({ intro, busy, respond }: { intro: IntroCardView; busy: null | 
   );
 }
 
-function FirstStep({ intro }: { intro: IntroCardView }) {
+function FirstStep({ intro }: { intro: IntroCardData }) {
   const s = intro.step;
   const meta = [s.when, s.seatsLeft !== null ? `${s.seatsLeft} ${s.seatsLeft === 1 ? 'seat' : 'seats'} left` : null].filter(Boolean).join(' · ');
   return (
@@ -103,7 +104,69 @@ function FirstStep({ intro }: { intro: IntroCardView }) {
   );
 }
 
-function AgentLog({ intro }: { intro: IntroCardView }) {
+/**
+ * Muse's ask once both said yes, with its quick replies: Hold seats (both people join the first
+ * step's quest) or Pick another time (switch to another plan). Muse posts each answer in the chat.
+ */
+function MusePlan({ intro, onPlan }: { intro: IntroCardData; onPlan: (id: string, act: IntroPlanAction) => Promise<void> }) {
+  const plan = intro.plan;
+  const [busy, setBusy] = useState<null | string>(null);
+  const [picking, setPicking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!plan) return null;
+  const run = async (key: string, act: IntroPlanAction) => {
+    setBusy(key); setError(null);
+    try { await onPlan(intro.id, act); setPicking(false); } catch (e) {
+      setError(e instanceof Error ? e.message : 'Muse could not do that.');
+    } finally { setBusy(null); }
+  };
+  return (
+    <div className="rounded-btn border border-[#e4dbfb] bg-[#f8f5ff] px-3 py-2" data-testid="muse-plan" aria-live="polite">
+      <p className="flex items-center gap-1 text-[12px] font-semibold text-[#6b3fd4]"><Sparkles size={12} aria-hidden /> Muse, in your chat</p>
+      <p className="mt-0.5 text-[15px] text-fb-text" data-testid="muse-ask">{plan.ask.replace(/ Tap .*$/, '')}</p>
+      {plan.held ? (
+        <p className="mt-1 flex items-center gap-1 text-[14px] font-semibold text-fb-green" data-testid="seats-held">
+          <Check size={16} aria-hidden /> Seats held for you and {intro.other.firstName}
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {plan.questId && (
+            <Button size="sm" onClick={() => void run('hold', { action: 'hold' })} disabled={!!busy || !plan.canHold}
+              icon={<Ticket size={14} aria-hidden />} data-testid="hold-seats">
+              {busy === 'hold' ? 'Holding…' : `Hold ${plan.seatsNeeded} ${plan.seatsNeeded === 1 ? 'seat' : 'seats'}`}
+            </Button>
+          )}
+          {plan.options.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => setPicking((p) => !p)} disabled={!!busy} aria-expanded={picking}
+              icon={<CalendarClock size={14} aria-hidden />} data-testid="pick-time">
+              {plan.questId ? 'Pick another time' : 'Pick a time'}
+            </Button>
+          )}
+        </div>
+      )}
+      {picking && !plan.held && (
+        <ul className="mt-2 space-y-1.5" data-testid="plan-options">
+          {plan.options.map((o) => (
+            <li key={o.questId}>
+              <button type="button" onClick={() => void run(o.questId, { action: 'pick', questId: o.questId })} disabled={!!busy}
+                className="flex w-full items-center gap-2 rounded-btn bg-fb-surface px-3 py-2 text-left hover:bg-fb-hover disabled:opacity-60"
+                data-testid="plan-option">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold text-fb-text">{o.label}</span>
+                  <span className="block text-[13px] text-fb-text-2">{o.when} · {o.seatsLeft} {o.seatsLeft === 1 ? 'seat' : 'seats'} left</span>
+                </span>
+                {busy === o.questId && <span className="text-[13px] text-fb-text-2">Saving…</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <p className="mt-1 text-[13px] text-fb-red" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+function AgentLog({ intro }: { intro: IntroCardData }) {
   const name = intro.other.firstName;
   return (
     <div className="mt-2 space-y-2" data-testid="agent-log">
@@ -125,7 +188,9 @@ function AgentLog({ intro }: { intro: IntroCardView }) {
   );
 }
 
-export function IntroCard({ intro, onRespond }: { intro: IntroCardView; onRespond: (id: string, accept: boolean) => Promise<void> }) {
+export function IntroCard({ intro, onRespond, onPlan }: {
+  intro: IntroCardData; onRespond: (id: string, accept: boolean) => Promise<void>; onPlan: (id: string, act: IntroPlanAction) => Promise<void>;
+}) {
   const [busy, setBusy] = useState<null | 'accept' | 'pass'>(null);
   const [open, setOpen] = useState(false);
   const name = intro.other.firstName;
@@ -163,6 +228,7 @@ export function IntroCard({ intro, onRespond }: { intro: IntroCardView; onRespon
         </ul>
       </section>
       <FirstStep intro={intro} />
+      {intro.state === 'connected' && <MusePlan intro={intro} onPlan={onPlan} />}
       <div>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
           className="flex items-center gap-1 text-[14px] font-semibold text-fb-text-2 hover:underline">

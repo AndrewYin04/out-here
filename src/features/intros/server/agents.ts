@@ -11,7 +11,7 @@ import { museJSON, MuseTimeoutError, type MuseJSONOptions, type MuseResult } fro
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
 import {
-  codeScore, distinctTopics, factsFor, firstName, introProfileOf, kindsOn, trustLabels, type Candidate, type SharedFact,
+  codeScore, distinctTopics, factsFor, firstName, introProfileOf, lookingForOf, trustLabels, type Candidate, type SharedFact,
 } from './rules';
 
 const ROUTE = 'intros/click';
@@ -44,14 +44,12 @@ export async function museWithRetry<T>(opts: MuseJSONOptions<T>, deadline: numbe
 const KIND_LABEL: Record<IntroKind, string> = { friendship: 'a new friend', networking: 'a coffee chat', dating: 'a date' };
 
 // ---------- what each agent may see ----------
-type OwnBrief = { firstName: string; bio: string; interests: string[]; job: string | null; lookingFor: string[] };
+/** lookingFor is only what the person wrote for this intro's kind: a dating want never reaches a coffee-chat exchange. */
+type OwnBrief = { firstName: string; bio: string; interests: string[]; job: string | null; lookingFor: string };
 type PublicBrief = { firstName: string; interests: string[]; job: string | null; sharedGroups: string[]; mutualFriends: string[] };
 
-function ownBrief(p: Profile, ip: IntroProfile): OwnBrief {
-  return {
-    firstName: firstName(p), bio: p.bio, interests: p.interests, job: p.job,
-    lookingFor: kindsOn(ip).map((k) => `${k}: ${ip.kinds[k].lookingFor}`).filter((s) => !s.endsWith(': ')),
-  };
+function ownBrief(p: Profile, ip: IntroProfile, kind: IntroKind): OwnBrief {
+  return { firstName: firstName(p), bio: p.bio, interests: p.interests, job: p.job, lookingFor: lookingForOf(ip, kind) };
 }
 function publicBrief(v: View, viewerId: ID, other: Profile, c: Candidate): PublicBrief {
   const seen = v.profileFor(viewerId, other);
@@ -63,16 +61,26 @@ function publicBrief(v: View, viewerId: ID, other: Profile, c: Candidate): Publi
 }
 
 // ---------- first step: an upcoming quest that matches a shared fact ----------
-export function pickFirstStep(v: View, a: Profile, b: Profile, facts: SharedFact[], nowMs: number): FirstStep {
-  const keys = facts.map((f) => f.keyword).filter(Boolean);
+/**
+ * Upcoming public quests that match the pair, best first: each shared interest (or fact keyword)
+ * found in the quest's title, tags or description scores 1, a fact keyword adds 2. Ties go to the
+ * sooner quest. Quests that match nothing are left out.
+ */
+type QuestRow = View['db']['quests'][number];
+export function rankSteps(v: View, a: Profile, b: Profile, keys: string[], nowMs: number): QuestRow[] {
   const words = [...new Set([...keys, ...a.interests, ...b.interests].map((k) => k.toLowerCase()))];
   const upcoming = v.db.quests.filter((q) => q.isPublic && (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs);
-  const scored = upcoming.map((q) => {
+  return upcoming.map((q) => {
     const hay = `${q.title} ${q.tags.join(' ')} ${q.description}`.toLowerCase();
     return { q, s: words.filter((w) => hay.includes(w)).length + (keys.some((k) => hay.includes(k)) ? 2 : 0) };
-  }).filter((x) => x.s > 0).sort((x, y) => y.s - x.s || x.q.startsAt.localeCompare(y.q.startsAt));
-  const best = scored[0]?.q;
-  if (best) return { text: `${best.emoji} ${best.title} at ${best.venueName}`, questId: best.id, placeId: null };
+  }).filter((x) => x.s > 0).sort((x, y) => y.s - x.s || x.q.startsAt.localeCompare(y.q.startsAt)).map((x) => x.q);
+}
+
+export const stepOf = (q: QuestRow): FirstStep => ({ text: `${q.emoji} ${q.title} at ${q.venueName}`, questId: q.id, placeId: null });
+
+export function pickFirstStep(v: View, a: Profile, b: Profile, facts: SharedFact[], nowMs: number): FirstStep {
+  const best = rankSteps(v, a, b, facts.map((f) => f.keyword).filter(Boolean), nowMs)[0];
+  if (best) return stepOf(best);
   return { text: '☕ A 20-minute coffee somewhere halfway', questId: null, placeId: null };
 }
 
@@ -156,8 +164,8 @@ export async function runClick(
 ): Promise<ClickResult> {
   const b = c.profile;
   const bIntro = introProfileOf(v, b.id);
-  const aOwn = ownBrief(a, aIntro);
-  const bOwn = ownBrief(b, bIntro);
+  const aOwn = ownBrief(a, aIntro, c.kind);
+  const bOwn = ownBrief(b, bIntro, c.kind);
   const aSeesB = publicBrief(v, a.id, b, c);
   const bSeesA = publicBrief(v, b.id, a, c);
   const trust = trustLabels(v, c.trust);
@@ -200,8 +208,8 @@ export async function runClick(
   // B's agent sees only public facts about A, so its own turns never restate A's looking-for text.
   const sharedInterest = c.facts.find((f) => f.looker === null)?.keyword;
   const overlap = sharedInterest ? `they both love ${sharedInterest}` : `${bName}'s profile fits what ${aName} is looking for`;
-  const aLooking = aOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
-  const bLooking = bOwn.lookingFor.map((l) => l.split(': ')[1]).join(' and ') || KIND_LABEL[c.kind];
+  const aLooking = aOwn.lookingFor || KIND_LABEL[c.kind];
+  const bLooking = bOwn.lookingFor || KIND_LABEL[c.kind];
   await say('a', `Pitch what ${aName} wants and why ${bName} might fit.`, {
     message: `Hi, I'm ${aName}'s agent. ${aName} is new around here and looking for ${aLooking}, and is into ${a.interests.slice(0, 3).join(', ')}. Is ${bName} looking for anything like that?`,
     outcome: `pitched what ${aName} is looking for`,

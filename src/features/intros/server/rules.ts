@@ -32,6 +32,8 @@ export function introProfileOf(v: View, userId: ID): IntroProfile {
 }
 
 export const kindsOn = (p: IntroProfile): IntroKind[] => INTRO_KINDS.filter((k) => p.kinds[k]?.on);
+/** What p wrote under `kind`, or '' when that kind is off. */
+export const lookingForOf = (p: IntroProfile, kind: IntroKind): string => (p.kinds[kind]?.on ? p.kinds[kind].lookingFor.trim() : '');
 
 // ---------- reach and trust path ----------
 /** Friends-of-friends plus members of the viewer's Groups, never the viewer or a friend. */
@@ -127,7 +129,8 @@ function evidence(y: Profile, keys: string[], kind: IntroKind): Evidence | null 
 export const stem = (w: string) => (w.length > 4 && w.endsWith('ies') ? `${w.slice(0, -3)}y`
   : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
 
-const MUTUAL_LINE: Record<IntroKind, (words: string) => string> = {
+/** The symmetric line for a want both sides wrote under the same kind, filled with the shared words. */
+export const MUTUAL_LINE: Record<IntroKind, (words: string) => string> = {
   friendship: (w) => `You're both looking for new friends into ${w}`,
   networking: (w) => `You're both open to coffee chats about ${w}`,
   dating: (w) => `You're both hoping to meet someone into ${w}`,
@@ -135,12 +138,38 @@ const MUTUAL_LINE: Record<IntroKind, (words: string) => string> = {
 const joinWords = (ws: string[]) => (ws.length > 2 ? `${ws.slice(0, -1).join(', ')} and ${ws.at(-1)}` : ws.join(' and '));
 
 /**
- * The words two looking-for texts share, in `mine`'s order and spelling: "people to go to local
- * shows with" and "friends for local shows and gig nights" share "local", "shows". Empty when none.
+ * Words that name the kind of intro or the person wanted, not a topic. The MUTUAL_LINE template
+ * already says them, so a shared run never repeats them ("coffee chats about coffee chats").
  */
-export function sharedWants(mine: string, theirs: string): string[] {
-  const t = new Set(keywords(theirs).map(stem));
-  return keywords(mine).filter((w) => t.has(stem(w)));
+export const KIND_WORDS = new Set([
+  'coffee', 'chat', 'friend', 'buddy', 'buddie', 'people', 'person', 'someone', 'date', 'dating', 'partner', 'meet',
+  'new', 'work', 'night', 'like', 'love', 'want', 'more', 'some', 'with', 'into', 'about', 'from', 'that', 'this',
+  'other', 'the', 'and', 'for', 'who', 'go', 'to',
+]);
+const isTopicWord = (w: string) => w.length >= 3 && !KIND_WORDS.has(stem(w)) && !STOP.has(w);
+const splitWords = (t: string) => t.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+
+/**
+ * The topic phrases two looking-for texts share, as runs of consecutive words in `mine`'s order
+ * and spelling: "someone into local shows" and "someone into local shows and dumplings" share
+ * ["local shows"]; "product/design coffee chats" and "coffee chats with product people about
+ * design work" share ["product design"]. Kind words never count. Empty when none.
+ */
+export function sharedRuns(mine: string, theirs: string): string[] {
+  const t = new Set(splitWords(theirs).filter(isTopicWord).map(stem));
+  const out: string[] = []; let run: string[] = [];
+  const flush = () => { const r = run.join(' '); if (r && !out.includes(r)) out.push(r); run = []; };
+  for (const w of splitWords(mine)) {
+    if (isTopicWord(w) && t.has(stem(w))) run.push(w); else flush();
+  }
+  flush();
+  return out;
+}
+
+/** The MUTUAL_LINE for `kind` from two looking-for texts, or null when they share no topic word. */
+export function mutualLine(kind: IntroKind, mine: string, theirs: string): string | null {
+  const runs = sharedRuns(mine, theirs);
+  return runs.length ? MUTUAL_LINE[kind](joinWords(runs)) : null;
 }
 
 /**
@@ -188,10 +217,12 @@ export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
 }
 
 /**
- * Concrete shared facts between a and b, each citing real profile or Intro-settings text:
- * shared interests, then what each one is looking for against the other's profile.
+ * Concrete shared facts between a and b for an intro of `kind`, each citing real profile or
+ * Intro-settings text: shared interests, a want both wrote under `kind`, then what each one is
+ * looking for under `kind` against the other's profile. Text written under another kind (a
+ * dating want on a coffee-chat intro) is never used.
  */
-export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroProfile): SharedFact[] {
+export function sharedFacts(v: View, a: Profile, b: Profile, kind: IntroKind, aOverride?: IntroProfile): SharedFact[] {
   const out: SharedFact[] = [];
   const aP = aOverride ?? introProfileOf(v, a.id);
   const bP = introProfileOf(v, b.id);
@@ -202,33 +233,31 @@ export function sharedFacts(v: View, a: Profile, b: Profile, aOverride?: IntroPr
       out.push({ keyword: i.toLowerCase(), forA: t, forB: t, looker: null, topic: keywords(i) });
     }
   }
-  // A want both sides wrote, for a kind both turned on: one symmetric line, each in their own words.
-  for (const k of INTRO_KINDS) {
-    if (!aP.kinds[k]?.on || !bP.kinds[k]?.on) continue;
-    const aw = sharedWants(aP.kinds[k].lookingFor, bP.kinds[k].lookingFor);
-    const bw = sharedWants(bP.kinds[k].lookingFor, aP.kinds[k].lookingFor);
-    if (!aw.length || !bw.length) continue;
-    out.push({ keyword: aw[0], forA: MUTUAL_LINE[k](joinWords(aw)), forB: MUTUAL_LINE[k](joinWords(bw)), looker: null, topic: aw });
+  const aText = lookingForOf(aP, kind);
+  const bText = lookingForOf(bP, kind);
+  // A want both sides wrote for this kind: one symmetric line, each in their own words.
+  const forA = aText && bText ? mutualLine(kind, aText, bText) : null;
+  const forB = aText && bText ? mutualLine(kind, bText, aText) : null;
+  if (forA && forB) {
+    const runs = sharedRuns(aText, bText);
+    out.push({ keyword: runs[0], forA, forB, looker: null, topic: runs.flatMap(keywords) });
   }
   // Evidence about y uses only the fields x is allowed to see (y always sees their own).
-  const pairs: [IntroProfile, Profile, boolean][] = [
-    [aP, v.profileFor(a.id, b), true], [bP, v.profileFor(b.id, a), false],
+  const pairs: [string, Profile, boolean][] = [
+    [aText, v.profileFor(a.id, b), true], [bText, v.profileFor(b.id, a), false],
   ];
-  for (const [xP, y, xIsA] of pairs) {
-    for (const k of kindsOn(xP)) {
-      const looking = xP.kinds[k].lookingFor.trim();
-      if (!looking) continue;
-      const keys = keywords(looking);
-      const e = evidence(y, keys, k);
-      if (!e) continue;
-      const forX = `You're looking for ${looking}, and ${e.they(firstName(y))}`;
-      out.push({
-        keyword: hit(keys, looking) ?? keys[0],
-        forA: xIsA ? forX : null, forB: xIsA ? null : forX,
-        looker: xIsA ? 'a' : 'b',
-        topic: keywords(e.term),
-      });
-    }
+  for (const [looking, y, xIsA] of pairs) {
+    if (!looking) continue;
+    const keys = keywords(looking);
+    const e = evidence(y, keys, kind);
+    if (!e) continue;
+    const forX = `You're looking for ${looking}, and ${e.they(firstName(y))}`;
+    out.push({
+      keyword: hit(keys, looking) ?? keys[0],
+      forA: xIsA ? forX : null, forB: xIsA ? null : forX,
+      looker: xIsA ? 'a' : 'b',
+      topic: keywords(e.term),
+    });
   }
   return out;
 }
@@ -263,16 +292,24 @@ export function candidatesFor(
     const theirs = introProfileOf(v, id);
     if (theirs.paused) continue;
     const kinds = opts.kinds.filter((k) => theirs.kinds[k]?.on && myP.kinds[k]?.on);
-    const kind = kinds.find((k) => k !== 'dating' || (fitsPrefs(myP.datingPrefs, p) && fitsPrefs(theirs.datingPrefs, me)));
-    if (!kind) continue;
+    const eligible = kinds.filter((k) => k !== 'dating' || (fitsPrefs(myP.datingPrefs, p) && fitsPrefs(theirs.datingPrefs, me)));
+    if (!eligible.length) continue;
     if (me.home && p.home) {
       const km = haversineMeters(me.home, p.home) / 1000;
       if (km > Math.min(myP.maxKm, theirs.maxKm)) continue;
     }
     const trust = trustPathOf(v, viewerId, id);
     if (!trust) continue;
-    const facts = sharedFacts(v, me, p, opts.viewerProfile);
-    out.push({ profile: p, kind, trust, facts, codeScore: codeScore(distinctTopics(facts)) });
+    // Facts come from one kind only, so the intro is made for the kind with the most distinct
+    // facts (ties keep the order of `kinds`): Alex and Jordan share more as a coffee chat than
+    // as friends, and a friendship intro never borrows their coffee-chat wants.
+    let best: { kind: IntroKind; facts: SharedFact[]; score: number } | null = null;
+    for (const kind of eligible) {
+      const facts = sharedFacts(v, me, p, kind, opts.viewerProfile);
+      const score = codeScore(distinctTopics(facts));
+      if (!best || score > best.score) best = { kind, facts, score };
+    }
+    out.push({ profile: p, kind: best!.kind, trust, facts: best!.facts, codeScore: best!.score });
   }
   return out.sort((x, y) => y.codeScore - x.codeScore || x.profile.id.localeCompare(y.profile.id));
 }

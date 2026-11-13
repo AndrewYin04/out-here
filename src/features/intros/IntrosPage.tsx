@@ -4,12 +4,13 @@
 // src/features/intros/server for the rules. Everything here reads and writes through /api/intros.
 import { RotateCcw, Settings, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { INTRO_KINDS, type IntroCardView, type IntroKind, type IntroProfile } from '@/shared';
+import { INTRO_KINDS, type IntroKind, type IntroProfile } from '@/shared';
+import type { IntroCardData, IntroPlanAction } from './types';
 import { apiPost, useApi, useViewer } from '@/features/data';
 import { Button, Card, IconButton, Sheet, Skeleton, cn } from '@/features/ui';
 import { IntroCard, KIND_LABELS, MuseTag } from './IntroCard';
 
-type RoundResult = { intro: IntroCardView | null; considered: number; belowBar: number; capped: boolean; paused: boolean; message: string; none?: true };
+type RoundResult = { intro: IntroCardData | null; considered: number; belowBar: number; capped: boolean; paused: boolean; message: string; none?: true };
 
 const PLACEHOLDERS: Record<IntroKind, string> = {
   friendship: 'e.g. a climbing partner, people to go to shows with',
@@ -154,7 +155,7 @@ function IntroSettings({ open, onClose }: { open: boolean; onClose: () => void }
 
 export function IntrosPage() {
   const { viewer } = useViewer();
-  const { data, loading, refetch } = useApi<{ intros: IntroCardView[] }>('/api/intros', [`user:${viewer.id}`]);
+  const { data, loading, refetch } = useApi<{ intros: IntroCardData[] }>('/api/intros', [`user:${viewer.id}`]);
   const [round, setRound] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | 'run' | 'reset'>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -176,6 +177,10 @@ export function IntrosPage() {
   };
   const respond = async (id: string, accept: boolean) => {
     await apiPost(`/api/intros/${id}/respond`, { accept });
+    await refetch();
+  };
+  const plan = async (id: string, act: IntroPlanAction) => {
+    await apiPost(`/api/intros/${id}/plan`, act);
     await refetch();
   };
 
@@ -213,7 +218,7 @@ export function IntrosPage() {
             <p className="text-[14px] text-fb-text-2">When Muse is confident about someone, their card shows up here.</p>
           </Card>
         )}
-        {intros.map((i) => <IntroCard key={i.id} intro={i} onRespond={respond} />)}
+        {intros.map((i) => <IntroCard key={i.id} intro={i} onRespond={respond} onPlan={plan} />)}
       </section>
 
       <AskMuse onResult={() => void refetch()} />

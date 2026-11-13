@@ -101,6 +101,32 @@ test.describe('Muse Intros', () => {
       const list = Array.isArray(body) ? body : body.messages ?? [];
       expect(list.filter((m) => m.kind === 'muse' && m.text.startsWith('✨ Muse: '))).toHaveLength(1);
 
+      // Review P3: Muse's ask has quick replies on both cards. Hold seats joins both to the quest.
+      const plan = card.getByTestId('muse-plan');
+      await expect(plan).toBeVisible();
+      await expect(plan.getByTestId('muse-ask')).toContainText(/Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at .*Local-band show pregame/);
+      await expect(jCard.getByTestId('muse-plan')).toBeVisible();
+      const stepHref = await card.getByRole('link', { name: 'Plan it together' }).getAttribute('href');
+      const questId = decodeURIComponent(stepHref!.split('quest=')[1]);
+      const memberBefore: Record<string, boolean> = {};
+      for (const h of ['alex', 'jordan']) {
+        memberBefore[h] = (await (await request.get(`/api/quests/${questId}`, { headers: as(h) })).json() as { viewerIsMember: boolean }).viewerIsMember;
+      }
+      if (width === 1440) {
+        await card.getByTestId('hold-seats').click();
+        await expect(card.getByTestId('seats-held')).toContainText('Seats held for you and Jordan');
+        await expect(jCard.getByTestId('seats-held')).toContainText('Seats held for you and Alex', { timeout: 10_000 });
+        for (const h of ['alex', 'jordan']) {
+          expect((await (await request.get(`/api/quests/${questId}`, { headers: as(h) })).json() as { viewerIsMember: boolean }).viewerIsMember).toBe(true);
+        }
+      } else {
+        await card.getByTestId('pick-time').click();
+        await expect(card.getByTestId('plan-options').getByTestId('plan-option').first()).toBeVisible();
+      }
+      await card.scrollIntoViewIfNeeded();
+      await alex.screenshot({ path: `.verify/intros/intros-alex-plan-${width}.png` });
+      await jordan.screenshot({ path: `.verify/intros/intros-jordan-plan-${width}.png` });
+
       // On-request dating intro: nobody clears the bar.
       const ask = alex.getByTestId('ask-muse');
       await ask.getByRole('radio', { name: 'Dating' }).click();
@@ -125,13 +151,20 @@ test.describe('Muse Intros', () => {
       // Open chat: Muse's note is a centred card from Muse, addressed to both, not a bubble from Jordan.
       await card.getByRole('link', { name: 'Open chat' }).click();
       await expect(alex).toHaveURL(/\/messages\?thread=/);
-      const museNote = alex.getByTestId('muse-note');
+      const museNote = alex.getByTestId('muse-note').first();
       await expect(museNote).toBeVisible({ timeout: 20_000 });
       await expect(museNote).toContainText('✨ Muse');
       await expect(museNote).toContainText('Alex, meet Jordan. Jordan, meet Alex.');
-      await expect(museNote).toContainText(/First step idea: .+\((Starts in \d+ min|Today|Tomorrow|Happening now)/);
+      await expect(museNote).toContainText(/Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at .+\((Starts in \d+ min|Today|Tomorrow|Happening now)/);
+      // Muse is the third person in the chat, by name.
+      await expect(alex.getByTestId('conversation-title').first()).toHaveText('Alex, Jordan + Muse');
+      if (width === 1440) await expect(alex.getByTestId('muse-note')).toHaveCount(2);   // the opener + "Done, ... both going"
       await expect(alex.getByTestId('bubble-theirs')).toHaveCount(0);
       await alex.screenshot({ path: `.verify/intros/intros-chat-${width}.png` });
+      // Put the quest back the way the seed had it, so the 390 pass (and reruns) start the same.
+      for (const h of ['alex', 'jordan']) {
+        if (!memberBefore[h]) expect((await request.post(`/api/quests/${questId}/leave`, { headers: as(h), data: {} })).ok()).toBe(true);
+      }
       await alex.context().close();
       await jordan.context().close();
     }

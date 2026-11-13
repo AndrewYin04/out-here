@@ -452,13 +452,14 @@ describe('privacy: no card quotes the other side\'s looking-for before both acce
       viewer, seenOther: other,
       viewerIntro: { userId: 'x', kinds: { friendship: { on: true, lookingFor: 'people to go to local shows with' }, networking: { on: false, lookingFor: '' }, dating: { on: false, lookingFor: '' } }, datingPrefs: null, maxKm: 25, paused: false },
       secrets: ['friends for local shows and gig nights'],
+      kind: 'friendship', otherKindText: 'friends for local shows and gig nights',
     });
     expect(g.leaks("You're looking for people to go to local shows with")).toBe(false);
     expect(g.leaks('Jordan is into film photography')).toBe(false);
     expect(g.leaks('Jordan wants gig nights')).toBe(true);
     expect(g.leaks('Jordan wants friends for local shows and gig nights')).toBe(true);
     expect(g.reasons(['Jordan wants gig nights', 'You both love local bands'])).toEqual([
-      "You're both looking for people into local shows", 'You both love local bands',
+      "You're both looking for new friends into local shows", 'You both love local bands',
     ]);
   });
 

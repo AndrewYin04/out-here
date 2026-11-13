@@ -7,11 +7,12 @@ import {
   INTRO_KINDS, now,
   type ID, type Intro, type IntroCardView, type IntroKind, type IntroKindSetting, type IntroProfile, type IntroStepView,
 } from '@/shared';
-import { badRequest, notFound, publish, type DataStore, type View } from '@/features/data/server';
-import { runClick, type ClickResult } from './agents';
+import { badRequest, conflict, notFound, publish, type DataStore, type View } from '@/features/data/server';
+import type { IntroCardData, IntroPlanAction, IntroPlanOption, IntroPlanView } from '../types';
+import { rankSteps, runClick, stepOf, type ClickResult } from './agents';
 import { privacyGuard, privateTexts } from './privacy';
 import {
-  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, passesBar, SCORE_THRESHOLD,
+  AGENT_SHORTLIST, candidatesFor, firstName, INTRO_TTL_MS, introProfileOf, kindsOn, lookingForOf, passesBar, SCORE_THRESHOLD,
   trustLabels, underWeeklyCap,
 } from './rules';
 
@@ -60,16 +61,72 @@ function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   };
 }
 
+const seatsText = (n: number) => `${n} ${n === 1 ? 'seat' : 'seats'}`;
+const liveStep = (s: IntroStepView) => !!s.href && s.seatsLeft !== null;
+
+/** Which of the two people are not yet on the first step's quest (both, until Muse holds seats). */
+function notYetOn(v: View, i: Intro): ID[] {
+  const members = i.firstStep.questId ? v.questMemberIds(i.firstStep.questId) : [];
+  return [i.aId, i.bId].filter((id) => !members.includes(id));
+}
+
 /**
- * Muse's note that opens the pair's chat, addressed to both people, with the first step's time:
- * "✨ Muse: Alex, meet Jordan. Jordan, meet Alex. You both know Maya. … First step idea:
- * 🎸 Local-band show pregame at The Signal Room (Today 6:00 PM, 3 seats left)."
+ * Muse's concrete ask for a connected pair, tied to the first step: "Want me to hold 2 seats at
+ * 🎸 Local-band show pregame at The Signal Room (Today 7:50 PM, 3 seats left)? ..."
+ */
+export function museAsk(v: View, i: Intro, nowMs: number): string {
+  const s = stepView(v, i, nowMs);
+  if (!liveStep(s)) return 'Want me to find a plan for you two? Tap Pick a time on your intro.';
+  const missing = notYetOn(v, i);
+  if (missing.length === 0) return `You're both going to ${s.label} (${s.when}).`;
+  const going = [i.aId, i.bId].find((id) => !missing.includes(id)) ?? i.aId;
+  const hold = missing.length === 2 ? 'hold 2 seats'
+    : `hold a seat for ${firstName(v.profileById.get(missing[0]))} (${firstName(v.profileById.get(going))} is already going)`;
+  return `Want me to ${hold} at ${s.label} (${s.when}, ${seatsText(s.seatsLeft ?? 0)} left)? Tap Hold seats or Pick another time on your intro.`;
+}
+
+/**
+ * Muse's note that opens the pair's chat, addressed to both people, ending with Muse's ask:
+ * "✨ Muse: Alex, meet Jordan. Jordan, meet Alex. You both know Maya. … Want me to hold 2 seats
+ * at 🎸 Local-band show pregame at The Signal Room (Today 7:50 PM, 3 seats left)? …"
  */
 export function museNote(v: View, i: Intro, nowMs: number): string {
   const A = firstName(v.profileById.get(i.aId)); const B = firstName(v.profileById.get(i.bId));
+  return `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary} ${museAsk(v, i, nowMs)}`;
+}
+
+/** The pair's chat name, so the chat header shows Muse is in it: "Alex, Jordan + Muse". */
+export const threadNameFor = (v: View, i: Pick<Intro, 'aId' | 'bId'>) =>
+  `${firstName(v.profileById.get(i.aId))}, ${firstName(v.profileById.get(i.bId))} + Muse`;
+
+/** Up to 3 other upcoming plans that match the pair and have room for both of them. */
+function planOptions(v: View, i: Intro, nowMs: number): IntroPlanOption[] {
+  const a = v.profileById.get(i.aId); const b = v.profileById.get(i.bId);
+  if (!a || !b) return [];
+  return rankSteps(v, a, b, [], nowMs)
+    .filter((q) => q.id !== i.firstStep.questId)
+    .filter((q) => {
+      const m = v.questMemberIds(q.id);
+      return v.seatsLeft(q) >= [i.aId, i.bId].filter((id) => !m.includes(id)).length;
+    })
+    .slice(0, 3)
+    .map((q) => ({ questId: q.id, label: `${q.emoji} ${q.title} at ${q.venueName}`, when: relativeWhen(q.startsAt, nowMs), seatsLeft: v.seatsLeft(q) }));
+}
+
+/** The plan step on a connected card: Muse's ask, whether seats are held, and other plans. */
+export function planView(v: View, i: Intro, nowMs: number): IntroPlanView | null {
+  if (i.status !== 'accepted') return null;
   const s = stepView(v, i, nowMs);
-  const detail = [s.when, s.seatsLeft !== null ? `${s.seatsLeft} ${s.seatsLeft === 1 ? 'seat' : 'seats'} left` : null].filter(Boolean).join(', ');
-  return `${MUSE_PREFIX}${A}, meet ${B}. ${B}, meet ${A}. ${i.summary} First step idea: ${s.label}${detail ? ` (${detail})` : ''}.`;
+  const live = liveStep(s);
+  const need = live ? notYetOn(v, i).length : 0;
+  return {
+    questId: live ? i.firstStep.questId : null,
+    ask: museAsk(v, i, nowMs),
+    held: live && need === 0,
+    seatsNeeded: need,
+    canHold: live && need > 0 && (s.seatsLeft ?? 0) >= need,
+    options: planOptions(v, i, nowMs),
+  };
 }
 
 /** Fallback texts when a model-written note or summary quotes private settings. */
@@ -81,17 +138,21 @@ const safeSummary = (trust: string | undefined) => `${trust ?? 'You share a conn
  * settings (`viewerIntro` for the viewer, `otherExtra` for the other side) add to the stored ones.
  */
 function guardFor(
-  v: View, i: Pick<Intro, 'trustPath' | 'firstStep'>, viewerId: ID, otherId: ID,
-  over: { viewerIntro?: IntroProfile; otherExtra?: string[] } = {},
+  v: View, i: Pick<Intro, 'kind' | 'trustPath' | 'firstStep'>, viewerId: ID, otherId: ID,
+  over: { viewerIntro?: IntroProfile; otherIntro?: IntroProfile } = {},
 ) {
   const viewer = v.profileById.get(viewerId); const other = v.profileById.get(otherId);
   if (!viewer || !other) return null;
   const stored = introProfileOf(v, viewerId);
+  const otherStored = introProfileOf(v, otherId);
+  const otherIntro = over.otherIntro ?? otherStored;
   return privacyGuard({
     viewer, viewerIntro: over.viewerIntro ?? stored,
     seenOther: v.profileFor(viewerId, other),
-    secrets: [...privateTexts(introProfileOf(v, otherId)), ...(over.otherExtra ?? [])],
+    secrets: [...new Set([...privateTexts(otherStored), ...privateTexts(otherIntro)])],
     extra: [...privateTexts(stored), ...trustLabels(v, i.trustPath), i.firstStep.text],
+    // A leaking reason is rewritten from what both wrote for this intro's kind only.
+    kind: i.kind, otherKindText: lookingForOf(otherIntro, i.kind),
   });
 }
 
@@ -99,9 +160,9 @@ function guardFor(
  * Rewrites one vetted result so neither side's text quotes the other side's private looking-for
  * (review E4). A's settings may carry an on-request override, so they are passed in.
  */
-function scrubResult(v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<Intro, 'trustPath' | 'firstStep'>, r: ClickResult): ClickResult {
+function scrubResult(v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<Intro, 'kind' | 'trustPath' | 'firstStep'>, r: ClickResult): ClickResult {
   const gA = guardFor(v, i, aId, bId, { viewerIntro: aIntro });
-  const gB = guardFor(v, i, bId, aId, { otherExtra: privateTexts(aIntro) });
+  const gB = guardFor(v, i, bId, aId, { otherIntro: aIntro });
   if (!gA || !gB) return r;
   const aName = firstName(v.profileById.get(aId)); const bName = firstName(v.profileById.get(bId));
   return {
@@ -117,7 +178,7 @@ function scrubResult(v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<In
   };
 }
 
-export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()): IntroCardView | null {
+export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()): IntroCardData | null {
   if (!visibleTo(i, viewerId)) return null;
   const isA = i.aId === viewerId;
   const other = v.profileById.get(isA ? i.bId : i.aId);
@@ -158,22 +219,23 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
     state, closedText,
     threadId: state === 'connected' ? i.threadId : null,
     createdAt: i.createdAt,
+    plan: state === 'connected' ? planView(v, i, nowMs) : null,
   };
 }
 
-export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intros: IntroCardView[] }> {
+export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intros: IntroCardData[] }> {
   const { view } = await store.museContext();
   const nowMs = now().getTime();
   const intros = view.db.intros
     .filter((i) => i.aId === viewerId || i.bId === viewerId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .map((i) => cardFor(view, viewerId, i, nowMs))
-    .filter((c): c is IntroCardView => !!c);
+    .filter((c): c is IntroCardData => !!c);
   return { intros };
 }
 
 export type RoundResult = {
-  intro: IntroCardView | null;
+  intro: IntroCardData | null;
   /** Pairs the agents vetted that did not clear the bar (names never sent). */
   considered: number;
   belowBar: number;
@@ -207,7 +269,7 @@ async function round(
   const vetted = await Promise.all(shortlist.map(async (c) => {
     try {
       const raw = await runClick(view, me, opts.profile, c, nowMs, deadline);
-      return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { trustPath: c.trust, firstStep: raw.firstStep }, raw) };
+      return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { kind: c.kind, trustPath: c.trust, firstStep: raw.firstStep }, raw) };
     } catch (err) {
       console.error('[intros] agent exchange failed:', String((err as Error)?.message ?? err).slice(0, 200));
       return null;
@@ -270,7 +332,7 @@ export async function requestIntro(store: DataStore, viewerId: ID, kind: IntroKi
  * makes the change and does its side effects (notifying B, opening the chat, Muse's note);
  * the other re-reads and returns the card as it now stands.
  */
-export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, accept: boolean): Promise<{ intro: IntroCardView }> {
+export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, accept: boolean): Promise<{ intro: IntroCardData }> {
   const { view } = await store.museContext();
   const nowMs = now().getTime();
   const i = view.db.intros.find((x) => x.id === introId);
@@ -307,7 +369,13 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
   }
   if (!(await store.transitionIntro(i.id, i.status, { status: 'accepted', decidedAt: now().toISOString() }))) return current();
   // This request won the transition to accepted: it alone opens the chat and posts the note.
-  const thread = await store.openThread(viewerId, [otherId]);
+  // The pair's own chat, named so Muse shows as the third person in it; a rehearsal reuses it.
+  const name = threadNameFor(view, i);
+  const existing = view.db.threads.find((t) => t.name === name && (() => {
+    const ms = view.threadMemberIds(t.id);
+    return ms.length === 2 && ms.includes(i.aId) && ms.includes(i.bId);
+  })());
+  const thread = existing ?? await store.openThread(viewerId, [otherId], name);
   // One Muse note per pair: a reused thread that already has this pair's note gets no copy.
   const opener = `${MUSE_PREFIX}${firstName(a)}, meet ${firstName(b)}.`;
   const already = (await store.museContext()).view.messages(thread.id).some((m) => m.kind === 'muse' && m.text.startsWith(opener));
@@ -318,6 +386,47 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
   await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
   await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
   return current();
+}
+
+/**
+ * Muse's quick replies in a connected intro. 'hold' takes a seat on the first step's quest for
+ * each of the two people not yet on it (join_quest, one atomic seat each) and Muse confirms in the
+ * pair's chat. 'pick' switches the first step to another plan from the card's options and Muse
+ * reposts its ask with the new time. Either person may answer; both see the result live.
+ */
+export async function planIntro(store: DataStore, viewerId: ID, introId: ID, act: IntroPlanAction): Promise<{ intro: IntroCardData }> {
+  const { view } = await store.museContext();
+  const nowMs = now().getTime();
+  const i = view.db.intros.find((x) => x.id === introId);
+  if (!i || !visibleTo(i, viewerId)) throw notFound('intro_not_found');
+  if (i.status !== 'accepted' || !i.threadId) throw conflict('intro_not_connected');
+  const plan = planView(view, i, nowMs)!;
+  const viewerName = firstName(view.profileById.get(viewerId));
+  const names = `${firstName(view.profileById.get(i.aId))} and ${firstName(view.profileById.get(i.bId))}`;
+  if (act.action === 'hold') {
+    if (!plan.questId) throw conflict('no_plan_to_hold');
+    if (!plan.held) {
+      if (!plan.canHold) throw conflict(`Only ${seatsText(stepView(view, i, nowMs).seatsLeft ?? 0)} left`);
+      for (const id of notYetOn(view, i)) await store.joinQuest(id, plan.questId);
+      const after = (await store.museContext()).view;
+      const s = stepView(after, i, nowMs);
+      await store.sendMessage(viewerId, i.threadId,
+        `${MUSE_PREFIX}Done, ${viewerName} asked me to hold it: ${names} are both going to ${s.label} (${s.when}). It's on both your Out Here maps. See you there!`, 'muse');
+    }
+  } else {
+    const pick = plan.options.find((o) => o.questId === act.questId);
+    if (!pick) throw badRequest('questId is not one of this intro\'s options');
+    const q = view.db.quests.find((x) => x.id === pick.questId)!;
+    await store.updateIntro(i.id, { firstStep: stepOf(q) });
+    const after = (await store.museContext()).view;
+    const moved = after.db.intros.find((x) => x.id === i.id)!;
+    await store.sendMessage(viewerId, i.threadId,
+      `${MUSE_PREFIX}${viewerName} picked another time. ${museAsk(after, moved, nowMs)}`, 'muse');
+  }
+  await publish(`user:${i.aId}`, { type: 'intro', id: i.id });
+  await publish(`user:${i.bId}`, { type: 'intro', id: i.id });
+  const after = (await store.museContext()).view;
+  return { intro: cardFor(after, viewerId, after.db.intros.find((x) => x.id === i.id)!, nowMs)! };
 }
 
 export async function getIntroProfile(store: DataStore, viewerId: ID): Promise<{ profile: IntroProfile }> {
