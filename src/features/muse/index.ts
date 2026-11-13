@@ -28,3 +28,5 @@ export { PARSE_BUDGET_MS, PLAN_BUDGET_MS, RANK_BUDGET_MS, plan } from './plan';
 export type { PlanInput, PlanMeta, PlanOutput, PlanSource, PlanTimings } from './plan';
 export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
 export type { TimeExpression } from './time';
+export { HANG_BUDGET_MS, hangCopyIssue, mockHangCopy, writeHangCopy } from './hang';
+export type { HangCopy, HangCopyInput } from './hang';

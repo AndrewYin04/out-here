@@ -130,6 +130,7 @@ for (const width of [390, 1440]) {
       await expect(s).toContainText('Dumpling Den');
       await expect(s).toContainText('seats left');
       await expect(page.getByTestId('hang-reason')).toContainText("Maya's status: “craving dumplings”");
+      await expect(page.getByTestId('hang-muse-label')).toContainText('✨ Muse');
       await expect(page.getByLabel('Message to Maya')).toHaveValue(/Dumpling Den/);
       await page.screenshot({ path: `test-results/findmy-hang-${width}.png` });
       await page.getByRole('button', { name: 'Send invite' }).click();
@@ -178,8 +179,21 @@ for (const width of [390, 1440]) {
       await expect(page.getByLabel("What's on your mind?")).toHaveValue('new here, say hi');
       await expect(form.getByText('Close friends')).toBeVisible();
       await expect(form.getByText('Only me')).toBeVisible();
-      await expect(page.getByRole('switch', { name: 'Pause sharing' })).toHaveAttribute('aria-checked', 'false');
+      // Find My style: the share switch is first, on, and says until when
+      await expect(page.getByRole('switch', { name: 'Share my location' })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByTestId('sharing-status')).toContainText(/Sharing with Friends · until \d{1,2}:\d\d [AP]M/);
       await page.screenshot({ path: `test-results/findmy-sharing-${width}.png` });
+    });
+
+    test('a friend in another city gets Message, not Want to hang?, and no walk time', async ({ page }) => {
+      await openMap(page, 'alex', width);
+      await page.getByRole('button', { name: /^People/ }).click();
+      await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
+      const card = page.getByTestId('friend-card');
+      await expect(card.getByTestId('friend-far-note')).toContainText('Ben is in New York, NY');
+      await expect(card.getByRole('link', { name: 'Message' })).toBeVisible();
+      await expect(card.getByRole('button', { name: 'Want to hang?' })).toHaveCount(0);
+      await expect(page.getByTestId('friend-distance')).not.toContainText('walk');
     });
   });
 }
@@ -225,6 +239,17 @@ test.describe('two personas, live', () => {
       await b.getByRole('button', { name: 'Save' }).click();
       await expect(b.getByText('Your status is updated')).toBeVisible();
       await expect(mayaPin).toHaveAttribute('aria-label', /ramen instead?/, { timeout: 2_000 });
+
+      // the share switch applies at once, with no Save; Undo brings her back
+      await b.getByRole('button', { name: 'Your status' }).click();
+      await b.getByRole('switch', { name: 'Share my location' }).click();
+      await expect(mayaPin).toHaveCount(0, { timeout: 2_000 });
+      await expect(b.getByTestId('sharing-button')).toHaveText('Sharing paused');
+      await expect(b.getByTestId('my-pin')).toHaveAttribute('data-paused', 'true');
+      await b.getByRole('button', { name: 'Undo' }).click();
+      await expect(mayaPin).toHaveCount(1, { timeout: 2_000 });
+      await expect(b.getByTestId('sharing-button')).toHaveText('Your status');
+      await b.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
 
       await b.getByRole('button', { name: 'Your status' }).click();
       await b.getByText('Only me', { exact: true }).click();

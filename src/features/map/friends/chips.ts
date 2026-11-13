@@ -3,6 +3,8 @@
 // box is clear of every avatar (the viewer's included), every chip already placed and the map
 // edge; if none fits, it is hidden. Quest pins are soft obstacles: a chip lies under one only when
 // no spot clear of them exists.
+// `only` limits chips to a few friends (overview zooms and phones show the nearest two plus the
+// open one); `hard` boxes (quest labels) are never covered.
 // Modes: 'full' is the whole thought (wrapping to 2 lines on desktop), 'short' is the emoji plus
 // the first 18 characters and an ellipsis, 'mini' the emoji plus the first 10 characters, 'emoji'
 // is the emoji alone.
@@ -64,6 +66,10 @@ export type ChipOptions = {
   shift?: boolean;
   /** Screen boxes no chip may cover, such as quest pins, so a tap there still reaches the pin. */
   obstacles?: Box[];
+  /** Boxes a chip never covers, even as a last resort, such as quest labels. */
+  hard?: Box[];
+  /** Only these friends get a chip (the rest show the avatar alone); omitted means everyone. */
+  only?: ReadonlySet<string> | null;
 };
 
 /** Estimated chip size at 13 px semibold: about 7 px a character, plus padding and the 16 px emoji. */
@@ -109,6 +115,7 @@ export function placeChipsSided(
   const sides = opts.sides ?? ['above'];
   const taken: Box[] = items.map(({ x, y }) => ({ x0: x - AVATAR_PX / 2, y0: y - AVATAR_PX, x1: x + AVATAR_PX / 2, y1: y }));
   if (me) taken.push({ x0: me.x - AVATAR_PX / 2, y0: me.y - AVATAR_PX - 18, x1: me.x + AVATAR_PX / 2, y1: me.y });
+  taken.push(...(opts.hard ?? []));
   // Quest pins are soft: at each chip length, every chip first looks for a spot clear of them, and
   // only a chip with no such spot may lie under one before it is shortened (quest pins draw above
   // friend markers, so the pin stays tappable).
@@ -121,6 +128,7 @@ export function placeChipsSided(
   const passes = opts.shift ? tryModes.map((m) => [m]) : [tryModes];
   for (const passModes of passes) for (const strict of soft.length ? [true, false] : [false]) for (const { pin, x, y } of order) {
     if (out.get(pin.friend.id)?.mode && out.get(pin.friend.id)?.mode !== 'none') continue;
+    if (opts.only && !opts.only.has(pin.friend.id)) { out.set(pin.friend.id, { mode: 'none', side: 'above', dx: 0 }); continue; }
     const modes = passModes.filter((m) =>
       m === 'emoji' ? !!pin.bubble.emoji : !!pin.bubble.thought && !emojiOnly);
     // A bubble with an emoji and no thought still gets its emoji.

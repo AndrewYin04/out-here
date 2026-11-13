@@ -3,6 +3,7 @@ import { haversineMeters, profileId, seedId, setNow, snapToGrid } from '@/shared
 import { createMemoryStore } from '@/features/data/memory-store';
 import { subscribe, type RealtimeMessage } from '@/features/data/realtime-server';
 import type { CoreStore } from '@/features/data/core';
+import { hangCopyIssue, writeHangCopy } from '@/features/muse';
 import { clearOfQuests, placeChips, placeChipsSided, questBox, type ChipItem } from '@/features/map/friends/chips';
 
 const id = (h: string) => profileId(h);
@@ -128,6 +129,75 @@ describe('Find My: editing my share', () => {
     expect(s?.title ?? '').not.toMatch(/Art walk/);
     expect(s?.reason ?? '').not.toMatch(/Ethan's need/);
     expect(s?.draft ?? '').not.toMatch(/You said you're/);
+  });
+
+  it('leans toward right now: Ethan\'s "need a second coffee" picks a coffee place, not board games at 1 PM', async () => {
+    const s = await store.hangSuggestion(id('alex'), id('ethan'));
+    expect(s?.kind).toBe('place');
+    expect(s?.venueName).toBe('El Camino Coffee Works');
+    expect(s?.reason).toContain("Ethan's status: “need a second coffee”");
+    expect(s?.facts.theirWalkMinutes).toBeLessThanOrEqual(25);
+  });
+
+  it('a later quest must overlap the friend\'s free window: 3 PM against a 5:15 to 6 PM window is rejected', async () => {
+    const noon = new Date('2026-11-12T20:00:00Z'); // 12:00 PT
+    setNow(noon);
+    store = createMemoryStore(noon);
+    const v = await store.view();
+    const maya = id('maya');
+    const a = v.db.availability.find((x) => x.userId === maya)!;
+    await store.backend.remove('availability', { userId: maya });
+    await store.backend.upsert('availability', [{ ...a, startsAt: '2026-11-13T01:15:00Z', endsAt: '2026-11-13T02:00:00Z', text: 'free after work' }]);
+    const q = v.db.quests.find((x) => x.title === 'Dumplings before the rush')!;
+    // 3:00 to 4:00 PM: 180 min out, before her window opens
+    await store.backend.update('quests', { id: q.id }, { startsAt: '2026-11-12T23:00:00Z', endsAt: '2026-11-13T00:00:00Z' });
+    expect((await store.hangSuggestion(id('alex'), maya))?.questId ?? null).not.toBe(q.id);
+    // 5:00 to 6:00 PM overlaps it, and she can arrive before 6
+    await store.backend.update('quests', { id: q.id }, { startsAt: '2026-11-13T01:00:00Z', endsAt: '2026-11-13T02:00:00Z' });
+    for (const other of v.db.quests.filter((x) => x.id !== q.id)) await store.backend.update('quests', { id: other.id }, { isPublic: false });
+    // an empty bubble, so a matching meet-now place does not outrank it
+    await store.backend.update('locationShares', { userId: maya }, { bubble: { emoji: null, thought: null, doing: null, wantsTo: null } });
+    expect((await store.hangSuggestion(id('alex'), maya))?.questId).toBe(q.id);
+  });
+
+  it('a friend in another city gets no hang suggestion and never a walk time', async () => {
+    expect(await store.hangSuggestion(id('alex'), id('ben'))).toBeNull();
+    const ben = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('ben'));
+    expect(ben?.walkingMinutes).toBeNull();
+  });
+});
+
+describe('Find My: Muse writes the hang copy', () => {
+  it('mock mode writes the reason and draft from the picked facts, and the copy passes the checks', async () => {
+    const s = (await store.hangSuggestion(id('alex'), id('maya')))!;
+    const copy = await writeHangCopy(s, { senderName: 'Alex Rivera' });
+    expect(copy.writtenBy).toBe('muse');
+    expect(copy.mock).toBe(true);
+    expect(copy.reason).toContain("Maya's status: “craving dumplings”");
+    expect(copy.draft).toMatch(/^Maya, Dumpling Den at \d{1,2}:\d\d [AP]M\? \d+-min walk for you, 2 seats left\./);
+    expect(hangCopyIssue(s, copy)).toBeNull();
+  });
+
+  it('rejects text that drops the venue or invents a number, so the template is kept', async () => {
+    const s = (await store.hangSuggestion(id('alex'), id('maya')))!;
+    expect(hangCopyIssue(s, { reason: 'Maya loves dumplings.', draft: 'Maya, dumplings later?' })).toMatch(/venue/);
+    expect(hangCopyIssue(s, { reason: 'Only $3 each.', draft: 'Maya, Dumpling Den? $3 each.' })).toMatch(/number 3/);
+  });
+});
+
+describe('Find My: chip limits', () => {
+  const at = (h: string, x: number, y: number, km: number): ChipItem => ({
+    pin: { friend: { id: h } as ChipItem['pin']['friend'], bubble: { emoji: '🥟', thought: 'craving dumplings', doing: null, wantsTo: null }, distanceKm: km, updatedAt: '2026-11-12T18:00:00Z' },
+    x, y,
+  });
+  it('only the allowed friends get a chip, and a chip never covers a quest label (hidden, not cut short)', () => {
+    const items = [at('a', 100, 200, 0.2), at('b', 300, 200, 0.4), at('c', 200, 400, 0.6)];
+    const label = { x0: 0, y0: 100, x1: 400, y1: 160 }; // a label band right above a's and b's avatars
+    const out = placeChipsSided(items, null, { w: 400, h: 600 }, false,
+      { maxW: 200, lines: 2, modes: ['full'], sides: ['above'], shift: true, only: new Set(['a', 'c']), hard: [label] });
+    expect(out.get('b')?.mode).toBe('none'); // not allowed
+    expect(out.get('a')?.mode).toBe('none'); // its only spot is under the label
+    expect(out.get('c')?.mode).toBe('full');
   });
 });
 

@@ -100,6 +100,7 @@ function buildPin(q: Quest, testId: string): PinParts {
 
   const faces = document.createElement('span');
   faces.setAttribute('aria-hidden', 'true');
+  faces.setAttribute('data-role', 'pin-faces');
   faces.style.cssText = 'position:absolute;left:-12px;top:-10px;display:none;pointer-events:none;';
 
   const more = document.createElement('button');
@@ -205,7 +206,9 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       const lw = labelWidth(ref.label.textContent ?? '');
       const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
       // While a plan shows, dimmed pins drop their labels so the "✨ Muse pick" pills have room.
+      // a label that would run off the map edge is hidden, not cut
       const fits = !ref.root.hasAttribute('data-dimmed')
+        && lb.x >= 2 && lb.x + lb.w <= map.getContainer().clientWidth - 2
         && taken.length < maxLabels
         && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
         && !taken.some((t) => overlaps(t, lb));

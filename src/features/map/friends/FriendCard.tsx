@@ -13,6 +13,8 @@ import type { FriendPin } from '@/shared/types';
 
 import { distanceLine, firstName, floatingPanel, updatedAgo } from './useFindMy';
 
+const NO_PLAN_DRAFT = 'Want to hang soon? Let me know when you are free.';
+
 export type FriendCardProps = {
   pin: FriendPin | null;
   onClose: () => void;
@@ -46,12 +48,12 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
       .then((r) => {
         if (!live) return;
         setSuggestion(r.suggestion);
-        setMessage((m) => (edited && m ? m : r.suggestion?.draft ?? 'Want to hang? I\'m nearby for a bit.'));
+        setMessage((m) => (edited && m ? m : r.suggestion?.draft ?? NO_PLAN_DRAFT));
       })
       .catch(() => {
         if (!live) return;
         setSuggestion(null);
-        setMessage((m) => m || 'Want to hang? I\'m nearby for a bit.');
+        setMessage((m) => m || NO_PLAN_DRAFT);
       });
     return () => { live = false; };
   }, [composing, friendId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,6 +61,8 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
   if (!pin) return null;
   const f = pin.friend;
   const name = firstName(f.name);
+  // walking time is null past a 2-hour walk (another city): no hang, no walk time
+  const far = pin.walkingMinutes === null;
 
   async function send() {
     if (!pin) return;
@@ -126,7 +130,21 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
           </p>
         )}
 
-        {!composing && (
+        {!composing && far && (
+          <div className="flex flex-col gap-2">
+            <p className="text-[13px] text-fb-text-2" data-testid="friend-far-note">
+              {name} is in {pin.placeLabel ?? 'another city'}, too far to meet up today. Send a message instead.
+            </p>
+            <LinkButton href={`/messages?to=${encodeURIComponent(f.handle)}`} variant="primary" icon={<MessageCircle size={16} aria-hidden />}>
+              Message
+            </LinkButton>
+            <LinkButton href={`/profile/${encodeURIComponent(f.handle)}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
+              View profile
+            </LinkButton>
+          </div>
+        )}
+
+        {!composing && !far && (
           <div className="flex flex-col gap-2">
             <Button variant="primary" block icon={<Hand size={16} aria-hidden />} onClick={() => setComposing(true)} aria-expanded={composing}>
               Want to hang?
@@ -168,9 +186,21 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
                       <span className="font-semibold text-fb-blue">{suggestion.seatsLeft} {suggestion.seatsLeft === 1 ? 'seat' : 'seats'} left</span>
                     )}
                   </p>
-                  <p className="mt-1 text-[13px] text-fb-text" data-testid="hang-reason">{suggestion.reason.split(' · ')[0]}</p>
+                  <p className="mt-1 text-[13px] text-fb-text" data-testid="hang-reason">
+                    {suggestion.writtenBy === 'muse' && (
+                      <span className="mr-1 font-semibold text-fb-blue" data-testid="hang-muse-label">
+                        ✨ Muse{suggestion.museMock ? ' [mock]' : ''}
+                      </span>
+                    )}
+                    {suggestion.writtenBy === 'muse' ? suggestion.reason : suggestion.reason.split(' · ')[0]}
+                  </p>
                 </div>
               </div>
+            )}
+            {suggestion === null && (
+              <p className="text-[13px] text-fb-text-2" data-testid="hang-no-plan">
+                Nothing open within a 25-min walk of you both right now, so this is a plain invite.
+              </p>
             )}
             <label htmlFor="hang-message" className="sr-only">Message to {name}</label>
             <textarea

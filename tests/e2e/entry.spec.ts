@@ -58,24 +58,27 @@ for (const width of [390, 1440]) {
       await expect(page).toHaveURL(/\/profile\/maya/);
     });
 
-    test('status bubbles: full thought on desktop, short text on phones, never emoji only', async ({ page }) => {
+    test('status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few', async ({ page }) => {
       await openFriendsMap(page, width);
-      const maya = page.locator('[data-testid="friend-pin"][data-handle="maya"]');
-      const text = maya.getByTestId('friend-chip-text');
-      await expect(text).toHaveText('craving dumplings');
-      // Not clipped: the whole thought fits inside its box.
-      const clipped = await text.evaluate((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
-      expect(clipped).toBe(false);
-      await expect(maya).toHaveAttribute('data-chip', width < 800 ? 'short' : 'full');
+      if (width >= 800) {
+        const maya = page.locator('[data-testid="friend-pin"][data-handle="maya"]');
+        const text = maya.getByTestId('friend-chip-text');
+        await expect(text).toHaveText('craving dumplings');
+        // Not clipped: the whole thought fits inside its box.
+        const clipped = await text.evaluate((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
+        expect(clipped).toBe(false);
+        await expect(maya).toHaveAttribute('data-chip', 'full');
+      }
+      await page.waitForTimeout(1000); // chip placement settles after the first framing
 
       const modes = await page.locator('[data-testid="friend-pin"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-chip')));
-      expect(modes).not.toContain('emoji');
+      for (const m of modes) expect(['full', 'none']).toContain(m);
+      const texts = await page.getByTestId('friend-chip-text').allTextContents();
+      for (const t of texts) expect(t).not.toMatch(/…$/);
       if (width < 800) {
-        expect(modes).not.toContain('full');
-        const texts = await page.getByTestId('friend-chip-text').allTextContents();
-        for (const t of texts) expect(t.length).toBeLessThanOrEqual(19);
-        // Crowded phone maps move or shorten chips instead of hiding them.
-        expect(texts.length).toBeGreaterThanOrEqual(5);
+        // Find My style: avatars for everyone, a chip for the nearest two at most
+        expect(texts.length).toBeGreaterThanOrEqual(1);
+        expect(texts.length).toBeLessThanOrEqual(2);
       } else {
         const widths = await page.getByTestId('friend-chip').evaluateAll((els) =>
           els.map((e) => (e.parentElement as HTMLElement).getBoundingClientRect().width));
