@@ -10,8 +10,9 @@ test('outhere:rate-hangout opens the rating with the selfie attached', async ({ 
   const as = (persona: string) => ({ 'x-persona': persona });
   const now = Date.now();
   const title = `Selfie rating ${project} ${now}`;
+  // Maya hosts: alex already hosts plans in other specs, and the server allows 5 a day per host.
   const created = await request.post('/api/quests', {
-    headers: as('alex'),
+    headers: as('maya'),
     data: {
       title, category: 'food', venueName: 'Test courtyard', location: { lat: 37.4847, lng: -122.1477 },
       startsAt: new Date(now - 60_000).toISOString(), endsAt: new Date(now + 600_000).toISOString(), capacity: 3,
@@ -20,7 +21,7 @@ test('outhere:rate-hangout opens the rating with the selfie attached', async ({ 
   });
   expect(created.ok()).toBeTruthy();
   const { quest } = await created.json();
-  expect((await request.post(`/api/quests/${quest.id}/join`, { headers: as('maya'), data: {} })).ok()).toBeTruthy();
+  expect((await request.post(`/api/quests/${quest.id}/join`, { headers: as('alex'), data: {} })).ok()).toBeTruthy();
   const done = await request.post(`/api/quests/${quest.id}/complete`, { headers: as('alex'), data: {} });
   expect(done.ok()).toBeTruthy();
   const { crew } = await done.json();
