@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 
 import { useApi, useViewer } from '@/features/data';
 import { CategoryIcon, categoryOf, cn, IconButton, Skeleton } from '@/features/ui';
-import type { PersonCard } from '@/shared';
+import type { ForYouResponse, PersonCard } from '@/shared';
+import { FOR_YOU_ICONS, ForYouWhy } from './ForYou';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
 import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
@@ -29,13 +30,14 @@ const DURATIONS = [
 const BUDGETS = [{ id: '$', ask: 'under $15', label: 'Under $15' }, { id: '$$', ask: 'under $30', label: 'Under $30' }] as const;
 type BudgetId = (typeof BUDGETS)[number]['id'];
 type DurationId = (typeof DURATIONS)[number]['id'];
-const MOODS = [
+type Mood = { id: string; Icon: LucideIcon; label: string; ask: string; forYou?: boolean; because?: string };
+const MOODS: readonly Mood[] = [
   { id: 'hungry', Icon: Utensils, label: 'Food', ask: 'hungry' }, { id: 'coffee', Icon: Coffee, label: 'Coffee', ask: 'coffee' },
   { id: 'boba', Icon: CupSoda, label: 'Boba', ask: 'boba' }, { id: 'sports', Icon: Dumbbell, label: 'Active', ask: 'sports' },
   { id: 'games', Icon: Gamepad2, label: 'Games', ask: 'games' }, { id: 'art', Icon: Palette, label: 'Art', ask: 'art' },
   { id: 'music', Icon: Music, label: 'Music', ask: 'live music' }, { id: 'walk', Icon: Footprints, label: 'Walk', ask: 'a walk' },
   { id: 'people', Icon: Hand, label: 'New people', ask: 'meet people' },
-] as const;
+];
 /** Picking a time and something you're up for asks Muse on its own after this pause. */
 const AUTO_ASK_MS = 700;
 
@@ -56,15 +58,15 @@ const durationMinutes = (id: DurationId | null): number | null => {
 const mentionsTime = (t: string) => /\b\d+\s*(m|min|mins|minutes|h|hr|hrs|hour|hours)\b|\b(tonight|till|until|before|after)\b/i.test(t);
 
 /** "hungry, boba, under $15, 1 hr". The picked time is left out when the text already has one. */
-function composeAsk(moods: ReadonlySet<string>, text: string, duration: DurationId | null, budget: BudgetId | null = null): string {
+function composeAsk(moods: ReadonlySet<string>, text: string, duration: DurationId | null, budget: BudgetId | null = null, list: readonly Mood[] = MOODS): string {
   const t = text.trim().replace(/[,\s]+$/, '');
-  const parts = [...MOODS.filter((m) => moods.has(m.id)).map((m) => m.ask), budget ? BUDGETS.find((b) => b.id === budget)!.ask : '', t];
+  const parts = [...list.filter((m) => moods.has(m.id)).map((m) => m.ask), budget ? BUDGETS.find((b) => b.id === budget)!.ask : '', t];
   if (duration && !mentionsTime(t)) parts.push(duration === 'tonight' ? 'tonight' : DURATIONS.find((d) => d.id === duration)!.label);
   return parts.filter(Boolean).join(', ');
 }
 /** The note friends see: moods and text, no times ("hungry, under $15"). */
-function noteFor(moods: ReadonlySet<string>, text: string): string {
-  return [...MOODS.filter((m) => moods.has(m.id)).map((m) => m.ask), text.trim()].filter(Boolean).join(', ') || 'free';
+function noteFor(moods: ReadonlySet<string>, text: string, list: readonly Mood[] = MOODS): string {
+  return [...list.filter((m) => moods.has(m.id)).map((m) => m.ask), text.trim()].filter(Boolean).join(', ') || 'free';
 }
 
 /** Time and budget: rounded chips, one line. */
@@ -81,14 +83,21 @@ function Chip({ on, onClick, children, label }: { on: boolean; onClick: () => vo
 }
 
 /** What you're up for: a round line icon with a small label, so the row reads at a glance. */
-function Activity({ on, onClick, Icon, label }: { on: boolean; onClick: () => void; Icon: LucideIcon; label: string }) {
+function Activity({ on, onClick, Icon, label, forYou, because }: { on: boolean; onClick: () => void; Icon: LucideIcon; label: string; forYou?: boolean; because?: string }) {
   return (
-    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick}
+    <button type="button" aria-pressed={on} aria-label={label}
+      title={forYou ? `Picked for you · ${because ?? ''}` : undefined} data-for-you={forYou ? '' : undefined} onClick={onClick}
       className="oh-press flex w-[62px] shrink-0 flex-col items-center gap-1">
       <span aria-hidden className={cn(
-        'flex size-[54px] items-center justify-center rounded-full transition-all',
-        on ? 'bg-fb-blue text-white shadow-[0_4px_12px_rgba(8,102,255,.35)] [&]:scale-105' : 'bg-fb-secondary-btn text-fb-text',
-      )}><Icon size={24} /></span>
+        'relative flex size-[54px] items-center justify-center rounded-full transition-all',
+        on ? 'bg-fb-blue text-white shadow-[0_4px_12px_rgba(8,102,255,.35)] [&]:scale-105' : forYou ? 'bg-fb-blue-tint text-fb-blue' : 'bg-fb-secondary-btn text-fb-text',
+      )}><Icon size={24} />
+        {forYou && (
+          <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-card">
+            <Sparkles size={11} />
+          </span>
+        )}
+      </span>
       <span className={cn('text-[11px] font-semibold', on ? 'text-fb-blue' : 'text-fb-text-2')}>{label}</span>
     </button>
   );
@@ -192,6 +201,16 @@ export function PlanSheet({ className }: { className?: string }) {
   const inFlight = useRef<AbortController | null>(null);
   const friends = useApi<{ friends: PersonCard[] }>(open ? '/api/friends' : null);
   const friendMap = useMemo(() => new Map((friends.data?.friends ?? []).map((f) => [f.id, f])), [friends.data]);
+  // "Up for" chips picked for you from your hangouts, videos and profile, first in the row; a
+  // generic chip asking the same thing steps aside.
+  const forYou = useApi<ForYouResponse>(open ? '/api/muse/for-you' : null);
+  const moodList = useMemo<readonly Mood[]>(() => {
+    const picked: Mood[] = (forYou.data?.chips ?? []).map((c) => ({
+      id: `fy:${c.id}`, Icon: FOR_YOU_ICONS[c.icon], label: c.label, ask: c.ask, forYou: true, because: c.because,
+    }));
+    const taken = new Set(picked.flatMap((m) => [m.ask.toLowerCase(), m.label.toLowerCase()]));
+    return [...picked, ...MOODS.filter((m) => !taken.has(m.ask.toLowerCase()) && !taken.has(m.label.toLowerCase()))];
+  }, [forYou.data]);
 
   // /out-here?free=1 (the Feed's "I'm free" button) opens the sheet with the empty composer
   // focused. It never submits. The param is dropped so a reload or Back does not reopen it.
@@ -220,12 +239,12 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
 
-  const ask = composeAsk(moods, text, duration, budget);
+  const ask = composeAsk(moods, text, duration, budget, moodList);
   const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   /** Just show I'm free / Update status: your status only, no Muse. */
   const justFree = () => {
-    void myStatus.setFree(0, durationMinutes(duration) ?? 60, noteFor(moods, text));
+    void myStatus.setFree(0, durationMinutes(duration) ?? 60, noteFor(moods, text, moodList));
   };
 
   const submit = async (e?: FormEvent) => {
@@ -234,7 +253,7 @@ export function PlanSheet({ className }: { className?: string }) {
     if (!t) return;
     // A picked time sets your status right away (friends see it while Muse thinks).
     const picked = durationMinutes(duration);
-    if (picked !== null) void myStatus.setFree(0, picked, noteFor(moods, text));
+    if (picked !== null) void myStatus.setFree(0, picked, noteFor(moods, text, moodList));
     setPickersOpen(false);
     setOthersOpen(false);
     // A new ask replaces one still in flight: abort it, and seq drops any late answer.
@@ -254,7 +273,7 @@ export function PlanSheet({ className }: { className?: string }) {
       // Muse is about to draft a plan with a free friend: it reads "who is free with you" from
       // your shared availability, so save that first (otherwise the draft races it and finds no one).
       const willDraft = r.plan.suggestions.length === 0 && (r.plan.meta?.friendsFree?.length ?? 0) > 0;
-      if (willDraft && picked === null) await shareAvailability(noteFor(moods, text), r.plan);
+      if (willDraft && picked === null) await shareAvailability(noteFor(moods, text, moodList), r.plan);
       if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
@@ -269,7 +288,7 @@ export function PlanSheet({ className }: { className?: string }) {
       });
       // Only the ask whose results are shown becomes the viewer's availability (unless a time
       // was picked, which already set it).
-      if (picked === null && !willDraft) void shareAvailability(noteFor(moods, text), r.plan);
+      if (picked === null && !willDraft) void shareAvailability(noteFor(moods, text, moodList), r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
@@ -364,10 +383,11 @@ export function PlanSheet({ className }: { className?: string }) {
                 ))}
               </Row>
               <Row label="Up for">
-                {MOODS.map((m) => (
-                  <Activity key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} Icon={m.Icon} label={m.label} />
+                {moodList.map((m) => (
+                  <Activity key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} Icon={m.Icon} label={m.label} forYou={m.forYou} because={m.because} />
                 ))}
               </Row>
+              <ForYouWhy data={forYou.data} loading={forYou.loading} />
               <div className="mt-2 flex items-center gap-2 rounded-full bg-fb-secondary-btn py-1 pl-4 pr-1 ring-fb-blue focus-within:ring-2">
                 <label htmlFor="imfree-text" className="sr-only">Tell Muse</label>
                 <textarea

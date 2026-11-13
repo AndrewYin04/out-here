@@ -354,3 +354,28 @@ export type HangoutRecap = {
   highlights: { label: string; count: number }[];   // counted across raters, most first
   myRating: HangoutRating | null;
 };
+
+// ---- "Up for" chips picked for you (GET /api/muse/for-you) ----
+// Code picks the chips from the viewer's own hangout ratings, watched videos and profile interests,
+// and keeps only chips an open plan nearby backs. Muse writes the one "Decided" sentence.
+export type ForYouIcon = 'dumplings' | 'boba' | 'music' | 'sketch' | 'thrift' | 'run' | 'climb' | 'volley' | 'film' | 'games' | 'yoga' | 'plants';
+export type ForYouChip = {
+  id: string; label: string;
+  /** What the chip adds to the ask ("dumplings"): the same words as the quest tags it matches. */
+  ask: string; icon: ForYouIcon;
+  /** Short evidence ("Rated 9.2"), for the chip's accessible description. */
+  because: string;
+  /** Open plans nearby this chip matches right now (always ≥ 1). */
+  openPlans: number;
+};
+export type ForYouNoticed = { kind: 'hangout' | 'video' | 'interest'; text: string };
+export type ForYouResponse = {
+  chips: ForYouChip[];
+  /** Real data the chips came from, newest signal kinds first. */
+  noticed: ForYouNoticed[];
+  /** What code checked (open plans, dropped topics). */
+  checked: string[];
+  /** Muse's one sentence, or the code template when byMuse is false. */
+  decided: string;
+  byMuse: boolean;
+};
