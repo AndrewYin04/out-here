@@ -5,15 +5,14 @@
 //  - a friend hand-off: whose Muse was asked, that the message went out, that a reply came back
 //    (the real agent events)
 //  - a photo is being looked at
-//  - when a plan reply lands: what Muse worked through, from the reply's own numbers
+//  - after a plan reply: what Muse worked through, from the reply's own numbers (until your next message)
 // It never invents stages or timings. World3D moves it to Jolly's screen position every frame.
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useRef, type CSSProperties, type RefObject } from 'react';
 import { useAgentEncounter, useChatMessages, useMuseSnapshot } from '@/features/muse-companion';
 import { museSteps } from '@/features/outhere';
 import { cn } from '@/features/ui';
 
 const WORKING = new Set(['thinking', 'evaluating', 'sending', 'receiving', 'delivering']);
-const RECAP_MS = 11000;
 // Bubble spots around Jolly, in units of the ring radius (--r): left, right, left, right.
 const SLOTS: [number, number][] = [[-1, -1.25], [1, -0.7], [-1, 0.05], [1, 0.65]];
 
@@ -27,15 +26,12 @@ export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElemen
 
   // The latest plan reply: its recap shows for a while after it arrives.
   const last = [...messages].reverse().find((m) => m.role === 'muse' && m.plan);
-  const [recapId, setRecapId] = useState<string | null>(null);
-  const seen = useRef<string | null>(null);
-  useEffect(() => {
-    if (!last || last.role !== 'muse' || seen.current === last.id) return;
-    seen.current = last.id;
-    setRecapId(last.id);
-    const t = window.setTimeout(() => setRecapId((cur) => (cur === last.id ? null : cur)), RECAP_MS);
-    return () => window.clearTimeout(t);
-  }, [last]);
+  // It stays until your next message (the working bubbles replace it) or until the chat closes.
+  // Only replies that arrive while this chat is open count (the history is kept between sessions).
+  const baseline = useRef<{ open: boolean; id: string | null }>({ open: false, id: null });
+  if (snap.open && !baseline.current.open) baseline.current = { open: true, id: last?.id ?? null };
+  else if (!snap.open && baseline.current.open) baseline.current = { open: false, id: null };
+  const recapId = last && last.id !== baseline.current.id ? last.id : null;
 
   let bubbles: Bubble[] = [];
   const who = encounter?.recipient.name.split(' ')[0];
