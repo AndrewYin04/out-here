@@ -1,4 +1,4 @@
-// Small motion kit for Out Here's moments (join, live seats, "It's a plan!").
+// Small motion kit for Out Here's moments (join, live seats, "It's a plan").
 // Web Animations API only, no dependency. Every helper is a no-op under prefers-reduced-motion,
 // and none of them changes layout, opacity of whole sheets, or anything a test reads.
 
@@ -169,11 +169,11 @@ export function questPin(questId: string | null | undefined): HTMLElement | null
 
 /**
  * You joined: your avatar arcs from the button you tapped onto the quest's pin, the pin squashes
- * as it lands and the quest's emoji bursts out. With no pin on screen, the burst comes from the button.
+ * as it lands. No confetti: Facebook marks a join with motion, not emoji. With no pin on screen,
+ * the button bumps.
  */
-export function celebrateJoin(from: Element | null, questId: string | null | undefined, avatarSrc: string, emoji: string) {
+export function celebrateJoin(from: Element | null, questId: string | null | undefined, avatarSrc: string) {
   const pin = questPin(questId);
-  const emojis = [emoji, '✨', emoji, '🎉'];
-  const flew = flyAvatar(from, pin, avatarSrc, () => { squash(pin); burst(pin, emojis, 8); });
-  if (!flew) burst(from, emojis, 8);
+  const flew = flyAvatar(from, pin, avatarSrc, () => squash(pin));
+  if (!flew) bump(from);
 }

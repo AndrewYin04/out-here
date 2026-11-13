@@ -28,7 +28,7 @@ export function MuseStepsLoading({ steps = LOADING_STEPS, className }: { steps?:
 
   return (
     <div data-testid="muse-steps-loading" className={cn('mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card', className)}>
-      <p className="mb-1.5 text-[15px] font-semibold text-fb-text">✨ Muse is working</p>
+      <p className="mb-1.5 text-[15px] font-semibold text-fb-text">Muse is working…</p>
       <ul className="flex flex-col gap-1">
         {steps.slice(0, shown).map((label, i) => {
           const current = i === shown - 1;
@@ -74,7 +74,7 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
         className="flex w-full items-center justify-between gap-2 py-0.5 text-left"
       >
         <span className="flex items-center gap-2">
-          {showMuse ? <MuseLabel /> : <span aria-hidden>✨</span>}
+          {showMuse && <MuseLabel />}
           <span className="text-[13px] font-semibold text-fb-text">How Muse picked these</span>
         </span>
         <span className="flex items-center gap-0.5 text-[13px] text-fb-text-2">
@@ -89,7 +89,7 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
               key={s.key}
               data-step={s.key}
               className={cn(
-                'flex items-start gap-2 text-[13px] leading-[18px] transition-all duration-200',
+                'flex items-start gap-2 text-[13px] leading-[18px] transition-[opacity,transform] duration-200',
                 s.tone === 'ok' ? 'text-fb-text' : 'text-fb-text-2',
                 i < shown ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0',
               )}

@@ -12,5 +12,7 @@ export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, OfflineLabel, SeatsBadge } from './SuggestionCard';
 export { MuseStepsLoading } from './MuseSteps';
 export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, usePlanAsk, setPlanStatus, usePlanStatus, type PlanPicks, type PlanStatus } from './plan-state';
+export { requestPlan, errorText, type PlanResponse } from './plan-api';
+export { openPlanWith } from './plan-state';
 export { useMuseFilter, MUSE_FILTER_KEY, type MuseFilter, type MuseFilterMode } from './filter-state';
 export { dropText, shownDrops, type DroppedView, type DropReasonCode } from './dropped';

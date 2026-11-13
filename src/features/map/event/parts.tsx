@@ -4,18 +4,18 @@
 import { Flag } from 'lucide-react';
 import { useState } from 'react';
 import { apiPost } from '@/features/data';
-import { Modal, cn, useToast } from '@/features/ui';
+import { CATEGORY_STYLE, CategoryGlyph, Modal, cn, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
-import { visibilityChip } from '../visibility';
+import { visibilityChip, visibilityMeta } from '../visibility';
 
-/** The plan's poster; tapping it opens the full image. Falls back to the emoji on a gradient. */
-export function Poster({ quest, className, fallback = false }: { quest: Pick<Quest, 'posterUrl' | 'emoji' | 'title'>; className?: string; fallback?: boolean }) {
+/** The plan's poster; tapping it opens the full image. Falls back to its category icon on the category's tint. */
+export function Poster({ quest, className, fallback = false }: { quest: Pick<Quest, 'posterUrl' | 'emoji' | 'title' | 'category'>; className?: string; fallback?: boolean }) {
   const [open, setOpen] = useState(false);
   if (!quest.posterUrl) {
     if (!fallback) return null;
     return (
-      <div aria-hidden className={cn('flex items-center justify-center bg-gradient-to-br from-[#DDEDFE] via-[#F2F4F7] to-[#FDE7EF] text-[64px]', className)}>
-        {quest.emoji}
+      <div aria-hidden className={cn('flex items-center justify-center', className)} style={{ background: (CATEGORY_STYLE[quest.category] ?? CATEGORY_STYLE.other).bg }}>
+        <CategoryGlyph category={quest.category} size={64} strokeWidth={1.5} />
       </div>
     );
   }
@@ -50,24 +50,31 @@ export function Bubble({ text, className }: { text: string | null; className?: s
 }
 
 export function VisibilityChip({ quest, groupName, className }: { quest: Pick<Quest, 'visibility'>; groupName?: string | null; className?: string }) {
+  const Icon = visibilityMeta(quest.visibility).icon;
   return (
-    <span data-testid="quest-visibility" className={cn('inline-flex items-center rounded-pill bg-fb-input px-2 py-0.5 text-fb-meta font-semibold text-fb-text-2', className)}>
+    <span data-testid="quest-visibility" className={cn('inline-flex items-center gap-1 rounded-pill bg-fb-input px-2 py-0.5 text-fb-meta font-semibold text-fb-text-2', className)}>
+      <Icon size={12} aria-hidden />
       {visibilityChip(quest.visibility, groupName)}
     </span>
   );
 }
 
-/** "12 going · 3 spots left · 🔴 Live · 5 here" */
+/** "12 going · 3 spots left · Live · 5 here" */
 export function StatLine({ memberCount, seatsLeft, isLive, hereCount, className }: {
-  memberCount: number; seatsLeft: number; isLive: boolean; hereCount: number; className?: string;
+  /** Leave seatsLeft out where the seat count is already shown (the quest sheet's own row). */
+  memberCount: number; seatsLeft?: number; isLive: boolean; hereCount: number; className?: string;
 }) {
   return (
     <p data-testid="quest-stats" className={cn('flex flex-wrap items-center gap-x-1.5 text-fb-body', className)}>
       <span className="font-semibold text-fb-text">{memberCount} going</span>
-      <span className="text-fb-text-2" aria-hidden>·</span>
-      <span className={seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
-        {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
-      </span>
+      {seatsLeft !== undefined && (
+        <>
+          <span className="text-fb-text-2" aria-hidden>·</span>
+          <span className={seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
+            {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
+          </span>
+        </>
+      )}
       {isLive && (
         <>
           <span className="text-fb-text-2" aria-hidden>·</span>

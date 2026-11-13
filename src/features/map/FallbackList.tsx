@@ -1,6 +1,7 @@
 'use client';
 // Shown instead of the map when the browser has no WebGL: the same quests as a list.
 import type { Quest } from '@/shared';
+import { CategoryIcon } from '@/features/ui';
 import { seatBadge, seatsLeftOf, startsLabel, walkLabel } from './format';
 
 export type FallbackListProps = {
@@ -29,7 +30,7 @@ export function FallbackList({ quests, walkMinutes, now, onSelect, testIdFor }: 
                   onClick={() => onSelect(q.id)}
                   className="flex w-full items-center gap-3 rounded-btn p-2 text-left hover:bg-fb-hover"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fb-input text-[22px]" aria-hidden>{q.emoji}</span>
+                  <CategoryIcon category={q.category} size={40} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-fb-body font-semibold">{q.title}</span>
                     <span className="block truncate text-fb-meta text-fb-text-2">

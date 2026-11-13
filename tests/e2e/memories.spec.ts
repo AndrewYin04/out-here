@@ -12,7 +12,7 @@ test.describe("Memories", () => {
     await card.getByRole("button", { name: "Get this group together again" }).click();
     const s = card.getByTestId("regroup-suggestion");
     await expect(s).toBeVisible({ timeout: 15_000 });
-    await expect(s).toContainText("✨ Muse");
+    await expect(s).toContainText("Muse");
     await expect(s.getByRole("button", { name: "Send to crew" })).toBeEnabled();
   });
 

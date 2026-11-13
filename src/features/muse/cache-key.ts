@@ -70,11 +70,17 @@ export type CacheKeyInput = {
   cacheKey?: unknown;
 };
 
+/** Message content as key text: plain text, or text parts plus image urls for vision messages. */
+function contentKey(content: CacheKeyInput['messages'][number]['content']): string {
+  if (typeof content === 'string') return normalizeVolatile(content);
+  return content.map((p) => (p.type === 'text' ? normalizeVolatile(p.text) : `image:${p.image_url.url}`)).join('\n');
+}
+
 export function museCacheKey(input: CacheKeyInput): string {
   const prompt = input.cacheKey === undefined
-    ? input.messages.map((m) => ({ role: m.role, content: normalizeVolatile(m.content) }))
+    ? input.messages.map((m) => ({ role: m.role, content: contentKey(m.content) }))
     : {
-        system: input.messages.filter((m) => m.role === 'system').map((m) => normalizeVolatile(m.content)),
+        system: input.messages.filter((m) => m.role === 'system').map((m) => contentKey(m.content)),
         key: input.cacheKey,
       };
   const doc = canonicalJSON({

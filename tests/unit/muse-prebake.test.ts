@@ -215,7 +215,7 @@ describe('plan pipeline', () => {
   const fake: MuseTransport = async (req) => {
     calls++;
     if (req.schemaName === 'intent') return { content: INTENT, usage };
-    const user = JSON.parse(req.messages[1].content) as { candidates: { id: string }[] };
+    const user = JSON.parse(req.messages[1].content as string) as { candidates: { id: string }[] };
     return {
       content: JSON.stringify({
         summary: 'Two plans fit.',

@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { CalendarDays, Camera, Clock, Footprints, MapPin, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiFetch, apiPost, currentPersona, useApi, useViewer } from '@/features/data';
-import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
+import { AvatarStack, Button, Card, CategoryIcon, EmptyState, Skeleton } from '@/features/ui';
 import { formatDemoTime, type CompleteQuestResponse, type MyRating, type YourPlan, type YourPlansResponse } from '@/shared';
+
 import { MemoryCapture } from './MemoryCapture';
 import { MemoryThumb } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
@@ -114,7 +115,7 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
   return (
     <Card as="article" padded className="border border-fb-divider-soft" aria-label={quest.title}>
       <div className="flex items-start gap-3">
-        <span aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-fb-blue-tint text-2xl">{quest.emoji}</span>
+        <CategoryIcon category={quest.category} size={44} />
         <div className="min-w-0 flex-1">
           <h3 className="text-[17px] font-bold">{quest.title}</h3>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-fb-text-2"><MapPin size={15} aria-hidden />{quest.venueName}</p>

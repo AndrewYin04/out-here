@@ -272,7 +272,8 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       {chip !== 'none' && (
         <span
           className={cn(
-            'pointer-events-none absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            // The status shows on hover or keyboard focus; a tap opens the friend's card with all of it.
+            'pointer-events-none absolute left-1/2 z-10 hidden w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover group-hover:flex group-focus-visible:flex',
             side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
           style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}
@@ -298,17 +299,7 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       )}>
         <Avatar src={pin.friend.avatarUrl} name={pin.friend.name} size={36} decorative />
       </span>
-      {free.kind !== 'busy' && (
-        <span
-          data-testid="friend-free"
-          className={cn(
-            '-mt-1.5 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold leading-4 shadow-card',
-            free.kind === 'free' ? 'bg-fb-green text-white' : 'bg-white text-fb-text-2',
-          )}
-        >
-          {freeStatusLabel(free).replace(/^Free/, 'free')}
-        </span>
-      )}
+      {/* "Free till …" lives in the friend's card; on the map the green ring says they're free. */}
     </button>
   );
 }
