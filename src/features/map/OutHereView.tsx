@@ -15,7 +15,7 @@ import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
-import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
+import { MarketPanel, MuseFindCard, watchLabel } from './market/MuseFind';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
@@ -691,15 +691,15 @@ export function OutHereView() {
             now={now}
             onSelect={select}
             showActions={!walkingNow}
-            extraActions={mode === 'explore' ? (
-              <MarketMenu
+            marketPanel={(
+              <MarketPanel
                 wants={wants}
                 onWantsChanged={() => { void wantsApi.refetch(); }}
                 onSell={startSell}
                 showListings={showListings}
                 onShowListings={setShowListings}
               />
-            ) : null}
+            )}
           />
         </div>
       )}

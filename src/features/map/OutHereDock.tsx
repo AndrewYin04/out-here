@@ -10,7 +10,7 @@
 //      Memories opens the Memories page
 //  - Three heights: peek (tabs only, the default), half (the tab's list) and full. Drag or tap the
 //    handle, or use the keyboard (Enter toggles, ArrowUp/ArrowDown step, Escape folds).
-import { CalendarCheck, Images, LocateFixed, Map as MapIcon, MapPin, Plus, Users } from 'lucide-react';
+import { CalendarCheck, Images, LocateFixed, Map as MapIcon, MapPin, Plus, Store, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { PeopleList, SharingSheet, flyToPin, useFriendPins } from '@/features/map/friends';
@@ -22,7 +22,7 @@ import type { Quest } from '@/shared';
 import { seatBadge, seatsLeftOf, startsLabel, walkLabel } from './format';
 import type { MapMode } from './types';
 
-export type DockTab = MapMode | 'plans';
+export type DockTab = MapMode | 'plans' | 'market';
 type Level = 0 | 1 | 2;
 
 /** Opens the dashboard on a tab from anywhere in Out Here (for example "Your plans" in a card). */
@@ -44,8 +44,10 @@ type Props = {
   onSelect: (id: string) => void;
   /** The I'm free row hides while you walk; the tabs stay. */
   showActions?: boolean;
-  /** More action buttons beside Post (the Marketplace menu). */
+  /** More action buttons beside Post. */
   extraActions?: ReactNode;
+  /** The Marketplace tab's panel (sell, Muse wants, listings toggle). Omitted = no tab. */
+  marketPanel?: ReactNode;
 };
 
 const SNAP_PX = 48;
@@ -55,23 +57,25 @@ const TAB = 'oh-press flex h-11 min-w-0 items-center justify-center gap-2 rounde
 const tabClass = (on: boolean) => cn(TAB, on ? 'min-w-fit grow-[2.4] bg-fb-blue-tint px-4 text-fb-blue' : 'grow text-fb-text-2 hover:bg-fb-hover');
 const ROUND = 'oh-press flex size-11 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue';
 
-export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCreate, quests, walkMinutes, now, onSelect, showActions = true, extraActions }: Props) {
+export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCreate, quests, walkMinutes, now, onSelect, showActions = true, extraActions, marketPanel }: Props) {
   const [tab, setTab] = useState<DockTab>(mode);
   const [level, setLevel] = useState<Level>(0);
   const [editing, setEditing] = useState(false);
   const { data: friendData } = useFriendPins();
   const friendCount = friendData?.pins.length ?? 0;
   // The map mode can change from outside (a friend tapped in 3D, ?mode=friends): follow it.
-  useEffect(() => { setTab((t) => (t === 'plans' ? t : mode)); }, [mode]);
+  // Marketplace lives on the Explore map, so it stays open while the map is in Explore.
+  useEffect(() => { setTab((t) => (t === 'plans' || (t === 'market' && mode === 'explore') ? t : mode)); }, [mode]);
 
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const choose = useCallback((t: DockTab) => {
-    if (t !== 'plans') onMode(t);
+    if (t === 'market') onMode('explore');
+    else if (t !== 'plans') onMode(t);
     // Tapping the open tab again folds or unfolds its list; a new tab keeps the panel's height,
-    // except Plans, which has nothing on the map and so opens its list.
+    // except Plans and Marketplace, which open their panel.
     if (tabRef.current === t) setLevel((l) => (l === 0 ? 1 : 0));
-    else if (t === 'plans') setLevel((l) => (l === 0 ? 1 : l));
+    else if (t === 'plans' || t === 'market') setLevel((l) => (l === 0 ? 1 : l));
     tabRef.current = t;
     setTab(t);
     // Muse says what this section is for (MuseDockButton).
@@ -81,7 +85,8 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
   useEffect(() => {
     const on = (e: Event) => {
       const t = (e as CustomEvent<DockTab>).detail;
-      if (t !== 'plans') onMode(t);
+      if (t === 'market') onMode('explore');
+      else if (t !== 'plans') onMode(t);
       tabRef.current = t;
       setTab(t);
       setLevel((l) => (l === 0 ? 1 : l));
@@ -157,8 +162,8 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
   const pickQuest = (id: string) => { setLevel(0); onSelect(id); };
   const label = tab === 'explore'
     ? quests.length === 0 ? 'No plans on the map right now' : mode === 'friends' ? `Plans your friends joined · ${quests.length}` : `Plans on the map · ${quests.length}`
-    : tab === 'friends' ? `Friends sharing with you · ${friendCount}` : 'Your plans';
-  const listName = tab === 'explore' ? 'the plans' : tab === 'friends' ? 'People' : 'Your plans';
+    : tab === 'friends' ? `Friends sharing with you · ${friendCount}` : tab === 'market' ? 'Marketplace pickup · things nearby you can pick up today' : 'Your plans';
+  const listName = tab === 'explore' ? 'the plans' : tab === 'friends' ? 'People' : tab === 'market' ? 'Marketplace' : 'Your plans';
 
   return (
     <div
@@ -224,6 +229,7 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
           <TabButton id="friends" on={tab === 'friends'} label="Friends" icon={<Users size={22} aria-hidden />} onClick={() => choose('friends')} testId="map-mode-friends" />
           <TabButton id="explore" on={tab === 'explore'} label="Explore" icon={<MapPin size={22} aria-hidden />} onClick={() => choose('explore')} testId="map-mode-explore" />
           <TabButton id="plans" on={tab === 'plans'} label="Plans" icon={<CalendarCheck size={22} aria-hidden />} onClick={() => choose('plans')} testId="dock-tab-plans" />
+          {marketPanel && <TabButton id="market" on={tab === 'market'} label="Marketplace" icon={<Store size={22} aria-hidden />} onClick={() => choose('market')} testId="market-btn" />}
           <Link href="/memories" aria-label="Memories" title="Memories" className={tabClass(false)}>
             <Images size={22} aria-hidden />
           </Link>
@@ -271,6 +277,7 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
                   <PeopleList onPick={(p) => { setLevel(0); flyToPin(null, p); }} onEdit={() => { setLevel(0); setEditing(true); }} />
                 </div>
               )}
+              {tab === 'market' && marketPanel}
               {tab === 'plans' && (
                 <div className="px-1" data-testid="dock-plans"><YourPlans /></div>
               )}
