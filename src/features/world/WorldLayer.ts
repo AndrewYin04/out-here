@@ -157,6 +157,9 @@ export class WorldLayer implements CustomLayerInterface {
   private lamps:StreetLamp[]=[];
   private statics = new Map<string, THREE.Object3D>();
   private anchors = new Map<string, { pos: LatLng; altitude: number; el: HTMLElement }>();
+  /** Measured label sizes (refreshed every 20 frames) for the overlap check. */
+  private labelSize = new WeakMap<HTMLElement, [number, number]>();
+  private frameCount = 0;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
 
@@ -488,6 +491,9 @@ export class WorldLayer implements CustomLayerInterface {
       }
     }
 
+    // Plan and place labels: nearest first; a label that would overlap a nearer one, or hang off the
+    // screen edge, waits hidden until there's room (no half-cut or stacked chips).
+    const onScreenLabels: { el: HTMLElement; x: number; y: number; d: number }[] = [];
     for (const a of this.anchors.values()) {
       const o = offsetMeters(this.origin, a.pos);
       this.tmp.set(o.east, a.altitude, -o.north, 1).applyMatrix4(this.full);
@@ -495,7 +501,19 @@ export class WorldLayer implements CustomLayerInterface {
       const x = ((this.tmp.x / this.tmp.w + 1) / 2) * w;
       const py = ((1 - this.tmp.y / this.tmp.w) / 2) * h;
       a.el.style.transform = `translate(${x.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -100%)`;
-      a.el.style.visibility = x > -100 && x < w + 100 && py > -50 && py < h + 50 ? 'visible' : 'hidden';
+      onScreenLabels.push({ el: a.el, x, y: py, d: this.tmp.w });
+    }
+    onScreenLabels.sort((p, q) => p.d - q.d);
+    if (this.frameCount++ % 20 === 0) for (const l of onScreenLabels) this.labelSize.set(l.el, [l.el.offsetWidth || 120, l.el.offsetHeight || 32]);
+    const shown: [number, number, number, number][] = [];
+    for (const l of onScreenLabels) {
+      const [sw, sh] = this.labelSize.get(l.el) ?? [120, 32];
+      const r: [number, number, number, number] = [l.x - sw / 2, l.y - sh, l.x + sw / 2, l.y];
+      const inside = r[0] >= 4 && r[2] <= w - 4 && r[1] >= 4 && r[3] <= h + 20;
+      const clash = shown.some((v) => r[0] < v[2] + 6 && r[2] + 6 > v[0] && r[1] < v[3] + 4 && r[3] + 4 > v[1]);
+      const ok = inside && !clash;
+      l.el.style.visibility = ok ? 'visible' : 'hidden';
+      if (ok) shown.push(r);
     }
 
     const focus=this.actors.get(this.focusActor);
