@@ -40,6 +40,9 @@ void main() {
 export class SparkleWake {
   readonly object: THREE.Points;
   private n: number;
+  private alive=0;
+  get activeCount():number{return this.alive;}
+  get capacity():number{return this.n;}
   private pos: Float32Array;
   private vel: Float32Array;
   private data: Float32Array;
@@ -52,7 +55,8 @@ export class SparkleWake {
   private mat: THREE.ShaderMaterial;
   private geo = new THREE.BufferGeometry();
 
-  constructor(count = 128) {
+  constructor(count = 64) {
+    count=Math.max(1,Math.min(64,Math.floor(Number.isFinite(count)?count:64)));
     this.n = count;
     this.pos = new Float32Array(count * 3);
     this.vel = new Float32Array(count * 3);
@@ -80,6 +84,8 @@ export class SparkleWake {
    * `bufferHeight`: the drawing buffer's height in device pixels (point sizes are world sizes).
    */
   update(dt: number, feet: THREE.Vector3, spawning: boolean, s: number, bufferHeight: number): void {
+    dt=Math.max(0,Math.min(.05,dt));
+    this.alive=0;
     this.time += dt;
     this.mat.uniforms.uTime.value = this.time;
     this.mat.uniforms.uH.value = bufferHeight;
@@ -91,6 +97,8 @@ export class SparkleWake {
       const i3 = i * 3;
       if (this.age[i] >= this.life[i]) { this.data[i3 + 1] = 0; this.data[i3] = 0; continue; }
       this.age[i] += dt;
+      if(this.age[i]>=this.life[i]){this.data[i3+1]=0;this.data[i3]=0;continue;}
+      this.alive++;
       const t = Math.min(1, this.age[i] / this.life[i]);
       this.pos[i3] += this.vel[i3] * dt;
       this.pos[i3 + 1] += this.vel[i3 + 1] * dt;

@@ -14,3 +14,5 @@ export type {MuseViewport} from './controller';
 export {beginMuseActivity,finishMuseActivity,releaseMuseActivity,useMuseActivity} from './controller';
 export {MuseActivityStatus} from './MuseActivityStatus';
 export type {MuseActivity, MuseActivityOutcome} from './controller';
+
+export type { ChatMessage } from './controller';

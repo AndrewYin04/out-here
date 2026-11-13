@@ -197,8 +197,8 @@ export function MuseChat() {
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">
-            <button type="button" aria-label="Make Jolly do a move" title="Tap for a move" onClick={() => window.dispatchEvent(new Event('muse:trick'))}
-              className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue">
+            <button type="button" aria-label="Make Jolly do a move" title="Tap for a move" disabled={busy || snap.state === 'approaching' || snap.state === 'returning'} onClick={() => window.dispatchEvent(new Event('muse:trick'))}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue">
               <MuseOrb state={snap.state} size={36} />
             </button>
             <div className="min-w-0 flex-1">

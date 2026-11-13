@@ -208,6 +208,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     window.visualViewport?.addEventListener('resize',measure);window.visualViewport?.addEventListener('scroll',measure);
     return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);window.visualViewport?.removeEventListener('resize',measure);window.visualViewport?.removeEventListener('scroll',measure);};
   },[map,companion.open,viewport]);
+  // Faded map markers must also leave the tab order while Muse is the conversation focus.
+  useEffect(()=>{
+    if(!companion.open)return;
+    const container=map.getContainer(),saved=new Map<HTMLElement,boolean>();
+    const mute=()=>{for(const marker of container.querySelectorAll<HTMLElement>('.maplibregl-marker')){if(!saved.has(marker))saved.set(marker,marker.inert);marker.inert=true;}};
+    mute();const observer=new MutationObserver(mute);observer.observe(container,{childList:true,subtree:true});
+    return()=>{observer.disconnect();for(const [marker,inert] of saved)marker.inert=inert;};
+  },[map,companion.open]);
   const chatOpen = useRef(companion.open);
   chatOpen.current = companion.open;
   useEffect(()=>{if(!companion.open&&manualChatCamera.current)map.setMaxZoom(MAX_3D_ZOOM);manualChatCamera.current=false;},[map,companion.open]);
@@ -216,7 +224,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petBoost = useRef(1);
-  const fidgetIn = useRef(8);
+  const fidgetIn = useRef(24);
   const trickAt = useRef(0);
   const chatAreaHeight = useRef(450);
   const thoughtsRef = useRef<HTMLDivElement>(null);
@@ -725,8 +733,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       if (pState === 'stand' && !reducedMotion()) {
         fidgetIn.current -= dt;
         if (fidgetIn.current <= 0) {
-          fidgetIn.current = 7 + Math.random() * 7;
-          const moves = ['wave', 'nod', 'jump', 'spin'];
+          fidgetIn.current = 24 + Math.random() * 12;
+          const moves = ['wave', 'nod'];
           layer.setState('pet', moves[Math.floor(Math.random() * moves.length)]);
         }
       } else fidgetIn.current = Math.max(fidgetIn.current, 5);
@@ -979,7 +987,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // Tapping Jolly's picture in the Muse chat header makes him do the next move in his repertoire.
   useEffect(() => {
     const moves = ['wave', 'jump', 'spin', 'dance', 'cheer', 'nod'];
-    const on = () => { layerRef.current?.setState('pet', moves[trickAt.current++ % moves.length]); };
+    const on = () => { if(reducedMotion()||processing.current==='pending'||photoTargetForRender())return;layerRef.current?.setState('pet', moves[trickAt.current++ % moves.length]); };
     window.addEventListener('muse:trick', on);
     return () => window.removeEventListener('muse:trick', on);
   }, []);
@@ -1184,7 +1192,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       <style>{'[data-view3d] [data-map-marker="me"]{transition:opacity .18s}[data-view3d][data-world-characters="true"] [data-map-marker="me"]{opacity:0;pointer-events:none}@media(prefers-reduced-motion:reduce){[data-view3d] [data-map-marker="me"]{transition:none}}'}</style>
 
       {/* Labels the world layer keeps above heads: the pet's speech, friends' names and status. */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div inert={companion.open} className="absolute inset-0 overflow-hidden">
         {bubble ? (
           <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" data-muse-world-bubble role="status" aria-live="polite" aria-atomic="true" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
             <button
@@ -1238,7 +1246,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Building names at Meta HQ: only on the campus tour (they crowd the plan cards otherwise). */}
       {tour && (
-        <div className="absolute inset-0 overflow-hidden">
+        <div inert={companion.open} className="absolute inset-0 overflow-hidden">
           {hqLabels.map((l) => (
             <div key={l.id} ref={(el) => layerRef.current?.bindAnchor(l.id, l.pos, l.altitude, el)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
               <span data-testid="hq-label" className="block whitespace-nowrap rounded-pill bg-[#1C1E21]/85 px-2 py-0.5 text-[12px] font-bold text-white shadow-card">{l.name}</span>

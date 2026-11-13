@@ -95,7 +95,7 @@
 [data-muse-chat="true"] [data-world-label] { opacity: 0; pointer-events: none; }
 /* The 2D map's markers (friends' photos, plan pins) also step aside for the chat. */
 body:has([data-muse-chat="true"]) .maplibregl-marker { opacity: 0 !important; pointer-events: none; transition: opacity .25s ease; }
-@media (prefers-reduced-motion: reduce) { [data-world-label] { transition: none; } }
+@media (prefers-reduced-motion: reduce) { [data-world-label], body:has([data-muse-chat="true"]) .maplibregl-marker { transition: none !important; } }
 
 /* The 3D loading screen: Jolly bobs while thinking, and the bubble's dots pulse. */
 @keyframes oh-jolly-bob {

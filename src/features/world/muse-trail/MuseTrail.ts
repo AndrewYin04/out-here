@@ -225,6 +225,8 @@ export class MuseTrail {
     if (this.cfg.reducedMotion) return;
     this.pulseFrom.copy(from); this.pulseTo.copy(to); this.pulseAge=0;
   }
+  isProcessing(): boolean { return this.processing === 'pending' || (this.processingAge < .45 && this.processingGain > .001); }
+
   isReleasing(): boolean { return this.processing === 'success' && this.processingAge < .45; }
 
   setConfig(patch: Partial<MuseTrailConfig>): void {

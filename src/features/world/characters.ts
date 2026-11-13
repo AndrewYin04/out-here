@@ -310,13 +310,12 @@ function adaptClip(clip: THREE.AnimationClip, keep: Set<string>, rootName: strin
   return tracks.length ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : null;
 }
 
-const AXIS_X = new THREE.Vector3(1, 0, 0);
-
 /** Jolly's one-shot moves, in code (his model has no clips for them), and how long each lasts. */
 const ACTIONS: Record<string, number> = { jump: 1.1, cheer: 2.0, wave: 1.7, spin: 1.1, dance: 3.2, nod: 0.9 };
 /** Moods that hold while the state lasts: they ease in and out. */
 const MOODS = ['think', 'listen', 'sad', 'talk'] as const;
 type Role = 'armL' | 'armR' | 'legL' | 'legR';
+const LIMBS:readonly Role[]=['armL','armR','legL','legR'];
 
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
@@ -472,7 +471,7 @@ vec3 jollyLimbs(vec3 p) {
   ny = 0.30 + dy2 * cos(th) - p.z * sin(th);
   vec3 q = vec3(s * nx, ny, nz);
   // legs: swing about the hip
-  float lw = smoothstep(0.115, 0.01, q.y) * smoothstep(0.015, 0.045, abs(q.x));
+  float lw = (1.0 - smoothstep(0.01, 0.115, q.y)) * smoothstep(0.015, 0.045, abs(q.x));
   float lg = (s > 0.0 ? uLegL : uLegR) * lw;
   float hy = q.y - 0.115;
   float lz = hy * sin(lg) + q.z * cos(lg);
@@ -541,7 +540,7 @@ vec3 jollyLimbs(vec3 p) {
     this.clock += dt;
     const P = this.pose, L = this.limbAng;
     P.y = y; P.rx = 0; P.ry = 0; P.rz = 0; P.sy = 1;
-    for (const k of Object.keys(L) as Role[]) { L[k][0] = 0; L[k][1] = 0; }
+    for (const k of LIMBS) { L[k][0] = 0; L[k][1] = 0; }
 
     // The jog: about 2.9 steps a second. The body bounces on each step, rocks and leans in, and the
     // limbs swing: each leg with the opposite arm, arms bent forward.

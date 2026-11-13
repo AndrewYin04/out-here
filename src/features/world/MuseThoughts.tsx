@@ -9,12 +9,12 @@
 // It never invents stages or timings. World3D moves it to Jolly's screen position every frame.
 import { useRef, type CSSProperties, type RefObject } from 'react';
 import { useAgentEncounter, useChatMessages, useMuseSnapshot } from '@/features/muse-companion';
-import { museSteps } from '@/features/outhere';
+import { companionThought } from './thought-line';
 import { cn } from '@/features/ui';
 
 const WORKING = new Set(['thinking', 'evaluating', 'sending', 'receiving', 'delivering']);
 // Bubble spots around Jolly, in units of the ring radius (--r): left, right, left, right.
-const SLOTS: [number, number][] = [[-1, -1.25], [1, -0.7], [-1, 0.05], [1, 0.65]];
+const SLOTS: [number, number][] = [[-1, -1.25]];
 
 // Where the thought trail starts (up by Jolly's head, in ring radii) and its circles: how far along
 // the line from the cloud to his head (0 = the cloud, 1 = his head) and the size in px.
@@ -38,23 +38,14 @@ export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElemen
   else if (!snap.open && baseline.current.open) baseline.current = { open: false, id: null };
   const recapId = last && last.id !== baseline.current.id ? last.id : null;
 
-  let bubbles: Bubble[] = [];
-  const who = encounter?.recipient.name.split(' ')[0];
-  if (encounter && who) {
-    bubbles = [{ key: 'ask', text: `Asking ${who}’s Muse` }];
-    if (encounter.sent > 0) bubbles.push({ key: 'sent', text: 'Message sent' });
-    if (encounter.received > 0) bubbles.push({ key: 'recv', text: `${who}’s Muse replied` });
-  } else if (working) {
-    bubbles = [{ key: 'work', text: snap.state === 'evaluating' ? 'Looking at your photo' : 'Working on your request' }];
-  } else if (snap.open && last && last.role === 'muse' && last.plan && recapId === last.id) {
-    bubbles = museSteps(last.plan, last.source).map((s) => ({ key: s.key, text: s.text }));
-  }
-  bubbles = bubbles.slice(0, SLOTS.length);
+  const latest=messages.at(-1);
+  const text=companionThought(snap.state,encounter,latest,!!recapId&&latest?.id===recapId);
+  const bubbles:Bubble[]=text?[{key:encounter?`${encounter.id}:${encounter.sent}:${encounter.received}:${encounter.outcome}`:working?snap.state:recapId??'reply',text:text.length>110?`${text.slice(0,109).trimEnd()}…`:text}]:[];
 
   if (!snap.open) return null;
   return (
     <div ref={anchorRef} aria-hidden data-testid="muse-thoughts" className="pointer-events-none absolute left-0 top-0 z-[6]" style={{ ['--r' as string]: '110px' } as CSSProperties}>
-      {(working || !!encounter) && (
+      {(working && !encounter?.outcome) && (
         <>
           <span className="muse-thought-orbit" style={{ animationDuration: '5.2s' }}><i className="muse-thought-orb" style={{ width: 16, height: 16 }} /></span>
           <span className="muse-thought-orbit" style={{ animationDuration: '7.4s', animationDelay: '-2.1s' }}><i className="muse-thought-orb" style={{ width: 11, height: 11 }} /></span>

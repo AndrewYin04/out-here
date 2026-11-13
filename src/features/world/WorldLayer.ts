@@ -194,7 +194,7 @@ export class WorldLayer implements CustomLayerInterface {
     const a = this.actors.get(id);
     if (!a) return;
     this.charScene.remove(a.char.root);
-    a.trail?.dispose();
+    if(a.trail){this.charScene.remove(a.trail.object);a.trail.dispose();}
     if (a.sparkles) { this.charScene.remove(a.sparkles.object); a.sparkles.dispose(); }
     if (a.shadow) this.scene.remove(a.shadow);
     a.char.dispose();
@@ -218,7 +218,7 @@ export class WorldLayer implements CustomLayerInterface {
     const a = this.actors.get(id);
     if (!a) return;
     // One-shot moves play over his current state (and do not change it).
-    if (['jump', 'cheer', 'spin', 'dance', 'nod'].includes(state)) { a.char.setState(state); return; }
+    if (a.kind === 'pet' && ['jump', 'cheer', 'spin', 'dance', 'nod', 'wave', 'happy', 'celebrate'].includes(state)) { a.char.setState(state); return; }
     if (a.state === state && !['wave', 'happy', 'celebrate'].includes(state)) return;
     a.state = state; a.char.setState(state);
   }
@@ -462,13 +462,14 @@ export class WorldLayer implements CustomLayerInterface {
           // On the ground Jolly leaves sparkles from his feet instead of the energy ray; the ray is for
           // flying and for Muse's thinking.
           const onGround = a.state === 'walk' || a.state === 'stand';
-          const ray = !onGround || a.processing !== 'off' || a.trail.isReleasing();
+          const working=a.trail.isProcessing();
+          const ray = !onGround || working;
           if (!ray) a.trail.object.visible = false;
           if (a.sparkles) {
             this.feet.set(o.east, a.altitude * scale, -o.north);
             const still = !!this.motionQuery?.matches;
-            a.sparkles.object.visible = true;
-            a.sparkles.update(dt, this.feet, onGround && a.state === 'walk' && !still && a.processing === 'off', s, this.renderer?.getDrawingBufferSize(this.bufSize).y ?? 800);
+            a.sparkles.update(dt, this.feet, onGround && a.state === 'walk' && !still && !working, s, this.renderer?.getDrawingBufferSize(this.bufSize).y ?? 800);
+            a.sparkles.object.visible = !still && a.sparkles.activeCount > 0;
           }
         } else { a.trail.object.visible = false; if (a.sparkles) a.sparkles.object.visible = false; }
       }
