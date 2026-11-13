@@ -1,9 +1,11 @@
 'use client';
 
-import { Check, ChevronDown, ChevronUp, Loader2, Minus } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Loader2, Minus, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
+import type { MuseWork } from './muse-work';
+import type { RuledOutRow } from './dropped';
 import { MuseLabel } from './SuggestionCard';
 
 const LOADING_STEP_MS = 600;
@@ -103,5 +105,91 @@ export function MuseStepsDone({ steps, showMuse }: { steps: MuseStep[]; showMuse
         </ul>
       )}
     </div>
+  );
+}
+
+function RuledOutItem({ row }: { row: RuledOutRow }) {
+  return (
+    <li data-testid="ruled-out" data-reason={row.reason} className="flex min-w-0 gap-2 text-[13px] leading-[18px] text-fb-text-2">
+      <span aria-hidden className="w-4 shrink-0 text-center">{row.emoji}</span>
+      <span className="min-w-0">
+        <span className="font-semibold text-fb-text">{row.title}</span>: {row.text}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * What was checked and who did it, open by default so a judge sees it without a tap. Code
+ * counted the plans and friends and ruled plans out (candidates.ts), so those lines carry no
+ * Muse label. The read line says ✨ Muse when the live model parsed the words, and the rank line
+ * when the live model ranked and explained the picks. The other ruled-out rows open on "N more".
+ */
+export function MuseWorkPanel({ work }: { work: MuseWork }) {
+  const [open, setOpen] = useState(false);
+  const { top, more, offTopic } = work.ruledOut;
+  const hasDetails = more.length > 0 || offTopic > 0;
+  const toggle = hasDetails ? (
+    <button
+      type="button"
+      aria-expanded={open}
+      data-testid="muse-work-more"
+      onClick={() => setOpen((v) => !v)}
+      className="inline-flex shrink-0 items-center gap-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
+    >
+      {open ? 'Less' : more.length > 0 ? `${more.length} more` : 'Details'}
+      {open ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+    </button>
+  ) : null;
+
+  return (
+    <section data-testid="muse-work" aria-label="What was checked" className="mb-2 rounded-card bg-fb-surface px-3 py-2.5 shadow-card">
+      <p data-testid="muse-work-checked" className="text-[15px] font-semibold leading-5 text-fb-text">
+        {work.checked}
+        {work.fit && <span className="font-normal text-fb-text-2"> · {work.fit}</span>}
+      </p>
+      <p data-testid="muse-work-read" data-by={work.readByMuse ? 'muse' : 'code'} className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+        {work.readByMuse
+          ? <span className="font-semibold text-fb-blue">✨ Muse read:</span>
+          : <span className="font-semibold text-fb-text">Read</span>}
+        {' '}<span className="text-fb-text">{work.read.join(' · ')}</span>
+        {/* The walk cap is code's default when the ask named none: muted, and not part of what was read. */}
+        {work.walkDefault && <span data-testid="muse-work-walk-default"> · {work.walkDefault}</span>}
+      </p>
+      {work.friends && (
+        <p data-testid="muse-work-friends" className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] text-fb-text-2">
+          <Users size={13} aria-hidden className="shrink-0" />
+          {work.friends}
+        </p>
+      )}
+      <p
+        data-testid="muse-work-rank"
+        data-by={work.rankByMuse ? 'muse' : 'code'}
+        title={work.rank}
+        className={cn('mt-0.5 truncate text-[13px] leading-[18px]', work.rankByMuse ? 'font-semibold text-fb-text' : 'text-fb-text-2')}
+      >
+        {work.rankByMuse ? <span className="text-fb-blue">✨ Muse</span> : null}
+        {work.rankByMuse ? ` ${work.rank.replace(/^Muse /, '')}` : work.rank}
+      </p>
+      {top.length > 0 ? (
+        <div className="mt-1.5 border-t border-fb-divider pt-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-semibold uppercase tracking-[0.02em] text-fb-text-2">Ruled out</span>
+            {toggle}
+          </div>
+          <ul data-testid="why-not" className="mt-0.5 flex flex-col gap-0.5">
+            {top.map((r) => <RuledOutItem key={r.questId} row={r} />)}
+            {open && more.map((r) => <RuledOutItem key={r.questId} row={r} />)}
+          </ul>
+        </div>
+      ) : (
+        toggle && <div className="mt-1 flex justify-end">{toggle}</div>
+      )}
+      {open && offTopic > 0 && (
+        <p data-testid="muse-work-details" className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+          {offTopic} other{offTopic === 1 ? " wasn't" : "s weren't"} what you asked for
+        </p>
+      )}
+    </section>
   );
 }

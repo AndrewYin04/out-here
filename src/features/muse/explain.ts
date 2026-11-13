@@ -2,6 +2,7 @@
 // and the replacement text validate() uses when a model sentence names someone it may not.
 import { formatDemoTime, type MuseIntent, type PlanSuggestion } from '../../shared';
 import type { PlanCandidate } from './candidates';
+import { statusPhrase } from './prompts/reason-facts';
 import { windowMinutes } from './time';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -46,15 +47,17 @@ const joinNames = (names: string[]) =>
   names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
 /**
- * Why this plan, for this person. The card already shows time, walk, price and seats, so the
- * reason never repeats them: it leads with the shared interest and the friend's own words.
+ * Why this plan, for this person. With a free friend it leads with their bubble in a few words,
+ * then when they are free and how far it is: "Maya's craving dumplings and wants to try Dumpling
+ * Den. Maya's free till 4:44 PM, and it's a 9 min walk." The card then drops its overlap line.
  */
 export function reasonText(c: PlanCandidate, friendIds: string[]): string {
   const friends = c.friendOverlap.filter((f) => friendIds.includes(f.friendId));
   if (friends.length > 0) {
     const f = friends[0];
     const shared = f.sharedWithQuest[0];
-    if (f.status) return `${f.firstName}'s status says "${f.status}", and you both like ${shared}.`;
+    const said = statusPhrase(f.firstName, f.status);
+    if (said) return `${said}. ${f.firstName}'s free till ${formatDemoTime(f.freeUntil)}, and it's a ${c.travelMinutes} min walk.`;
     const room = c.seatsLeft >= friends.length + 1 ? ' and there is room for both of you' : '';
     return `You and ${joinNames(friends.map((x) => x.firstName))} both like ${shared}${room}.`;
   }

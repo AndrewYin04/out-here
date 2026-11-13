@@ -14,6 +14,8 @@ export type PlanResponse = MusePlan & {
     friendsFree?: { firstName: string; freeUntil: string }[];
     models?: { parse: string; rank: string }; rankFallback?: boolean;
     timings?: { totalMs: number };
+    /** questId -> priceMax for the plans that fit, so cards show the price without a second fetch. */
+    prices?: Record<string, number>;
   };
 };
 /** "mock" = offline heuristic text, "fallback" = code answered after a live model step failed. */

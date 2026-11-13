@@ -242,7 +242,7 @@ export function validate(
       return fallback();
     };
     const modelReason = s.reason?.trim();
-    const reason = concreteReason((modelReason && checked('reason', modelReason, () => null)) || reasonText(c, keptFriends), c, { budgetMax: claims?.intent.budgetMax ?? null, windowEnd: claims?.intent.windowEnd ?? null });
+    const reason = concreteReason((modelReason && checked('reason', modelReason, () => null)) || reasonText(c, keptFriends), c, { budgetMax: claims?.intent.budgetMax ?? null, windowEnd: claims?.intent.windowEnd ?? null, windowStart: claims?.intent.windowStart ?? null, now: claims?.now ?? null });
     const modelBridge = s.bridge?.trim();
     const bridge = modelBridge ? checked('bridge', modelBridge, () => bridgeText(c, keptFriends)) : null;
     const modelInvite = s.inviteDraft?.trim();

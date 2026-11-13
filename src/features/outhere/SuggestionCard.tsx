@@ -1,10 +1,11 @@
 'use client';
 
-import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
+import { CheckCircle2, Footprints, Clock, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
+import { reasonCoversOverlap } from './dedupe';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 
@@ -54,21 +55,24 @@ export function SeatsBadge({ seats }: { seats: number }) {
 type Props = {
   s: PlanSuggestion;
   friends: Map<string, PersonCard>;
+  /** First name -> when that friend's shared free window ends, from the plan's meta. */
+  freeUntil?: Map<string, string>;
+  /** The plan's price from the plan answer (meta.prices), so the meta row is complete on first paint. */
+  priceMax?: number;
   showMuse: boolean;
   onJoined?: () => void;
 };
 
-export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
+export function SuggestionCard({ s, friends, freeUntil, priceMax, showMuse, onJoined }: Props) {
   const quest = useQuest(s.questId);
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
-  const price = quest.data?.quest.priceMax;
+  const price = quest.data?.quest.priceMax ?? priceMax;
   const isMember = quest.data?.viewerIsMember ?? false;
   const people = s.friendIds.map((id) => friends.get(id)).filter((p): p is PersonCard => !!p);
 
   const { viewer } = useViewer();
   const [inviteFor, setInviteFor] = useState<PersonCard | null>(null);
   const [draft, setDraft] = useState('');
-  const [whyOpen, setWhyOpen] = useState(false);
   /** friend id -> invite id */
   const [sentTo, setSentTo] = useState<Map<string, string>>(new Map());
   /** friend id -> what they answered */
@@ -179,6 +183,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   };
 
   const venue = quest.data?.quest.venueName ?? null;
+  // The overlap line goes when the reason already names this friend and their free-until time.
+  const firstNames = people.map((p) => p.name.split(' ')[0] ?? p.name);
+  const overlapCovered = reasonCoversOverlap(s.reason, firstNames, firstNames[0] ? freeUntil?.get(firstNames[0]) : undefined, s.bridge);
   const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
 
   return (
@@ -200,22 +207,12 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       </div>
 
-      {/* The short bridge line shows; Muse's full reasoning opens on tap so the card stays light. */}
-      {s.bridge && !(s.precheck && s.precheck.length > 0) && <p className="mt-2 text-[13px] text-fb-text-2">{s.bridge}</p>}
+      {/* Muse's one-line why and the friend overlap show by default, so the reasoning is visible without a tap. */}
       {s.reason && (
-        <div className="mt-1.5">
-          <button
-            type="button"
-            aria-expanded={whyOpen}
-            onClick={() => setWhyOpen((v) => !v)}
-            data-testid="suggestion-why"
-            className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
-          >
-            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
-            {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-          </button>
-          {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}
-        </div>
+        <p data-testid="suggestion-reason" className="mt-2 text-[13px] leading-[18px] text-fb-text max-md:line-clamp-2" title={s.reason}>
+          {showMuse && <span className="font-semibold text-fb-blue">✨ Muse: </span>}
+          {s.reason}
+        </p>
       )}
 
       {people.length > 0 && s.precheck && s.precheck.length > 0 ? (
@@ -232,13 +229,14 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
             )];
           })}
         </ul>
-      ) : people.length > 0 && (
-        <div className="mt-2 flex items-center gap-2 text-[13px] text-fb-text-2">
-          <Users size={14} aria-hidden />
-          <div className="flex -space-x-1.5">
-            {people.map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={24} ring />)}
-          </div>
-          <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} can make it</span>
+      ) : (people.length > 0 || s.bridge) && !overlapCovered && (
+        <div data-testid="suggestion-overlap" className="mt-1.5 flex items-center gap-2 text-[13px] leading-[18px] text-fb-text-2">
+          {people.length > 0 ? (
+            <div className="flex shrink-0 -space-x-1.5">
+              {people.map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={24} ring />)}
+            </div>
+          ) : <Users size={14} aria-hidden className="shrink-0" />}
+          <span className="min-w-0">{s.bridge ?? overlapText(people, freeUntil)}</span>
         </div>
       )}
 
@@ -321,4 +319,13 @@ function outcomeText(name: string, o: Outcome, venue: string | null, s: PlanSugg
   const where = venue ?? s.title;
   const leave = minutesUntil(leaveBy) > 0 ? ` · leave by ${formatDemoTime(leaveBy)} for the ${s.travelMinutes} min walk` : ` · ${s.travelMinutes} min walk`;
   return `${name}'s in. You're both going to ${where}, ${formatDemoTime(s.startsAt)}${leave}.`;
+}
+
+/** "Maya can make it · free till 3:58 PM": who Muse matched, and when their shared window ends. */
+function overlapText(people: PersonCard[], freeUntil?: Map<string, string>): string {
+  const names = people.map((p) => p.name.split(' ')[0] ?? p.name);
+  const base = `${names.join(', ')} can make it`;
+  if (names.length !== 1) return base;
+  const until = freeUntil?.get(names[0]);
+  return until ? `${base} · free till ${formatDemoTime(until)}` : base;
 }

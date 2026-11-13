@@ -32,7 +32,7 @@ export type RankPromptInput = {
 
 /** Every reason must cite a fact from the candidate data; code replaces reasons that do not. */
 export const REASON_FACT_RULE =
-  'Every reason must cite at least one concrete fact from that candidate\'s data: a shared interest by name (from "matches", "youLike" or a friend\'s "likes"), a friend\'s free window ("freeUntil") or what they "say" in their status, the price ("priceMax"), or the walk minutes ("walkMin"). Quote numbers exactly as given, in plain words ("$12", "free till 11:53 AM"). Never write the data field names themselves (priceMax, walkMin, freeUntil, startsInMin, seatsLeft, youLike, matches). Never use generic phrases such as "fits your time best", "great option" or "perfect fit".';
+  'Every reason must cite at least one concrete fact from that candidate\'s data: a shared interest by name (from "matches", "youLike" or a friend\'s "likes"), a friend\'s free window ("freeUntil") or what they "say" in their status (paraphrase it in a few words, such as "Maya\'s craving dumplings"; never paste the whole status or its " · " separators), the price ("priceMax"), or the walk minutes ("walkMin"). Quote numbers exactly as given, in plain words ("$12", "free till 11:53 AM"). Never write the data field names themselves (priceMax, walkMin, freeUntil, startsInMin, seatsLeft, youLike, matches). Never use generic phrases such as "fits your time best", "great option" or "perfect fit".';
 
 export function rankPrompt(input: RankPromptInput): MuseMessage[] {
   return [

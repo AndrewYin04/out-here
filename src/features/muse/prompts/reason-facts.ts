@@ -1,5 +1,6 @@
 // The rank prompt asks every reason to cite one concrete fact from the candidate data. Code
 // checks that it did; a reason with no fact is replaced by one built from candidate data.
+import { formatDemoTime } from '../../../shared';
 import type { PlanCandidate } from '../candidates';
 
 /** Phrases that say nothing specific about this plan. A reason made only of these is replaced. */
@@ -35,18 +36,67 @@ export function hasConcreteFact(reason: string, c: PlanCandidate): boolean {
   return reasonFactWords(c).some((w) => rest.includes(w));
 }
 
-export type FactReasonOptions = { budgetMax?: number | null; windowEnd?: string | null };
+export type FactReasonOptions = {
+  budgetMax?: number | null; windowEnd?: string | null;
+  /** When the free window starts (ISO): with windowEnd it gives "your 15 min". */
+  windowStart?: string | null;
+  /** The plan's clock, for "starts in 9 min"; without it the start time is named instead. */
+  now?: Date | null;
+};
+
+const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu;
 
 /**
- * A reason built only from checked candidate data. It prefers facts the card's meta row
- * (walk minutes, start time, price) does not already show: a free friend's bubble or shared
- * interest, the viewer's own interests by name, a friend already going, then the budget
- * headroom ("$8 under your $15 budget"). Returns '' when only meta-row facts remain, and
- * the card then hides the reason line instead of printing a copy of the meta row.
+ * A friend's status bubble paraphrased, never pasted: the bubble line is
+ * "craving dumplings 🥟 · lunch break for ~45 min · wants to try Dumpling Den", and this returns
+ * "Maya's craving dumplings and wants to try Dumpling Den". The "doing" part is left out; the
+ * reason names the free-until time instead. Null when the line has no thought or wish.
+ */
+export function statusPhrase(firstName: string, line: string | null | undefined): string | null {
+  if (!line) return null;
+  const parts = line.split(' · ').map((p) => p.replace(EMOJI, '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const wants = parts.find((p) => /^wants to /i.test(p)) ?? null;
+  const thought = parts[0] && parts[0] !== wants ? parts[0] : null;
+  // "craving dumplings" reads as "Maya's craving dumplings"; anything else is quoted, short
+  const said = thought
+    ? /^[a-z]+ing\b/i.test(thought) ? `${firstName}'s ${thought}` : `${firstName} says "${thought}"`
+    : null;
+  if (said && wants) {
+    const both = `${said} and ${wants}`;
+    return both.length <= 80 ? both : said;
+  }
+  return said ?? (wants ? `${firstName} ${wants}` : null);
+}
+
+/** "4 min walk, starts in 9 min, $7 of your $15": the concrete fit for a pick with no friend. */
+function fitReason(c: PlanCandidate, opts: FactReasonOptions): string {
+  const parts = [`${c.travelMinutes} min walk`];
+  const now = opts.now?.getTime();
+  const startsIn = now !== undefined ? Math.round((Date.parse(c.quest.startsAt) - now) / 60_000) : null;
+  parts.push(startsIn !== null && startsIn > 0 && startsIn <= 90 ? `starts in ${startsIn} min` : `starts ${formatDemoTime(c.quest.startsAt)}`);
+  const budget = opts.budgetMax ?? null;
+  const price = c.quest.priceMax === 0 ? 'free' : `$${c.quest.priceMax}`;
+  parts.push(budget !== null && budget >= c.quest.priceMax && c.quest.priceMax > 0 ? `${price} of your $${budget}` : price);
+  const start = Date.parse(opts.windowStart ?? '');
+  const end = Date.parse(opts.windowEnd ?? '');
+  if (Number.isFinite(end) && Date.parse(c.arriveAt) <= end) {
+    const mins = Number.isFinite(start) && end > start ? Math.round((end - start) / 60_000) : null;
+    return `Fits before your ${mins !== null && mins <= 120 ? `${mins} min is` : `free time is`} up: ${parts.join(', ')}.`;
+  }
+  return `${parts.join(', ')}.`;
+}
+
+/**
+ * A reason built only from checked candidate data: a free friend's bubble (paraphrased) or shared
+ * interest, the viewer's own interests by name, a friend already going, the activity asked for.
+ * With none of those it names the concrete fit ("Fits before your 15 min is up: 4 min walk,
+ * starts in 9 min, $7 of your $15"), never the budget alone. Returns '' only when there is no
+ * window and nothing else to cite.
  */
 export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): string {
   const f = c.friendOverlap[0];
-  if (f?.status) return `${f.firstName}'s status says "${f.status}".`;
+  const said = f ? statusPhrase(f.firstName, f.status) : null;
+  if (said) return `${said}.`;
   if (f?.sharedWithQuest[0]) return `You and ${f.firstName} both like ${f.sharedWithQuest[0]}.`;
   const broad = new Set([...BROAD_WORDS, c.quest.category]);
   const interests = c.viewerInterests.filter((i) => !broad.has(i.trim().toLowerCase()));
@@ -55,14 +105,7 @@ export function factReason(c: PlanCandidate, opts: FactReasonOptions = {}): stri
   if (m) return `Your friend ${m.firstName} is already going.`;
   const asked = c.matchedActivities.find((a) => !broad.has(a.trim().toLowerCase()));
   if (asked) return `It is the ${asked} you asked for.`;
-  const budget = opts.budgetMax ?? null;
-  if (budget !== null && budget > c.quest.priceMax) {
-    return `$${budget - c.quest.priceMax} under your $${budget} budget.`;
-  }
-  if (opts.windowEnd) {
-    const spare = Math.floor((Date.parse(opts.windowEnd) - Date.parse(c.arriveAt)) / 60_000);
-    if (spare >= 5) return `You get there with ${spare} min of your free time left.`;
-  }
+  if (opts.windowEnd || opts.budgetMax != null) return fitReason(c, opts);
   const tags = c.quest.tags.filter((t) => !broad.has(t.trim().toLowerCase())).slice(0, 2);
   if (tags.length > 0) return `For people into ${tags.join(' and ')}.`;
   return '';

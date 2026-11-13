@@ -25,8 +25,8 @@ const BOX_W = 46;
 const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
-/** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
-const PHONE_RESULTS_SHEET = 0.5;
+/** Share of the map the phone plan sheet covers while results show (its max-h-[68%]). */
+const PHONE_RESULTS_SHEET = 0.68;
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
 const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
@@ -55,6 +55,8 @@ export type MapCanvasProps = {
   friendFaces: Record<ID, FriendFace[]> | null;
   /** Quest ids of the Muse plan on screen: those pins get a blue ring and a "Muse pick" tag, others dim. */
   picks: ID[] | null;
+  /** The live model ranked the picks: the tag reads "✨ Muse pick"; otherwise "Top pick". */
+  picksByMuse: boolean;
   /** Extra points the plan framing includes (the top suggestion's friends, from their Find My pins). */
   fitTo: LatLng[] | null;
   now: Date;
@@ -160,7 +162,7 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
 }
 
 /** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null) {
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, byMuse: boolean) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
@@ -172,7 +174,7 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.vis.textContent = glyph ?? '';
   p.vis.style.display = glyph ? 'block' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${picked ? (byMuse ? 'Muse pick: ' : 'Top pick: ') : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
   const ring = selected || picked ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
@@ -183,6 +185,7 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.button.style.opacity = dimmed ? '0.4' : '1';
   p.button.style.transition = 'opacity .2s';
   p.root.toggleAttribute('data-dimmed', dimmed);
+  p.pick.textContent = byMuse ? '✨ Muse pick' : 'Top pick';
   if (picked && !p.pick.isConnected) p.button.append(p.pick);
   else if (!picked && p.pick.isConnected) p.pick.remove();
   paintFaces(p, faces);
@@ -196,7 +199,7 @@ function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
 }
 
 export default function MapCanvas({
-  quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
+  quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, picksByMuse, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
   onPickLocation, draft, onDraftMove,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -262,6 +265,18 @@ export default function MapCanvas({
       } else {
         ref.more.style.display = 'none';
       }
+    }
+    // Two picks side by side on a phone would stack their tags into "✨ Muse✨ Muse pick": the
+    // higher-ranked pick keeps its tag and a tag that would overlap it is hidden.
+    const tags: DOMRect[] = [];
+    for (const id of order.current) {
+      const ref = pins.current.get(id);
+      if (!ref || !ref.pick.isConnected || !g.has(id)) continue;
+      ref.pick.style.display = '';
+      const r = ref.pick.getBoundingClientRect();
+      const clash = tags.some((t) => r.left < t.right + 4 && t.left < r.right + 4 && r.top < t.bottom && t.top < r.bottom);
+      if (clash) ref.pick.style.display = 'none';
+      else tags.push(r);
     }
   };
   const schedule = () => {
@@ -382,15 +397,16 @@ export default function MapCanvas({
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, picksByMuse);
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }
     }
-    const rank = (q: Quest) => (q.id === selectedId ? 0 : pickSet?.has(q.id) ? 1 : viewerId && q.memberIds.includes(viewerId) ? 2 : 3);
+    // Picks keep the plan's order, so the top suggestion keeps its tag when two tags collide.
+    const rank = (q: Quest) => (q.id === selectedId ? 0 : picks?.includes(q.id) ? 1 + picks.indexOf(q.id) / 10 : viewerId && q.memberIds.includes(viewerId) ? 2 : 3);
     order.current = [...quests].sort((a, b) => rank(a) - rank(b) || a.startsAt.localeCompare(b.startsAt)).map((q) => q.id);
     schedule();
-  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces, picks]);
+  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces, picks, picksByMuse]);
 
   // A new Muse plan: frame the viewer, the picked plans and the top suggestion's friends,
   // clear of the plan sheet (left panel on desktop, bottom sheet on phones).
@@ -408,13 +424,38 @@ export default function MapCanvas({
     if (n === 0) return;
     if (origin) b.extend([origin.lng, origin.lat]);
     for (const p of fitTo ?? []) b.extend([p.lng, p.lat]);
+    if (isDesktop()) {
+      map.fitBounds(b, { padding: { top: 90, bottom: 70, left: 460, right: 90 }, maxZoom: 16, duration: 600 });
+      schedule();
+      return;
+    }
+    // Phones: the results sheet covers 68% of the map (PlanSheet). A fitBounds with ~570 px of
+    // bottom padding on a ~730 px map left the strip above the sheet without tiles, so the
+    // camera is computed with even padding, zoomed out until the picks fit the strip, and
+    // its center shifted up by offset (no padding is kept on the map).
+    const w = map.getContainer().clientWidth;
     const h = map.getContainer().clientHeight;
-    const padding = isDesktop()
-      ? { top: 90, bottom: 70, left: 460, right: 90 }
-      // With results the phone sheet drops to a peek of 50% of the map (PlanSheet); fit the
-      // picks, their pills and labels in the space above it, 24 px clear of the sheet edge.
-      : { top: 72, bottom: Math.max(0, Math.min(Math.round(h * PHONE_RESULTS_SHEET) + 24 + BOX_BOTTOM + LABEL_H, h - 72 - 90)), left: 48, right: 48 };
-    map.fitBounds(b, { padding, maxZoom: isDesktop() ? 16 : 15.5, duration: 600 });
+    const sheetPx = Math.round(h * PHONE_RESULTS_SHEET);
+    const TOP_UI = 72; // Explore/Friends toggle and the Muse filter pill
+    const strip = Math.max(80, h - sheetPx - TOP_UI - 24);
+    const cam = map.cameraForBounds(b, { padding: 48, maxZoom: 15.5, bearing: map.getBearing() });
+    if (!cam || cam.zoom === undefined) return;
+    // Pixel size of the bounds at the camera's zoom, then the zoom that fits it in the strip,
+    // leaving room for the pins (above the point) and their labels (below it).
+    const ne = map.project(b.getNorthEast());
+    const sw = map.project(b.getSouthWest());
+    const scale = 2 ** (cam.zoom - map.getZoom());
+    const bw = Math.abs(ne.x - sw.x) * scale;
+    const bh = Math.abs(ne.y - sw.y) * scale;
+    const fitW = (w - 96) / Math.max(bw, 1);
+    const fitH = (strip - BOX_TOP - BOX_BOTTOM - LABEL_H) / Math.max(bh, 1);
+    const zoom = Math.min(15.5, cam.zoom + Math.log2(Math.min(1, fitW, fitH)));
+    // The strip's middle sits this far above the map's middle.
+    const lift = h / 2 - (TOP_UI + strip / 2);
+    map.easeTo({
+      center: cam.center, zoom, bearing: map.getBearing(), offset: [0, -lift],
+      padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600,
+    });
     schedule();
     // quests/origin/fitTo are read at the moment a plan arrives; picksKey and fitKey trigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -426,6 +467,9 @@ export default function MapCanvas({
     const map = mapRef.current;
     if (!map || framed.current || quests.length === 0 || !origin || !walkMinutes) return;
     framed.current = true;
+    // A plan that answered before the map's data loaded has already framed its picks; framing
+    // every plan now would move the picks under the phone sheet.
+    if (picksKey) return;
     const desktop = isDesktop();
     const pick = desktop
       ? quests
@@ -439,7 +483,7 @@ export default function MapCanvas({
       duration: 0,
     });
     schedule();
-  }, [quests, origin, walkMinutes]);
+  }, [quests, origin, walkMinutes, picksKey]);
 
   // The plan being created: a draggable pin. Dragging it moves the plan.
   const draftKey = draft ? `${draft.at.lat.toFixed(6)},${draft.at.lng.toFixed(6)}` : '';

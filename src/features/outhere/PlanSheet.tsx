@@ -1,13 +1,13 @@
 'use client';
 
-import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
-import { shownDrops } from './dropped';
-import { museSteps } from './muse-steps';
-import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
+import { summaryWithoutTop } from './dedupe';
+import { museWork } from './muse-work';
+import { MuseStepsLoading, MuseWorkPanel } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
@@ -144,9 +144,10 @@ export function PlanSheet({ className }: { className?: string }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<PlanResult | null>(null);
+  /** Quest ids the answer before this one suggested: a pick that dropped out is explained first. */
+  const [previousIds, setPreviousIds] = useState<string[]>([]);
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [whyOpen, setWhyOpen] = useState(false);
   const [duration, setDuration] = useState<DurationId | null>(null);
   const [moods, setMoods] = useState<Set<string>>(new Set());
   /** After an ask, the two picker rows fold into one line so Muse's results have room. */
@@ -182,7 +183,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
+    setResult(null); setPreviousIds([]); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -210,14 +211,14 @@ export function PlanSheet({ className }: { className?: string }) {
     const mine = ++seq.current;
     setStatus('loading');
     setError(null);
-    setWhyOpen(false);
     setAsked(t);
     setPlanAsk(t);
     setPlanStatus({ state: 'loading', summary: null, topTitle: null, topReason: null, error: null, live: false });
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
-      setResult(r); setPlanSuggestions(r.plan.suggestions);
+      setPreviousIds(result ? result.plan.suggestions.flatMap((s) => (s.questId ? [s.questId] : [])) : []);
+      setResult(r); setPlanSuggestions(r.plan.suggestions, r.museSource === 'muse');
       setStatus('done');
       const top = r.plan.suggestions[0];
       setPlanStatus({
@@ -242,9 +243,32 @@ export function PlanSheet({ className }: { className?: string }) {
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';
-  const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
-  const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
-  const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
+  // Read once per answer: phones show 2 ruled-out rows, wider screens 3.
+  const work = useMemo(() => {
+    if (!result?.plan.meta) return null;
+    const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+    return museWork(result.plan, result.museSource, new Date(), wide ? 3 : 2, previousIds);
+  }, [result, previousIds]);
+  // First name -> end of the free window Muse matched (meta.friendsFree carries no ids).
+  // A first name two free friends share is left out rather than guessed.
+  const freeUntil = useMemo(() => {
+    const out = new Map<string, string>();
+    const dup = new Set<string>();
+    for (const f of result?.plan.meta?.friendsFree ?? []) {
+      if (out.has(f.firstName)) dup.add(f.firstName);
+      out.set(f.firstName, f.freeUntil);
+    }
+    for (const n of dup) out.delete(n);
+    return out;
+  }, [result]);
+  // Under the cards the summary drops sentences that repeat the top card.
+  const summary = useMemo(() => {
+    const raw = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
+    const top = result?.plan.suggestions[0];
+    const friend = top?.friendIds[0] ? friendMap.get(top.friendIds[0]) : undefined;
+    const name = friend ? (friend.name.split(' ')[0] ?? friend.name) : undefined;
+    return summaryWithoutTop(raw, top, name ? { name, freeUntil: freeUntil.get(name) } : undefined);
+  }, [result, friendMap, freeUntil]);
 
   return (
     <>
@@ -254,7 +278,7 @@ export function PlanSheet({ className }: { className?: string }) {
           data-testid="plan-sheet"
           className={cn(
             'absolute inset-x-0 bottom-0 z-30 flex animate-sheet-up flex-col rounded-t-[16px] bg-fb-surface shadow-popover md:animate-panel-in',
-            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[82%]',
+            result && result.plan.suggestions.length > 0 ? 'max-h-[68%]' : 'max-h-[78%]',
             'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
@@ -351,51 +375,39 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
-                {steps.length > 0 && <MuseStepsDone steps={steps} showMuse={showMuse} />}
-                {summary && (
-                  <div data-testid="plan-summary" className="mb-3 animate-step-in px-1">
-                    {showMuse && <MuseLabel className="mb-1" />}
-                    {offline && <OfflineLabel className="mb-1" />}
-                    <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
-                  </div>
-                )}
+                {work && <MuseWorkPanel work={work} />}
                 <PrecheckLine plan={result.plan} friends={friendMap} />
                 {result.plan.suggestions.length === 0 ? (
-                  <div data-testid="plan-empty" className="animate-rise rounded-card bg-fb-surface p-4 text-center shadow-card">
-                    <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
-                    <p className="mt-1 text-[13px] text-fb-text-2">Try a longer time, like 1 hr.</p>
-                  </div>
+                  <>
+                  {summary && (
+                    <div data-testid="plan-summary" className={cn("px-1", result.plan.suggestions.length > 0 ? "mt-3" : "mb-3")}>
+                      {showMuse && <MuseLabel className="mb-1" />}
+                      {offline && <OfflineLabel className="mb-1" />}
+                      <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
+                    </div>
+                  )}
+                    <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
+                      <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
+                      <p className="mt-1 text-[13px] text-fb-text-2">Try a longer window, or tap &quot;40 min&quot;.</p>
+                    </div>
+                  </>
                 ) : (
-                  <div className="flex flex-col gap-2">
-                    {result.plan.suggestions.map((s, i) => (
-                      <div key={`${s.questId ?? s.title}-${i}`} className="animate-rise" style={{ animationDelay: `${80 + i * 90}ms` }}>
-                        <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {drops.length > 0 && (
-                  <div className="mt-3 rounded-card bg-fb-surface shadow-card">
-                    <button
-                      type="button"
-                      aria-expanded={whyOpen}
-                      onClick={() => setWhyOpen((v) => !v)}
-                      className="flex w-full items-center justify-between rounded-card px-3 py-2.5 text-[15px] font-semibold text-fb-text hover:bg-fb-hover"
-                    >
-                      Why not others?
-                      {whyOpen ? <ChevronUp size={18} aria-hidden /> : <ChevronDown size={18} aria-hidden />}
-                    </button>
-                    {whyOpen && (
-                      <ul data-testid="why-not" className="px-3 pb-3">
-                        {drops.map((d) => (
-                          <li key={d.questId} className="flex gap-2 py-1 text-[13px] text-fb-text-2">
-                            <span aria-hidden>{d.emoji}</span>
-                            <span><span className="font-semibold text-fb-text">{d.venueName}</span>: {d.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-2">
+                      {result.plan.suggestions.map((s, i) => (
+                        <div key={`${s.questId ?? s.title}-${i}`} className="animate-rise" style={{ animationDelay: `${80 + i * 90}ms` }}>
+                          <SuggestionCard s={s} friends={friendMap} freeUntil={freeUntil} priceMax={s.questId ? result.plan.meta?.prices?.[s.questId] : undefined} showMuse={showMuse} />
+                        </div>
+                      ))}
+                    </div>
+                  {summary && (
+                    <div data-testid="plan-summary" className={cn("px-1", result.plan.suggestions.length > 0 ? "mt-3" : "mb-3")}>
+                      {showMuse && <MuseLabel className="mb-1" />}
+                      {offline && <OfflineLabel className="mb-1" />}
+                      <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
             )}

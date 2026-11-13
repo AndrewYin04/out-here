@@ -17,8 +17,18 @@ test.describe("Muse picks on the map", () => {
     await page.getByRole("button", { name: "Find a plan" }).click();
     await expect(page.getByTestId("plan-summary")).toBeVisible({ timeout: 15_000 });
 
-    await expect(dumplings.getByTestId("muse-pick")).toHaveText("✨ Muse pick");
-    await expect(dumplings).toHaveAttribute("aria-label", /^Muse pick: /);
+    // ✨ only when the live model ranked; mock and fallback plans say "Top pick".
+    const mock = process.env.MUSE_MOCK === "1";
+    await expect(dumplings.getByTestId("muse-pick")).toHaveText(mock ? "Top pick" : /^(✨ Muse pick|Top pick)$/);
+    await expect(dumplings).toHaveAttribute("aria-label", mock ? /^Top pick: / : /^(Muse|Top) pick: /);
+    // two tags never overlap (dumplings and boba sit about 45 px apart at 390 px)
+    await page.waitForTimeout(900);
+    const tagBoxes = (await Promise.all((await page.getByTestId("muse-pick").all()).map((t) => t.boundingBox()))).filter((b) => b !== null);
+    for (let i = 0; i < tagBoxes.length; i++) for (let j = i + 1; j < tagBoxes.length; j++) {
+      const a = tagBoxes[i]!, b = tagBoxes[j]!;
+      const hit = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      expect(hit, "two Muse pick tags overlap").toBe(false);
+    }
     const dimmed = page.locator("[data-dimmed]");
     expect(await dimmed.count()).toBeGreaterThan(0);
     await expect(dimmed.first().locator('[data-map-marker=quest]')).toHaveCSS("opacity", "0.4");

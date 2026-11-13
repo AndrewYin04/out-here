@@ -20,7 +20,7 @@ const SHORT: Record<DropReasonCode, string> = {
   not_open: 'other',
 };
 
-function windowText(plan: PlanResponse, now: Date): string | null {
+export function windowText(plan: PlanResponse, now: Date): string | null {
   const end = Date.parse(plan.intent.windowEnd);
   const start = Math.max(Date.parse(plan.intent.windowStart) || now.getTime(), now.getTime());
   if (!Number.isFinite(end) || end <= start) return null;
@@ -74,15 +74,16 @@ function plansStep(plan: PlanResponse): MuseStep {
   return { key: 'plans', text: `Checked ${total} plan${total === 1 ? '' : 's'}: ${parts.join(' · ')}`, tone: fit > 0 ? 'ok' : 'muted' };
 }
 
-function rankStep(plan: PlanResponse, source: PlanResult['museSource']): MuseStep {
+export function rankStep(plan: PlanResponse, source: PlanResult['museSource']): MuseStep {
   const fit = plan.meta.candidateCount ?? plan.suggestions.length;
   if (fit === 0) return { key: 'rank', text: 'Nothing left to rank', tone: 'muted' };
   const n = plan.suggestions.length;
   const ms = plan.meta.timings?.totalMs;
   // Under 0.1 s means a dev cache answered; "0.0 s" would read as fake, so leave it out.
   const secs = typeof ms === 'number' && ms >= 100 ? ` · ${(ms / 1000).toFixed(1)} s` : '';
-  if (source === 'mock') return { key: 'rank', text: `Ranked offline (mock): ${n} pick${n === 1 ? '' : 's'}${secs}`, tone: 'muted' };
-  if (source === 'fallback') return { key: 'rank', text: `Muse didn't answer in time, so sorted by time and distance${secs}`, tone: 'muted' };
+  // Mock and fallback picks come from explain.ts heuristicScore: free friends, interests, walk time.
+  if (source === 'mock') return { key: 'rank', text: `Sorted offline by who's free, interests, walk${secs}`, tone: 'muted' };
+  if (source === 'fallback') return { key: 'rank', text: `Muse didn't answer in time, so sorted by who's free, your interests and walk time${secs}`, tone: 'muted' };
   return { key: 'rank', text: `Muse ranked ${n} of ${fit} and explained why${secs}`, tone: 'ok' };
 }
 

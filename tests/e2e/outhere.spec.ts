@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 // Out Here core loop: "I'm free" -> Muse plan -> invite -> friend accepts -> seats drop live.
 // The MemoryStore keeps state for the server's lifetime, so the two-persona flow (which fills
 // the dumpling quest) runs only in the desktop project; the phone project checks the composer,
-// the time-fit rules and "Why not others?", which do not depend on that quest's seats.
+// the time-fit rules and the ruled-out reasons, which do not depend on that quest's seats.
 const PLACEHOLDER = "hungry, got like 40 min, under $15";
 const DUMPLINGS = "Dumplings before the rush";
 
@@ -40,7 +40,8 @@ test.describe("Out Here plan sheet", () => {
     await expect(box).toHaveValue("");
 
     await ask(page, "hungry, 15 min");
-    await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
+    // not a pick (it may still be listed as ruled out, with its reason)
+    await expect(page.getByTestId("suggestion").filter({ hasText: DUMPLINGS })).toHaveCount(0);
     const cards = page.getByTestId("suggestion");
     if ((await cards.count()) === 0) await expect(page.getByTestId("plan-empty")).toContainText("No plan fits 15 minutes right now");
 
@@ -55,10 +56,10 @@ test.describe("Out Here plan sheet", () => {
       await page.getByRole("button", { name: "Cancel" }).click();
     }
 
-    await page.getByRole("button", { name: "Why not others?" }).click();
+    // Muse's ruled-out reasons show without a tap (issue #12)
     const why = page.getByTestId("why-not");
-    await expect(why).toContainText(/\d+ min walk, too far/);
-    await expect(why).toContainText("over your $15 budget");
+    await expect(why).toContainText(/\d+ min walk, over your 25/);
+    await expect(why).toContainText("$26, over your $15");
 
     await page.getByRole("button", { name: "Close" }).click();
     await expect(page.getByTestId("plan-sheet")).toHaveCount(0);

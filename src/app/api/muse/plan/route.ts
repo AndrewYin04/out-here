@@ -55,6 +55,8 @@ export const POST = route(async ({ req, viewer }) => {
       const walkMinutes = walkingMinutes(context.location, q.location);
       return [{
         questId: d.questId, title: d.title, venueName: q.venueName, emoji: q.emoji, reason: d.reason,
+        // the numbers behind the reason, so the sheet can say "28 min walk, over your 25"
+        walkMinutes, priceMax: q.priceMax, startsAt: q.startsAt,
         text: dropText(d.reason, { walkMinutes, priceMax: q.priceMax, budgetMax }),
       }];
     });
