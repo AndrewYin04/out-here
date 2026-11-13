@@ -63,7 +63,9 @@ export class SupabaseBackend implements Backend {
     };
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
-    const first = await page(0, true);
+    // One retry when the request never reached the database (a dropped connection).
+    let first = await page(0, true);
+    if (first.error && /fetch failed|network|ECONNRESET|ETIMEDOUT|socket/i.test(first.error.message ?? '')) first = await page(0, true);
     // Tables added by a later migration read as empty until that migration is applied, so a
     // deploy that lands before `db:migrate` still serves every page (writes to them fail).
     if (first.error && OPTIONAL_TABLES.has(key) && /Could not find the table|does not exist|PGRST205|42P01/.test(`${first.error.code ?? ''} ${first.error.message ?? ''}`)) {
