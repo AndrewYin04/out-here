@@ -66,16 +66,17 @@ function PopUpSheet({ at, now, onClose, onPosted, popUp }: SellSheetProps & { po
     setBusy(true);
     setError(null);
     try {
-      let first: MapListing | null = null;
-      for (const [i, it] of popUp.items.entries()) {
+      // Every item at once (each POST is its own row and its own listings:new), so the last pin
+      // doesn't wait on the first. The seller lands on the first item's sheet.
+      const posted = await Promise.all(popUp.items.map((it, i) => {
         const body: CreateListingBody = {
           title: it.title, priceUsd: it.priceUsd, category: it.category, imageUrl: it.imageUrl, description: it.description,
           // Each table a few metres along, so the seller's own pins don't sit on top of each other.
           location: i === 0 ? at : offsetPoint(at, 25 * i, 90), pickupLabel: popUp.name, pickupSpot: popUp.spot, pickupUntil: until,
         };
-        const r = await apiPost<MapListingResponse>('/api/listings', body);
-        first ??= r.listing;
-      }
+        return apiPost<MapListingResponse>('/api/listings', body);
+      }));
+      const first: MapListing | null = posted[0]?.listing ?? null;
       if (first) onPosted(first);
     } catch (e) {
       setError(e instanceof ApiFetchError ? e.message : 'Could not open the pop-up. Try again.');
