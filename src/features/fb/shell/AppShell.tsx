@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ToastProvider } from '@/features/ui';
+import { SideQuestHost } from '@/features/daily';
 import { InviteInbox } from '@/features/outhere';
 import { LeftNav } from './LeftNav';
 import { MobileTabBar } from './MobileTabBar';
@@ -66,6 +67,7 @@ export function AppShell({ children, layout }: { children: ReactNode; layout?: S
         )}
       </div>
       <InviteInbox />
+      <SideQuestHost />
       <MobileTabBar />
     </ToastProvider>
   );
