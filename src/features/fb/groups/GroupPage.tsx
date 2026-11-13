@@ -127,7 +127,7 @@ function Composer({ group, onPosted }: { group: GroupView; onPosted: (p: PostVie
             onChange={(e) => setText(e.target.value)}
             placeholder="Write something..."
             data-testid="group-composer"
-            className="h-10 w-full rounded-pill bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 hover:bg-fb-secondary-btn focus-visible:ring-2 focus-visible:ring-fb-blue"
+            className="h-10 w-full rounded-pill bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 hover:bg-fb-secondary-btn"
           />
         </label>
         <Button type="submit" disabled={busy || !text.trim()}>Post</Button>

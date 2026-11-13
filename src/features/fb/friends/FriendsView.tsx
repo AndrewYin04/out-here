@@ -219,7 +219,7 @@ function AllFriends() {
     <section aria-label="All friends">
       <PageHeader title="All friends" subtitle={data ? `${data.friends.length} friends` : undefined} />
       <Card flushOnMobile className="p-2">
-        <label className="mb-1 flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3 focus-within:ring-2 focus-within:ring-fb-blue">
+        <label className="mb-1 flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3">
           <Search size={16} className="shrink-0 text-fb-text-2" aria-hidden />
           <span className="sr-only">Search friends</span>
           <input

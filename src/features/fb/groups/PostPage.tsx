@@ -97,7 +97,7 @@ export function PostPage({ id }: { id: string }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`Comment as ${viewer.name}`}
-              className="h-9 w-full rounded-[18px] bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus-visible:ring-2 focus-visible:ring-fb-blue"
+              className="h-9 w-full rounded-[18px] bg-fb-input px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2"
             />
           </label>
           <Button type="submit" size="sm" disabled={busy || !text.trim()}>Post</Button>

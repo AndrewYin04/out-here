@@ -60,7 +60,7 @@ function SectionSearch({ section }: { section: Section }) {
   };
   return (
     <form role="search" aria-label={section.search.label} onSubmit={submit} className="px-2 pb-2">
-      <label className="flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3 focus-within:ring-2 focus-within:ring-fb-blue">
+      <label className="flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3">
         <Search size={16} className="shrink-0 text-fb-text-2" aria-hidden />
         <span className="sr-only">{section.search.label}</span>
         <input

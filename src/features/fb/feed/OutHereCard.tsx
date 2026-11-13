@@ -113,7 +113,7 @@ export function OutHereCard() {
                   {featured.quest.venueName} · {featured.walk} min walk · {startsLabel(featured.quest.startsAt)}
                 </span>
               </span>
-              <span className="shrink-0 rounded-full bg-[#FDE8EA] px-2 py-0.5 text-[12px] font-semibold text-fb-red" data-testid="home-outhere-seats">
+              <span className="shrink-0 rounded-full bg-fb-red px-2 py-0.5 text-[12px] font-semibold text-white" data-testid="home-outhere-seats">
                 {featured.seatsLeft} {featured.seatsLeft === 1 ? 'seat' : 'seats'} left
               </span>
             </Link>
@@ -121,8 +121,10 @@ export function OutHereCard() {
         </div>
       )}
 
-      {/* One action: the rows above already open the map. */}
-      <LinkButton href={`${ROUTES.outHere}?free=1`} size="sm" block className="mt-3" data-testid="home-outhere-free-button">I&apos;m free</LinkButton>
+      <div className="mt-3 flex gap-2">
+        <LinkButton href={`${ROUTES.outHere}?free=1`} size="sm" className="flex-1" data-testid="home-outhere-free-button">I&apos;m free</LinkButton>
+        <LinkButton href={ROUTES.outHere} size="sm" variant="secondary" className="flex-1">Open map</LinkButton>
+      </div>
     </Card>
   );
 }

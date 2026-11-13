@@ -184,7 +184,7 @@ function CommentBox({ placeholder, onSubmit, onCancel, autoFocus, small, initial
       onSubmit={(e) => { e.preventDefault(); submit(); }}
     >
       <Avatar name={viewer.name} src={viewer.avatarUrl} size={small ? 24 : 32} decorative />
-      <div className="flex h-9 min-w-0 flex-1 items-center rounded-[18px] bg-fb-input pl-3 pr-1 focus-within:ring-2 focus-within:ring-fb-blue">
+      <div className="flex h-9 min-w-0 flex-1 items-center rounded-[18px] bg-fb-input pl-3 pr-1">
         <input
           ref={inputRef}
           value={text}
