@@ -21,6 +21,8 @@ export type ListingSheetProps = {
   walkMin?: number | null;
   /** Muse's line when this listing is the viewer's find. */
   museLine: string | null;
+  /** The watch the find matched ("track jacket under $25"), shown above Muse's line. */
+  museWatch?: string | null;
   onClose: () => void;
   onChanged: () => void;
 };
@@ -45,7 +47,7 @@ const ago = (iso: string, at: Date) => {
 
 const directionsUrl = (p: LatLng) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
 
-export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, museLine, onClose, onChanged }: ListingSheetProps) {
+export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, museLine, museWatch = null, onClose, onChanged }: ListingSheetProps) {
   const api = useMapListing(listingId);
   const m = api.data?.listing ?? null;
   const toast = useToast();
@@ -115,7 +117,9 @@ export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, mu
         <div className="flex flex-col gap-3 overflow-y-auto px-4 pb-4">
           {museLine && !isSeller && m.status === 'available' && (
             <p data-testid="listing-muse-line" className="rounded-card bg-fb-blue-tint px-3 py-2 text-[14px] leading-[19px] text-fb-text">
-              <span className="mr-1 font-semibold text-fb-blue">✨ Muse</span>{museLine}
+              <span className="mr-1 font-semibold text-fb-blue">✨ Muse</span>
+              {museWatch && <span className="font-semibold">Fits the watch you set: {museWatch}. </span>}
+              {museLine}
             </p>
           )}
 

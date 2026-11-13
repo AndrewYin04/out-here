@@ -13,7 +13,7 @@ import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
-import { MarketMenu, MuseFindCard } from './market/MuseFind';
+import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
@@ -262,6 +262,11 @@ export function OutHereView() {
   const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings);
   const allFinds = useMemo(() => [...(findsApi.data?.finds ?? []), ...watchFinds], [findsApi.data, watchFinds]);
   const find = allFinds.find((f) => !dismissedFinds.has(f.listingId)) ?? null;
+  const watchFor = useCallback((listing: string | null) => {
+    const f = listing ? allFinds.find((x) => x.listingId === listing) : null;
+    const w = f ? wants.find((x) => x.id === f.wantId) : null;
+    return w ? watchLabel(w) : null;
+  }, [allFinds, wants]);
   const viewFind = useCallback((id: string, at: LatLng | null) => {
     setMode('explore');
     setShowListings(true);
@@ -641,6 +646,7 @@ export function OutHereView() {
           <MuseFindCard
             key={find.listingId}
             find={find}
+            watch={watchFor(find.listingId)}
             onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
             onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
           />
@@ -711,6 +717,7 @@ export function OutHereView() {
           driveMin={driveMin}
           walkMin={walkMin}
           museLine={allFinds.find((f) => f.listingId === listingId)?.line ?? null}
+          museWatch={watchFor(listingId)}
           onClose={() => openListing(null)}
           onChanged={() => { void listingsApi.refetch(); }}
         />
