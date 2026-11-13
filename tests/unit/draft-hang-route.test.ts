@@ -64,6 +64,30 @@ describe('POST /api/muse/draft-hang', () => {
     expect(incoming.some((i) => i.questId === quest.id && i.message === d.invite)).toBe(true);
   });
 
+  it('drafts with the next free friend when the first one is nearly out of time', async () => {
+    const s = createMemoryStore(NOW);
+    store.current = s;
+    viewerId.current = alex;
+    const kai = profileId('kai');
+    const soon = new Date(NOW.getTime() + 20 * 60_000).toISOString(); // too short for 30 min together
+    const later = new Date(NOW.getTime() + 90 * 60_000).toISOString();
+    await s.createAvailability(alex, { text: 'free', startsAt: NOW.toISOString(), endsAt: later, location: DEMO_CENTER });
+    await s.createAvailability(maya, { text: 'free a bit', startsAt: NOW.toISOString(), endsAt: soon, location: DEMO_CENTER });
+    await s.createAvailability(kai, { text: 'down for boba', startsAt: NOW.toISOString(), endsAt: later, location: DEMO_CENTER });
+    const free = await s.freeWithMe(alex);
+    expect(free.items[0]?.friend.id).toBe(maya); // Maya comes first, so the fallback to Kai is what is tested
+    expect(free.items.map((i) => i.friend.id)).toContain(kai);
+
+    const body = await (await draft({ text: 'free for a bit' })).json();
+    expect(body.reason).toBeUndefined();
+    expect(body.friend.id).toBe(kai);
+    expect(body.draft.friendId).toBe(kai);
+    expect(body.others.map((p: { id: string }) => p.id)).not.toContain(kai);
+    // asking for Maya by name still says her window is too short
+    const mayaOnly = await (await draft({ text: 'free for a bit', friendId: maya })).json();
+    expect(mayaOnly).toMatchObject({ draft: null, reason: 'no_place_fits' });
+  });
+
   it('says so when nobody is free with you', async () => {
     const s = createMemoryStore(NOW);
     store.current = s;
