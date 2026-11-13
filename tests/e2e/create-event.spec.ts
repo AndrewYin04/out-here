@@ -32,7 +32,7 @@ test.describe("Post a plan", () => {
     await page.getByTestId("visibility-friends").click();
     await expect(page.getByTestId("create-post")).toHaveText("Pick at least one friend");
 
-    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(sheet).toHaveCount(0);
     await expect(page.getByTestId("draft-pin")).toHaveCount(0);
   });

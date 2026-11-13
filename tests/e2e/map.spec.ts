@@ -94,8 +94,16 @@ test.describe('phone 390', () => {
     await openMap(page, 'alex');
     await expect(page.getByTestId('quest-pin-dumplings')).toBeVisible();
     await page.waitForTimeout(500);
-    const bubble = page.locator('[data-role="cluster"]').filter({ visible: true }).first();
-    test.skip((await bubble.count()) === 0, 'no pins are grouped at this framing');
+    // The first bubble on screen: a marker can sit just outside the phone viewport.
+    const all = page.locator('[data-role="cluster"]').filter({ visible: true });
+    const vp = page.viewportSize()!;
+    let pick = -1;
+    for (let i = 0; i < await all.count() && pick < 0; i++) {
+      const b = await all.nth(i).boundingBox();
+      if (b && b.x >= 0 && b.y >= 0 && b.x + b.width <= vp.width && b.y + b.height <= vp.height) pick = i;
+    }
+    test.skip(pick < 0, 'no pins are grouped on screen at this framing');
+    const bubble = all.nth(pick);
     const root = bubble.locator('xpath=..');
     const id = await root.getAttribute('data-quest-id');
     const n = Number(((await bubble.textContent()) ?? '+0').slice(1));

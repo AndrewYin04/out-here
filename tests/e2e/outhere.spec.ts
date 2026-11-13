@@ -63,7 +63,7 @@ test.describe("Out Here plan sheet", () => {
     await expect(why).toContainText(/\d+ min walk, too far/);
     await expect(why).toContainText("over your $15 budget");
 
-    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(page.getByTestId("plan-sheet")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "I'm free" })).toBeVisible();
   });

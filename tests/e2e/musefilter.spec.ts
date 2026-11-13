@@ -113,7 +113,7 @@ test.describe('Muse filter', () => {
     await page.locator('[data-testid="friend-pin"][data-handle="maya"]').click();
     await expect(page.getByTestId('friend-muse-reason')).toContainText(/Maya: you both like/);
     await page.screenshot({ path: `test-results/musefilter-friend-card-${page.viewportSize()!.width}.png` });
-    await page.getByRole('button', { name: 'Close' }).first().click();
+    await page.getByRole('button', { name: 'Close', exact: true }).first().click();
     await expect(page.getByTestId('friend-card')).toHaveCount(0);
     await page.getByTestId('muse-filter-show-all').click();
     const friendMarkers = page.locator('[data-testid="friend-pin"], [data-testid="friend-cluster"]');

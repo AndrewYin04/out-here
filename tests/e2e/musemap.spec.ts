@@ -39,7 +39,7 @@ test.describe("Muse picks on the map", () => {
     }
     await page.screenshot({ path: test.info().outputPath("plan.png") });
 
-    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
     await expect(page.getByTestId("muse-pick")).toHaveCount(0);
     await expect(page.locator("[data-dimmed]")).toHaveCount(0);
   });
