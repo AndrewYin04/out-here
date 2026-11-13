@@ -698,7 +698,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         layer.setPose(id, cur.at, cur.heading, 0);
       }
 
-      // The pet: at your shoulder, or in front of you facing the camera while it talks.
+      // The pet: close behind your shoulder, or in front of you facing the camera while it talks.
       const front = !photoFocus && petMode.current === 'front';
       const stage=museStage(front);
       const beside=moveMeters(pos.current,stage.sideways*scale,camBearing.current+90);
