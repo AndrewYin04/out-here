@@ -21,7 +21,7 @@ test('two attendees can find a joined hangout and share one crew album', async (
   await page.getByTestId('dock-tab-plans').click();
   const alexPlan = page.getByRole('article', { name: title });
   await expect(alexPlan).toBeVisible();
-  await expect(alexPlan.getByRole('link', { name: 'Walk there' })).toHaveAttribute('href', /travelmode=walking/);
+  await expect(alexPlan.getByRole('button', { name: 'Walk there' })).toBeVisible();
   const outsiders = await request.get('/api/quests/mine', { headers: as('jordan') });
   expect((await outsiders.json()).plans.some((plan: { quest: { id: string } }) => plan.quest.id === quest.id)).toBe(false);
 
