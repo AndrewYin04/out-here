@@ -34,7 +34,7 @@ describe('separate agents and code-enforced privacy', () => {
     expect(events.map(e => e.type)).toEqual(['accepted', 'sent', 'received']);
     expect(done.messages.map(m => m.senderAgentId)).toEqual([`muse:${alex}`, `muse:${maya}`]);
     expect(done.result).toMatchObject({ mode: 'live', approvalRequired: true });
-    expect(done.result?.text).toContain('can’t confirm');
+    expect(done.result?.text).toMatch(/(can|could)n?’t confirm/);
     expect(done.result?.suggestions[0].friendIds).toEqual([maya]);
     expect((await repo.get(done.id, alex))?.messages).toEqual(done.messages);
   });

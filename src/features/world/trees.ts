@@ -179,6 +179,22 @@ export function nearestOpen(p: LatLng, blocked: (q: LatLng) => boolean): LatLng 
   return p;
 }
 
+/** How far (meters, up to `maxM`) you can walk from `p` along `heading` before a building or water. */
+export function clearRun(p: LatLng, heading: number, blocked: (q: LatLng) => boolean, maxM = 60): number {
+  const a = (heading * Math.PI) / 180;
+  for (let r = 3; r <= maxM; r += 3) if (blocked(fromOffset(p, Math.sin(a) * r, Math.cos(a) * r))) return r - 3;
+  return maxM;
+}
+
+/** The heading with the most open ground ahead: `prefer` (e.g. both ways along the street) wins when it has room. */
+export function openHeading(p: LatLng, blocked: (q: LatLng) => boolean, prefer: number[] = []): number | null {
+  const best = (hs: number[]) => hs.map((h) => ({ h, run: clearRun(p, h, blocked) })).sort((x, y) => y.run - x.run)[0] ?? null;
+  const street = best(prefer);
+  if (street && street.run >= 24) return street.h;
+  const any = best(Array.from({ length: 16 }, (_, k) => k * 22.5));
+  return any && (!street || any.run > street.run) ? any.h : street?.h ?? null;
+}
+
 /** The closest point to `p` on any of `lines` ([lng, lat] coords), if one is within `maxM` meters. */
 export function nearestOnLines(p: LatLng, lines: number[][][], maxM: number): LatLng | null {
   let best: { e: number; n: number; d: number } | null = null;
