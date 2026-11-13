@@ -5,12 +5,15 @@
 import { MapPin, RotateCcw, Settings, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatDemoTime, INTRO_KINDS, type IntroKind, type IntroProfile } from '@/shared';
-import type { IntroCardData, IntroPlanAction } from './types';
+import type { IntroCardData, IntroChoice, IntroPlanAction } from './types';
 import { apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
-import { Button, Card, IconButton, Sheet, Skeleton, cn } from '@/features/ui';
+import { Avatar, Button, Card, IconButton, Sheet, Skeleton, cn } from '@/features/ui';
 import { IntroCard, KIND_LABELS, MuseTag } from './IntroCard';
 
-type RoundResult = { intro: IntroCardData | null; considered: number; belowBar: number; capped: boolean; paused: boolean; message: string; none?: true };
+type RoundResult = {
+  intro: IntroCardData | null; choices?: IntroChoice[];
+  considered: number; belowBar: number; capped: boolean; paused: boolean; message: string; none?: true;
+};
 
 const PLACEHOLDERS: Record<IntroKind, string> = {
   friendship: 'e.g. a climbing partner, people to go to shows with',
@@ -35,16 +38,58 @@ function KindPicker({ value, onChange, name }: { value: IntroKind; onChange: (k:
 /** The plan an intro request is for, from /intros?quest=<id> ("Find someone to go with" on a plan). */
 type PlanFor = { id: string; label: string; when: string };
 
-function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult) => void; plan: PlanFor | null; onClearPlan: () => void }) {
+/**
+ * Scene 5: Muse found 2 or 3 people for the plan. Each row is the person, the trust path and the
+ * one-line why; picking one is your yes, so only that person is asked.
+ */
+function Choices({ choices, onPicked }: { choices: IntroChoice[]; onPicked: (pickedId: string) => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pick = async (c: IntroChoice) => {
+    setBusy(c.introId); setError(null);
+    try {
+      await apiPost(`/api/intros/${encodeURIComponent(c.introId)}/pick`, { drop: choices.filter((x) => x.introId !== c.introId).map((x) => x.introId) });
+      onPicked(c.introId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Muse could not ask them.');
+    } finally { setBusy(null); }
+  };
+  return (
+    <div className="space-y-2" data-testid="intro-choices">
+      <ul className="space-y-1.5">
+        {choices.map((c) => (
+          <li key={c.introId} className="flex items-center gap-3 rounded-btn bg-fb-input px-3 py-2" data-testid="intro-choice" data-handle={c.other.handle}>
+            <Avatar src={c.other.avatarUrl} name={c.other.firstName} size={40} decorative />
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-semibold text-fb-text">{c.other.firstName}</p>
+              {c.trustPath && <p className="text-[13px] text-fb-text-2">{c.trustPath}</p>}
+              <p className="text-[14px] text-fb-text">{c.why}</p>
+            </div>
+            <Button size="sm" onClick={() => void pick(c)} disabled={!!busy} data-testid="pick-choice">
+              {busy === c.introId ? 'Asking…' : 'Go with them'}
+            </Button>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[13px] text-fb-text-2">Only the person you pick is asked. The others never hear about it.</p>
+      {error && <p className="text-[13px] text-fb-red" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult | null) => void; plan: PlanFor | null; onClearPlan: () => void }) {
   const [kind, setKind] = useState<IntroKind>('friendship');
   const [lookingFor, setLookingFor] = useState('');
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [choices, setChoices] = useState<IntroChoice[] | null>(null);
   const ask = async () => {
-    setBusy(true); setAnswer(null);
+    setBusy(true); setAnswer(null); setChoices(null);
     try {
-      const r = await apiPost<RoundResult>('/api/intros/request', { kind, lookingFor, ...(plan ? { questId: plan.id } : {}) });
+      // For a plan, Muse tries every kind you have on and keeps the best match.
+      const r = await apiPost<RoundResult>('/api/intros/request', plan ? { lookingFor, questId: plan.id } : { kind, lookingFor });
       setAnswer(r.intro ? `Muse found someone: meet ${r.intro.other.firstName}. Their card is below.` : r.message);
+      setChoices(r.choices?.length ? r.choices : null);
       onResult(r);
     } catch (e) {
       setAnswer(e instanceof Error ? `Muse couldn't look right now: ${e.message}` : "Muse couldn't look right now.");
@@ -69,8 +114,8 @@ function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult) =
           </button>
         </div>
       )}
-      <KindPicker value={kind} onChange={setKind} name="Intro kind" />
-      {kind === 'dating' && <p className="text-[13px] text-fb-text-2">Dating intros only happen between two people who both opted into Dating and fit each other&apos;s preferences.</p>}
+      {!plan && <KindPicker value={kind} onChange={setKind} name="Intro kind" />}
+      {!plan && kind === 'dating' && <p className="text-[13px] text-fb-text-2">Dating intros only happen between two people who both opted into Dating and fit each other&apos;s preferences.</p>}
       <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); void ask(); }}>
         <label className="sr-only" htmlFor="ask-looking">What are you looking for?</label>
         <input id="ask-looking" value={lookingFor} onChange={(e) => setLookingFor(e.target.value)} maxLength={140}
@@ -79,6 +124,14 @@ function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult) =
         <Button type="submit" disabled={busy} icon={<Sparkles size={16} aria-hidden />}>{busy ? 'Muse is looking…' : 'Ask Muse'}</Button>
       </form>
       {answer && <p className="text-[15px] text-fb-text" data-testid="ask-answer" aria-live="polite">{answer}</p>}
+      {choices && (
+        <Choices choices={choices} onPicked={(id) => {
+          const c = choices.find((x) => x.introId === id);
+          setChoices(null);
+          setAnswer(c ? `Muse is asking ${c.other.firstName}. Their card is below.` : null);
+          onResult(null);
+        }} />
+      )}
     </Card>
   );
 }
@@ -175,7 +228,10 @@ export function IntrosPage() {
   const [round, setRound] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | 'run' | 'reset'>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const intros = data?.intros ?? [];
+  // Proposed intros that are still choices in the ask panel stay out of the inbox until one is picked.
+  const [choiceIds, setChoiceIds] = useState<string[]>([]);
+  const intros = (data?.intros ?? []).filter((i) => !choiceIds.includes(i.id));
+  const onAsk = (r: RoundResult | null) => { setChoiceIds(r?.choices?.map((c) => c.introId) ?? []); void refetch(); };
   // "Find someone to go with ✨" on a plan links here with ?quest=<id>; the ask is pre-filled with it.
   const [planId, setPlanId] = useState<string | null>(null);
   useEffect(() => { setPlanId(new URLSearchParams(window.location.search).get('quest')); }, []);
@@ -234,7 +290,7 @@ export function IntrosPage() {
       </Card>
 
       {/* Asked from a plan: the pre-filled ask comes first, above the inbox. */}
-      {planFor && <AskMuse key={planFor.id} onResult={() => void refetch()} plan={planFor} onClearPlan={clearPlan} />}
+      {planFor && <AskMuse key={planFor.id} onResult={onAsk} plan={planFor} onClearPlan={clearPlan} />}
 
       <section aria-label="Your intros" className="space-y-3">
         {loading && !data && <Card padded><Skeleton className="h-40 w-full" /></Card>}
@@ -247,7 +303,7 @@ export function IntrosPage() {
         {intros.map((i) => <IntroCard key={i.id} intro={i} onRespond={respond} onPlan={plan} />)}
       </section>
 
-      {!planFor && <AskMuse onResult={() => void refetch()} plan={null} onClearPlan={clearPlan} />}
+      {!planFor && <AskMuse onResult={onAsk} plan={null} onClearPlan={clearPlan} />}
       <IntroSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );

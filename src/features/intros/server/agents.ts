@@ -145,7 +145,15 @@ const JUDGE_JSON = {
 export type ClickResult = {
   score: number; reasonsA: string[]; reasonsB: string[]; summary: string; noteA: string; noteB: string;
   firstStep: FirstStep; logA: AgentTurn[]; logB: AgentTurn[];
+  /** Plan-anchored only: A's first reason ties B to the plan (else the intro falls below the bar). */
+  planTied?: boolean;
 };
+
+/** Puts the reasons that tie the person to the plan first, keeping the judge's order otherwise. */
+export function planFirst(reasons: string[], planTexts: readonly (string | null)[]): string[] {
+  const tied = reasons.filter((r) => planTexts.includes(r));
+  return [...tied, ...reasons.filter((r) => !planTexts.includes(r))];
+}
 
 const AGENT_RULES = [
   'You are a Muse agent on Facebook who represents exactly one person in a private agent-to-agent chat about a possible warm intro.',
@@ -196,7 +204,7 @@ export async function runClick(
             `Public facts about the other person: ${JSON.stringify(other)}`,
             `How they are connected: ${trust.join('; ')}`,
             step.anchored
-              ? `The plan ${aName} wants company for (the first step): ${step.text}`
+              ? `The plan ${aName} wants company for (the first step): ${step.text}. Why ${bName} fits this plan: ${planWhy || 'nothing found yet'}. Open with why ${bName} fits this plan.`
               : `A possible first step nearby: ${step.text}`,
             `Conversation so far:\n${dialog(log, who)}`,
             `Your turn: ${instruction}`,
@@ -209,6 +217,8 @@ export async function runClick(
   };
 
   const fit = distinctTopics(c.facts);
+  // For a plan: the code-found line that ties B to it, which A's agent opens with.
+  const planWhy = c.facts.find((f) => f.plan)?.forA ?? '';
   // B's agent sees only public facts about A, so its own turns never restate A's looking-for text.
   const sharedInterest = c.facts.find((f) => f.looker === null)?.keyword;
   const overlap = sharedInterest ? `they both love ${sharedInterest}` : `${bName}'s profile fits what ${aName} is looking for`;
@@ -216,7 +226,7 @@ export async function runClick(
   const bLooking = bOwn.lookingFor || KIND_LABEL[c.kind];
   await say('a', `Pitch what ${aName} wants and why ${bName} might fit.`, {
     message: step.anchored
-      ? `Hi, I'm ${aName}'s agent. ${aName} is going to ${step.text} and wants company: someone for ${aLooking}. ${aName} is into ${a.interests.slice(0, 3).join(', ')}. Would ${bName} be up for it?`
+      ? `Hi, I'm ${aName}'s agent. ${aName} is going to ${step.text} and wants company.${planWhy ? ` ${planWhy.replace(/^You both love/, `${aName} and ${bName} both love`)}.` : ''} ${aName} is also into ${a.interests.slice(0, 3).join(', ')}. Would ${bName} be up for it?`
       : `Hi, I'm ${aName}'s agent. ${aName} is new around here and looking for ${aLooking}, and is into ${a.interests.slice(0, 3).join(', ')}. Is ${bName} looking for anything like that?`,
     outcome: step.anchored ? `asked if ${bName} wants to come along to the plan` : `pitched what ${aName} is looking for`,
   });
@@ -280,6 +290,7 @@ export async function runClick(
           'Never quote or paraphrase one person\'s private "looking for" text, or what their agent said they want, to the other person.',
           'summary: one sentence to both people naming the trust path and the kind. noteA: 1-2 sentences to A on why your agents think A and B would click; noteB: the mirror.',
           'summary, noteA and noteB must not repeat any fact used in the reasons; name the kind and the first step instead.',
+          'When the first step is a plan A asked company for, the lines that say why B fits that plan (they end with "a fit for <plan>" or "that\'s what <plan> is about") must come first in factsA and factsB if they are real; without one, score below 85.',
           `End noteA and noteB with what the first step is worth, tied to the kind, e.g. "${verb}".`,
         ].join(' '),
       },
@@ -298,11 +309,17 @@ export async function runClick(
     mock: mockJudge,
   }, deadline);
   const j = judged.data;
+  // The reasons are the accepted facts in code's wording for that side; unknown numbers are dropped.
+  // For a plan, the reason tying B to it always reads first.
+  const planA = c.facts.filter((f) => f.plan).map((f) => f.forA);
+  const planB = c.facts.filter((f) => f.plan).map((f) => f.forB);
+  const reasonsA = planFirst(pickFacts(factsA, j.factsA), planA);
+  const reasonsB = planFirst(pickFacts(factsB, j.factsB), planB);
   return {
     score: j.score,
-    // The reasons are the accepted facts in code's wording for that side; unknown numbers are dropped.
-    reasonsA: pickFacts(factsA, j.factsA),
-    reasonsB: pickFacts(factsB, j.factsB),
+    reasonsA,
+    reasonsB,
+    ...(step.anchored ? { planTied: !!reasonsA[0] && planA.includes(reasonsA[0]) } : {}),
     summary: j.summary.trim(),
     noteA: j.noteA.trim(),
     noteB: j.noteB.trim(),

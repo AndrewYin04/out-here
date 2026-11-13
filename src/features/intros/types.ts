@@ -1,5 +1,5 @@
 // Client-safe types for the Muse Intros plan step (the part after both people said yes).
-import type { ID, IntroCardView } from '@/shared';
+import type { ID, IntroCardView, IntroKind } from '@/shared';
 
 /** Another upcoming plan the pair can switch to ("Pick another time"). */
 export type IntroPlanOption = { questId: ID; label: string; when: string; seatsLeft: number };
@@ -20,7 +20,21 @@ export type IntroPlanView = {
   options: IntroPlanOption[];
 };
 
-/** The card the /intros page renders: the shared card view plus the plan step once connected. */
-export type IntroCardData = IntroCardView & { plan: IntroPlanView | null };
+/**
+ * The card the /intros page renders: the shared card view plus the plan step once connected, and,
+ * on an unanswered plan-anchored intro, what saying yes commits the viewer to
+ * ("Saying yes adds you to 🖼️ Art walk · Today 8:35 PM · 11 min walk").
+ */
+export type IntroCardData = IntroCardView & { plan: IntroPlanView | null; joinLine: string | null };
+
+/** One person Muse found for a plan; the viewer picks one before anyone is asked. */
+export type IntroChoice = {
+  introId: ID; kind: IntroKind; score: number;
+  other: { id: ID; handle: string; firstName: string; avatarUrl: string };
+  /** "You both know Maya". */
+  trustPath: string;
+  /** The first reason: why this person fits the plan. */
+  why: string;
+};
 
 export type IntroPlanAction = { action: 'hold' } | { action: 'pick'; questId: ID };

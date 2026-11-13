@@ -8,7 +8,7 @@ import {
   type ID, type Intro, type IntroCardView, type IntroKind, type IntroKindSetting, type IntroProfile, type IntroStepView,
 } from '@/shared';
 import { badRequest, conflict, notFound, publish, type DataStore, type View } from '@/features/data/server';
-import type { IntroCardData, IntroPlanAction, IntroPlanOption, IntroPlanView } from '../types';
+import type { IntroCardData, IntroChoice, IntroPlanAction, IntroPlanOption, IntroPlanView } from '../types';
 import { rankSteps, runClick, stepOf, type ClickResult } from './agents';
 import { privacyGuard, privateTexts } from './privacy';
 import {
@@ -195,7 +195,7 @@ const safeSummary = (trust: string | undefined) => `${trust ?? 'You share a conn
  */
 function guardFor(
   v: View, i: Pick<Intro, 'kind' | 'trustPath' | 'firstStep'>, viewerId: ID, otherId: ID,
-  over: { viewerIntro?: IntroProfile; otherIntro?: IntroProfile } = {},
+  over: { viewerIntro?: IntroProfile; otherIntro?: IntroProfile; otherAsk?: string } = {},
 ) {
   const viewer = v.profileById.get(viewerId); const other = v.profileById.get(otherId);
   if (!viewer || !other) return null;
@@ -205,7 +205,7 @@ function guardFor(
   return privacyGuard({
     viewer, viewerIntro: over.viewerIntro ?? stored,
     seenOther: v.profileFor(viewerId, other),
-    secrets: [...new Set([...privateTexts(otherStored), ...privateTexts(otherIntro)])],
+    secrets: [...new Set([...privateTexts(otherStored), ...privateTexts(otherIntro), ...(over.otherAsk ? [over.otherAsk] : [])])],
     extra: [...privateTexts(stored), ...trustLabels(v, i.trustPath), i.firstStep.text],
     // A leaking reason is rewritten from what both wrote for this intro's kind only.
     kind: i.kind, otherKindText: lookingForOf(otherIntro, i.kind),
@@ -216,9 +216,12 @@ function guardFor(
  * Rewrites one vetted result so neither side's text quotes the other side's private looking-for
  * (review E4). A's settings may carry an on-request override, so they are passed in.
  */
-function scrubResult(v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<Intro, 'kind' | 'trustPath' | 'firstStep'>, r: ClickResult): ClickResult {
+function scrubResult(
+  v: View, aId: ID, aIntro: IntroProfile, bId: ID, i: Pick<Intro, 'kind' | 'trustPath' | 'firstStep'>, r: ClickResult, aAsk = '',
+): ClickResult {
   const gA = guardFor(v, i, aId, bId, { viewerIntro: aIntro });
-  const gB = guardFor(v, i, bId, aId, { otherIntro: aIntro });
+  // What A typed when asking is as private as A's saved looking-for.
+  const gB = guardFor(v, i, bId, aId, { otherIntro: aIntro, otherAsk: aAsk });
   if (!gA || !gB) return r;
   const aName = firstName(v.profileById.get(aId)); const bName = firstName(v.profileById.get(bId));
   return {
@@ -276,7 +279,23 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
     threadId: state === 'connected' ? i.threadId : null,
     createdAt: i.createdAt,
     plan: state === 'connected' ? planView(v, i, nowMs) : null,
+    joinLine: state === 'new' ? joinLineFor(v, i, viewerId, nowMs) : null,
   };
+}
+
+/**
+ * For a plan-anchored intro the viewer has not answered: saying yes also puts them on the plan,
+ * so the card says so under the button. "Saying yes adds you to 🖼️ Art walk · Today 8:35 PM ·
+ * 11 min walk". Null when the intro has no live plan or the viewer is already on it.
+ */
+export function joinLineFor(v: View, i: Intro, viewerId: ID, nowMs: number): string | null {
+  if (!i.firstStep.anchored || !i.firstStep.questId) return null;
+  const q = v.db.quests.find((x) => x.id === i.firstStep.questId);
+  if (!q || q.status === 'done' || Date.parse(q.endsAt) <= nowMs) return null;
+  if (v.questMemberIds(q.id).includes(viewerId)) return null;
+  const walk = walkToPlan(v, viewerId, q, nowMs);
+  return [`Saying yes adds you to ${q.emoji} ${q.title}`, relativeWhen(q.startsAt, nowMs), walk !== null ? `${walk} min walk` : null]
+    .filter(Boolean).join(' · ');
 }
 
 export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intros: IntroCardData[] }> {
@@ -292,6 +311,12 @@ export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intr
 
 export type RoundResult = {
   intro: IntroCardData | null;
+  /**
+   * Plan-anchored requests with 2 or 3 people above the bar: each is a proposed intro only the
+   * viewer sees. The viewer picks one (pickIntro), the others are removed, and only the picked
+   * person is asked. Absent when one person or nobody passed.
+   */
+  choices?: IntroChoice[];
   /** Pairs the agents vetted that did not clear the bar (names never sent). */
   considered: number;
   belowBar: number;
@@ -305,7 +330,8 @@ const introNotice = (otherName: string, trust: string | undefined, step?: Intro[
 
 /** One vetting round for the viewer. auto rounds obey the weekly cap; requests do not. */
 async function round(
-  store: DataStore, viewerId: ID, opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile; quest?: QuestRow },
+  store: DataStore, viewerId: ID,
+  opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile; quest?: QuestRow; ask?: string },
 ): Promise<RoundResult> {
   const { view } = await store.museContext();
   const me = view.profileById.get(viewerId);
@@ -317,7 +343,7 @@ async function round(
     return { ...empty, capped: true, message: 'Muse already made your intro this week. Muse takes its time to find someone great.' };
   }
   const kinds = opts.kinds.filter((k) => opts.profile.kinds[k]?.on);
-  let pool = candidatesFor(view, viewerId, { kinds, nowMs, viewerProfile: opts.profile, quest: opts.quest });
+  let pool = candidatesFor(view, viewerId, { kinds, nowMs, viewerProfile: opts.profile, quest: opts.quest, ask: opts.ask });
   if (opts.source === 'auto') pool = pool.filter((c) => underWeeklyCap(view.db.intros, c.profile.id, nowMs));
   const shortlist = pool.slice(0, AGENT_SHORTLIST);
   const deadline = Date.now() + ROUND_BUDGET_MS;
@@ -325,16 +351,18 @@ async function round(
   const vetted = await Promise.all(shortlist.map(async (c) => {
     try {
       const raw = await runClick(view, me, opts.profile, c, nowMs, deadline, opts.quest);
-      return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { kind: c.kind, trustPath: c.trust, firstStep: raw.firstStep }, raw) };
+      return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { kind: c.kind, trustPath: c.trust, firstStep: raw.firstStep }, raw, opts.ask) };
     } catch (err) {
       console.error('[intros] agent exchange failed:', String((err as Error)?.message ?? err).slice(0, 200));
       return null;
     }
   }));
-  // Each person must get at least 2 concrete reasons written to them.
+  // Each person must get at least 2 concrete reasons written to them. For a plan, A's first
+  // reason must also say why this person fits that plan.
   const passing = vetted
     .filter((x): x is NonNullable<typeof x> => !!x
-      && passesBar(x.r.score, x.r.reasonsA, x.c.trust).ok && passesBar(x.r.score, x.r.reasonsB, x.c.trust).ok)
+      && passesBar(x.r.score, x.r.reasonsA, x.c.trust).ok && passesBar(x.r.score, x.r.reasonsB, x.c.trust).ok
+      && (!opts.quest || (!!x.c.planTie && !!x.r.planTied)))
     .sort((x, y) => y.r.score - x.r.score);
   const best = passing[0];
   const considered = vetted.filter(Boolean).length;
@@ -344,19 +372,40 @@ async function round(
       ...empty, considered, belowBar: considered,
       message: opts.quest && !considered
         ? `No great match yet${forPlan}. Nobody Muse could introduce you to is free then and close enough to walk.`
+        : opts.quest && !vetted.some((x) => x?.c.planTie)
+        ? `No great match yet${forPlan}. Muse considered ${considered} ${considered === 1 ? 'person' : 'people'}, but nothing on their profile says they'd want to go to this plan.`
         : considered
         ? `No great match yet. Muse considered ${considered} ${considered === 1 ? 'person' : 'people'}, but nobody was a strong enough match.`
         : 'No great match yet. Muse only introduces when it\'s confident.',
     };
   }
-  const row: Intro = {
-    id: crypto.randomUUID(), kind: best.c.kind, source: opts.source, aId: viewerId, bId: best.c.profile.id,
-    trustPath: best.c.trust, score: best.r.score,
-    reasons: best.r.reasonsA.slice(0, 3), reasonsB: best.r.reasonsB.slice(0, 3), summary: best.r.summary,
-    noteA: best.r.noteA, noteB: best.r.noteB, firstStep: best.r.firstStep,
-    agentLogA: best.r.logA, agentLogB: best.r.logB,
+  const rowOf = (x: typeof best): Intro => ({
+    id: crypto.randomUUID(), kind: x.c.kind, source: opts.source, aId: viewerId, bId: x.c.profile.id,
+    trustPath: x.c.trust, score: x.r.score,
+    reasons: x.r.reasonsA.slice(0, 3), reasonsB: x.r.reasonsB.slice(0, 3), summary: x.r.summary,
+    noteA: x.r.noteA, noteB: x.r.noteB, firstStep: x.r.firstStep,
+    agentLogA: x.r.logA, agentLogB: x.r.logB,
     status: 'proposed', declinedBy: null, threadId: null, createdAt: now().toISOString(), decidedAt: null,
-  };
+  });
+  if (opts.quest && passing.length >= 2) {
+    // Scene 5: 2 or 3 people for the plan, each with a one-line why. Nobody hears anything yet.
+    const picks = passing.slice(0, 3).map((x) => ({ x, row: rowOf(x) }));
+    for (const { row: r } of picks) await store.insertIntro(r);
+    await publish(`user:${viewerId}`, { type: 'intro', id: picks[0].row.id });
+    const after = (await store.museContext()).view;
+    const choices: IntroChoice[] = picks.map(({ x, row: r }) => ({
+      introId: r.id, kind: r.kind, score: r.score,
+      other: { id: x.c.profile.id, handle: x.c.profile.handle, firstName: firstName(x.c.profile), avatarUrl: x.c.profile.avatarUrl },
+      trustPath: trustLabels(after, r.trustPath)[0] ?? '',
+      why: cardFor(after, viewerId, r, nowMs)?.reasons[0] ?? '',
+    }));
+    const others = considered - choices.length;
+    return {
+      intro: null, choices, considered, belowBar: others, capped: false, paused: false,
+      message: `Muse found ${choices.length} people${forPlan}. Pick one and Muse asks them.`,
+    };
+  }
+  const row = rowOf(best);
   await store.insertIntro(row);
   // Only A hears now. B is asked after A says yes.
   await store.notifyIntro(viewerId, row.bId, row.id, introNotice(firstName(best.c.profile), trustLabels(view, row.trustPath)[0], row.firstStep));
@@ -383,7 +432,7 @@ export async function runIntroRound(store: DataStore, viewerId: ID, kind?: Intro
  * accept both people join it.
  */
 export async function requestIntro(
-  store: DataStore, viewerId: ID, kind: IntroKind, lookingFor: string, questId?: ID | null,
+  store: DataStore, viewerId: ID, kind: IntroKind | null, ask: string, questId?: ID | null,
 ): Promise<RoundResult> {
   const { view } = await store.museContext();
   const base = introProfileOf(view, viewerId);
@@ -394,9 +443,33 @@ export async function requestIntro(
     if (!isJoinablePlan(q, now().getTime())) throw conflict('This plan is over or full.');
     quest = q;
   }
-  // The request counts as opting into that kind for this search only; settings stay as they are.
-  const profile: IntroProfile = { ...base, kinds: { ...base.kinds, [kind]: { on: true, lookingFor: lookingFor.trim() || base.kinds[kind].lookingFor } } };
-  return round(store, viewerId, { kinds: [kind], source: 'request', profile, quest });
+  // For a plan, Muse tries every kind the viewer has on (the asked kind first, Dating only when
+  // asked for), so the default Friendship tab never hides a match another kind would find.
+  const others = quest ? kindsOn(base).filter((k) => k !== kind && k !== 'dating') : [];
+  const kinds: IntroKind[] = kind ? [kind, ...others] : others.length ? others : ['friendship'];
+  // The request counts as opting into the asked kind for this search only; settings stay as they
+  // are. The typed ask is an extra fact source and never replaces the saved looking-for text
+  // (it fills in only when nothing was saved).
+  const first = kinds[0];
+  const saved = base.kinds[first]?.on ? base.kinds[first].lookingFor.trim() : '';
+  const profile: IntroProfile = { ...base, kinds: { ...base.kinds, [first]: { on: true, lookingFor: saved || ask.trim() } } };
+  return round(store, viewerId, { kinds, source: 'request', profile, quest, ask: ask.trim() });
+}
+
+/**
+ * The viewer picks one of a plan request's choices: the other proposed choices are removed (they
+ * were never shown to anyone else), and the pick counts as the viewer's yes, so only that person
+ * is asked.
+ */
+export async function pickIntro(store: DataStore, viewerId: ID, introId: ID, dropIds: ID[]): Promise<{ intro: IntroCardData }> {
+  const { view } = await store.museContext();
+  const i = view.db.intros.find((x) => x.id === introId);
+  if (!i || i.aId !== viewerId) throw notFound('intro_not_found');
+  if (i.status !== 'proposed') throw conflict('intro_already_answered');
+  const drop = view.db.intros.filter((x) => dropIds.includes(x.id) && x.id !== i.id && x.aId === viewerId && x.status === 'proposed'
+    && x.firstStep.anchored && x.firstStep.questId === i.firstStep.questId);
+  if (drop.length) await store.removeIntros(drop.map((x) => x.id), []);
+  return respondIntro(store, viewerId, i.id, true);
 }
 
 /**
