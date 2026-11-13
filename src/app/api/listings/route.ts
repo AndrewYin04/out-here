@@ -8,7 +8,7 @@ const CreateZ = z.object({
   description: z.string().trim().max(500).optional(),
   imageUrl: z.string().max(500).nullish(),
   location: LatLngZ,
-  pickupLabel: z.string().trim().min(1).max(80),
+  pickupLabel: z.string().trim().max(80).optional(),
   pickupSpot: z.string().trim().min(1).max(120),
   pickupUntil: z.string().datetime({ offset: true }),
 });

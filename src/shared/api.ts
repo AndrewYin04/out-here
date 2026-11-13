@@ -262,7 +262,8 @@ export type MapListingsResponse = { listings: MapListing[] };
 export type MapListingResponse = { listing: MapListing };
 export type CreateListingBody = {
   title: string; priceUsd: number; category: string; description?: string; imageUrl?: string | null;
-  location: LatLng; pickupLabel: string; pickupSpot: string; pickupUntil: string;
+  /** pickupLabel defaults to the neighbourhood of `location`. */
+  location: LatLng; pickupLabel?: string; pickupSpot: string; pickupUntil: string;
 };
 export type HoldRequestBody = { offerUsd: number; etaMin: number; message: string };
 export type HoldRespondBody = { accept: boolean };

@@ -17,6 +17,7 @@ import type { CreateListingBody, HoldRequestBody, MapListing } from '@/shared/ap
 import type { CoreStore } from './core';
 import type { ListingHoldRow } from './db';
 import { badRequest, conflict, forbidden, notFound } from './errors';
+import { areaLabel } from './locations';
 import { publish } from './realtime-server';
 import type { View } from './view';
 
@@ -146,7 +147,7 @@ export async function createListing(store: CoreStore, viewerId: ID, body: Create
     id, sellerId: viewerId, title: body.title.trim(), priceUsd: body.priceUsd, condition: '',
     category: body.category.trim(), description: body.description?.trim() ?? '', imageUrl: body.imageUrl ?? null,
     location: body.location, status: 'available', createdAt: iso(at),
-    pickupUntil: until.toISOString(), pickupLabel: body.pickupLabel.trim(), pickupSpot: body.pickupSpot.trim(),
+    pickupUntil: until.toISOString(), pickupLabel: body.pickupLabel?.trim() || areaLabel(body.location), pickupSpot: body.pickupSpot.trim(),
   }]);
   // Ids only: every map refetches /api/listings/map, which strips the exact spot per viewer.
   await publish('listings:new', { listingId: id });
