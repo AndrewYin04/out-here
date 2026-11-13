@@ -8,7 +8,7 @@ export { petPose, type MuseEvent, type MuseSnapshot, type MuseState, type Extern
 export { sendAgentMessage, finishAgentEncounter, useAgentEncounter } from './controller';
 export type { AgentEncounter, AgentTransport, AgentRecipient, AgentEvent } from './encounter';
 export {beginPhotoAnalysis,endPhotoAnalysis} from './controller';
-export {attachMuseWorld,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
+export {attachMuseWorld,useMuseInWorld,setMuseDockFrom,takeMuseDockFrom,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
 export type {MuseViewport} from './controller';
 
 export {beginMuseActivity,finishMuseActivity,releaseMuseActivity,useMuseActivity} from './controller';

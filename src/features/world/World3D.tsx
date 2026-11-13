@@ -11,7 +11,7 @@ import { usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
 import { useApi } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
-import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
+import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,setMuseDockFrom,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
 import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea, museStage} from './muse-layout';
@@ -360,6 +360,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       map.off('rotatestart', detach);
       map.off('zoomstart', userZoom);
       map.off('zoomend', zoomEnd);
+      // Leaving 3D: note where Jolly is on screen, so on the map he flies out from there to his spot
+      // at the side (MuseChat's docked Jolly).
+      if (layer) {
+        const p = { x: 0, y: 0, elevation: 0 }, r = map.getCanvas().getBoundingClientRect();
+        if (layer.actorScreenPoint('pet', p) && p.x >= 0 && p.y >= 0 && p.x <= r.width && p.y <= r.height) setMuseDockFrom({ x: p.x + r.left, y: p.y + r.top });
+        else setMuseDockFrom({ x: r.left + r.width / 2, y: r.top + r.height * 0.6 });
+      }
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
       undoTheme?.();
       layerRef.current = null;

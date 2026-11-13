@@ -193,3 +193,18 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Jolly docked at the side of the map (MuseChat): a little agent that hovers, glows and casts a soft
+   shadow; he flies in from the 3D world when you zoom out (muse-dock-flying). */
+.muse-dock-float { position: relative; display: block; animation: muse-dock-hover 3.6s ease-in-out infinite; }
+.muse-dock-glow { position: absolute; inset: -9px; border-radius: 9999px; background: radial-gradient(circle, rgba(35, 217, 245, .38) 0%, rgba(8, 102, 255, .14) 55%, transparent 72%); animation: muse-dock-glow 3.6s ease-in-out infinite; }
+.muse-dock-shadow { position: absolute; left: 50%; bottom: -8px; width: 34px; height: 8px; margin-left: -17px; border-radius: 9999px; background: rgba(5, 30, 70, .28); filter: blur(2px); animation: muse-dock-shadow 3.6s ease-in-out infinite; }
+.muse-dock-spark { position: absolute; right: -2px; top: 2px; width: 8px; height: 8px; border-radius: 9999px; background: #B8F7FF; box-shadow: 0 0 8px 2px rgba(35, 217, 245, .7); animation: muse-dock-spark 2.4s ease-in-out infinite; }
+.muse-dock:hover .muse-dock-float { animation-duration: 1.8s; }
+.muse-dock-flying .muse-dock-shadow, .muse-dock-flying .muse-dock-tag { opacity: 0; }
+.muse-dock-flying .muse-dock-glow { inset: -16px; }
+@keyframes muse-dock-hover { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(2deg); } }
+@keyframes muse-dock-glow { 0%, 100% { opacity: .75; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes muse-dock-shadow { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.72); opacity: .55; } }
+@keyframes muse-dock-spark { 0%, 100% { opacity: 0; transform: scale(.4); } 45% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .muse-dock-float, .muse-dock-glow, .muse-dock-shadow, .muse-dock-spark { animation: none; } }

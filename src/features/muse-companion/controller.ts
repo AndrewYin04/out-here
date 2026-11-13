@@ -305,9 +305,18 @@ export function endPhotoAnalysis(id:number, outcome:'live'|'mock'|'error'|'cance
 
 /** Presentation ownership never owns or cancels an API request. */
 export function attachMuseWorld():()=>void {
-  worldOwners++;let attached=true;
-  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(!worldOwners&&store.encounter){store={...store,encounter:null};emit();}};
+  worldOwners++;let attached=true;emit();
+  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(!worldOwners&&store.encounter)store={...store,encounter:null};emit();};
 }
+/** True while the 3D world is showing Jolly (the map's docked Jolly steps aside). */
+export function useMuseInWorld():boolean {return useSyncExternalStore(subscribe,()=>worldOwners>0,()=>false);}
+
+// Where Jolly was on screen when the 3D world closed, so the map's docked Jolly can fly out from there.
+let dockFrom:{x:number;y:number;at:number}|null=null;
+/** The 3D world records Jolly's last screen position (viewport px) as it closes. */
+export function setMuseDockFrom(p:{x:number;y:number}):void {dockFrom=Number.isFinite(p.x)&&Number.isFinite(p.y)?{x:p.x,y:p.y,at:Date.now()}:null;}
+/** Takes the recorded position once, if the world closed in the last moment; otherwise null. */
+export function takeMuseDockFrom():{x:number;y:number}|null {const d=dockFrom;dockFrom=null;return d&&Date.now()-d.at<1500?{x:d.x,y:d.y}:null;}
 /** Dashboard collapse hides the conversation while preserving pending backend work. */
 export function minimizeChat():void {store={...store,snap:{...store.snap,open:false}};emit();}
 export function setMuseViewport(next:MuseViewport):void {if(JSON.stringify(viewport)===JSON.stringify(next))return;viewport=next;emit();}

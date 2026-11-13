@@ -5,7 +5,7 @@
 // conversation, the open state and Jolly's pose survive moving between Out Here sections.
 import { Send, X, RotateCcw, MapPin } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { MuseLabel, OfflineLabel, SuggestionCard, setPlanOpen, usePlanOpen } from '@/features/outhere';
 import { cn } from '@/features/ui';
@@ -13,6 +13,7 @@ import type { PersonCard } from '@/shared';
 import {
   closeChat, museDispatch, openChat, retryLast, selectPlan, sendMessage,
   reportAgentRecipientError, sendAgentMessage, useAgentEncounter, useChatError, useChatMessages, useMuseSnapshot, type ChatMessage,
+  takeMuseDockFrom, useMuseInWorld,
 } from './controller';
 import { simulationTransport } from './encounter';
 import { backendTransport, isCoordinationAsk } from '@/features/muse-encounters';
@@ -134,6 +135,29 @@ export function MuseChat() {
     else el.scrollTop = el.scrollHeight;
   }, [messages, thinking, snap.open]);
   // Hand focus back to the launcher after closing, so keyboard users are not dropped.
+  // In 3D Jolly is in the world (the launcher is a plain pill); everywhere else he hovers docked at
+  // the side. When the 3D world closes, he flies from his last spot in the world to the dock: up
+  // toward you as the camera pulls back, then across and down into place.
+  const inWorld = useMuseInWorld();
+  const docked = !inWorld;
+  const showLauncher = !snap.open && !planOpen;
+  useLayoutEffect(() => {
+    if (!docked || !showLauncher) return;
+    const from = takeMuseDockFrom();
+    const el = launcherRef.current;
+    if (!from || !el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const r = el.getBoundingClientRect();
+    const dx = from.x - (r.left + r.width / 2), dy = from.y - (r.top + r.height / 2);
+    el.classList.add('muse-dock-flying');
+    const a = el.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(.55)`, opacity: 0.2 },
+      { transform: `translate(${dx * 0.6}px, ${dy * 0.6 - 110}px) scale(1.9)`, opacity: 1, offset: 0.42 },
+      { transform: `translate(${dx * 0.15}px, ${dy * 0.15 - 30}px) scale(1.15)`, offset: 0.8 },
+      { transform: 'translate(0, 0) scale(1)' },
+    ], { duration: 1250, easing: 'cubic-bezier(.33,.7,.3,1)' });
+    a.onfinish = a.oncancel = () => el.classList.remove('muse-dock-flying');
+    return () => a.cancel();
+  }, [docked, showLauncher]);
   const wasOpen = useRef(false);
   useEffect(() => { if (wasOpen.current && !snap.open) launcherRef.current?.focus({ preventScroll: true }); wasOpen.current = snap.open; }, [snap.open]);
 
@@ -166,7 +190,29 @@ export function MuseChat() {
   return (
     <>
       <MuseStyles />
-      {!snap.open && !planOpen && (
+      {!snap.open && !planOpen && docked && (
+        // On the map Jolly hovers at the side as a little agent; tap him to talk. Leaving 3D, he
+        // flies out from where he was in the world to this spot (see the layout effect above).
+        <button
+          ref={launcherRef}
+          type="button"
+          data-testid="muse-launcher"
+          data-docked="true"
+          aria-label="Ask Muse"
+          onClick={openChat}
+          className="muse-dock group fixed right-3 z-30 flex size-[60px] items-center justify-center rounded-full bottom-[136px] max-md:bottom-auto max-md:top-[200px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue"
+        >
+          <span aria-hidden className="muse-dock-shadow" />
+          <span className="muse-dock-float">
+            <span aria-hidden className="muse-dock-glow" />
+            <MuseOrb state={snap.state} size={50} className="shadow-popover rounded-full" />
+            <span aria-hidden className="muse-dock-spark" />
+          </span>
+          {/* Desktop: a small "Ask Muse" tag beside him. Phones: just Jolly, so he never covers a sheet. */}
+          <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-card transition-transform group-hover:-translate-x-0.5 max-md:sr-only">Ask Muse</span>
+        </button>
+      )}
+      {!snap.open && !planOpen && !docked && (
         <button
           ref={launcherRef}
           type="button"
