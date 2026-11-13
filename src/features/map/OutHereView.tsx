@@ -307,7 +307,7 @@ export function OutHereView() {
     window.history.replaceState(window.history.state, '', url.toString());
     setMode('explore');
     letsGo(id);
-  }, [letsGo]);
+  }, [letsGo, setMode]);
   const onArrive = useCallback((questId: string) => {
     finishWalk(questId);
     setArrivedId(questId);
