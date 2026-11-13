@@ -88,9 +88,9 @@ export function reduce(s: MuseSnapshot, e: MuseEvent): MuseSnapshot {
 }
 
 /** Where the 3D pet goes and which clip it plays, from the companion's state. */
-export function petPose(s: MuseSnapshot): { front: boolean; clip: 'hover' | 'think' | 'talk' | 'happy' } {
+export function petPose(s: MuseSnapshot): { front: boolean; clip: 'hover' | 'think' | 'talk' | 'happy' | 'listen' | 'sad' } {
   const clip = s.state === 'thinking' || s.state === 'evaluating' ? 'think'
     : s.state === 'responding' || s.state === 'approaching' || s.state === 'delivering' || s.state === 'sending' || s.state === 'receiving' ? 'talk'
-      : s.state === 'celebrating' ? 'happy' : 'hover';
+      : s.state === 'celebrating' ? 'happy' : s.state === 'listening' ? 'listen' : s.state === 'error' ? 'sad' : 'hover';
   return { front: s.open || s.state === 'delivering' || s.state === 'evaluating', clip };
 }

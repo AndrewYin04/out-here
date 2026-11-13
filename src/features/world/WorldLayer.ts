@@ -214,7 +214,14 @@ export class WorldLayer implements CustomLayerInterface {
     a.pos = pos; a.heading = heading; a.altitude = altitude;
   }
 
-  setState(id: string, state: string) { const a=this.actors.get(id);if(!a||(a.state===state&&!['wave','happy','celebrate'].includes(state)))return;a.state=state;a.char.setState(state); }
+  setState(id: string, state: string) {
+    const a = this.actors.get(id);
+    if (!a) return;
+    // One-shot moves play over his current state (and do not change it).
+    if (['jump', 'cheer', 'spin', 'dance', 'nod'].includes(state)) { a.char.setState(state); return; }
+    if (a.state === state && !['wave', 'happy', 'celebrate'].includes(state)) return;
+    a.state = state; a.char.setState(state);
+  }
 
   /** Muse's wake follows its speed by default ('auto'); force a look for scripted moves. */
   setTrailMode(id: string, mode: MuseTrailModeSetting) { this.actors.get(id)?.trail?.setMode(mode); }

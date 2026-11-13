@@ -216,6 +216,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petBoost = useRef(1);
+  const fidgetIn = useRef(8);
+  const trickAt = useRef(0);
   const chatAreaHeight = useRef(450);
   const thoughtsRef = useRef<HTMLDivElement>(null);
   const petPos = useRef<LatLng>(start);
@@ -719,6 +721,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       petAlt.current += ((front ? stage.altitude : grounded ? 0 : .8) - petAlt.current) * kp;
       const pState = flying ? 'fly' : grounded ? (moving ? 'walk' : 'stand') : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
+      // Standing beside you he fidgets now and then: a wave, a nod, a jump or a spin.
+      if (pState === 'stand' && !reducedMotion()) {
+        fidgetIn.current -= dt;
+        if (fidgetIn.current <= 0) {
+          fidgetIn.current = 7 + Math.random() * 7;
+          const moves = ['wave', 'nod', 'jump', 'spin'];
+          layer.setState('pet', moves[Math.floor(Math.random() * moves.length)]);
+        }
+      } else fidgetIn.current = Math.max(fidgetIn.current, 5);
       let petBearing=front ? normalizeDeg(camBearing.current + 180) : heading.current;
       if(photoFocus){layer.actorScreenPoint('pet',screenPoint);const b=cameraRects.current?.bounds;if(b)petBearing=photoFocusBearing({x:screenPoint.x+b.left,y:screenPoint.y+b.top},photoFocus.rect,camBearing.current);}
       // With the chat open Jolly flies up toward the screen: he grows until he almost fills the map
@@ -965,6 +976,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     selfieShown.current.add(q.id);
     setSelfieQuest(q);
   }, [setSelfieQuest, arrival, viewer.id]);
+  // Tapping Jolly's picture in the Muse chat header makes him do the next move in his repertoire.
+  useEffect(() => {
+    const moves = ['wave', 'jump', 'spin', 'dance', 'cheer', 'nod'];
+    const on = () => { layerRef.current?.setState('pet', moves[trickAt.current++ % moves.length]); };
+    window.addEventListener('muse:trick', on);
+    return () => window.removeEventListener('muse:trick', on);
+  }, []);
   // "Take a photo together" on the Up next card reopens this dialog (one photo prompt).
   useEffect(() => {
     const on = (e: Event) => {

@@ -16,6 +16,11 @@ const WORKING = new Set(['thinking', 'evaluating', 'sending', 'receiving', 'deli
 // Bubble spots around Jolly, in units of the ring radius (--r): left, right, left, right.
 const SLOTS: [number, number][] = [[-1, -1.25], [1, -0.7], [-1, 0.05], [1, 0.65]];
 
+// Where the thought trail starts (up by Jolly's head, in ring radii) and its circles: how far along
+// the line from the cloud to his head (0 = the cloud, 1 = his head) and the size in px.
+const HEAD_Y = -0.3;
+const TAIL: [number, number][] = [[0.4, 15], [0.54, 11], [0.67, 7]];
+
 type Bubble = { key: string; text: string };
 
 export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElement | null> }) {
@@ -56,15 +61,32 @@ export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElemen
           <span className="muse-thought-orbit" style={{ animationDuration: '9.6s', animationDelay: '-5s' }}><i className="muse-thought-orb" style={{ width: 20, height: 20 }} /></span>
         </>
       )}
-      {bubbles.map((b, i) => (
-        <span
-          key={b.key}
-          className={cn('muse-thought')}
-          style={{ left: `calc(var(--r) * ${SLOTS[i][0]})`, top: `calc(var(--r) * ${SLOTS[i][1]})`, animationDelay: `${i * 0.45}s` }}
-        >
-          {b.text}
-        </span>
-      ))}
+      {bubbles.map((b, i) => {
+        const [sx, sy] = SLOTS[i];
+        return (
+          <span key={b.key}>
+            {/* The trail of small circles that joins the cloud to Jolly's head, like a thought bubble. */}
+            {TAIL.map(([t, px], k) => (
+              <i
+                key={k}
+                className="muse-thought-dot"
+                style={{
+                  left: `calc(var(--r) * ${(sx * (1 - t)).toFixed(3)})`,
+                  top: `calc(var(--r) * ${(HEAD_Y + (sy - HEAD_Y) * (1 - t)).toFixed(3)})`,
+                  width: px, height: px,
+                  animationDelay: `${i * 0.45 + (TAIL.length - k) * 0.1}s`,
+                }}
+              />
+            ))}
+            <span
+              className={cn('muse-thought')}
+              style={{ left: `calc(var(--r) * ${sx})`, top: `calc(var(--r) * ${sy})`, animationDelay: `${i * 0.45 + 0.35}s` }}
+            >
+              {b.text}
+            </span>
+          </span>
+        );
+      })}
     </div>
   );
 }

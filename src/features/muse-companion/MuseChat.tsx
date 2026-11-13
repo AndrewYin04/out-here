@@ -197,7 +197,10 @@ export function MuseChat() {
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">
-            <MuseOrb state={snap.state} size={36} />
+            <button type="button" aria-label="Make Jolly do a move" title="Tap for a move" onClick={() => window.dispatchEvent(new Event('muse:trick'))}
+              className="shrink-0 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue">
+              <MuseOrb state={snap.state} size={36} />
+            </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-[16px] font-bold leading-5 text-fb-text">Muse <span aria-hidden>✨</span></h2>
               <p className="truncate text-[12px] leading-4 text-fb-text-2" data-testid="muse-state-label">{demo ? 'Simulation only · illustrative positions · no messages sent' : encounter?.source === 'simulation' ? 'Simulated coordination · offline' : STATE_LABEL[snap.state] ?? 'Ready when you are'}</p>

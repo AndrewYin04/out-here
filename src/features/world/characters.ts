@@ -13,7 +13,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
 // 'stand' and 'walk' keep Jolly on the ground beside you (the hover platform hides, and walking adds a
 // waddle in code, since the model has no walk clip); the others are the floating poses.
-export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy' | 'stand' | 'walk';
+export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy' | 'stand' | 'walk' | 'listen' | 'sad' | 'jump' | 'cheer' | 'wave' | 'spin' | 'dance' | 'nod';
 
 export interface Character {
   /** Positioned, turned and scaled by the world layer. */
@@ -261,7 +261,8 @@ const AVATAR_CLIPS: Record<AvatarState, string[]> = {
 };
 const PET_CLIPS: Record<PetState, string[]> = {
   hover: ['Hover', 'Idle'], fly: ['Fly', 'Hover', 'Idle'], talk: ['Talk', 'Hover', 'Idle'], think: ['Think', 'Hover', 'Idle'], happy: ['Happy', 'Wave', 'Hover'],
-  stand: ['Stand', 'Hover', 'Idle'], walk: ['Walk', 'Run', 'Hover', 'Idle'],
+  stand: ['Stand', 'Hover', 'Idle'], walk: ['Walk', 'Run', 'Hover', 'Idle'], listen: ['Listen', 'Hover', 'Idle'], sad: ['Sad', 'Hover', 'Idle'],
+  jump: ['Hover'], cheer: ['Hover'], wave: ['Hover'], spin: ['Hover'], dance: ['Hover'], nod: ['Hover'],
 };
 
 export type CharacterSpec = {
@@ -311,6 +312,12 @@ function adaptClip(clip: THREE.AnimationClip, keep: Set<string>, rootName: strin
 
 const AXIS_X = new THREE.Vector3(1, 0, 0);
 
+/** Jolly's one-shot moves, in code (his model has no clips for them), and how long each lasts. */
+const ACTIONS: Record<string, number> = { jump: 1.1, cheer: 2.0, wave: 1.7, spin: 1.1, dance: 3.2, nod: 0.9 };
+/** Moods that hold while the state lasts: they ease in and out. */
+const MOODS = ['think', 'listen', 'sad', 'talk'] as const;
+type Role = 'armL' | 'armR' | 'legL' | 'legR';
+
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
@@ -334,8 +341,16 @@ class GltfCharacter implements Character {
   private gait = 0;
   private gaitAmp = 0;
   // Jolly's arm and leg nodes (no clip drives them), swung in code while he walks.
-  private limbs: { node: THREE.Object3D; base: THREE.Quaternion; leg: boolean; side: 1 | -1 }[] = [];
-  private limbQ = new THREE.Quaternion();
+  // Jolly's arms and legs are part of one mesh, so they are bent in the vertex shader (see
+  // patchLimbs). Each limb is [swing, raise outward] in radians; swing > 0 is backward.
+  private limbU = { armL: { value: new THREE.Vector2() }, armR: { value: new THREE.Vector2() }, legL: { value: 0 }, legR: { value: 0 } };
+  // The pose for this frame: body bounce, tilt, squash, and each limb as [swing, raise-outward].
+  private pose = { y: 0, rx: 0, ry: 0, rz: 0, sy: 1 };
+  private limbAng: Record<Role, [number, number]> = { armL: [0, 0], armR: [0, 0], legL: [0, 0], legR: [0, 0] };
+  private moods: Record<string, number> = { think: 0, listen: 0, sad: 0, talk: 0 };
+  private mood = '';
+  private act: { name: string; t: number; dur: number } | null = null;
+  private clock = 0;
 
   constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
     this.kind = kind;
@@ -369,11 +384,14 @@ class GltfCharacter implements Character {
       const next = mats.map((m) => {
         // Jolly's fur is a warm cream in the model, but the scene's cool daylight and tone mapping turn
         // it gray. A warm self-light and a slightly richer base bring the cream back.
-        if (kind === 'pet' && /Fur/.test(m.name) && (m as THREE.MeshStandardMaterial).color) {
+        if (kind === 'pet' && /Fur|Fiber/.test(m.name) && (m as THREE.MeshStandardMaterial).color) {
           const fur = (m as THREE.MeshStandardMaterial).clone();
-          fur.color.set('#F2DDB9');
-          fur.emissive.set('#F0CFA2');
-          fur.emissiveIntensity = 0.32;
+          if (/Fur/.test(m.name)) {
+            fur.color.set('#F2DDB9');
+            fur.emissive.set('#F0CFA2');
+            fur.emissiveIntensity = 0.32;
+          }
+          this.patchLimbs(fur);
           this.owned.push(fur);
           return fur;
         }
@@ -404,10 +422,6 @@ class GltfCharacter implements Character {
       plat.material = this.glow;
       plat.renderOrder = 2;
     }
-    if (kind === 'pet') {
-      const roles: Record<string, [boolean, 1 | -1]> = { Muse_LegL: [true, 1], Muse_LegR: [true, -1], Muse_ArmL: [false, 1], Muse_ArmR: [false, -1] };
-      model.traverse((o) => { const r = roles[o.name]; if (r) this.limbs.push({ node: o, base: o.quaternion.clone(), leg: r[0], side: r[1] }); });
-    }
     this.effectBody = model.getObjectByName('Muse_Body') as THREE.Mesh | undefined ?? null;
     if (this.effectBody?.isMesh) this.effectBody.geometry.computeBoundingBox();
     else this.effectBody = null;
@@ -432,6 +446,45 @@ class GltfCharacter implements Character {
     this.setState(kind === 'avatar' ? 'idle' : 'hover');
   }
 
+  /**
+   * Bend Jolly's legs (hips at y 0.115) and arms (shoulders at x +-0.15, y 0.30) in the vertex shader,
+   * with soft weights so the fur stretches instead of tearing. The body and his fuzz use the same bend.
+   */
+  private patchLimbs(mat: THREE.Material) {
+    const u = this.limbU;
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uArmL = u.armL; sh.uniforms.uArmR = u.armR; sh.uniforms.uLegL = u.legL; sh.uniforms.uLegR = u.legR;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+uniform vec2 uArmL; uniform vec2 uArmR; uniform float uLegL; uniform float uLegR;
+vec3 jollyLimbs(vec3 p) {
+  float s = p.x >= 0.0 ? 1.0 : -1.0;
+  float ax = abs(p.x);
+  // arms: raise outward about the shoulder, then swing forward / back
+  vec2 a = s > 0.0 ? uArmL : uArmR;
+  float aw = smoothstep(0.14, 0.185, ax) * smoothstep(0.12, 0.17, p.y) * (1.0 - smoothstep(0.30, 0.34, p.y));
+  float phi = a.y * aw, th = a.x * aw;
+  float dx = ax - 0.15, dy = p.y - 0.30;
+  float nx = 0.15 + dx * cos(phi) - dy * sin(phi);
+  float ny = 0.30 + dx * sin(phi) + dy * cos(phi);
+  float dy2 = ny - 0.30;
+  float nz = dy2 * sin(th) + p.z * cos(th);
+  ny = 0.30 + dy2 * cos(th) - p.z * sin(th);
+  vec3 q = vec3(s * nx, ny, nz);
+  // legs: swing about the hip
+  float lw = smoothstep(0.115, 0.01, q.y) * smoothstep(0.015, 0.045, abs(q.x));
+  float lg = (s > 0.0 ? uLegL : uLegR) * lw;
+  float hy = q.y - 0.115;
+  float lz = hy * sin(lg) + q.z * cos(lg);
+  q.y = 0.115 + hy * cos(lg) - q.z * sin(lg);
+  q.z = lz;
+  return q;
+}`)
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  transformed = jollyLimbs(transformed);');
+    };
+    mat.customProgramCacheKey = () => 'jolly-limbs-v1';
+  }
+
   private play(state: string, once: boolean): boolean {
     const action = (this.clipMap[state] ?? []).map((n) => this.actions.get(n)).find(Boolean);
     if (!action) return false;
@@ -448,8 +501,14 @@ class GltfCharacter implements Character {
   }
 
   setState(s: string) {
+    if (this.kind === 'pet') {
+      // A one-shot move (happy and celebrate are the cheer): it plays over whatever he is doing.
+      const move = s === 'happy' || s === 'celebrate' ? 'cheer' : s;
+      if (ACTIONS[move]) { this.act = { name: move, t: 0, dur: ACTIONS[move] }; return; }
+    }
     const once = ONE_SHOT.has(s);
     if (this.kind === 'pet' && !once) {
+      this.mood = (MOODS as readonly string[]).includes(s) ? s : '';
       const grounded = s === 'walk' || s === 'stand';
       this.walking = s === 'walk';
       if (this.platform) this.platform.visible = !grounded;
@@ -476,29 +535,102 @@ class GltfCharacter implements Character {
       this.hopLeft = Math.max(0, this.hopLeft - dt);
       y = Math.abs(Math.sin(this.hopLeft * 9)) * 0.22;
     }
-    if (this.kind === 'pet') {
-      // The waddle: a bounce on every step, a rock side to side, a lean into the walk. It eases in
-      // and out so Jolly settles when you stop.
-      this.gaitAmp += ((this.walking ? 1 : 0) - this.gaitAmp) * (1 - Math.exp(-dt * 7));
-      if (this.gaitAmp > 0.004) {
-        // A jog: about 2.9 steps a second. The body bounces on each step, rocks and leans in, and
-        // the limbs swing: each leg with the opposite arm, arms bent forward.
-        this.gait += dt * Math.PI * 2 * 1.45;
-        const a = this.gaitAmp, sw = Math.sin(this.gait);
-        y += Math.abs(sw) * 0.09 * a;
-        this.hop.rotation.set(0.16 * a, sw * 0.05 * a, sw * 0.09 * a);
-        for (const l of this.limbs) {
-          const dir = l.leg ? l.side : -l.side;
-          const ang = (l.leg ? 0.9 : 0.75) * sw * dir * a + (l.leg ? 0 : -0.4 * a);
-          this.limbQ.setFromAxisAngle(AXIS_X, ang);
-          l.node.quaternion.copy(l.base).multiply(this.limbQ);
-        }
+    if (this.kind !== 'pet') { this.hop.position.y = y; return; }
+
+    // ---- Jolly: the pose is the sum of the jog, the current mood and any one-shot move ----
+    this.clock += dt;
+    const P = this.pose, L = this.limbAng;
+    P.y = y; P.rx = 0; P.ry = 0; P.rz = 0; P.sy = 1;
+    for (const k of Object.keys(L) as Role[]) { L[k][0] = 0; L[k][1] = 0; }
+
+    // The jog: about 2.9 steps a second. The body bounces on each step, rocks and leans in, and the
+    // limbs swing: each leg with the opposite arm, arms bent forward.
+    this.gaitAmp += ((this.walking ? 1 : 0) - this.gaitAmp) * (1 - Math.exp(-dt * 7));
+    if (this.gaitAmp > 0.004) {
+      this.gait += dt * Math.PI * 2 * 1.45;
+      const a = this.gaitAmp, sw = Math.sin(this.gait);
+      P.y += Math.abs(sw) * 0.09 * a; P.rx += 0.16 * a; P.ry += sw * 0.05 * a; P.rz += sw * 0.09 * a;
+      L.legL[0] += 0.9 * sw * a; L.legR[0] -= 0.9 * sw * a;
+      L.armL[0] += -0.75 * sw * a - 0.4 * a; L.armR[0] += 0.75 * sw * a - 0.4 * a;
+    }
+
+    // Moods (they ease in and out): thinking has a hand to his chin and a slow tilt; listening leans in
+    // with his arms a little forward; talking bounces with arm gestures; sad slumps.
+    const t = this.clock;
+    for (const m of MOODS) {
+      this.moods[m] += ((this.mood === m ? 1 : 0) - this.moods[m]) * (1 - Math.exp(-dt * 6));
+      const a = this.moods[m];
+      if (a < 0.004) continue;
+      if (m === 'think') {
+        P.rz += Math.sin(t * 1.3) * 0.09 * a; P.rx += 0.05 * a;
+        L.armR[0] += -1.55 * a; L.armR[1] += -0.25 * a; L.armL[0] += -0.15 * a;
+      } else if (m === 'listen') {
+        P.rz += 0.11 * a; P.rx += 0.06 * a; L.armL[0] += -0.25 * a; L.armR[0] += -0.25 * a;
+      } else if (m === 'talk') {
+        P.y += Math.abs(Math.sin(t * 9)) * 0.02 * a; P.rx += Math.sin(t * 9) * 0.03 * a;
+        L.armL[0] += -0.55 * a * (0.5 + 0.5 * Math.sin(t * 5)); L.armR[0] += -0.55 * a * (0.5 + 0.5 * Math.sin(t * 5 + 2.2));
+        L.armL[1] += 0.15 * a; L.armR[1] += 0.15 * a;
       } else {
-        this.hop.rotation.set(0, 0, 0);
-        for (const l of this.limbs) l.node.quaternion.copy(l.base);
+        P.rx += 0.2 * a; P.y -= 0.02 * a; P.sy *= 1 - 0.04 * a;
+        L.armL[0] += 0.3 * a; L.armR[0] += 0.3 * a; L.armL[1] += 0.12 * a; L.armR[1] += 0.12 * a;
       }
     }
-    this.hop.position.y = y;
+
+    // A one-shot move.
+    if (this.act) {
+      this.act.t += dt;
+      const u = this.act.t / this.act.dur;
+      if (u >= 1) this.act = null;
+      else {
+        const e0 = Math.max(0, Math.min(1, u / 0.1, (1 - u) / 0.1)), e = e0 * e0 * (3 - 2 * e0), PI = Math.PI;
+        switch (this.act.name) {
+          case 'jump':
+            if (u < 0.2) { const k = u / 0.2; P.sy *= 1 - 0.22 * Math.sin(k * PI / 2); L.armL[0] += 0.5 * k; L.armR[0] += 0.5 * k; }
+            else if (u < 0.8) {
+              const v = (u - 0.2) / 0.6, up = Math.sin(v * PI);
+              P.y += 0.36 * 4 * v * (1 - v); P.sy *= 1 + 0.12 * up;
+              L.armL[1] += 2.2 * up; L.armR[1] += 2.2 * up; L.legL[0] -= 0.5 * up; L.legR[0] -= 0.5 * up;
+            } else { const k = (u - 0.8) / 0.2; P.sy *= 1 - 0.16 * Math.sin(k * PI); }
+            break;
+          case 'cheer': {
+            const v = (u * 2) % 1;
+            P.y += 0.3 * 4 * v * (1 - v) * e; P.sy *= 1 + 0.05 * Math.sin(v * PI) * e;
+            L.armL[1] += 2.3 * e; L.armR[1] += 2.3 * e;
+            P.ry += Math.sin(u * 34) * 0.14 * e; P.rz += Math.sin(u * 26) * 0.07 * e;
+            L.legL[0] += 0.3 * Math.sin(u * 40) * e; L.legR[0] -= 0.3 * Math.sin(u * 40) * e;
+            break;
+          }
+          case 'wave':
+            L.armR[1] += (2.1 + Math.sin(u * 34) * 0.28) * e; L.armR[0] += -0.2 * e; P.rz += 0.05 * e;
+            break;
+          case 'spin': {
+            const sp = u * u * (3 - 2 * u), out = Math.sin(u * PI);
+            P.ry += sp * PI * 2; P.y += 0.1 * out; L.armL[1] += 1.3 * out; L.armR[1] += 1.3 * out;
+            break;
+          }
+          case 'dance': {
+            const ph = u * 3.2 * PI * 2 * 1.5;
+            P.rz += Math.sin(ph) * 0.18 * e; P.y += Math.abs(Math.sin(ph)) * 0.05 * e; P.ry += Math.sin(ph * 0.5) * 0.25 * e;
+            L.armL[1] += (1.2 + 0.8 * Math.sin(ph)) * e; L.armR[1] += (1.2 + 0.8 * Math.sin(ph + PI)) * e;
+            L.legL[0] += 0.35 * Math.sin(ph) * e; L.legR[0] -= 0.35 * Math.sin(ph) * e;
+            break;
+          }
+          case 'nod':
+            P.rx += 0.28 * Math.sin(u * PI * 4) * e;
+            break;
+        }
+      }
+    }
+
+    // ---- apply ----
+    this.hop.position.y = P.y;
+    this.hop.rotation.set(P.rx, P.ry, P.rz);
+    const sq = 1 / Math.sqrt(P.sy); // squash and stretch keep his volume
+    this.hop.scale.set(sq, P.sy, sq);
+    this.limbU.armL.value.set(L.armL[0], L.armL[1]);
+    this.limbU.armR.value.set(L.armR[0], L.armR[1]);
+    this.limbU.legL.value = L.legL[0];
+    this.limbU.legR.value = L.legR[0];
   }
 
   getEffectCenter(out: THREE.Vector3): void {
