@@ -21,7 +21,7 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import {
-  addMuseWant, createListing, mapListing, mapListings, markSold, museWants, publicListing, releaseHold, removeMuseWant, requestHold, respondHold,
+  addMuseWant, createListing, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold,
 } from './market';
 import { marketplaceContext, recordWatch, watch } from './watch';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
@@ -1231,16 +1231,19 @@ export class CoreStore {
   }
 
   // ---------- marketplace / reels ----------
-  async listings(): Promise<Listing[]> {
+  /** The Marketplace grid. Location and pickupSpot follow listingFor: exact only for the seller and an accepted buyer. */
+  async listings(viewerId: ID): Promise<Listing[]> {
     const v = await this.view();
-    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicListing);
+    const at = now();
+    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((l) => listingFor(v, viewerId, l, at));
   }
 
   async listing(viewerId: ID, id: ID): Promise<{ listing: Listing; seller: PersonCard }> {
     const v = await this.view();
     const l = v.db.listings.find((x) => x.id === id);
     if (!l) throw notFound('listing_not_found');
-    return { listing: publicListing(l), seller: v.person(viewerId, l.sellerId)! };
+    return { listing: listingFor(v, viewerId, l, now()), seller: v.person(viewerId, l.sellerId)! };
   }
 
   async reels(): Promise<Reel[]> {

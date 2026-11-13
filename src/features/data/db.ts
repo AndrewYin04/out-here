@@ -3,7 +3,8 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, HangoutRating, HangAgain, TogetherPlan, MuseWant, WatchEvent,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, HangoutRating, HangAgain, TogetherPlan, MuseWant,
+  WatchEvent,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -84,7 +85,8 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares', togetherPlans: 'together_plans',
-  hangoutRatings: 'hangout_ratings', hangAgain: 'hang_again', listingHolds: 'listing_holds', museWants: 'muse_wants', watchEvents: 'watch_events',
+  hangoutRatings: 'hangout_ratings', hangAgain: 'hang_again', listingHolds: 'listing_holds', museWants: 'muse_wants',
+  watchEvents: 'watch_events',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 

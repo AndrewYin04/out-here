@@ -3,7 +3,7 @@
 // Realtime: user:<viewerId> {type:"watch", id} so the viewer's other tabs (Marketplace) refetch.
 import { coverFor, now, SEED_VIDEOS, VIDEO_BY_KEY, videoClip, type ID, type Listing } from '@/shared';
 import type { MarketplacePick, PersonCard, WatchHistoryItem, WatchResponse, WatchVideo } from '@/shared/api';
-import { publicListing } from './market';
+import { listingFor } from './market';
 import type { CoreStore } from './core';
 import { notFound } from './errors';
 import { publish } from './realtime-server';
@@ -61,7 +61,7 @@ export async function recordWatch(store: CoreStore, viewerId: ID, videoKey: stri
 export type MarketplaceContext = {
   history: (WatchHistoryItem & { video: WatchVideo })[];
   interests: string[];
-  /** Listings the viewer could buy: not sold, not their own. The exact pickup spot is stripped. */
+  /** Listings the viewer could buy: not sold, not their own. Read through listingFor, so location and spot follow the viewer. */
   listings: { listing: Listing; seller: PersonCard; openHouse: MarketplacePick['openHouse'] }[];
 };
 
@@ -85,7 +85,7 @@ export async function marketplaceContext(store: CoreStore, viewerId: ID): Promis
     .filter((l) => l.status !== 'sold' && l.sellerId !== viewerId)
     .flatMap((l) => {
       const seller = v.person(viewerId, l.sellerId);
-      return seller ? [{ listing: publicListing(l), seller, openHouse: openHouse.get(l.id) ?? null }] : [];
+      return seller ? [{ listing: listingFor(v, viewerId, l, at), seller, openHouse: openHouse.get(l.id) ?? null }] : [];
     });
   return { history, interests: v.profileById.get(viewerId)?.interests ?? [], listings };
 }
