@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import { ArrivalSelfie, OPEN_SELFIE } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
 import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
-import { Footprints, LocateFixed, MapPin, Sparkles, Users, X } from 'lucide-react';
+import { Footprints, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
@@ -835,10 +835,20 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       className="pointer-events-none absolute inset-0 z-[5]"
     >
       {!settled && (
-        <div data-testid="world-loading" className="absolute inset-0 z-[1] flex items-center justify-center bg-[#EEF0F2]">
-          <p role="status" className="flex items-center gap-2 rounded-pill bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-card">
-            <Sparkles size={16} aria-hidden className="animate-pulse text-fb-blue" /> Getting the street view ready…
+        // While the street view loads: Jolly, thinking, says what's happening.
+        <div data-testid="world-loading" className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-[#EEF0F2]/35 backdrop-blur-[2px]">
+          <p role="status" className="relative mb-3 rounded-[18px] bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-popover">
+            Switching views
+            <span aria-hidden className="ml-0.5 inline-flex gap-[3px] align-middle">
+              {[0, 1, 2].map((i) => (
+                <span key={i} className="size-1 rounded-full bg-fb-text-2 animate-[oh-think-dot_1.2s_ease-in-out_infinite] motion-reduce:animate-none" style={{ animationDelay: `${i * 0.18}s` }} />
+              ))}
+            </span>
+            <span aria-hidden className="absolute -bottom-[6px] left-1/2 size-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
           </p>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a small static render of Jolly */}
+          <img src="/muse/jolly-thinking.webp" alt="" width={102} height={160}
+            className="h-40 w-auto animate-[oh-jolly-bob_2.4s_ease-in-out_infinite] drop-shadow-[0_6px_10px_rgba(0,0,0,.12)] motion-reduce:animate-none" />
         </div>
       )}
       {/* Walking: one capsule at the top. The plan, everyone's progress along the way, minutes left. */}
@@ -942,37 +952,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           <div role="status" data-testid="hq-tour-caption" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-card bg-[#1C1E21]/90 px-3 py-2 text-[14px] font-semibold text-white shadow-popover">
             <span>{tour}</span>
             <button type="button" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="shrink-0 font-semibold text-[#8AB4FF] hover:underline">End tour</button>
-          </div>
-        )}
-        {/* One walk bar: while you walk, the countdown below says who you're walking with. */}
-        {together.plan && !walk && (
-          <div role="status" data-testid="walk-together" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text shadow-popover">
-            <Users size={16} aria-hidden className="shrink-0 text-fb-text-2" />
-            <span className="min-w-0 truncate">
-              {together.walkers.length > 0
-                ? (
-                  <button
-                    type="button"
-                    data-testid="walk-together-show"
-                    title="Show them on the map"
-                    onClick={() => {
-                      // Look at the nearest walker; "Back to me" brings the camera home.
-                      const at = walkerPos.current.get(`w:${together.walkers[0].id}`)?.at ?? together.walkers[0].location;
-                      entering.current = false;
-                      stopTour();
-                      setFollow(false);
-                      map.easeTo({ center: [at.lng, at.lat], duration: reducedMotion() ? 0 : 900 });
-                    }}
-                    className="truncate text-left hover:underline"
-                  >
-                    <b>Walking with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</b> to {clip(together.plan.title, 22)}
-                  </button>
-                )
-                : together.sharing ? <>Your walk to {clip(together.plan.title, 22)} is shown to the people going</> : <>Your walk is not shared</>}
-            </span>
-            <button type="button" data-testid="walk-share-toggle" onClick={() => together.setSharing(!together.sharing)} className="shrink-0 font-semibold text-fb-blue hover:underline">
-              {together.sharing ? 'Stop sharing' : 'Share'}
-            </button>
           </div>
         )}
         {arrival && !walk && !selfieQuest && (

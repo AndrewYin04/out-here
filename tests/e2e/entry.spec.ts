@@ -62,6 +62,11 @@ for (const width of [390, 1440]) {
       await openFriendsMap(page, width);
       const maya = page.locator('[data-testid="friend-pin"][data-handle="maya"]');
       const text = maya.getByTestId('friend-chip-text');
+      // The status shows on hover where there is one (desktop); on phones a tap opens the card.
+      if (width > 800) {
+        await maya.hover();
+        await expect(text).toBeVisible();
+      }
       await expect(text).toHaveText('craving dumplings');
       // Not clipped: the whole thought fits inside its box.
       const clipped = await text.evaluate((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);

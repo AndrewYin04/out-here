@@ -12,8 +12,6 @@ const UP_NEXT_WINDOW_MIN = 120;
 /** "Time to go" this many minutes before leave-by (and after it, until the start). */
 const LEAVE_HEADS_UP_MIN = 2;
 
-const first = (name: string) => name.split(' ')[0] ?? name;
-const names = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
 /** Re-render every 15 s so the countdown moves. */
 function useClock(ms = 15_000): number {
@@ -61,9 +59,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   const phase: Phase = now >= starts ? 'live' : now >= leaveBy - LEAVE_HEADS_UP_MIN * 60_000 ? 'go' : 'later';
   // Most recent joiners first: the friend you made this plan with leads ("with Maya, Nina and Kai").
   const others = plan.members.filter((m) => m.id !== viewer.id).reverse();
-  const withWho = others.length > 0 ? `with ${names(others.slice(0, 3).map((m) => first(m.name)))}${others.length > 3 ? ` +${others.length - 3}` : ''}` : 'just you so far';
   const minsToStart = Math.max(0, Math.round((starts - now) / 60_000));
-  const minsToLeave = Math.round((leaveBy - now) / 60_000);
 
   // The reminder: once per plan, when it's time to go.
   const reminded = useRef<string | null>(null);
@@ -80,10 +76,12 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   const takePhoto = () => { if (!requestSelfie(q.id)) onSee(q.id); };
 
   const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
-  const leave = arrived ? `You’re here${others.length > 0 ? ' · ' : ''}${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
-    : walking ? `On your way · ${plan.walkMinutes} min walk`
-      : phase === 'later' ? `Leave by ${formatDemoTime(new Date(leaveBy).toISOString())}${minsToLeave > 0 ? ` (in ${minsToLeave} min)` : ''} · ${plan.walkMinutes} min walk`
-        : phase === 'go' ? `Time to go · ${plan.walkMinutes} min walk` : `${plan.walkMinutes} min walk away`;
+  // One short line that fits on a phone: when it starts, then when to leave. Who's going is in the
+  // faces below; the walk time is on Let's go and the plan card.
+  const leave = arrived ? 'You’re here'
+    : walking ? 'On your way'
+      : phase === 'later' ? `Leave by ${formatDemoTime(new Date(leaveBy).toISOString())}`
+        : phase === 'go' ? 'Time to go' : `${plan.walkMinutes} min walk`;
 
   return (
     <section aria-label="Up next" data-testid="up-next" data-phase={arrived ? 'arrived' : phase}
@@ -92,7 +90,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
         <CategoryIcon category={q.category} size={44} className={cn(phase === 'go' && !arrived && 'ring-2 ring-fb-blue')} />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-fb-blue">Up next</p>
-          <p className="truncate text-[15px] font-bold leading-5 text-fb-text" data-testid="up-next-title">{q.title} <span className="font-normal text-fb-text-2">{withWho}</span></p>
+          <p className="truncate text-[15px] font-bold leading-5 text-fb-text" data-testid="up-next-title">{q.title}</p>
           <p className={cn('truncate text-[13px] leading-[18px]', phase === 'go' && !arrived && !walking ? 'font-semibold text-fb-blue' : 'text-fb-text-2')} data-testid="up-next-when">
             {when} · {leave}
           </p>
