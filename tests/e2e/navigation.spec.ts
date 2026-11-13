@@ -14,8 +14,8 @@ const dock = (page: Page) => page.getByTestId('out-here-dock');
 test.describe('Out Here navigation', () => {
   test('the dashboard: tabs, three heights, keyboard and Escape', async ({ page }) => {
     await openMap(page);
-    const explore = page.getByRole('button', { name: 'Explore' });
-    const friends = page.getByRole('button', { name: 'Friends' });
+    const explore = dock(page).getByRole('button', { name: 'Explore', exact: true });
+    const friends = dock(page).getByRole('button', { name: 'Friends', exact: true });
     await expect(explore).toHaveAttribute('aria-pressed', 'true');
     await expect(dock(page)).toHaveAttribute('data-level', '0');
 
@@ -39,7 +39,7 @@ test.describe('Out Here navigation', () => {
     await expect(page.getByTestId('people-row').first()).toBeVisible();
 
     // Plans opens Your plans inside Out Here: the page does not change.
-    await page.getByRole('button', { name: 'Plans' }).click();
+    await page.getByTestId('out-here-dock').getByRole('button', { name: 'Plans', exact: true }).click();
     await expect(page.getByTestId('dock-plans')).toBeVisible();
     await expect(page).toHaveURL(/\/out-here/);
   });

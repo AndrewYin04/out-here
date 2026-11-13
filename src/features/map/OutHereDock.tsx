@@ -142,22 +142,23 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
       {/* Actions above the panel. They step aside while the list is open. */}
       {showActions && level < 2 && (
         <div className="pointer-events-auto mb-3 flex items-center gap-2 px-3 md:px-0">
-          <ImFreeButton />
+          <ImFreeButton className="min-w-0 shrink whitespace-nowrap" />
           {tab === 'explore' && onCreate && (
             <button type="button" data-testid="create-plan-btn" aria-label="Post a plan" title="Post a plan (or long-press the map)" onClick={onCreate}
-              className="oh-press inline-flex h-11 items-center gap-1.5 rounded-full bg-fb-surface px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue">
+              className="oh-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fb-surface px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue max-[359px]:px-3">
               <Plus size={20} className="text-fb-blue" aria-hidden />
-              Post
+              {/* Under 360 px the row would wrap: Post keeps only its icon (its name stays for screen readers). */}
+              <span className="max-[359px]:sr-only">Post</span>
             </button>
           )}
           <span className="flex-1" />
-          <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={onRecenter} className={ROUND}>
+          <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={onRecenter} className={cn(ROUND, 'shrink-0')}>
             <LocateFixed size={20} aria-hidden />
           </button>
           {onToggleView && (
             <button type="button" data-testid={view === '3d' ? 'view-map' : 'view-3d'}
               aria-label={view === '3d' ? 'Switch to the flat map' : 'Switch to the 3D street view'} title={view === '3d' ? 'Flat map' : '3D street view'}
-              onClick={onToggleView} className={cn(ROUND, 'text-[15px] font-bold')}>
+              onClick={onToggleView} className={cn(ROUND, 'shrink-0 text-[15px] font-bold')}>
               {view === '3d' ? <MapIcon size={20} aria-hidden /> : '3D'}
             </button>
           )}
