@@ -7,7 +7,8 @@
 // GPS. Neither writes a position to the server; Find My keeps doing location sharing.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
+import { usePlanOpen, usePlanStatus } from '@/features/outhere';
+import { openChat, petPose, useMuseSnapshot } from '@/features/muse-companion';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
@@ -109,6 +110,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // ---- Muse pet: what it says and where it floats ----
   const planOpen = usePlanOpen();
   const plan = usePlanStatus();
+  // The Muse companion (chat): while it is open Jolly comes to the front and acts out its state.
+  const companion = useMuseSnapshot();
+  const pose = petPose(companion);
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petPos = useRef<LatLng>(start);
@@ -129,7 +133,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => window.clearTimeout(t);
   }, [cheer]);
 
-  const bubble: { text: string; tone: 'muse' | 'plain'; pending?: boolean } | null = cheer
+  const bubble: { text: string; tone: 'muse' | 'plain'; pending?: boolean } | null = companion.open
+    ? null // the chat panel is talking; no second speech bubble
+    : cheer
     ? { text: cheer, tone: 'plain' }
     : plan.state === 'loading'
       ? { text: 'Checking who’s free and what fits…', tone: 'plain', pending: true }
@@ -140,10 +146,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           : planOpen
             ? { text: 'What are you up for?', tone: 'plain' }
             : hello
-              ? { text: `Hi ${firstName(viewer.name)}! Tap ✨ I’m free and I’ll find something nearby.`, tone: 'plain' }
+              ? { text: `Hi ${firstName(viewer.name)}! Tap me and I’ll find something nearby.`, tone: 'plain' }
               : null;
-  const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
-  const nextPetState = cheer ? 'happy' : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
+  const nextPetMode: PetMode = pose.front || planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
+  const nextPetState = cheer ? 'happy'
+    : pose.clip !== 'hover' ? pose.clip
+      : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
   petMode.current = nextPetMode;
   petState.current = nextPetState;
 
@@ -663,16 +671,29 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Labels the world layer keeps above heads: the pet's speech, friends' names and status. */}
       <div className="absolute inset-0 overflow-hidden">
-        {bubble && (
+        {bubble ? (
           <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
             <button
               type="button"
-              onClick={() => setPlanOpen(true)}
+              aria-label={planOpen ? undefined : `Muse says: ${bubble.text}. Open Muse chat`}
+              onClick={planOpen ? undefined : openChat}
               className="pointer-events-auto relative block max-w-[260px] rounded-[18px] bg-fb-surface px-3 py-2 text-left text-[14px] leading-[18px] text-fb-text shadow-popover"
             >
               {bubble.tone === 'muse' && <span className="mb-0.5 block text-[12px] font-bold text-fb-blue">✨ Muse</span>}
               <span className={cn(bubble.pending && 'animate-pulse')}>{bubble.text}</span>
               <span aria-hidden className="absolute -bottom-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
+            </button>
+          </div>
+        ) : !companion.open && (
+          // Tap Jolly: a small target over the pet's head opens the chat (the 3D pet itself is not pickable).
+          <div ref={bindLabel('pet', 0.15)} data-testid="pet-tap" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-1">
+            <button
+              type="button"
+              aria-label="Talk to Muse"
+              onClick={openChat}
+              className="pointer-events-auto block rounded-pill bg-fb-surface/90 px-2 py-0.5 text-[12px] font-bold text-fb-blue shadow-card hover:bg-fb-surface"
+            >
+              ✨ Muse
             </button>
           </div>
         )}

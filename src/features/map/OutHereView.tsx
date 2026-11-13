@@ -193,6 +193,12 @@ export function OutHereView() {
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
   const togetherId = useTogetherId();
   const sheetOpen = planOpen || togetherId !== null;
+  // "View on map" from the Muse chat: show Explore (so the pin is there) and open that quest.
+  useEffect(() => {
+    const on = (e: Event) => { setMode('explore'); select((e as CustomEvent<string>).detail); };
+    window.addEventListener('muse:select-quest', on);
+    return () => window.removeEventListener('muse:select-quest', on);
+  }, [select]);
   // "See it on the map" from a confirmed shared plan opens that quest's panel here.
   useEffect(() => {
     const on = (e: Event) => select((e as CustomEvent<string>).detail);
