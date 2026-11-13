@@ -20,7 +20,7 @@ export function audienceLabel(a: Audience, lists: FriendList[] = []): string {
 
 const EMOJIS = ['🥟', '☕', '🍜', '🧋', '🏐', '🎸', '📚', '🧗', '🎲', '🌅', '👋', '😴'];
 
-type SharePatch = { paused?: boolean; audience?: Audience; precision?: LocationPrecision };
+type SharePatch = { paused?: boolean; audience?: Audience; precision?: LocationPrecision; expiresAt?: string };
 
 export function SharingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const toast = useToast();
@@ -73,13 +73,21 @@ export function SharingSheet({ open, onClose }: { open: boolean; onClose: () => 
 
   async function setSharing(on: boolean) {
     const before = paused;
+    // Undo puts back exactly what the server had: paused or not, and the same expiry.
+    const beforeExpiry = share?.expiresAt;
     setPaused(!on);
     const saved = await apply({ paused: !on });
     if (!saved) { setPaused(before); return; }
+    let undone = false;
     toast.show(on ? `Sharing your location until ${formatDemoTime(saved.expiresAt)}` : 'Location sharing paused', {
       action: {
         label: 'Undo',
-        onClick: () => { setPaused(!on); void apply({ paused: on }); },
+        onClick: () => {
+          if (undone) return;
+          undone = true;
+          setPaused(before);
+          void apply({ paused: before, ...(beforeExpiry ? { expiresAt: beforeExpiry } : {}) }).then((s) => { if (!s) setPaused(!on); });
+        },
       },
     });
   }

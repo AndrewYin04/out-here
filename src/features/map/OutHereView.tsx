@@ -495,8 +495,11 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} questPoints={questPoints} />
-          {/* People and Your status: top left on desktop; on phones a row under I'm free, clear of the map */}
-          <div className="absolute z-10 flex gap-2 max-md:pointer-events-none max-md:inset-x-3 max-md:bottom-4 max-md:justify-center max-md:*:pointer-events-auto md:left-3 md:top-16">
+          {/* People and Your status: top left on desktop; on phones a row under I'm free, right of the Map / 3D toggle */}
+          <div className={cn(
+            'absolute z-10 flex gap-2 max-md:pointer-events-none max-md:bottom-4 max-md:right-3 max-md:*:pointer-events-auto md:left-3 md:top-16',
+            unsupported ? 'max-md:left-3 max-md:justify-center' : 'max-md:left-[124px] max-md:justify-end',
+          )}>
             <PeopleButton map={map} />
             <SharingButton />
           </div>

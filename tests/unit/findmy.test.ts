@@ -199,6 +199,19 @@ describe('Find My: chip limits', () => {
     expect(out.get('a')?.mode).toBe('none'); // its only spot is under the label
     expect(out.get('c')?.mode).toBe('full');
   });
+
+  it('a must-show chip (nearest friend) still shows in full when its only spots are under quest labels and pins', () => {
+    const items = [at('maya', 100, 300, 0.8), at('ethan', 120, 180, 0.3)];
+    const labels = [{ x0: 0, y0: 200, x1: 400, y1: 256 }, { x0: 0, y0: 310, x1: 400, y1: 360 }];
+    const pins = [questBox({ x: 150, y: 330 })];
+    const out = placeChipsSided(items, null, { w: 390, h: 700 }, false, {
+      maxW: 200, lines: 2, modes: ['full'], sides: ['above', 'below'], shift: true,
+      only: new Set(['maya', 'ethan']), must: new Set(['maya', 'ethan']), hard: labels, obstacles: pins, top: 56,
+    });
+    expect(out.get('maya')?.mode).toBe('full');
+    expect(out.get('maya')?.over).toBe(true);
+    expect(out.get('ethan')?.mode).toBe('full');
+  });
 });
 
 describe('Find My: chip placement', () => {

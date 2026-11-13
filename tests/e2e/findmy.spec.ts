@@ -88,7 +88,7 @@ for (const width of [390, 1440]) {
       expect(await rows.count()).toBeGreaterThanOrEqual(20);
       await expect(page.getByTestId('people-list')).not.toContainText('Jordan');
       await page.screenshot({ path: `test-results/findmy-people-${width}.png` });
-      // a far-away friend: the map flies out to them and opens their card
+      // a far-away friend opens their card in place; the map stays on Menlo Park
       await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
       await expect(page.getByTestId('friend-card')).toContainText('New York, NY');
       await expect(page.getByTestId('friend-card')).toContainText('km away');

@@ -16,6 +16,8 @@ const PutZ = z.object({
   precision: z.enum(['exact', 'approximate']).optional(),
   audience: ShareAudienceZ.optional(),
   paused: z.boolean().optional(),
+  // Undo of a sharing change restores the expiry the share had (capped at 4 hours from now).
+  expiresAt: z.string().datetime().optional(),
   bubble: z.object({
     emoji: z.string().trim().max(16).nullable().optional(),
     thought: line.optional(),

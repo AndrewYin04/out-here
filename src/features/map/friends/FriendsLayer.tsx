@@ -128,7 +128,11 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
   return groups;
 }
 
-type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
+type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number; over: boolean };
+/** px the "free till" label adds under an avatar. */
+const FREE_LABEL_PX = 10;
+/** px of the map's top edge under the Explore / Friends toggle row. */
+const TOP_CONTROLS_PX = 56;
 
 export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, questPoints = null }: FriendsLayerProps) {
   const lib = useMapLib();
@@ -182,12 +186,14 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, qu
 
   // Opens a friend's card and flies the map so their pin is clear of the card:
   // window event "findmy:open" { detail: { id, zoom? } } (the People sheet sends it).
+  // A far-away friend (another city, no walking time) opens the card where the map is: the card
+  // already says the city and distance, and the local map stays put for the next tap.
   useEffect(() => {
     const on = (e: Event) => {
       const d = (e as CustomEvent<{ id: string; zoom?: number }>).detail;
       setOpenId(d.id);
       const pin = pins.find((p) => p.friend.id === d.id);
-      if (map && pin) {
+      if (map && pin && pin.walkingMinutes !== null) {
         map.flyTo({ center: [pin.location.lng, pin.location.lat], zoom: d.zoom ?? map.getZoom(), padding: panelPadding('right'), essential: true });
       }
     };
@@ -251,25 +257,26 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, qu
     }
     const screen = placed.map(({ pin, offset }) => {
       const pt = map.project([pin.location.lng, pin.location.lat]);
-      return { pin, x: pt.x + offset[0], y: pt.y + offset[1] };
+      const below = freeStatus(pin.availability ? [pin.availability] : []).kind === 'busy' ? 0 : FREE_LABEL_PX;
+      return { pin, x: pt.x + offset[0], y: pt.y + offset[1], below };
     });
     const mePt = me ? map.project([me.location.lng, me.location.lat]) : null;
     // Overview zooms and phones: chips for the nearest friends on screen and the open card only.
     const few = zoom < CHIP_ALL_ZOOM || view.w < PHONE_PX;
-    const only = few
-      ? new Set([
-        ...screen.filter((x) => x.x >= 0 && x.x <= view.w && x.y >= 0 && x.y <= view.h)
-          .sort((a, b) => a.pin.distanceKm - b.pin.distanceKm).slice(0, FEW_CHIPS).map((x) => x.pin.friend.id),
-        ...(openId ? [openId] : []),
-      ])
-      : null;
-    const opts: ChipOptions = { ...CHIPS, obstacles: questBoxes, hard: labelBoxes, only };
+    // The nearest friends on screen and the open card always carry their chip (never dropped).
+    const must = new Set([
+      ...screen.filter((x) => x.x >= 0 && x.x <= view.w && x.y >= 0 && x.y <= view.h)
+        .sort((a, b) => a.pin.distanceKm - b.pin.distanceKm).slice(0, FEW_CHIPS).map((x) => x.pin.friend.id),
+      ...(openId ? [openId] : []),
+    ]);
+    const only = few ? must : null;
+    const opts: ChipOptions = { ...CHIPS, obstacles: questBoxes, hard: labelBoxes, only, must, top: TOP_CONTROLS_PX };
     const chips = placeChipsSided(screen, mePt ? { x: mePt.x, y: mePt.y } : null, view, false, opts);
     return {
       clusters,
       singles: placed.map((s) => {
         const c = chips.get(s.pin.friend.id);
-        return { ...s, chip: c?.mode ?? 'none', side: c?.side ?? 'above', dx: c?.dx ?? 0 };
+        return { ...s, chip: c?.mode ?? 'none', side: c?.side ?? 'above', dx: c?.dx ?? 0, over: !!c?.over };
       }),
     };
     // questPoints is read through questKey, so a new array with the same points does not re-run this.
@@ -295,8 +302,9 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, qu
           </div>
         </MapMarker>
       )}
-      {layout.singles.map(({ pin, offset, chip, side, dx }) => (
-        <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={openId === pin.friend.id ? 5 : 3}>
+      {layout.singles.map(({ pin, offset, chip, side, dx, over }) => (
+        // A must-show chip lying over a quest label draws above the quest markers (z 6) so it stays readable.
+        <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={over ? 7 : openId === pin.friend.id ? 5 : 3}>
           <FriendPinView pin={pin} chip={chip} side={side} dx={dx} onOpen={() => openFromPin(pin)} />
         </MapMarker>
       ))}

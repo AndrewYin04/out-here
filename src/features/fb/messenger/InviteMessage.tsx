@@ -14,6 +14,13 @@ import { firstName } from './format';
  * which call POST /api/invites/:id/respond like the Out Here invite cards; accepting joins the
  * quest. Seats update live over quest:<id>.
  */
+/** The title without its leading emoji when the card already shows the quest's emoji ("🥟 Dumplings" -> "Dumplings"). */
+function titleWithoutEmoji(title: string, emoji: string | null | undefined): string {
+  const t = title.trim();
+  if (!emoji) return t;
+  return t.replace(/^\p{Extended_Pictographic}[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f]*\s*/u, '') || t;
+}
+
 export function InviteMessage({ message, invite, viewerId, mine, onAnswered }: {
   message: Message; invite: InviteView | null; viewerId: string; mine: boolean; onAnswered: () => void;
 }) {
@@ -70,7 +77,7 @@ export function InviteMessage({ message, invite, viewerId, mine, onAnswered }: {
       <div className="bg-fb-blue-tint px-3 py-2 text-[12px] font-semibold uppercase tracking-wide text-fb-blue">Out Here invite</div>
       <div className="px-3 py-2">
         <p className="text-[15px] font-semibold leading-5 text-fb-text">
-          {q?.emoji ? `${q.emoji} ` : ''}{invite?.suggestionTitle ?? message.text}
+          {q?.emoji ? `${q.emoji} ` : ''}{titleWithoutEmoji(invite?.suggestionTitle ?? message.text, q?.emoji)}
         </p>
         {q && <p className="mt-0.5 text-[13px] text-fb-text-2">{q.venueName}</p>}
         {details && <p className="mt-0.5 text-[13px] text-fb-text" data-testid="invite-details">{details}</p>}

@@ -151,6 +151,8 @@ export type LocationPatch = {
   audience?: Audience;
   paused?: boolean;
   bubble?: Partial<StatusBubble>;
+  /** Undo: put back the expiry the share had before (capped at the usual 4 hours from now). */
+  expiresAt?: string;
 };
 
 const clean = (s: string | null | undefined) => {
@@ -158,6 +160,14 @@ const clean = (s: string | null | undefined) => {
   const t = (s ?? '').trim();
   return t ? t : null;
 };
+
+/** A restored expiry, if it is still in the future; never later than the usual TTL from now. */
+function restoredExpiry(iso: string | undefined, t: Date): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms) || ms <= t.getTime()) return null;
+  return new Date(Math.min(ms, t.getTime() + SHARE_TTL_MIN * 60_000)).toISOString();
+}
 
 export async function updateMyLocation(store: CoreStore, viewerId: ID, patch: LocationPatch): Promise<LocationShare> {
   const v = await store.view();
@@ -191,7 +201,7 @@ export async function updateMyLocation(store: CoreStore, viewerId: ID, patch: Lo
     paused: patch.paused ?? old?.paused ?? false,
     bubble,
     updatedAt: t.toISOString(),
-    expiresAt: new Date(t.getTime() + SHARE_TTL_MIN * 60_000).toISOString(),
+    expiresAt: restoredExpiry(patch.expiresAt, t) ?? new Date(t.getTime() + SHARE_TTL_MIN * 60_000).toISOString(),
   };
   await store.backend.upsert('locationShares', [next]);
   const reach = new Set<ID>([viewerId, ...audienceViewers(v, viewerId, next.audience)]);
@@ -330,8 +340,8 @@ export function isOpenAt(hours: OpeningHours | null | undefined, at: Date): bool
  * open places that both people can walk to within 25 min. A quest must start within 2 hours,
  * or (up to 5 hours out) both overlap the friend's shared free window and let them arrive before
  * it ends. Order: a quest matching the friend's own words that starts within 60 min; then a
- * place that matches them ("need a second coffee" -> a cafe); then a later matching quest; then
- * any quest starting within 60 min; then any later quest; then the place nearest the friend.
+ * place whose name matches them ("need a second coffee" -> El Camino Coffee Works); then a later
+ * matching quest; then a place that matches only by kind (a cafe); then any quest starting within 60 min; then any later quest; then the place nearest the friend.
  * A place that hosts a matching quest is left out, so the quest is offered instead.
  * Words: thought, wish and free note count 3 each, what they are doing counts 1 (and not at all
  * for places). Walking times are measured from the viewer's own share, the point their "You" pin
@@ -391,7 +401,7 @@ export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): 
       const byKind = matchHang(wishes, new Set([...stems(p.category), ...(PLACE_WORDS[p.category] ?? []).flatMap((w) => [...stems(w)])]));
       const myWalk = walkingMinutes(origin, p.location);
       const theirWalk = walkingMinutes(friendAt, p.location);
-      return { p, score: byName.score * 2 + byKind.score, matched: byName.matched ?? byKind.matched, myWalk, theirWalk };
+      return { p, score: byName.score * 2 + byKind.score, byName: byName.score > 0, matched: byName.matched ?? byKind.matched, myWalk, theirWalk };
     })
     .filter((x) => x.myWalk <= HANG_MAX_WALK_MIN && x.theirWalk <= HANG_MAX_WALK_MIN);
 
@@ -404,8 +414,11 @@ export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): 
       tier: x.score > 0 ? (soon(x) ? 0 : 2) : (soon(x) ? 3 : 4),
       score: x.score, fits: Number(x.fitsWindow), walk: x.myWalk, quest: x,
     })),
+    // A place whose name has the friend's words beats a later matching quest; one that only
+    // matches by kind ("coffee" -> any cafe, a boba shop at night) comes after it, so "board games
+    // tonight?" gets the board game night rather than a boba cafe for "need a second coffee".
     ...places.map((x): Pick => ({
-      tier: x.score > 0 ? 1 : 5, score: x.score, fits: 1,
+      tier: x.score > 0 ? (x.byName ? 1 : 2.5) : 5, score: x.score, fits: 1,
       walk: x.score > 0 ? x.myWalk + x.theirWalk : x.theirWalk, place: x,
     })),
   ].sort((a, b) => a.tier - b.tier || b.score - a.score || b.fits - a.fits || a.walk - b.walk);
