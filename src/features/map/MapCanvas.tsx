@@ -160,25 +160,27 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
 }
 
 /** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null) {
+/** mine: the viewer joined this plan, so it reads "You're going" and stands out (docs/UX_PLAN.md). */
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, mine = false) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
-  p.badge.textContent = seatText;
-  p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
-  p.label.textContent = `${shortTitle(q.title)} · ${time}`;
+  p.badge.textContent = mine ? 'Going' : seatText;
+  p.badge.style.background = mine ? '#24832C' : seats > 0 ? '#0866FF' : '#65686C';
+  p.label.textContent = `${mine ? 'You’re going · ' : ''}${shortTitle(q.title)} · ${time}`;
+  p.root.toggleAttribute('data-mine', mine);
   p.bubble.textContent = q.bubbleText ?? '';
   const glyph = VIS_GLYPH[q.visibility ?? 'community'];
   p.vis.textContent = glyph ?? '';
   p.vis.style.display = glyph ? 'block' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${mine ? 'You’re going: ' : ''}${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-  const ring = selected || picked ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
+  const ring = selected || picked || mine ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
-  p.circle.style.transform = selected || picked ? 'scale(1.1)' : 'none';
-  p.root.style.zIndex = selected ? '4' : picked ? '3' : '1';
-  const dimmed = picked === false && !selected;
+  p.circle.style.transform = selected || picked || mine ? 'scale(1.1)' : 'none';
+  p.root.style.zIndex = selected ? '4' : picked || mine ? '3' : '1';
+  const dimmed = picked === false && !selected && !mine;
   // MapLibre owns the marker root's opacity, so the pin button carries the dimming.
   p.button.style.opacity = dimmed ? '0.4' : '1';
   p.button.style.transition = 'opacity .2s';
@@ -382,7 +384,7 @@ export default function MapCanvas({
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, !!viewerId && q.memberIds.includes(viewerId));
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }

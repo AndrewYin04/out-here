@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Camera, ChevronDown, ChevronUp, Footprints, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useViewer } from '@/features/data';
-import { MemoryCapture } from '@/features/memories';
+import { MemoryCapture, requestSelfie } from '@/features/memories';
 import { Avatar, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
 
@@ -81,8 +81,10 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, arrived, q.id]);
 
-  // Arriving opens the photo step.
-  useEffect(() => { if (arrived) { setOpen(true); setPhoto(true); } }, [arrived]);
+  // Arriving: the 3D view opens the selfie dialog itself, so this card only offers to reopen it
+  // (one photo prompt, not two). Without the 3D view, the photo form opens here.
+  useEffect(() => { if (arrived) setOpen(true); }, [arrived]);
+  const takePhoto = () => { if (!requestSelfie(q.id)) setPhoto(true); };
 
   const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
   const leave = arrived ? `You’re here 🎉 ${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
@@ -130,7 +132,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
               </button>
             </div>
           ) : !photo ? (
-            <button type="button" onClick={() => setPhoto(true)}
+            <button type="button" data-testid="up-next-photo-btn" onClick={takePhoto}
               className="oh-press inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-btn bg-fb-blue text-[15px] font-semibold text-white">
               <Camera size={18} aria-hidden />Take a photo together
             </button>
