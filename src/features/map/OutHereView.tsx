@@ -21,6 +21,13 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 // The 3D street view (world area). Loaded only when someone opens it, so three.js and the
 // models stay out of the map's first load.
 const World3D = dynamic(() => import('@/features/world').then((m) => m.World3D), { ssr: false });
+/** Load the street view's code, models and campus data in the background, once. */
+let worldWarm = false;
+function warmWorld() {
+  if (worldWarm) return;
+  worldWarm = true;
+  void import('@/features/world').then((m) => m.preloadWorld()).catch(() => { worldWarm = false; });
+}
 
 // Remembered per tab, so a fresh visit always lands on the 3D view (#13) and moving around the
 // app and back keeps whichever view this tab was on.
@@ -287,6 +294,12 @@ export function OutHereView() {
     return () => window.clearTimeout(t);
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
+  // Let's go should open the street at once: warm it a few seconds after the map is up.
+  useEffect(() => {
+    if (!map || unsupported) return;
+    const t = window.setTimeout(warmWorld, 2500);
+    return () => window.clearTimeout(t);
+  }, [map, unsupported]);
 
   // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();

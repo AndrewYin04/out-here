@@ -281,7 +281,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
           {answered.some(({ o }) => o.together) && s.questId && (
             <div className="mt-2 flex gap-2">
               <Button block icon={<Footprints size={18} />} data-testid="suggestion-lets-go" onClick={() => go(s.questId!)}>Let&rsquo;s go</Button>
-              <Button variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
+              <Button variant="secondary" className="shrink-0 whitespace-nowrap" onClick={() => setPlanOpen(false)}>Show on map</Button>
             </div>
           )}
         </div>

@@ -44,3 +44,16 @@ export function requestSelfie(questId: ID): boolean {
   window.dispatchEvent(e);
   return e.defaultPrevented;
 }
+
+/** Who actually arrived at a plan, remembered for this tab so the memory page names them, not every member. */
+const HERE_KEY = (questId: string) => `outhere.here.${questId}`;
+export function rememberHere(questId: string, ids: string[]): void {
+  try { window.sessionStorage.setItem(HERE_KEY(questId), JSON.stringify(ids)); } catch { /* private mode: page falls back to all members */ }
+}
+export function recallHere(questId: string): string[] | null {
+  try {
+    const raw = window.sessionStorage.getItem(HERE_KEY(questId));
+    const ids = raw ? (JSON.parse(raw) as unknown) : null;
+    return Array.isArray(ids) && ids.every((x) => typeof x === 'string') && ids.length > 0 ? ids : null;
+  } catch { return null; }
+}

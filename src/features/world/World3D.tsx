@@ -102,7 +102,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let done = false;
     const finish = () => { if (!done) { done = true; setSettled(true); } };
     map.once('idle', finish);
-    const t = window.setTimeout(finish, 12_000);
+    // Never hold the walk behind the veil for long: the street fills in as tiles arrive.
+    const t = window.setTimeout(finish, 5_000);
     return () => { done = true; map.off('idle', finish); window.clearTimeout(t); };
   }, [ready, settled, map]);
   /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
@@ -1193,7 +1194,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Bottom centre: walking countdown, arrival, "Walk there", GPS notes. */}
       <div className={cn(
-        'absolute inset-x-0 flex flex-col items-center gap-2 px-4',
+        // On phones keep clear of the map's right-hand buttons, so no bar runs under them.
+        'absolute inset-x-0 flex flex-col items-center gap-2 px-4 max-md:pr-[76px]',
         selectedId ? 'bottom-[calc(58%+12px)] md:bottom-24' : 'bottom-24 max-md:bottom-[252px]',
       )}>
         {tour && (

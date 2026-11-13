@@ -14,6 +14,7 @@ import { useApi, type QuestDetail } from '@/features/data';
 import { Avatar, burst, cn, flash, useDemoTools, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
 import type { PersonCard } from '@/shared/api';
+import { rememberHere } from './arrival';
 import { saveToAlbum } from './together-api';
 
 type Walker = { id: string; name: string; avatarUrl: string; minutesAway: number };
@@ -77,7 +78,10 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
   // Everyone on the way: you plus each person sharing their walk here. People who never set off
   // (no walk to follow) don't hold the moment up.
   const onTheWay = people.filter((p) => p.coming && !p.here);
-  const allHere = onTheWay.length === 0;
+  // "All here" needs company: everyone on the way has arrived AND you're not alone (or it's a
+  // plan of one). Until then the sheet says who it's waiting for, set off or not.
+  const notHere = people.filter((p) => !p.here);
+  const allHere = onTheWay.length === 0 && (here.length > 1 || people.length <= 1);
 
   // Confetti when you arrive, and again each time someone else gets there.
   const lastCount = useRef(0);
@@ -86,6 +90,8 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
     lastCount.current = here.length;
   }, [here.length, quest.emoji, folded]);
   useEffect(() => { if (allHere && togetherSince === null) setTogetherSince(Date.now()); }, [allHere, togetherSince]);
+  const hereKey = here.map((p) => p.id).join(',');
+  useEffect(() => { if (hereKey) rememberHere(quest.id, hereKey.split(',')); }, [hereKey, quest.id]);
 
   const candid = async (file: File | undefined) => {
     if (!file) return;
@@ -142,7 +148,7 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
       </div>
       <div className="px-4 pb-4">
         <h2 className="text-[22px] font-extrabold text-fb-text">
-          {allHere && here.length > 1 ? 'You’re all here!' : 'You made it!'} <span aria-hidden>🎉</span>
+          {allHere && notHere.length === 0 && here.length > 1 ? 'You’re all here!' : 'You made it!'} <span aria-hidden>🎉</span>
         </h2>
         <ul className="mt-2 flex gap-3 overflow-x-auto pb-1" aria-label="Who's here">
           {people.map((p) => (
