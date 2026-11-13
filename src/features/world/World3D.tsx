@@ -12,7 +12,7 @@ import { useApi } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender } from '@/features/muse-companion';
-import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
+import { OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
@@ -1200,7 +1200,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <MapPin size={16} aria-hidden />{arrival.text}
           </button>
         )}
-        <ArrivalSelfie key={viewer.id} quest={selfieQuest} onClose={closeSelfie} />
 
         {canWalk && selected && !walk && (
           // Phones: an open plan card covers this spot, and its own Let's go does the same.
