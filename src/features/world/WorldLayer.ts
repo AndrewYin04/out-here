@@ -236,6 +236,14 @@ export class WorldLayer implements CustomLayerInterface {
 
   setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { const a = this.actors.get(id); if (a) a.processing = phase; a?.trail?.setProcessing(phase); }
 
+  /** Stable rest-pose elevation, independent of thinking, gestures and breathing. */
+  actorCameraElevation(id: string, boost: number): number {
+    const a = this.actors.get(id);
+    if (!a) return 0;
+    const scale = characterScale(this.map?.getZoom() ?? 22);
+    return a.altitude * scale + (a.char.cameraHeight ?? a.char.height / 2) * .9 * scale * boost;
+  }
+
   /** Actual animated body centre, in map-canvas pixels, for the existing camera rig. */
   actorScreenPoint(id: string, out: { x: number; y: number; elevation: number }): boolean {
     const actor = this.actors.get(id), canvas = this.map?.getCanvas();

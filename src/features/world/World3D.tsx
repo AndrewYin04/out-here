@@ -14,7 +14,7 @@ import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
 import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
-import {museCameraArea, museStage} from './muse-layout';
+import {museCameraArea, museConversationArea, museStage} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
 import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
@@ -218,7 +218,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   },[map,companion.open]);
   const chatOpen = useRef(companion.open);
   chatOpen.current = companion.open;
-  useEffect(()=>{if(!companion.open&&manualChatCamera.current)map.setMaxZoom(MAX_3D_ZOOM);manualChatCamera.current=false;},[map,companion.open]);
+  useEffect(()=>{if(!companion.open&&manualChatCamera.current){map.setMaxZoom(MAX_3D_ZOOM);conversationCamera.current=false;}manualChatCamera.current=false;},[map,companion.open]);
   const upNext = useUpNext();
   const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
@@ -227,6 +227,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const fidgetIn = useRef(24);
   const trickAt = useRef(0);
   const chatAreaHeight = useRef(450);
+  const conversationCamera = useRef(false);
   const thoughtsRef = useRef<HTMLDivElement>(null);
   const petPos = useRef<LatLng>(start);
   const petAlt = useRef(1.7);
@@ -280,10 +281,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
   // ---- Set up the 3D map, and put it back on the way out ----
   useEffect(() => {
-    const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch(), fov:map.getVerticalFieldOfView() };
+    const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch(), fov:map.getVerticalFieldOfView(), pixelRatio:map.getPixelRatio() };
     let layer: WorldLayer | null = null;
     let undoTheme: (() => void) | null = null;
     let cancelled = false;
+    map.setPixelRatio(Math.min(saved.pixelRatio, 1.5));
     map.setMaxPitch(MAX_3D_PITCH);
     map.setVerticalFieldOfView(48);
     map.setMaxZoom(MAX_3D_ZOOM);
@@ -295,7 +297,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     // One camera: on every update (pinch, scroll, animation, the follow loop) the tilt comes from
     // the zoom, so zooming out lifts the camera to the overhead map in one continuous motion.
     // The HQ tour sets its own angles.
-    map.setTransformCameraUpdate((next) => (touring.current ? {} : { pitch: pitchForZoom(next.zoom) }));
+    map.setTransformCameraUpdate((next) => ((touring.current || conversationCamera.current) ? {} : { pitch: pitchForZoom(next.zoom) }));
     // Dev only: lets tests and debugging read the live map (never in a production build).
     if (process.env.NODE_ENV !== 'production') (window as unknown as { __ohMap?: MapLibreMap }).__ohMap = map;
 
@@ -364,6 +366,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       undoTheme?.();
       layerRef.current = null;
       map.getContainer().removeAttribute('data-view3d');
+      map.setPixelRatio(saved.pixelRatio);
       delete map.getContainer().dataset.worldModels;
       map.setTransformCameraUpdate(null);
       map.dragRotate.disable();
@@ -596,9 +599,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let lastPet = '';
     const walkerState = new Map<string, string>();
     let lastSecond = 0;
-    let chatCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number } | null = null;
-    let returnCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number } | null = null;
+    let chatCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number; pitch: number } | null = null;
+    let returnCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number; pitch: number } | null = null;
     let restoringUntil = 0;
+    let previousCamera: number[] | null = null;
+    const compose = (lng: number, lat: number, zoom: number, bearing: number, x: number, y: number, pitch = map.getPitch()) => {
+      const values = [lng, lat, zoom, bearing, x, y, pitch];
+      const tolerances = [1e-10, 1e-10, .0001, .001, .1, .1, .001];
+      if (previousCamera && values.every((v, i) => Math.abs(v - previousCamera![i]) < tolerances[i])) return;
+      previousCamera = values;
+      map.easeTo({center: [lng, lat], zoom, bearing, pitch, offset: [x, y], duration: 0});
+    };
     let flight: { id:number; peer:string; created:boolean; motion:EncounterMotion; origin:LatLng; altitude:number; scale:number; bearing:number; cursor:number; pulseAge:number;direction:'sent'|'received'|null } | null = null;
     const clearFlight = () => {
       if (!flight) return;
@@ -743,14 +754,22 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // With the chat open Jolly flies up toward the screen: he grows until he almost fills the map
       // above the chat (the camera is already framing him). Back to size when it closes.
       const phoneView = (cameraRects.current?.bounds.width ?? window.innerWidth) < 768;
-      // He fills the space the chat leaves (the camera pulls back as the chat grows, so he gets the most the layout allows).
-      const fit = phoneView ? Math.max(2.6, Math.min(6, chatAreaHeight.current / 30)) : 3.6;
+      // Size comes from the reserved conversation space, independent of reply-card height.
+      const fit = phoneView ? Math.max(2.6, Math.min(3.6, chatAreaHeight.current / 65)) : 3.6;
       const boostTarget = chatOpen.current && !encounterRef.current && !photoFocus ? fit : 1;
       petBoost.current += (boostTarget - petBoost.current) * (reducedMotion() ? 1 : 1 - Math.exp(-dt * 1.2));
       layer.setBoost('pet', petBoost.current);
       // Once Jolly fills the view the avatar steps out, so the chat shows just his front.
       layer.setHidden('me', chatOpen.current && !encounterRef.current && petBoost.current > 1.8);
       layer.setPose('pet', petPos.current, petBearing, petAlt.current);
+      // Keep the HTML thought anchor attached even when a manual gesture owns the camera.
+      if(chatOpen.current&&thoughtsRef.current){
+        layer.actorScreenPoint('pet',screenPoint);
+        const bounds=cameraRects.current?.bounds;
+        thoughtsRef.current.style.transform=`translate(${screenPoint.x.toFixed(1)}px, ${screenPoint.y.toFixed(1)}px)`;
+        thoughtsRef.current.style.setProperty('--r',`${Math.round(Math.min((bounds?.width??window.innerWidth)*.28,125))}px`);
+      }
+
 
       // One logical companion per user, in the same scene/frame loop. Origins are visual
       // staging points nearby, never a peer's private or inferred physical location.
@@ -845,48 +864,49 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
       if (chatOpen.current) {
-        if(manualChatCamera.current){chatCamera=null;returnCamera=null;map.setCenterClampedToGround(true);camBearing.current=map.getBearing();return;}
+        if(manualChatCamera.current){previousCamera=null;chatCamera=null;returnCamera=null;map.setCenterClampedToGround(true);camBearing.current=map.getBearing();return;}
         if (!chatCamera) {
           const c = map.getCenter();
-          chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom, bearing: map.getBearing(), elevation: map.getCenterElevation() };
+          chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom, bearing: map.getBearing(), elevation: map.getCenterElevation(), pitch: map.getPitch() };
           returnCamera = null; restoringUntil = 0;
           entering.current = false;
+          conversationCamera.current = true;
+          previousCamera = null;
           map.stop(); map.setMaxZoom(24.2); map.setCenterClampedToGround(false);
         }
         camBearing.current = map.getBearing();
         const measured=cameraRects.current;if(!measured)return;
-        const {bounds,area}=measured;
+        const {bounds,visible}=measured;
+        const area=museConversationArea(bounds,visible);
         const phone = bounds.width < 768;
         if(!area)return;
-        // The focus point may only move so far up the screen: at this near-level tilt a bigger shift (a
-        // tall reply card) swings the camera into the nearest wall instead of keeping Jolly in view.
+        // Reserve one composition for the conversation; only viewport/keyboard changes reframe it.
         const targetX = area.x, targetY = Math.max(area.y, bounds.height / 2 - 100);
         // The free space around that spot (nearest edge, doubled) is what Jolly's size has to fit in.
         chatAreaHeight.current = Math.max(80, 2 * Math.min(targetY - (area.y - area.height / 2), area.y + area.height / 2 - targetY));
-        // The zoom stays put however tall the chat gets (a smaller zoom pulls the camera back into the
-        // buildings); Jolly's size follows the free space instead (see petBoost).
-        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone ? 23.5 : 23.8;
+        // A real encounter can widen the shot; ordinary request states retain the same framing.
+        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone ? 23.5 : 23.3;
         // A slow ease so you can watch the camera move in on Jolly (about 2 s to settle).
         const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 1.5);
-        layer.actorScreenPoint('pet', screenPoint);
-        const thoughts = thoughtsRef.current;
-        if (thoughts) { thoughts.style.transform = `translate(${screenPoint.x.toFixed(1)}px, ${screenPoint.y.toFixed(1)}px)`; thoughts.style.setProperty('--r', `${Math.round(Math.min(bounds.width * 0.28, 125))}px`); }
-        map.setCenterElevation(map.getCenterElevation() + (screenPoint.elevation - map.getCenterElevation()) * easing);
-        const cameraFocus=flight ? moveMeters(flight.origin,1.5*flight.scale,flight.bearing+70) : petPos.current;
-        map.easeTo({
-          center: [cameraFocus.lng, cameraFocus.lat],
-          zoom: zoom + (targetZoom - zoom) * easing,
-          offset: [targetX - bounds.width / 2, targetY - bounds.height / 2], duration: 0,
-        });
+        const elevation = layer.actorCameraElevation('pet', boostTarget);
+        const currentElevation = map.getCenterElevation();
+        if (Math.abs(elevation - currentElevation) > .0005) {
+          map.setCenterElevation(Math.abs(elevation - currentElevation) < .005 ? elevation : currentElevation + (elevation - currentElevation) * easing);
+          previousCamera = null;
+        }
+        const cameraFocus=flight ? moveMeters(flight.origin,1.5*flight.scale,flight.bearing+70) : target;
+        const nextZoom = Math.abs(targetZoom - zoom) < .001 ? targetZoom : zoom + (targetZoom - zoom) * easing;
+        const pitch = Math.abs(map.getPitch() - 60) < .01 ? 60 : map.getPitch() + (60 - map.getPitch()) * easing;
+        compose(cameraFocus.lng, cameraFocus.lat, nextZoom, map.getBearing(), targetX - bounds.width / 2, targetY - bounds.height / 2, pitch);
         return;
       }
-      if(chatCamera){returnCamera=chatCamera;chatCamera=null;restoringUntil=now+(reducedMotion()?0:1900);}
+      if(chatCamera){previousCamera=null;returnCamera=chatCamera;chatCamera=null;restoringUntil=now+(reducedMotion()?0:1900);}
       if(returnCamera){
         const target=returnCamera,c=map.getCenter(),k=reducedMotion()?1:1-Math.exp(-dt*3);
         map.setCenterElevation(map.getCenterElevation()+(target.elevation-map.getCenterElevation())*k);
-        map.easeTo({center:[c.lng+(target.center[0]-c.lng)*k,c.lat+(target.center[1]-c.lat)*k],zoom:zoom+(target.zoom-zoom)*k,bearing:lerpDeg(map.getBearing(),target.bearing,k),duration:0});
+        map.easeTo({center:[c.lng+(target.center[0]-c.lng)*k,c.lat+(target.center[1]-c.lat)*k],zoom:zoom+(target.zoom-zoom)*k,bearing:lerpDeg(map.getBearing(),target.bearing,k),pitch:map.getPitch()+(target.pitch-map.getPitch())*k,duration:0});
         if(reducedMotion()||now>=restoringUntil||Math.abs(map.getZoom()-target.zoom)<.005){
-          map.jumpTo({center:target.center,zoom:target.zoom,bearing:target.bearing,elevation:target.elevation});map.setMaxZoom(MAX_3D_ZOOM);map.setCenterClampedToGround(true);returnCamera=null;restoringUntil=0;
+          map.jumpTo({center:target.center,zoom:target.zoom,bearing:target.bearing,pitch:target.pitch,elevation:target.elevation});map.setMaxZoom(MAX_3D_ZOOM);map.setCenterClampedToGround(true);returnCamera=null;restoringUntil=0;conversationCamera.current=false;
         }
         return; // Never overwrite a restored camera with the zoom sampled before restoration.
       }
@@ -899,13 +919,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         }
         camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
         const h = map.getContainer().clientHeight;
-        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, offset: [0, Math.round(h * 0.2)], duration: 0 });
+        compose(pos.current.lng, pos.current.lat, z, camBearing.current, 0, Math.round(h * 0.2));
       } else if (!busy) {
+        previousCamera = null;
         camBearing.current = map.getBearing();
       }
     };
     raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); clearFlight(); const previous = chatCamera ?? returnCamera; if (previous) { map.jumpTo({ center: previous.center, zoom: previous.zoom, bearing: previous.bearing, elevation: previous.elevation }); map.setCenterClampedToGround(true); } };
+    return () => { cancelAnimationFrame(raf); conversationCamera.current=false; clearFlight(); const previous = chatCamera ?? returnCamera; if (previous) { map.jumpTo({ center: previous.center, zoom: previous.zoom, bearing: previous.bearing, pitch: previous.pitch, elevation: previous.elevation }); map.setCenterClampedToGround(true); } };
   }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, stopWalk, tryMove, viewer.id]);
 
   // ---- GPS source ----

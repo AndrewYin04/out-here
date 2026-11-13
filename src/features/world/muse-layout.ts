@@ -39,3 +39,13 @@ export function museChatZoom(area: { width: number; height: number }, phone: boo
   const available = Math.min(area.width * 0.65, area.height * 0.55);
   return Math.min(phone ? 23.55 : 23.8, 23 + Math.log2(Math.max(55, Math.min(140, available)) / 80));
 }
+
+/** Reserve the conversation's full footprint so changing reply heights cannot move the camera. */
+export function museConversationArea(bounds: Rect, visible?: Rect | null) {
+  const phone = bounds.width < 768;
+  const bottom = Math.min(bounds.height, visible ? visible.top + visible.height - bounds.top : bounds.height);
+  const top = Math.min(110, bottom * .2);
+  const height = Math.max(80, bottom - top - (phone ? bounds.height * .42 + 68 : 24));
+  const width = Math.max(80, bounds.width - (phone ? 24 : 420));
+  return { x: 12 + width / 2, y: Math.max(top + height / 2, bottom / 2 - 100), width, height };
+}
