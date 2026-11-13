@@ -16,6 +16,7 @@ import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
 import { CreatePlanSheet, type HostPreset } from './create/CreatePlanSheet';
 import { HostPicker } from './create/HostPicker';
+import { PlaceMode } from './create/PlaceMode';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 import { initialView, shouldEnter3d, type MapView } from './view3d';
@@ -76,6 +77,8 @@ export function OutHereView() {
   const [creating, setCreating] = useState<{ at: LatLng; emoji: string; preset: HostPreset | null } | null>(null);
   // Long-press: the host picker fans out where you pressed, before the sheet opens.
   const [hostAt, setHostAt] = useState<LatLng | null>(null);
+  // The ＋ button: "pick a spot" first (custom cursor + hint), then the host picker there.
+  const [placing, setPlacing] = useState(false);
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -217,11 +220,13 @@ export function OutHereView() {
     setPlanOpen(false);
     select(null);
     setHostAt(null);
+    setPlacing(false);
     setCreating((cur) => ({ at: spot, emoji: preset?.emoji ?? cur?.emoji ?? '📍', preset: preset ?? null }));
   }, [map, select]);
   const openHostPicker = useCallback((at: LatLng) => {
     setPlanOpen(false);
     select(null);
+    setPlacing(false);
     setHostAt(at);
   }, [select]);
   const moveDraft = useCallback((at: LatLng) => setCreating((cur) => (cur ? { ...cur, at } : cur)), []);
@@ -255,7 +260,7 @@ export function OutHereView() {
   const meRef = useRef<LatLng>(DEMO_CENTER);
   meRef.current = ctx?.origin ?? DEMO_CENTER;
   const busyRef = useRef(false);
-  busyRef.current = !!creating;
+  busyRef.current = !!creating || placing || !!hostAt;
   useEffect(() => {
     if (!map || view !== 'map' || unsupported) return;
     let hand = false;
@@ -277,6 +282,19 @@ export function OutHereView() {
     return () => window.clearTimeout(t);
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
+  // ＋ from anywhere: hosting happens on the flat map. From the 3D street the camera eases back
+  // down to the map (World3D's exit tilts to pitch 0), then the map waits for a spot.
+  const beginPlace = useCallback(() => {
+    if (unsupported || !map) { startCreate(); return; }
+    setPlanOpen(false);
+    select(null);
+    setHostAt(null);
+    if (view === '3d') setView('map');
+    setPlacing(true);
+  }, [unsupported, map, startCreate, select, view, setView]);
+  const cancelPlace = useCallback(() => setPlacing(false), []);
+  // Another sheet (I'm free, Together) or a walk taking the screen ends the spot picking.
+  useEffect(() => { if (sheetOpen || walkTo) setPlacing(false); }, [sheetOpen, walkTo]);
 
   // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();
@@ -344,7 +362,7 @@ export function OutHereView() {
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
-          onSelect={creating ? noSelect : select}
+          onSelect={creating || placing ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
           onPickLocation={openHostPicker}
@@ -530,7 +548,7 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && (
+      {!selectedId && !creating && !placing && !sheetOpen && !walkingNow && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered.
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
           mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
@@ -547,7 +565,7 @@ export function OutHereView() {
       )}
 
       {/* Dock the availability card at the edge to leave room for the map and avatar. */}
-      {!selectedId && !creating && !sheetOpen && !upNext && !show3d && (
+      {!selectedId && !creating && !placing && !sheetOpen && !upNext && !show3d && (
         <div className={cn(
           'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
           show3d
@@ -561,14 +579,14 @@ export function OutHereView() {
       )}
 
       {/* One button at the bottom: I'm free (it also shows your status). Hidden while you walk. */}
-      {!sheetOpen && !creating && !walkingNow && (
+      {!sheetOpen && !creating && !placing && !walkingNow && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
           <ImFreeButton className="pointer-events-auto" />
         </div>
       )}
 
       {/* Right-side stack: 3D / Map, back to you, your plans, post a plan. */}
-      {!unsupported && !creating && !walkingNow && (
+      {!unsupported && !creating && !placing && !walkingNow && (
         <div role="group" aria-label="Map controls"
           className={cn('absolute right-3 z-20 flex flex-col overflow-hidden rounded-[22px] bg-fb-surface shadow-popover', sheetOpen ? 'max-md:hidden md:bottom-6' : 'bottom-24 max-md:bottom-[150px]', selectedId && 'max-md:hidden')}>
           <button type="button" data-testid={view === '3d' ? 'view-map' : 'view-3d'} aria-label={view === '3d' ? 'Flat map' : '3D street view'} title={view === '3d' ? 'Flat map' : '3D street view'}
@@ -585,7 +603,7 @@ export function OutHereView() {
             <CalendarCheck size={21} aria-hidden />
           </Link>
           <button type="button" data-testid="create-plan-btn" aria-label="Post a plan" title="Post a plan (or long-press the map)"
-            onClick={() => startCreate()}
+            onClick={beginPlace}
             className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-blue hover:bg-fb-hover">
             <Plus size={24} aria-hidden />
           </button>
@@ -601,6 +619,9 @@ export function OutHereView() {
       )}
       <PlanSheet />
       <TogetherSheet />
+      {placing && map && !show3d && !hostAt && !creating && (
+        <PlaceMode map={map} onPick={openHostPicker} onCancel={cancelPlace} />
+      )}
       {hostAt && map && !creating && (
         <HostPicker map={map} at={hostAt} onPick={(p) => startCreate(hostAt, p)} onCancel={() => setHostAt(null)} />
       )}

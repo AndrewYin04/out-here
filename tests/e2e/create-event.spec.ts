@@ -13,9 +13,35 @@ async function openMap(page: Page, persona: string) {
 }
 
 test.describe("Post a plan", () => {
-  test("＋ opens the host sheet with a draft pin, and Muse fills it in from the title", async ({ page }) => {
+  test("＋ from the 3D view lands on the map in pick-a-spot mode; Esc and Cancel leave it", async ({ page }) => {
+    await page.goto(`/out-here?as=jordan&view=3d`);
+    const root = page.getByTestId("out-here-map");
+    await expect(page.getByTestId("map-canvas")).toBeVisible({ timeout: 20_000 });
+    await expect(root).toHaveAttribute("data-view", "3d", { timeout: 20_000 });
+    await page.getByTestId("create-plan-btn").click();
+    await expect(root).toHaveAttribute("data-view", "map");
+    await expect(page.getByTestId("place-hint")).toBeVisible();
+    await expect(page.getByTestId("host-picker")).toHaveCount(0);
+    await expect(page.getByTestId("create-plan-sheet")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await page.getByTestId("create-plan-btn").click();
+    await page.getByTestId("place-cancel").click();
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await expect(page.getByTestId("create-plan-btn")).toBeVisible();
+  });
+
+  test("＋ then a click on the map opens the host picker there, then the sheet with a draft pin, and Muse fills it in", async ({ page }) => {
     await openMap(page, "jordan");
     await page.getByTestId("create-plan-btn").click();
+    await expect(page.getByTestId("place-hint")).toBeVisible();
+    const canvas = page.getByTestId("map-canvas");
+    const box = (await canvas.boundingBox())!;
+    // A tap on the phone project, a click on desktop: both open the picker in this mode.
+    await canvas.click({ position: { x: box.width * 0.35, y: box.height * 0.55 } });
+    await expect(page.getByTestId("host-picker")).toBeVisible();
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await page.getByTestId("host-pick-custom").click();
     const sheet = page.getByTestId("create-plan-sheet");
     await expect(sheet).toBeVisible();
     await expect(page.getByTestId("draft-pin")).toBeVisible();
