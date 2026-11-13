@@ -36,3 +36,8 @@ export {
   QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftMessages, mockDraft, nearbyPlaces, validateDraft,
 } from './create-quest';
 export type { CreateQuestContext, DraftPlace, RawDraft } from './create-quest';
+export {
+  ARRIVE_BEFORE_END_MIN, RAW_WANT_JSON_SCHEMA, RawWantZ, checkFindLine, cleanTitle, codeLine, explainFind, findFacts, matchListings,
+  mockWant, museFinds, parseWant, titleMatches, validateWant,
+} from './finds';
+export type { FindCandidate, ParsedWant, RawWant } from './finds';
