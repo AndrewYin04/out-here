@@ -18,6 +18,7 @@
     "storage:setup": "node --env-file=.env.local scripts/storage-setup.mjs dev",
     "gen:content": "node --env-file=.env.local scripts/gen-content.mjs",
     "gen:images": "node --env-file=.env.local scripts/gen-images.mjs",
+    "gen:clips": "node scripts/gen-clips.mjs",
     "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs",
     "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs",
     "watch:3d": "node scripts/watch-3d.mjs",
