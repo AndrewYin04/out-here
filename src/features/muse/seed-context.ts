@@ -5,8 +5,8 @@
 import seedContentJson from '../../../supabase/seed-content.json';
 import seedPlacesJson from '../../../supabase/seed-places.json';
 import {
-  DEMO_AVAILABILITY, DEMO_CENTER, DEMO_DRIVER_HANDLE, DEMO_QUESTS, LOCAL_CIRCLES, NEVER_PRESEATED,
-  PERSONA_HANDLES, deriveFriendGraph, floorToMinute, friendAdjacency, fuzzLocation, mulberry32,
+  DEMO_AVAILABILITY, DEMO_CENTER, DEMO_DRIVER_HANDLE, LOCAL_CIRCLES, NEVER_PRESEATED,
+  PERSONA_HANDLES, SEED_QUESTS, deriveFriendGraph, inFriendGraph, floorToMinute, friendAdjacency, fuzzLocation, mulberry32,
   offsetPoint, profileId, questVisibilityFields, seedId, shuffled,
   type Availability, type ID, type LatLng, type Profile, type Quest,
 } from '../../shared';
@@ -20,6 +20,7 @@ type SeedPerson = {
   circles?: string[]; isDemoUser?: boolean; avatar?: string | null; cover?: string | null;
   pronouns?: string | null; age?: number | null; school?: string | null; major?: string | null;
   gradYear?: number | null; hometown?: string | null; currentCity?: string | null; job?: string | null;
+  home?: LatLng | null;
 };
 type SeedGroup = { slug: string; memberHandles?: string[] };
 type SeedPlace = { name: string; lat: number; lng: number };
@@ -57,7 +58,7 @@ export function buildSeedWorld(now: Date): SeedWorld {
   const isLocal = (h: string) => (circlesOf.get(h) ?? []).some((c) => LOCAL_CIRCLES.includes(c));
 
   const profiles: Profile[] = people.map((p) => {
-    const home: LatLng = p.handle === 'alex'
+    const home: LatLng = p.home ? p.home : p.handle === 'alex'
       ? DEMO_CENTER
       : offsetPoint(DEMO_CENTER, 300 + (hash32(p.handle) % 2500), hash32(`${p.handle}:b`) % 360);
     return {
@@ -78,17 +79,18 @@ export function buildSeedWorld(now: Date): SeedWorld {
   const areFriends = (a: string, b: string) => adj.get(profileId(a))?.has(profileId(b)) ?? false;
 
   // quests: same member order as scripts/seed.ts
+  const outsider = new Set(people.filter((p) => !inFriendGraph(p)).map((p) => p.handle));
   const groupMembers = new Map(content.groups.map((g) => [g.slug, [...new Set((g.memberHandles ?? []).filter(has))]]));
   const placeByName = new Map(places.map((p) => [p.name, p]));
-  const everyone = people.map((p) => p.handle).sort();
+  const everyone = people.map((p) => p.handle).filter((h) => !outsider.has(h)).sort();
   const nonSeatable = new Set(NEVER_PRESEATED);
   const quests: Quest[] = [];
   const questIdByKey = new Map<string, ID>();
-  DEMO_QUESTS.forEach((q, qi) => {
+  SEED_QUESTS.forEach((q, qi) => {
     const place = placeByName.get(q.placeName);
-    if (!place) return;
+    if (!place || (q.hostHandle && !has(q.hostHandle))) return;
     const rng = mulberry32(1000 + qi);
-    const fromGroup = q.groupSlug ? groupMembers.get(q.groupSlug) ?? [] : [];
+    const fromGroup = (q.groupSlug ? groupMembers.get(q.groupSlug) ?? [] : []).filter((h) => !outsider.has(h));
     const order = [...new Set([
       ...q.preferredMembers.filter(has),
       ...shuffled(fromGroup, rng),

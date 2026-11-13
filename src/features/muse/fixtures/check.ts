@@ -1,6 +1,6 @@
 // Checks one plan result against a fixture's expected properties. Shared by the Vitest
 // fixture run (mock mode) and scripts/eval-muse.mjs (real API).
-import { DEMO_QUESTS, profileId, seedId } from '../../../shared';
+import { SEED_QUESTS, profileId, seedId } from '../../../shared';
 import type { PlanOutput } from '../plan';
 import { windowMinutes, wallClock } from '../time';
 import fixturesJson from './plan.json';
@@ -28,8 +28,8 @@ export type PlanFixtureFile = { description: string; now: string; cases: PlanFix
 
 export const planFixtures = fixturesJson as PlanFixtureFile;
 
-const keyById = new Map(DEMO_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
-const specByKey = new Map(DEMO_QUESTS.map((q) => [q.key, q]));
+const keyById = new Map(SEED_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
+const specByKey = new Map(SEED_QUESTS.map((q) => [q.key, q]));
 
 export function questKey(id: string | null): string | null {
   return id ? keyById.get(id) ?? null : null;

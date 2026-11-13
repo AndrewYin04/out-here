@@ -39,7 +39,7 @@ test.describe("Memories", () => {
   });
 
   test("a persona with no crews sees the empty state", async ({ page }) => {
-    await page.goto("/memories?as=jordan");
+    await page.goto("/memories?as=priya");   // jordan has a crew since the comic story (zine swap)
     await expect(page.getByText("No crews yet")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("link", { name: "Find a plan" })).toHaveAttribute("href", "/out-here");
   });

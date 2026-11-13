@@ -10,14 +10,26 @@ Alex likes comics. Scrolling Facebook, he sees a seller's box of comics on Marke
 
 Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows that it also works on mobile.
 
-## Defaults (the team can override them on the gap issues)
+## Decisions
 
 - **Person 1** is Alex, on laptop A.
-- **Person 2** is Jordan, on laptop B. Jordan and Alex are strangers. The trust path is "you both know Maya" (Jordan is Maya's roommate in the seed).
-- **The seller** is a new fictional persona, Theo.
-- **The open house** is "Comics open house" at Inkwell Comics Café, a fictional venue. It starts 30 minutes after the reseed and is about 9 minutes' walk from Alex.
-- **The demo database** (`out-here-demo`) is reseeded a few hours before the demo, around Fri 6 to 7 AM PT, so dry runs use the real times.
+- **Person 2** is Jordan, on laptop B. Jordan and Alex are strangers. The trust path is "you both know Maya": Jordan is already Maya's roommate in the seed.
+- **The seller** is Theo Nakamura (handle `theo`), a new fictional persona. Theo is not a friend of Alex or Jordan.
+- **The open house** is "📚 Comics open house" at Inkwell Comics Café, a fictional public venue about 580 m from Alex in a straight line. It starts 30 minutes after the reseed, lasts 2 hours, is free, and has 8 spots with 3 taken, so 5 are open. The walk is about 9 minutes (80 m/min with the 1.3 route factor).
+- **Scene 2** is done live if Rishab's listing-to-plan link (#48) lands by Fri 6 AM PT. Otherwise the open house is pre-seeded and scene 2 takes about 10 seconds: show the listing, then the plan it names.
+- **The selfie** uses the laptop camera, with a prepared photo file as the backup.
+- **The demo database** (`out-here-demo`) is reseeded around Fri 6 to 7 AM PT, so dry runs use the real times, and again about 10 minutes before going on stage, so the open house still starts about 20 minutes after the demo begins.
 - **The production URL** will be getouthere.vercel.app.
+
+## What the seed holds for this story
+
+Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.json`, `supabase/seed-places.json`). Every name and comic title is invented.
+
+- **Theo's listing** (`l31`): "Box of indie comics: Night Courier #1–12 + 30 more", $60, with a drawn photo of the box. Its description ends "Open house today at Inkwell Comics Café, come flip through."
+- **Theo's Feed post** (`p301`): a public post in Menlo Park New Grads, a Group Alex is in, posted 24 minutes before the reseed, so it is near the top of Alex's Feed. Sage has commented.
+- **The plan** (quest key `comics-open-house`): hosted by Theo, with Sage and Yuki already in. It carries the tag `listing:<listing id>` until #48 adds a real link.
+- **Alex and Jordan** both list comics and zines in their interests. Their friendship intro settings ask for friends for local shows, comic shops and open houses. A friendship intro round for Alex picks Jordan at 91 (local bands, comics, zines), with a comics reason. A round over all kinds still makes the coffee-chat intro, now at 97.
+- **Jordan's history:** one past hangout, a zine swap at El Camino Coffee Works 9 days ago with Sage, with a crew and one photo.
 
 ## Status key
 
@@ -31,9 +43,9 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 
 - **Screen:** laptop A.
 - **The judge sees:** Alex scrolls the Feed and sees a Marketplace post: a box of comics he likes.
-- **Status:** partly built.
-- **Exists:** Feed, Marketplace pages, 30 seeded listings.
-- **Needs:** Theo's comics listing in the seed, and the listing showing up in the Feed.
+- **Status:** built in the seed (`wt/comic-seed`).
+- **Exists:** Feed, Marketplace pages, 31 seeded listings. Theo's comics listing and his Feed post about it.
+- **Needs:** nothing for the seed. A "Marketplace" share card on the post would read better than a plain photo post.
 - **Owner:** Andrew's agent (seed).
 
 ### Scene 2. The seller makes it an open house
@@ -140,7 +152,7 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 
 ## What the demo still needs, in order of risk
 
-1. **The comic story in the seed.** No comics exist anywhere yet: no listing, no Theo, no open house, no hangout history for two comic fans. Every scene depends on it. Owner: Andrew's agent (it owns the seed; builder on `wt/comic-seed`).
+1. **The comic story in the seed.** Built on `wt/comic-seed`: Theo, his listing and post, the open house plan, Alex and Jordan as comic fans, and Jordan's past hangout. It reaches the demo with a reseed. Owner: Andrew's agent.
 2. **Event-anchored intro.** Muse Intros match people in general. The demo needs "find me someone to go to this plan with", which joins Rishab's plan, Alex's matching and the intro double opt-in. Owners: Alex (matching), with Andrew's agent (intros) and Rishab (the plan).
 3. **Muse talks inside the 3D view.** The conversation, the choices, Jordan's rundown and "head there now" belong in a Muse panel on the 3D map, not in Messenger. The companion and its speech bubble are on main. Owners: Alan (panel and animation), Ally (Muse model), Alex (what Muse says).
 4. **Two avatars walking together.** The joystick and the walk are on main. The missing part is each laptop seeing the other's avatar move live. Owner: Alan.
@@ -168,8 +180,4 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 
 ## Decisions the team still needs to make
 
-- **The people.** The defaults above are Alex, Jordan and Theo. Override them on the seed issue if you disagree.
-- **The open house time.** The default is 30 minutes after the reseed. It must start soon for the spontaneity to land.
-- **The selfie on stage.** Live laptop camera, or a prepared photo picked from a file?
-- **Which scenes may be pre-staged.** For example, Theo's open house already exists and scene 2 takes 10 seconds, to protect the time for Act 2.
 - **Who drives each laptop,** and who narrates.

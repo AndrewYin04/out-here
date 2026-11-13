@@ -127,8 +127,9 @@ test('create a post with audience and photo', async ({ page }) => {
 
 test('like, pick a reaction, and remove it', async ({ page }, info) => {
   await openHome(page);
-  // pin the post by id: other tests add posts above it while this one runs
-  const id = await page.getByTestId('post-card').first().getAttribute('data-post-id');
+  // pin the post by id: other tests add posts above it while this one runs. Each project takes
+  // its own post, since both react as Alex and would undo each other's reaction on a shared one.
+  const id = await page.getByTestId('post-card').nth(isPhone(info.project.name) ? 1 : 0).getAttribute('data-post-id');
   const post = page.locator(`[data-post-id="${id}"]`);
   const like = post.getByTestId('like-button');
   // start from no reaction

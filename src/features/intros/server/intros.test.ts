@@ -91,12 +91,12 @@ describe('mock Click round and double opt-in', () => {
   let store: DataStore;
   beforeAll(() => { store = createMemoryStore(); });
 
-  it('alex <-> jordan passes (~91) with a trust path; weak candidates stay hidden', async () => {
+  it('alex <-> jordan passes (97: local bands, comics, zines, product/design, design job) with a trust path; weak candidates stay hidden', async () => {
     const r = await runIntroRound(store, alex);
     expect(r.intro).not.toBeNull();
     const c = r.intro!;
     expect(c.other.handle).toBe('jordan');
-    expect(c.score).toBe(91);
+    expect(c.score).toBe(97);
     expect(c.trustPath[0]).toBe('You both know Maya');
     expect(c.reasons.length).toBeGreaterThanOrEqual(2);
     expect(c.reasons.join(' ')).toMatch(/local (bands|shows)/);
@@ -105,7 +105,7 @@ describe('mock Click round and double opt-in', () => {
     expect(c.myAgentLog.map((t) => t.mine)).toEqual([true, false, true, false]);
     expect(c.myAgentLog[1].text).toBe('sees a real fit, asked about timing');
     expect(c.myAgentLog[2].text).toMatch(/^On timing:/);
-    expect(c.judgeLine).toBe('Muse judge: 91/100, above the 85 bar');
+    expect(c.judgeLine).toBe('Muse judge: 97/100, above the 85 bar');
     expect(c.mutuals.map((m) => m.firstName)).toEqual(['Maya']);
     expect(c.step.href).toMatch(/^\/out-here\?quest=/);
     expect(c.step.when).toMatch(/^(Starts in \d+ min|Today|Tomorrow|Happening now)/);
@@ -129,7 +129,7 @@ describe('mock Click round and double opt-in', () => {
     // The seeded pair share more as a coffee chat, so that is the kind, and only coffee-chat wants are used.
     expect(a.kind).toBe('networking');
     expect(ra).toContain("You're looking for product/design coffee chats");
-    expect(ra).not.toContain('people to go to local shows with');   // alex's friendship want
+    expect(ra).not.toContain('people to go to local shows, comic shops');   // alex's friendship want
     expect(a.summary).toMatch(/^Your agents agree Jordan/);
     expect(a.summary).toMatch(/worth going to the .* together/);
     // One fact, one mention: the summary names the kind and step, and no two reasons share a topic.

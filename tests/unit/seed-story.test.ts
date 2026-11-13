@@ -12,8 +12,8 @@ const walk = (name: string) => walkingMinutes(DEMO_CENTER, place(name));
 const quest = (key: string) => DEMO_QUESTS.find((q) => q.key === key)!;
 
 describe('places', () => {
-  it('has the 18 places, all within ~2.2 km walking range of DEMO_CENTER', () => {
-    expect(places).toHaveLength(18);
+  it('has the 19 places (18 + Inkwell Comics Café), all within ~2.2 km walking range of DEMO_CENTER', () => {
+    expect(places).toHaveLength(19);
     for (const p of places) expect(walkingMinutesExact(DEMO_CENTER, p)).toBeLessThan(36); // 2.2 km × 1.3 / 80
   });
   it('every quest uses a known place', () => {

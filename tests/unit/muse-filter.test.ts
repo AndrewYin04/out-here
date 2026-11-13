@@ -35,8 +35,8 @@ describe('muse filter: mock mode', () => {
     const out = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
     const ids = out.keep.map((k) => k.id);
     expect(ids).toEqual(expect.arrayContaining([dumplings, bands, boba]));
-    // The 5K is the only other keep: Alex lists running as an interest.
-    expect(ids.sort()).toEqual([dumplings, bands, boba, seedId('quest', '5k')].sort());
+    // The other keeps: the 5K (Alex lists running) and the comics open house (Alex lists comics).
+    expect(ids.sort()).toEqual([dumplings, bands, boba, seedId('quest', '5k'), seedId('quest', 'comics-open-house')].sort());
     expect(out.source).toBe('muse');
     expect(out.mode).toBe('mock');
     expect(out.total).toBeGreaterThan(ids.length);

@@ -30,6 +30,8 @@ export type QuestSpec = {
   bubbleText?: string;
   /** Seeded members already checked in (the first N members), for a plan that is live now. */
   checkedIn?: number;
+  /** When set, this person hosts, and the plan is skipped if they are not in the seed content. */
+  hostHandle?: string;
 };
 
 /** People never pre-seated in upcoming quests: the demo driver joins live, Maya via invite. */
@@ -192,10 +194,17 @@ export type PastHangoutSpec = {
   durationMin: number;
   priceMax: number;
   tags: string[];
-  /** Alex plus these handles (missing handles are skipped; locals are filled in). */
+  /**
+   * Whose hangout it is (default 'alex'). For anyone else, the hangout is skipped unless they
+   * and every withHandles person are in the seed content.
+   */
+  person?: string;
+  /** The person plus these handles (missing handles are skipped; locals are filled in). */
   withHandles: string[];
   extraLocals: number;
   crew: { name: string; sharedPrefs: string[]; captions: string[] } | null;
+  /** Memory photos, one per caption; default: the next images from the post pool. */
+  photos?: string[];
 };
 
 /** One hangout a week for the last 6 weeks: the weekly streak. The 3 most recent formed crews. */
