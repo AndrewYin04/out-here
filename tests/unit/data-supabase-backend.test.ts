@@ -2,13 +2,15 @@
 // serve rows loaded before or during a write (finding E2), a mutating request must read the
 // tables once (finding E3), and a request's Broadcasts go out in one REST call.
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { profileId, seedId, setNow } from '@/shared';
+import { DEMO_CENTER, profileId, seedId, setNow } from '@/shared';
 import { CoreStore } from '@/features/data/core';
 import { TABLE_KEYS, TABLE_NAMES, toRow } from '@/features/data/db';
 import { buildMemoryDb } from '@/features/data/memory-store';
 import { flushOutbox, subscribe } from '@/features/data/realtime-server';
 import { newScope, runInScope } from '@/features/data/request-scope';
-import { SupabaseBackend } from '@/features/data/supabase-store';
+import { SLOW_MESSAGE, SupabaseBackend } from '@/features/data/supabase-store';
+import { HttpError } from '@/features/data/errors';
+import { TABLES, TableNotLoadedError } from '@/features/data/tables';
 
 type Row = Record<string, unknown>;
 const NOW = new Date('2026-11-12T18:07:00Z');
@@ -22,6 +24,10 @@ class FakeSupabase {
   tables = new Map<string, Row[]>();
   rpcDelayMs = 0;
   selects = 0;
+  /** Tables whose selects never answer (a stalled database). */
+  hang = new Set<string>();
+  /** Table name of every select, in order. */
+  selected: string[] = [];
   constructor() {
     const db = buildMemoryDb(NOW);
     for (const k of TABLE_KEYS) this.tables.set(TABLE_NAMES[k], (db[k] as unknown as Row[]).map((r) => toRow(k, r)));
@@ -34,6 +40,7 @@ class FakeSupabase {
       select() { op = { kind: 'select' }; return b; },
       order() { return b; },
       range(from: number, to: number) { range = [from, to]; return b; },
+      abortSignal() { return b; },
       eq(c: string, v: unknown) { filters.push((r) => r[c] === v); return b; },
       in(c: string, v: unknown[]) { filters.push((r) => v.includes(r[c])); return b; },
       insert(rows: Row[]) { op = { kind: 'insert', rows }; return b; },
@@ -46,6 +53,8 @@ class FakeSupabase {
           const hit = (r: Row) => filters.every((f) => f(r));
           if (op.kind === 'select') {
             this.selects++;
+            this.selected.push(table);
+            if (this.hang.has(table)) return new Promise<R>(() => {});
             const out = rows.filter(hit).map((r) => ({ ...r }));
             return res({ data: range ? out.slice(range[0], range[1] + 1) : out, error: null });
           }
@@ -159,5 +168,139 @@ describe('SupabaseBackend request cost (E3)', () => {
     expect(calls[1].messages).toEqual(expect.arrayContaining([
       expect.objectContaining({ topic: `quest:${dumplings}`, payload: expect.objectContaining({ memberCount: res.quest!.memberIds.length }) }),
     ]));
+  });
+});
+
+describe('SupabaseBackend query deadline (issue #36)', () => {
+  it('a stalled table query fails with 503 "Data is slow" at 8 s, and so does a request waiting on that load', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { fake, store } = setup();
+      fake.hang.add('quests');
+      const settled: string[] = [];
+      const track = (name: string, p: Promise<unknown>) => p.then(() => settled.push(`${name}:ok`), (e: unknown) => {
+        settled.push(`${name}:${(e as HttpError).status}:${(e as Error).message}`);
+      });
+      const a = track('a', runInScope(newScope(false), () => store.view(TABLES.quests)));
+      await vi.advanceTimersByTimeAsync(4000);
+      // a plain read 4 s later shares the stalled load from the cache
+      const b = track('b', runInScope(newScope(false), () => store.questsNear(alex, DEMO_CENTER, 50_000)));
+      await vi.advanceTimersByTimeAsync(3990);
+      expect(settled).toEqual([]);
+      await vi.advanceTimersByTimeAsync(20);
+      await Promise.all([a, b]);
+      expect(settled).toEqual([`a:503:${SLOW_MESSAGE}`, `b:503:${SLOW_MESSAGE}`]);
+      // the failed load left the cache, so the next read queries again and succeeds
+      fake.hang.clear();
+      const v = await runInScope(newScope(false), () => store.view(TABLES.quests));
+      expect(v.db.quests.length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('SupabaseBackend stale-while-revalidate (R1)', () => {
+  it('while a background reload stalls, plain reads keep getting the last rows, and a failed reload keeps them', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { fake, store } = setup();
+      const plain = () => runInScope(newScope(false), () => store.view(TABLES.quests));
+      const warm = await plain();
+      const before = warm.db.quests.length;
+      expect(before).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(11_000); // past SNAPSHOT_TTL_MS
+      fake.hang.add('quests');
+      fake.selected = [];
+      // the first stale read starts one background reload and answers at once
+      expect((await plain()).db.quests.length).toBe(before);
+      expect(fake.selected.filter((t) => t === 'quests')).toHaveLength(1);
+      // later plain reads during that reload get the same last rows, not the stalled promise
+      await vi.advanceTimersByTimeAsync(1000);
+      const settled: string[] = [];
+      const reads = [1, 2, 3].map((i) => plain().then((v) => settled.push(`${i}:${v.db.quests.length}`), (e: unknown) => settled.push(`${i}:${(e as HttpError).status}`)));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toEqual([`1:${before}`, `2:${before}`, `3:${before}`]);
+      // the reload hits the 8 s deadline: the old rows stay and no reload starts right away
+      await vi.advanceTimersByTimeAsync(8000);
+      await Promise.all(reads);
+      fake.selected = [];
+      expect((await plain()).db.quests.length).toBe(before);
+      expect(fake.selected).not.toContain('quests');
+      // after the retry delay a plain read starts one new reload, which succeeds
+      fake.hang.clear();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect((await plain()).db.quests.length).toBe(before);
+      expect(fake.selected.filter((t) => t === 'quests')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a fresh read waits for a load that started after it arrived, not for the stale rows', async () => {
+    const { fake, store } = setup();
+    await runInScope(newScope(false), () => store.view(TABLES.quests)); // warm
+    await sleep(5);
+    const q = fake.tables.get('quests')!;
+    fake.tables.set('quests', q.map((r) => (r.id === dumplings ? { ...r, title: 'Renamed elsewhere' } : r)));
+    const v = await runInScope(newScope(true), () => store.view(TABLES.quests));
+    expect(v.db.quests.find((x) => x.id === dumplings)?.title).toBe('Renamed elsewhere');
+  });
+});
+
+describe('SupabaseBackend table subsets (issue #36)', () => {
+  it('the map read (GET /api/quests) loads the quest tables only: no reactions, posts, comments or messages', async () => {
+    const { fake, store } = setup();
+    const scope = newScope(true);
+    await runInScope(scope, async () => {
+      await store.profileByHandle('alex');
+      return store.questsNear(alex, DEMO_CENTER, 50_000);
+    });
+    const tables = new Set(fake.selected);
+    for (const t of ['reactions', 'posts', 'comments', 'messages', 'notifications', 'stories']) expect(tables.has(t)).toBe(false);
+    expect(tables).toEqual(new Set(TABLES.quests.map((k) => TABLE_NAMES[k])));
+    expect(scope.queries).toBe(TABLES.quests.length);
+  });
+
+  it('Up next (GET /api/quests/mine) loads 12 tables instead of every table', async () => {
+    const { fake, store } = setup();
+    const full = newScope(true);
+    await runInScope(full, () => store.view());
+    const fullQueries = full.queries;
+    fake.selected = [];
+    const scope = newScope(true);
+    const plans = await runInScope(scope, () => store.yourPlans(alex));
+    expect(plans.length).toBeGreaterThan(0);
+    expect(fake.selected).not.toContain('reactions');
+    expect(scope.queries).toBe(TABLES.yourPlans.length);
+    expect(fullQueries).toBeGreaterThanOrEqual(TABLE_KEYS.length);
+  });
+
+  it('a write invalidates the subset cache: the next fresh read sees it, and a later read in the same request adds tables after the write', async () => {
+    const { store } = setup();
+    await runInScope(newScope(false), () => store.questsNear(alex, DEMO_CENTER, 50_000)); // warm
+    const q = (await store.view(TABLES.quests)).db.quests.find((x) => x.id === dumplings)!;
+    expect(q).toBeTruthy();
+    await runInScope(newScope(true), async () => {
+      await store.questsNear(maya, DEMO_CENTER, 50_000); // quest tables only
+      await store.joinQuest(maya, dumplings);
+      const plans = await store.yourPlans(maya); // loads crews after the join, keeps the joined quest
+      expect(plans.map((p) => p.quest.id)).toContain(dumplings);
+    });
+    const after = await runInScope(newScope(false), () => store.view(TABLES.quests));
+    expect(after.questMemberIds(dumplings)).toContain(maya);
+  });
+});
+
+describe('MemoryStore table subsets', () => {
+  it('reading a table outside the set throws, so a too-small set fails tests instead of showing empty data', async () => {
+    const { createMemoryStore } = await import('@/features/data/memory-store');
+    const store = createMemoryStore(NOW);
+    const db = await store.backend.snapshot(TABLES.quests);
+    expect(db.quests.length).toBeGreaterThan(0);
+    expect(() => db.reactions).toThrow(TableNotLoadedError);
+    expect(Object.keys({ ...db })).not.toContain('reactions');
+    // the same rows as a full snapshot
+    expect(db.quests).toBe((await store.backend.snapshot()).quests);
   });
 });

@@ -59,6 +59,10 @@ export function route<P extends Record<string, string> = Record<string, string>>
     try {
       res.headers.set('server-timing', `total;dur=${ms}, loads;desc="${scope.loads}", queries;desc="${scope.queries}", broadcasts;desc="${broadcasts}"`);
     } catch { /* immutable headers (e.g. a proxied Response) */ }
+    // OUTHERE_DEBUG_QUERIES=1: one log line per request with counts only (no ids, no rows).
+    if (process.env.OUTHERE_DEBUG_QUERIES === '1') {
+      console.log(`[queries] ${req.method} ${new URL(req.url).pathname} status=${res.status} ms=${ms} loads=${scope.loads} tableLoads=${scope.tableLoads} queries=${scope.queries}`);
+    }
     return res;
   };
 }

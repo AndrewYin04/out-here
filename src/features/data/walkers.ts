@@ -9,13 +9,15 @@
 //   last WALK_FRESH_MIN minutes, so it stops showing soon after they stop walking.
 // - Someone who never shared a location gets a paused share: friends' Find My does not start
 //   showing them because they walked to a plan. Their own sharing settings are otherwise kept.
-// - Realtime: each step sends user:<memberId> {type:"location", id} to the other members (ids
-//   only, then they refetch), plus the owner's usual Find My audience via updateMyLocation.
+// - Realtime: each step sends walk:<questId> {id: walkerId} (ids only; each member's walkers hook
+//   refetches), plus location:<friendId> to the owner's usual Find My audience via
+//   updateMyLocation. Never user:<id>: a step every 1.5 s must not refetch every user: hook.
 import { haversineMeters, now, walkingMinutes, type ID, type LatLng, type Quest } from '@/shared';
 import type { CoreStore } from './core';
 import { forbidden, notFound } from './errors';
 import { updateMyLocation } from './locations';
 import { publish } from './realtime-server';
+import { TABLES } from './tables';
 
 /** A walker disappears this long after their last step. */
 export const WALK_FRESH_MIN = 10;
@@ -30,7 +32,7 @@ export type Walker = {
 export const walkLabel = (q: Pick<Quest, 'venueName' | 'title'>) => `On the way to ${q.venueName || q.title}`;
 
 async function memberQuest(store: CoreStore, viewerId: ID, questId: ID) {
-  const v = await store.view();
+  const v = await store.view(TABLES.walk);
   const q = v.questById.get(questId);
   if (!q) throw notFound('quest_not_found');
   const members = v.questMemberIds(q.id);
@@ -63,13 +65,13 @@ export async function walkers(store: CoreStore, viewerId: ID, questId: ID): Prom
 
 /** One step of the viewer's walk to the plan. */
 export async function postWalkStep(store: CoreStore, viewerId: ID, questId: ID, location: LatLng): Promise<{ ok: true }> {
-  const { v, q, members } = await memberQuest(store, viewerId, questId);
+  const { v, q } = await memberQuest(store, viewerId, questId);
   const t = now().toISOString();
   if (q.status === 'done' || q.endsAt <= t) throw forbidden('this plan is over');
   // A step from across town is not a walk to this plan.
   if (haversineMeters(location, q.location) > 5_000) throw forbidden('too far from the plan to walk there');
   const had = (v.db.locationShares ?? []).some((s) => s.userId === viewerId);
   await updateMyLocation(store, viewerId, { location, placeLabel: walkLabel(q), ...(had ? {} : { paused: true }) });
-  await Promise.all(members.filter((id) => id !== viewerId).map((id) => publish(`user:${id}`, { type: 'location', id: viewerId })));
+  await publish(`walk:${q.id}`, { id: viewerId });
   return { ok: true };
 }

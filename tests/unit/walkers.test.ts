@@ -73,6 +73,8 @@ describe('walking there together (#46)', () => {
     expect(share.placeLabel).toBe(walkLabel(q));
     if (!before) expect(share.paused).toBe(true);
     else expect(share.paused).toBe(before.paused);
-    expect(got.some((m) => m.channel === `user:${id('alex')}` && (m.payload as { id?: string }).id === id('jordan'))).toBe(true);
+    expect(got.some((m) => m.channel === `walk:${q.id}` && (m.payload as { id?: string }).id === id('jordan'))).toBe(true);
+    // a walk step every 1.5 s must not refetch the user: hooks (issue #36)
+    expect(got.some((m) => m.channel.startsWith('user:'))).toBe(false);
   });
 });
