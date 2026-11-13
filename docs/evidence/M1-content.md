@@ -304,4 +304,46 @@ Model muse-image-1.0, $0.01/image, cache .cache/images/, cap 200/run.
 | /seed/videos/panel-layout.webp | 13414 | true | generated | 41.9 |
 | /seed/videos/volley-rally.webp | 23178 | true | generated | 41.2 |
 | /seed/videos/zine-fold.webp | 10683 | true | generated | 27.1 |
+
+### Run 2026-11-13T07:34:23.581Z
+
+`referenced=223 processed=24 generated=24 cacheHits=0 fallbacks=0 failures=0 stillMissing=0 spendUsd=0.24 publicSeedMB=9.99 seconds=114`
+
+| Kind | Files | Avg KB |
+|---|---|---|
+| portrait | 62 | 11.8 |
+| cover | 12 | 57.9 |
+| post | 45 | 61.0 |
+| story | 16 | 83.3 |
+| event | 20 | 63.7 |
+| listing | 30 | 29.7 |
+| video | 20 | 43.9 |
+| clip | 18 | 94.0 |
+
+| Path | ms | ok | how | KB |
+|---|---|---|---|---|
+| /seed/videos/frames/lamp-rewire-1.webp | 26788 | true | generated | 53.0 |
+| /seed/videos/frames/lamp-rewire-2.webp | 14084 | true | generated | 27.7 |
+| /seed/videos/frames/lamp-rewire-3.webp | 9976 | true | generated | 54.2 |
+| /seed/videos/frames/polaroid-walk-1.webp | 19635 | true | generated | 137.2 |
+| /seed/videos/frames/polaroid-walk-2.webp | 18497 | true | generated | 94.5 |
+| /seed/videos/frames/polaroid-walk-3.webp | 11752 | true | generated | 145.1 |
+| /seed/videos/frames/spot-vintage-denim-1.webp | 22929 | true | generated | 102.1 |
+| /seed/videos/frames/spot-vintage-denim-2.webp | 12137 | true | generated | 108.3 |
+| /seed/videos/frames/spot-vintage-denim-3.webp | 17686 | true | generated | 92.7 |
+| /seed/videos/frames/thrift-haul-1.webp | 10368 | true | generated | 87.7 |
+| /seed/videos/frames/thrift-haul-2.webp | 32736 | true | generated | 257.3 |
+| /seed/videos/frames/thrift-haul-3.webp | 29678 | true | generated | 97.2 |
+| /seed/videos/frames/vintage-watch-1.webp | 12091 | true | generated | 92.1 |
+| /seed/videos/frames/vintage-watch-2.webp | 22336 | true | generated | 53.7 |
+| /seed/videos/frames/vintage-watch-3.webp | 10712 | true | generated | 69.9 |
+| /seed/videos/frames/vinyl-dig-1.webp | 10781 | true | generated | 85.0 |
+| /seed/videos/frames/vinyl-dig-2.webp | 12628 | true | generated | 66.0 |
+| /seed/videos/frames/vinyl-dig-3.webp | 21744 | true | generated | 68.0 |
+| /seed/videos/lamp-rewire.webp | 27270 | true | generated | 46.2 |
+| /seed/videos/polaroid-walk.webp | 14263 | true | generated | 35.4 |
+| /seed/videos/spot-vintage-denim.webp | 27924 | true | generated | 85.6 |
+| /seed/videos/thrift-haul.webp | 21250 | true | generated | 57.8 |
+| /seed/videos/vintage-watch.webp | 13057 | true | generated | 75.6 |
+| /seed/videos/vinyl-dig.webp | 17656 | true | generated | 39.7 |
 <!-- images:end -->

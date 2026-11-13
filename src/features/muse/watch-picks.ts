@@ -137,9 +137,10 @@ const PICKS_SCHEMA = {
 
 type Cand = PicksInput['listings'][number] & { id: string; words: Set<string> };
 
-/** The words a topic stands for: its name, and its videos' titles and tags. */
+/** The words a topic stands for: its name and its videos' topic tags (not titles, which mention
+ *  incidental things: a "denim jacket" title must not make a rain jacket fit "vintage"). */
 function topicWords(t: TasteTopic): Set<string> {
-  return stems([t.name, ...t.evidence.flatMap((e) => [e.video.title, ...e.video.topics])].join(' '));
+  return stems([t.name, ...t.evidence.flatMap((e) => e.video.topics)].join(' '));
 }
 
 /** Offline picks: listings whose words overlap a topic's words, strongest topic first. */
@@ -152,8 +153,20 @@ export function mockPicks(topics: TasteTopic[], cands: Cand[]): RawPicks {
   return { picks: picks.slice(0, MAX_PICKS) };
 }
 
+/** The topic's video closest to this item (most shared words), else its most-watched one. */
+function closestVideo(t: TasteTopic, c: Cand): string | undefined {
+  let best = t.evidence[0];
+  let score = -1;
+  for (const e of t.evidence) {
+    const w = stems(`${e.video.title} ${e.video.topics.join(' ')}`);
+    const n = [...w].filter((x) => c.words.has(x)).length;
+    if (n > score) { score = n; best = e; }
+  }
+  return best?.video.title;
+}
+
 export function codeReason(t: TasteTopic, c: Cand): string {
-  const top = t.evidence[0]?.video.title;
+  const top = closestVideo(t, c);
   const watched = t.justNow && top
     ? `You just watched "${top}".`
     : `You've watched ${t.minutes} min of ${t.name} videos this week${top ? `, like "${top}"` : ''}.`;

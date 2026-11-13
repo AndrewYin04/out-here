@@ -281,7 +281,12 @@ export type MuseFind = {
 export type MuseFindsResponse = { finds: MuseFind[] };
 
 /** A Watch video as the app shows it. */
-export type WatchVideo = { key: string; title: string; minutes: number; topics: string[]; posterUrl: string; creator: PersonCard | null };
+export type WatchVideo = {
+  key: string; title: string; minutes: number; topics: string[]; posterUrl: string;
+  /** Short clip made from Muse-generated images (scripts/gen-clips.mjs). */
+  clipUrl: string;
+  creator: PersonCard | null;
+};
 /** The viewer's history, one row per video: total seconds and the last time they watched it. */
 export type WatchHistoryItem = { videoKey: string; seconds: number; lastAt: string };
 export type WatchResponse = { videos: WatchVideo[]; history: WatchHistoryItem[] };

@@ -12,15 +12,19 @@ export type SeedVideo = {
   topics: string[];
   /** Image prompt for gen:images (not shown in the app). */
   poster: string;
+  /** Keyframe prompts for the clip (gen:images, then gen:clips); without them the clip moves over the poster. */
+  frames?: string[];
 };
 
 export const SEED_VIDEOS: readonly SeedVideo[] = raw as SeedVideo[];
 export const VIDEO_BY_KEY: ReadonlyMap<string, SeedVideo> = new Map(SEED_VIDEOS.map((v) => [v.key, v]));
 export const videoPoster = (key: string) => `/seed/videos/${key}.webp`;
+/** The short AI clip (scripts/gen-clips.mjs): Muse-generated keyframes with camera moves. */
+export const videoClip = (key: string) => `/seed/videos/${key}.mp4`;
 
 /**
  * Alex's watch history before the demo: [video key, seconds watched, hours ago].
- * Heavy on comics (about 23 min) and local music (about 15 min), a little dumplings, two
+ * Heavy on comics (about 23 min), vintage (about 20 min) and local music (about 15 min), a little dumplings, two
  * sports/climbing clips skipped after seconds, and no film, so watching a film video on stage
  * adds that topic live.
  */
@@ -35,4 +39,9 @@ export const ALEX_WATCH_HISTORY: readonly [string, number, number][] = [
   ['dumpling-folds', 210, 66],
   ['volley-rally', 20, 26],
   ['first-v3', 30, 110],
+  // vintage: thrifting, denim, records, a lamp (about 20 min)
+  ['thrift-haul', 360, 18],
+  ['spot-vintage-denim', 180, 40],
+  ['vinyl-dig', 420, 62],
+  ['lamp-rewire', 240, 88],
 ];
