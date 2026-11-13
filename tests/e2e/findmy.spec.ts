@@ -1,5 +1,26 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { mkdirSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
 import { declineTracked, trackInvites } from './invites';
+
+// The phone and desktop projects run this file at the same time, and some tests change Maya's
+// share (bubble, pause, Only me, precision) while the other project's tests read it. Each test
+// takes a lock (one per server port) so the two projects take turns, test by test.
+const test = base.extend<{ findmyLock: void }>({
+  findmyLock: [async ({ baseURL }, use, info) => {
+    info.setTimeout(info.timeout + 120_000);
+    const dir = join(tmpdir(), `outhere-e2e-findmy-${new URL(baseURL ?? 'http://localhost:3100').port}`);
+    for (;;) {
+      try { mkdirSync(dir); break; } catch {
+        // A lock older than the longest test is left over from a killed run.
+        try { if (Date.now() - statSync(dir).mtimeMs > 200_000) rmSync(dir, { recursive: true, force: true }); } catch { /* gone */ }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    }
+    try { await use(); } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, { auto: true }],
+});
 
 // Find My inside Facebook: friend pins with status bubbles, the friend card, the People list,
 // sharing settings, and live updates between two personas. Runs at 390 (phone project) and
