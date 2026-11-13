@@ -17,7 +17,9 @@ export const GET = route(async ({ store, viewer, url }) => {
 
 /** Poster images come from our own upload route or the Storage bucket it writes to. */
 const PosterUrlZ = z.string().max(500).refine(
-  (u) => u.startsWith('/api/uploads/') || /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\//.test(u),
+  // An upload, or one of our own seed event photos (the host sheet suggests these as covers).
+  (u) => u.startsWith('/api/uploads/') || /^\/seed\/events\/[a-z0-9-]+\.webp$/.test(u)
+    || /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\//.test(u),
   'poster must be an uploaded image',
 );
 
