@@ -1429,7 +1429,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         {farKm != null && (
           <p role="status" className="pointer-events-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
-            You’re {farKm} km from Menlo Park, where the demo plans are.{' '}
+            You’re {farKm} km from the demo city. Turn on Here in the dock for plans around you.{' '}
             <button type="button" onClick={() => void chooseSource('demo')} className="font-semibold text-fb-blue hover:underline">Use the demo walk</button>
           </p>
         )}

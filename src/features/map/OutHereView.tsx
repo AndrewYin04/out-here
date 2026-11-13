@@ -4,7 +4,7 @@
 import dynamic from 'next/dynamic';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApi, useQuests, useViewer } from '@/features/data';
+import { useApi, useQuests, useViewer, useWhere } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { MuseMapLayer } from './MuseMapLayer';
 import { useFreeFriendNudge } from './useFreeFriendNudge';
@@ -84,12 +84,22 @@ function setListingParam(id: string | null) {
 export function OutHereView() {
   const { viewer: persona } = useViewer();
   const now = useNow();
-  const questsApi = useQuests(DEMO_CENTER, 5000);
-  const ctxApi = useApi<MapContext>('/out-here/context', [], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
+  // "Here" (the dock's location toggle): plans, walking times and the map start from your real spot.
+  const where = useWhere();
+  const here = where.mode === 'here' && where.status === 'on' ? where.fix : null;
+  const hereKey = here ? `${here.lat.toFixed(4)},${here.lng.toFixed(4)}` : '';
+  const hereCenter = useMemo(() => (hereKey ? { lat: Number(hereKey.split(',')[0]), lng: Number(hereKey.split(',')[1]) } : null), [hereKey]);
+  const questsApi = useQuests(hereCenter ?? DEMO_CENTER, 5000);
+  const ctxApi = useApi<MapContext>(hereCenter ? `/out-here/context?lat=${hereCenter.lat}&lng=${hereCenter.lng}` : '/out-here/context', ['quests:new'], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
   // Out Here opens on Friends (who's around), then Explore (every plan). ?mode=explore opens Explore.
   const [mode, setMode] = useState<MapMode>('friends');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
+  // Turning Here on (or moving far) flies the map to you; new nearby plans arrive over quests:new.
+  useEffect(() => {
+    if (!map || !hereCenter) return;
+    map.flyTo({ center: [hereCenter.lng, hereCenter.lat], zoom: Math.max(map.getZoom(), 15.5), essential: true });
+  }, [map, hereCenter]);
   const [unsupported, setUnsupported] = useState(false);
   const [view, setViewState] = useState<MapView>('map');
   const [viewNote, setViewNote] = useState<string | null>(null);

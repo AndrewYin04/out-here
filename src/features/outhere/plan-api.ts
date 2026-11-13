@@ -1,6 +1,6 @@
 // Client calls for the plan sheet. The plan call uses fetch directly because the UI needs the
 // x-muse-source and x-muse-mode headers (apiFetch returns only the body).
-import { ApiFetchError, apiPost, currentPersona } from '@/features/data';
+import { ApiFetchError, apiPost, currentPersona, hereLocation } from '@/features/data';
 import { DEMO_CENTER, type LatLng, type MusePlan, type PlanStageEvent } from '@/shared';
 import type { DroppedView } from './dropped';
 import { availabilityChanged } from './plan-state';
@@ -26,8 +26,8 @@ export async function requestPlan(text: string, signal?: AbortSignal): Promise<P
   const res = await fetch('/api/muse/plan', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-persona': currentPersona() },
-    // No location: the server starts from the viewer's own place (Alex: the demo center, others: home).
-    body: JSON.stringify({ text }),
+    // "Here" mode sends the real location; otherwise the server starts from the viewer's own place.
+    body: JSON.stringify({ text, location: hereLocation() ?? undefined }),
     signal,
   });
   const data = (await res.json().catch(() => ({}))) as PlanResponse & { error?: string };
@@ -50,7 +50,7 @@ export async function requestPlanStream(text: string, onStage: (e: PlanStageEven
   const res = await fetch('/api/muse/plan?stream=1', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-persona': currentPersona() },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, location: hereLocation() ?? undefined }),
     signal,
   });
   if (!res.ok || !res.body) {
