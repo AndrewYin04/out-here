@@ -28,8 +28,8 @@ export const SEED_LOCATION_SHARES: SeedLocationShare[] = [
     precision: 'exact', bubble: b('👋', 'new here, say hi', 'at work till 5', 'find people to grab food with'), updatedMinAgo: 6 },
 
   // local friends of Alex
-  { handle: 'maya', at: { place: 'El Camino Coffee Works', offsetM: 40, bearingDeg: 120 }, placeLabel: 'El Camino Coffee Works',
-    precision: 'exact', bubble: b('🧋', 'free after class', 'down for boba', null), updatedMinAgo: 3 },
+  { handle: 'maya', at: { place: 'Bobalicious Corner', offsetM: 520, bearingDeg: 160 }, placeLabel: 'near Willow Rd',
+    precision: 'exact', bubble: b('🧋', 'Free after class · Down for boba', 'out of class, free for an hour', 'grab boba'), updatedMinAgo: 3 },
   { handle: 'kai', at: { place: 'Boulder Bay Gym' }, placeLabel: 'Boulder Bay Gym',
     precision: 'exact', bubble: b('🧗', 'chalked up', 'bouldering till 1', 'find a climbing buddy'), updatedMinAgo: 12 },
   { handle: 'ethan', at: { place: 'Dumpling Den', offsetM: 220, bearingDeg: 35 }, placeLabel: 'near Willow Rd',

@@ -14,6 +14,7 @@ import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
 import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
+import { SellerRequests } from './market/SellerRequests';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
@@ -653,6 +654,14 @@ export function OutHereView() {
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
       {mode === 'explore' && !unsupported && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
+      )}
+
+      {/* A seller's pickup requests, with Accept, under the top bar (the pop-up seller's screen). */}
+      {!creating && !selling && !sheetOpen && !listingId && !selectedId && (
+        <div className="pointer-events-none absolute inset-x-3 top-[84px] z-30 flex justify-center empty:hidden">
+          <SellerRequests className="pointer-events-auto" viewerId={persona.id} listings={listingsApi.data?.listings ?? []} now={now}
+            onChanged={() => { void listingsApi.refetch(); }} />
+        </div>
       )}
 
       {/* Muse found something the viewer is looking for: a card above the dashboard. */}
