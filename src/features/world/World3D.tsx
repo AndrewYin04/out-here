@@ -18,6 +18,8 @@ import {
   ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
+import { StadiumLabels } from './StadiumLabels';
+import { stadiumLabels } from './stadiums';
 import { useGps } from './useGps';
 import { WorldLayer, type BeaconSpec } from './WorldLayer';
 
@@ -262,15 +264,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
 
-  // ---- Plan beacons ----
+  // ---- Plan beacons and stadiums (#23): an arena with one seat per spot under each beam ----
   useEffect(() => {
     const strong = new Set([...(picks ?? []), ...(selectedId ? [selectedId] : [])]);
+    const pickSet = new Set(picks ?? []);
     const specs: BeaconSpec[] = quests
       .filter((q) => q.status !== 'done' && q.capacity - q.memberIds.length > 0)
       .map((q) => ({
         id: q.id, pos: q.location, strong: strong.has(q.id),
         color: strong.has(q.id) ? '#0866FF' : CATEGORY_COLOR[q.category] ?? '#65676B',
         height: strong.has(q.id) ? 90 : 45,
+        capacity: q.capacity, taken: q.memberIds.length, pick: pickSet.has(q.id),
       }));
     layerRef.current?.setBeacons(specs);
   }, [quests, picks, selectedId, ready]);
@@ -621,6 +625,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     setFarKm(d > FAR_FROM_DEMO_M ? Math.round(d / 1000) : null);
   }, [source, gps.status, gps.reading]);
 
+  const questWhere = useMemo(() => new Map(quests.map((q) => [q.id, q.location])), [quests]);
+
   // ---- Walk to the selected plan ----
   const selected = useMemo(() => quests.find((q) => q.id === selectedId) ?? null, [quests, selectedId]);
   const selectedMin = selected ? minutesLeft(pos.current, selected.location) : null;
@@ -699,6 +705,16 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             </div>
           ))}
         </div>
+      )}
+
+      {/* Quest stadiums: name, spots left and the walk from you, above each nearby arena. */}
+      {ready && map.getZoom() >= CHARACTER_MIN_ZOOM && (
+        <StadiumLabels
+          labels={stadiumLabels(quests, pos.current, { picks, selectedId })}
+          where={questWhere}
+          layer={layerRef.current}
+          onSelect={onSelect}
+        />
       )}
 
       {/* Bottom centre: walking countdown, arrival, "Walk there", GPS notes. */}
