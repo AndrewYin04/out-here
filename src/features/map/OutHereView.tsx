@@ -29,19 +29,27 @@ function useNow(intervalMs = 30_000): Date {
   return now;
 }
 
-function setQuestParam(id: string | null) {
+function setUrlParam(name: string, value: string | null) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set('quest', id);
-  else url.searchParams.delete('quest');
+  if (value) url.searchParams.set(name, value);
+  else url.searchParams.delete(name);
   window.history.replaceState(window.history.state, '', url.toString());
 }
+const setQuestParam = (id: string | null) => setUrlParam('quest', id);
 
 export function OutHereView() {
   const { viewer: persona } = useViewer();
   const now = useNow();
   const questsApi = useQuests(DEMO_CENTER, 5000);
   const ctxApi = useApi<MapContext>('/out-here/context', [], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
-  const [mode, setMode] = useState<MapMode>('explore');
+  const [mode, setModeState] = useState<MapMode>('explore');
+  // The toggle is kept in ?mode=, so Back from Messenger or a profile returns to the same view.
+  // Explore has no friend card, so ?friend= goes with it.
+  const setMode = useCallback((m: MapMode) => {
+    setModeState(m);
+    setUrlParam('mode', m === 'friends' ? m : null);
+    if (m !== 'friends') setUrlParam('friend', null);
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
@@ -52,7 +60,7 @@ export function OutHereView() {
     const id = params.get('quest');
     if (id) setSelectedId(id);
     const m = params.get('mode');
-    if (m === 'friends' || m === 'explore') setMode(m);
+    if (m === 'friends' || m === 'explore') setModeState(m);
   }, []);
 
   // The Muse plan on screen: its picked pins stand out, and the map frames them with the viewer
@@ -163,6 +171,7 @@ export function OutHereView() {
     return pts.length > 0 ? pts : null;
   }, [planPicks, mode, friendPins.data]);
 
+  const questPoints = useMemo(() => shown.map((q) => q.location), [shown]);
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
@@ -317,14 +326,14 @@ export function OutHereView() {
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
-          {/* People and Your status sit below the centred chips at phone width, top left on desktop */}
-          <div className={cn('absolute left-3 z-10 flex gap-2 md:top-16', filter.on ? 'max-md:top-[136px]' : 'max-md:top-[100px]')}>
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} questPoints={questPoints} />
+          {/* People and Your status: top left on desktop; on phones a row under I'm free, clear of the map */}
+          <div className="absolute z-10 flex gap-2 max-md:pointer-events-none max-md:inset-x-3 max-md:bottom-4 max-md:justify-center max-md:*:pointer-events-auto md:left-3 md:top-16">
             <PeopleButton map={map} />
             <SharingButton />
           </div>
           {visible.length > 0 && (
-            <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
+            <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap max-md:hidden rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
             </p>
           )}

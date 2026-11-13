@@ -3,7 +3,7 @@ import { haversineMeters, profileId, seedId, setNow, snapToGrid } from '@/shared
 import { createMemoryStore } from '@/features/data/memory-store';
 import { subscribe, type RealtimeMessage } from '@/features/data/realtime-server';
 import type { CoreStore } from '@/features/data/core';
-import { placeChips, type ChipItem } from '@/features/map/friends/chips';
+import { clearOfQuests, placeChips, placeChipsSided, questBox, type ChipItem } from '@/features/map/friends/chips';
 
 const id = (h: string) => profileId(h);
 let store: CoreStore;
@@ -112,13 +112,22 @@ describe('Find My: editing my share', () => {
     const s = await store.hangSuggestion(id('alex'), id('maya'));
     expect(s?.kind).toBe('quest');
     expect(s?.venueName).toBe('Dumpling Den');
-    expect(s?.reason).toContain("Maya's craving dumplings");
-    expect(s?.draft).toContain('Dumpling Den');
+    expect(s?.reason).toContain("Maya's status: “craving dumplings”");
+    // a clock time, not "in 117 min", and the bubble quoted, not stitched into a sentence
+    expect(s?.draft).toMatch(/^Dumpling Den (at \d{1,2}:\d\d [AP]M|now)\? Saw your “craving dumplings”\./);
+    expect(s?.draft).not.toMatch(/You said you're|in \d+ min/);
     const { invite, suggestion } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
     expect(invite.questId).toBe(s!.questId);
     expect(suggestion).toContain('Dumplings');
     // a hidden friend gets no suggestion
     expect(await store.hangSuggestion(id('alex'), id('olivia'))).toBeNull();
+  });
+
+  it('generic words do not match: Ethan\'s "walk somewhere after" never picks the art walk', async () => {
+    const s = await store.hangSuggestion(id('alex'), id('ethan'));
+    expect(s?.title ?? '').not.toMatch(/Art walk/);
+    expect(s?.reason ?? '').not.toMatch(/Ethan's need/);
+    expect(s?.draft ?? '').not.toMatch(/You said you're/);
   });
 });
 
@@ -145,5 +154,47 @@ describe('Find My: chip placement', () => {
   it('shows emoji only when asked (phones zoomed out)', () => {
     const m = placeChips([item('a', 100, 300, 1)], null, view, true);
     expect(m.get('a')).toBe('emoji');
+  });
+});
+
+describe('Find My: quest pins stay tappable', () => {
+  const view = { w: 390, h: 700 };
+  const item = (id: string, x: number, y: number): ChipItem => ({
+    pin: { friend: { id } as ChipItem['pin']['friend'], bubble: { emoji: '🥟', thought: 'craving dumplings', doing: null, wantsTo: null }, distanceKm: 1, updatedAt: '2026-11-12T10:00:00Z' },
+    x, y,
+  });
+
+  it('an avatar on a quest pin steps off it, and stays on the map', () => {
+    const q = questBox({ x: 200, y: 300 });
+    const avatar = (x: number, y: number) => ({ x0: x - 21, y0: y - 42, x1: x + 21, y1: y });
+    const clear = (x: number, y: number) => { const a = avatar(x, y); return !(a.x0 < q.x1 && q.x0 < a.x1 && a.y0 < q.y1 && q.y0 < a.y1); };
+    // avatar bottom centre just below the quest circle centre: it covers the pin
+    const [dx, dy] = clearOfQuests(205, 310, [q], view);
+    expect(clear(205 + dx, 310 + dy)).toBe(true);
+    // at the left edge it never leaves the map
+    const edge = questBox({ x: 30, y: 300 });
+    const [ex, ey] = clearOfQuests(25, 310, [edge], view);
+    expect(25 + ex - 21).toBeGreaterThanOrEqual(4);
+    expect(ey === 0 ? ex > 0 : true).toBe(true);
+    // a move that would land on another friend is skipped when another one is free
+    const [ox] = clearOfQuests(205, 310, [q], view, [{ x: 245, y: 310 }]);
+    expect(ox).toBeLessThanOrEqual(0);
+    // clear already: no move
+    expect(clearOfQuests(100, 310, [q], view)).toEqual([0, 0]);
+  });
+
+  it('no chip is placed over a quest pin', () => {
+    const q = questBox({ x: 200, y: 240 });
+    const placed = placeChipsSided([item('a', 200, 300)], null, view, false, { obstacles: [q], sides: ['above', 'below'] });
+    const p = placed.get('a')!;
+    // the chip above would cover the quest pin, so it goes below the avatar
+    expect(p.mode).not.toBe('none');
+    expect(p.side).toBe('below');
+  });
+
+  it('a chip with no spot clear of quest pins still shows, under one, instead of hiding', () => {
+    const obstacles = [questBox({ x: 200, y: 240 }), questBox({ x: 200, y: 330 })];
+    const placed = placeChipsSided([item('a', 200, 300)], null, view, false, { obstacles, sides: ['above', 'below'], modes: ['short'] });
+    expect(placed.get('a')!.mode).toBe('short');
   });
 });

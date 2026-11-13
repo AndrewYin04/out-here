@@ -24,7 +24,8 @@ const b = (emoji: string, thought: string, doing: string | null, wantsTo: string
 
 export const SEED_LOCATION_SHARES: SeedLocationShare[] = [
   // the viewer
-  { handle: 'alex', at: { place: 'Hacker Way Courts', offsetM: 330, bearingDeg: 250 }, placeLabel: 'Hacker Way, Menlo Park',
+  // at DEMO_CENTER, so the You pin, walking times and Muse plans all start from one point
+  { handle: 'alex', at: { lat: 37.4847, lng: -122.1477 }, placeLabel: 'Hacker Way, Menlo Park',
     precision: 'exact', bubble: b('👋', 'new here, say hi', 'at work till 5', 'find people to grab food with'), updatedMinAgo: 6 },
 
   // local friends of Alex

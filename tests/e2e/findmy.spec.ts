@@ -129,11 +129,45 @@ for (const width of [390, 1440]) {
       const s = page.getByTestId('hang-suggestion');
       await expect(s).toContainText('Dumpling Den');
       await expect(s).toContainText('seats left');
-      await expect(page.getByTestId('hang-reason')).toContainText("Maya's craving dumplings");
+      await expect(page.getByTestId('hang-reason')).toContainText("Maya's status: “craving dumplings”");
       await expect(page.getByLabel('Message to Maya')).toHaveValue(/Dumpling Den/);
       await page.screenshot({ path: `test-results/findmy-hang-${width}.png` });
       await page.getByRole('button', { name: 'Send invite' }).click();
       await expect(page.getByText(/Invite sent to Maya: 🥟/)).toBeVisible();
+    });
+
+    test('tapping a status chip opens the card, like the avatar', async ({ page }) => {
+      await openMap(page, 'alex', width);
+      await page.waitForTimeout(1500); // chip placement settles after the first framing
+      // the first friend with a chip on screen; click the chip itself, not the avatar under it
+      const pin = page.locator('[data-testid="friend-pin"]', { has: page.getByTestId('friend-chip-text') }).first();
+      const name = (await pin.getAttribute('aria-label'))!.split(',')[0];
+      await pin.getByTestId('friend-chip').click();
+      await expect(page.getByRole('dialog', { name })).toBeVisible();
+      await expect(page.getByTestId('friend-card')).toBeVisible();
+    });
+
+    test('the toggle and the open card live in the URL, so Back from Messenger returns to the card', async ({ page }) => {
+      await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
+      await page.goto('/out-here?as=alex');
+      await page.getByTestId('map-mode-friends').click();
+      await expect(page).toHaveURL(/[?&]mode=friends/);
+      await page.getByRole('button', { name: /^People/ }).click();
+      await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      const card = page.getByTestId('friend-card');
+      await expect(card).toBeVisible();
+      await expect(page).toHaveURL(/[?&]friend=maya/);
+      await card.getByRole('link', { name: 'Message' }).click();
+      // Messenger replaces ?to=maya with ?thread=<id>; go Back once that has landed
+      await page.waitForURL(/\/messages\?thread=/);
+      await page.goBack();
+      await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+      await expect(page.getByTestId('friend-card')).toContainText('craving dumplings', { timeout: 15_000 });
+      // closing the card drops ?friend=; Explore drops ?mode=
+      await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+      await expect(page).not.toHaveURL(/friend=/);
+      await page.getByTestId('map-mode-explore').click();
+      await expect(page).not.toHaveURL(/mode=friends/);
     });
 
     test('sharing settings open from the map', async ({ page }) => {
@@ -149,6 +183,30 @@ for (const width of [390, 1440]) {
     });
   });
 }
+
+test.describe('quest pins stay tappable under friends', () => {
+  test.beforeEach(({}, info) => { test.skip(info.project.name !== 'phone', 'mutates Maya; runs once, at 390'); });
+
+  test('Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens', async ({ page, request }) => {
+    const put = (data: object) => request.put('/api/locations/me', { headers: asPersona('maya'), data });
+    try {
+      expect((await put({ precision: 'approximate' })).ok()).toBe(true);
+      await openMap(page, 'alex', 390);
+      const pin = page.getByTestId('quest-pin-dumplings');
+      await expect(pin).toBeVisible();
+      await page.waitForTimeout(1500);
+      const box = (await pin.boundingBox())!;
+      const top = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid]')?.getAttribute('data-testid') ?? null,
+        [box.x + box.width / 2, box.y + box.height / 2]);
+      expect(top).toBe('quest-pin-dumplings');
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await expect(page.getByTestId('quest-sheet')).toContainText('Dumplings before the rush');
+      await expect(page.getByTestId('friend-card')).toHaveCount(0);
+    } finally {
+      await put({ precision: 'exact' });
+    }
+  });
+});
 
 test.describe('two personas, live', () => {
   test.beforeEach(({}, info) => { test.skip(info.project.name !== 'desktop', 'mutates Maya; runs once'); });

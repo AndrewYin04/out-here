@@ -13,6 +13,7 @@ import {
   type Audience, type Availability, type FriendPin, type ID, type LatLng, type LocationPrecision,
   type LocationShare, type StatusBubble,
 } from '@/shared';
+import { formatDemoTime } from '@/shared/demo';
 import { SHARE_TTL_MIN } from '@/shared/seed/locations';
 import type { CoreStore } from './core';
 import { badRequest, notFound } from './errors';
@@ -111,7 +112,7 @@ export async function friendPins(store: CoreStore, viewerId: ID): Promise<Friend
   const at = now().toISOString();
   const shares = v.db.locationShares ?? [];
   const mine = shares.find((s) => s.userId === viewerId);
-  const origin = mine?.location ?? DEMO_CENTER;
+  const origin = mine?.location ?? v.profileById.get(viewerId)?.home ?? DEMO_CENTER;
   const pins: FriendPin[] = [];
   for (const s of shares) {
     if (!canSeeShare(v, viewerId, s, at)) continue;
@@ -207,7 +208,7 @@ export type HangSuggestion = {
   questId: ID | null; placeId: ID | null;
   title: string; emoji: string; venueName: string;
   startsAt: string | null; seatsLeft: number | null; walkMinutes: number;
-  /** Built from the friend's bubble and the data: "Maya's craving dumplings · 2 seats left · 9 min walk". */
+  /** The friend's own words it matched, quoted, then the data: Maya's status: “craving dumplings” · 2 seats left · 9 min walk. */
   reason: string;
   /** Prefilled invite message. */
   draft: string;
@@ -215,12 +216,17 @@ export type HangSuggestion = {
 
 /** A hang must be reachable on foot by both people within this many minutes. */
 const HANG_MAX_WALK_MIN = 25;
-/** Only quests starting within this many minutes are suggested. */
+/** Quests starting within this many minutes are suggested, or later ones inside the friend's free window. */
 const HANG_MAX_START_MIN = 120;
+/** A quest inside the friend's shared free window may start up to this many minutes out. */
+const HANG_MAX_WINDOW_START_MIN = 300;
+// Words that say nothing about what to do together ("walk somewhere after", "new here, say hi").
 const STOP = new Set([
   'the', 'and', 'for', 'with', 'want', 'wants', 'try', 'new', 'some', 'about', 'after', 'before', 'till', 'until',
   'work', 'break', 'again', 'still', 'just', 'need', 'someone', 'anyone', 'going', 'more', 'like', 'into', 'this',
-  'that', 'from', 'lunch', 'min', 'hour', 'today', 'tonight',
+  'that', 'from', 'lunch', 'min', 'hour', 'today', 'tonight', 'walk', 'somewhere', 'here', 'say', 'second',
+  'free', 'next', 'long', 'down', 'later', 'can', 'working', 'place', 'people', 'find', 'grab', 'craving', 'brain',
+  'energy', 'repeat', 'home', 'day', 'night', 'out', 'get', 'any', 'all', 'one', 'our', 'you', 'your',
 ]);
 
 /** Lowercase word stems of 3+ letters, plural "s" dropped ("dumplings" -> "dumpling"). */
@@ -233,12 +239,39 @@ export function stems(text: string | null | undefined): Set<string> {
   return out;
 }
 
-/** How many words of the bubble ("craving dumplings", "try Dumpling Den") the quest also has. */
-function bubbleHits(bubble: StatusBubble, words: Set<string>): number {
-  const want = new Set([...stems(bubble.thought), ...stems(bubble.wantsTo), ...stems(bubble.doing)]);
-  let hits = 0;
-  for (const w of want) if (words.has(w)) hits += 1;
-  return hits;
+/** Which part of the friend's status a quest matched; the reason line quotes it. */
+export type HangSource = 'thought' | 'wantsTo' | 'free' | 'doing';
+export type HangText = { source: HangSource; text: string; weight: number };
+
+/** The friend's own words, strongest first: their thought and wish, their free note, then what they are doing. */
+export function hangTexts(bubble: StatusBubble, freeText: string | null): HangText[] {
+  const out: HangText[] = [];
+  if (bubble.thought) out.push({ source: 'thought', text: bubble.thought, weight: 3 });
+  if (bubble.wantsTo) out.push({ source: 'wantsTo', text: bubble.wantsTo, weight: 3 });
+  if (freeText) out.push({ source: 'free', text: freeText, weight: 3 });
+  if (bubble.doing) out.push({ source: 'doing', text: bubble.doing, weight: 1 });
+  return out;
+}
+
+/** Weighted count of the friend's words the quest also has, and the first text that matched. */
+export function matchHang(texts: HangText[], words: Set<string>): { score: number; matched: HangText | null } {
+  let score = 0;
+  let matched: HangText | null = null;
+  for (const t of texts) {
+    let hits = 0;
+    for (const w of stems(t.text)) if (words.has(w)) hits += 1;
+    if (hits > 0) { score += hits * t.weight; matched ??= t; }
+  }
+  return { score, matched };
+}
+
+/** 'Maya's status: “craving dumplings”' or 'Ethan's free note: “board games tonight?”'. */
+export function quoteFor(name: string, t: HangText): string {
+  const q = `“${t.text}”`;
+  if (t.source === 'thought') return `${name}'s status: ${q}`;
+  if (t.source === 'wantsTo') return `${name} wants to: ${q}`;
+  if (t.source === 'free') return `${name}'s free note: ${q}`;
+  return `${name} right now: ${q}`;
 }
 
 const minutesUntil = (iso: string, atMs: number) => Math.round((new Date(iso).getTime() - atMs) / 60_000);
@@ -246,9 +279,11 @@ const seatsText = (n: number) => `${n} ${n === 1 ? 'seat' : 'seats'} left`;
 
 /**
  * Picks the hang for `toId`: an open public quest both people can walk to within 25 min that starts
- * within 2 hours, ranked by how many words of the friend's bubble it matches, then by whether the
- * friend can get there before their shared free window ends, then by the viewer's walking time.
- * Falls back to the place nearest the friend.
+ * within 2 hours (or later, up to 5 hours, inside the friend's shared free window), ranked by how
+ * many of the friend's own words it matches (thought, wish and free note count 3 each, what they
+ * are doing counts 1), then by whether the friend can get there before their free window ends, then
+ * by the viewer's walking time. Falls back to the place nearest the friend. Walking times are
+ * measured from the viewer's own share, the point their "You" pin sits on.
  */
 export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): Promise<HangSuggestion | null> {
   const v = await store.view();
@@ -260,13 +295,17 @@ export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): 
   const share = shares.find((s) => s.userId === to.id);
   if (!share || !canSeeShare(v, viewerId, share, atIso)) return null;
   const mine = shares.find((s) => s.userId === viewerId);
-  const origin = mine?.location ?? DEMO_CENTER;
+  const origin = mine?.location ?? v.profileById.get(viewerId)?.home ?? DEMO_CENTER;
   const friendAt = visibleLocation(share, origin).location;
   const name = to.name.split(' ')[0] ?? to.name;
-  const freeUntil = v.db.availability
+  const free = v.db.availability
     .filter((a) => a.userId === to.id && a.endsAt > atIso && v.canSee(viewerId, a.userId, a.audience))
-    .map((a) => a.endsAt).sort()[0] ?? null;
-  const b = share.bubble;
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0] ?? null;
+  const freeUntil = free?.endsAt ?? null;
+  const texts = hangTexts(share.bubble, free?.text ?? null);
+  const maxStartMin = freeUntil
+    ? Math.min(HANG_MAX_WINDOW_START_MIN, Math.max(HANG_MAX_START_MIN, minutesUntil(freeUntil, at.getTime())))
+    : HANG_MAX_START_MIN;
 
   const ranked = v.db.quests
     .filter((q) => q.isPublic && v.isActiveQuest(q) && v.seatsLeft(q) > 0)
@@ -276,33 +315,35 @@ export async function hangSuggestion(store: CoreStore, viewerId: ID, toId: ID): 
       const theirWalk = walkingMinutes(friendAt, q.approxLocation);
       const arriveMs = Math.max(new Date(q.startsAt).getTime(), at.getTime() + theirWalk * 60_000);
       const fitsWindow = !freeUntil || arriveMs < new Date(freeUntil).getTime();
-      return { q, hits: bubbleHits(b, words), myWalk, theirWalk, fitsWindow };
+      const startsIn = minutesUntil(q.startsAt, at.getTime());
+      return { q, ...matchHang(texts, words), myWalk, theirWalk, fitsWindow, startsIn };
     })
     .filter((x) => x.myWalk <= HANG_MAX_WALK_MIN && x.theirWalk <= HANG_MAX_WALK_MIN
-      && minutesUntil(x.q.startsAt, at.getTime()) <= HANG_MAX_START_MIN)
-    .sort((x, y) => y.hits - x.hits || Number(y.fitsWindow) - Number(x.fitsWindow) || x.myWalk - y.myWalk);
+      && (x.startsIn <= HANG_MAX_START_MIN || (x.fitsWindow && x.startsIn <= maxStartMin)))
+    .sort((x, y) => y.score - x.score || Number(y.fitsWindow) - Number(x.fitsWindow) || x.myWalk - y.myWalk);
   const pick = ranked[0];
-  const said = b.thought ? `${name}'s ${b.thought}` : b.wantsTo ? `${name} wants to ${b.wantsTo}` : `${name} is nearby`;
   if (pick) {
     const q = pick.q;
     const seats = v.seatsLeft(q);
-    const startsIn = minutesUntil(q.startsAt, at.getTime());
-    const when = startsIn > 0 ? `in ${startsIn} min` : 'now';
-    const why = pick.hits > 0 && b.thought ? ` You said you're ${b.thought}.` : '';
+    const when = pick.startsIn > 0 ? `at ${formatDemoTime(q.startsAt)}` : 'now';
+    const said = pick.matched?.text.trim() ?? '';
+    const why = pick.matched && pick.matched.source !== 'doing' ? ` Saw your “${said}”${/[.?!]$/.test(said) ? '' : '.'}` : '';
+    const lead = pick.matched ? quoteFor(name, pick.matched) : `Close to you both, starts ${when}`;
     return {
       kind: 'quest', questId: q.id, placeId: null, title: q.title, emoji: q.emoji, venueName: q.venueName,
       startsAt: q.startsAt, seatsLeft: seats, walkMinutes: pick.myWalk,
-      reason: `${said} · ${seatsText(seats)} · ${pick.myWalk} min walk`,
+      reason: `${lead} · ${seatsText(seats)} · ${pick.myWalk} min walk`,
       draft: `${q.venueName} ${when}?${why} ${seatsText(seats)}, I'll grab one.`,
     };
   }
   const place = [...v.db.places].sort((a, c) => haversineMeters(friendAt, a.location) - haversineMeters(friendAt, c.location))[0];
   if (!place) return null;
   const walk = walkingMinutes(origin, place.location);
+  const lead = texts[0] ? quoteFor(name, texts[0]) : `${name} is nearby`;
   return {
     kind: 'place', questId: null, placeId: place.id, title: `Meet at ${place.name}`, emoji: '📍', venueName: place.name,
     startsAt: null, seatsLeft: null, walkMinutes: walk,
-    reason: `${said} · ${place.name} is near them · ${walk} min walk for you`,
+    reason: `${lead} · ${place.name} is near them · ${walk} min walk for you`,
     draft: `Want to meet at ${place.name}? I can be there in ${walk} min.`,
   };
 }
