@@ -34,8 +34,8 @@ export const CAMPUS_THRIFT_POPUP: PopUpSale = {
   items: [
     { title: 'Vintage track jacket', priceUsd: 20, category: 'Clothing', imageUrl: '/seed/listings/l27.webp',
       description: 'Zip-up track jacket, size M, barely worn. At the Campus Thrift Pop-Up today only.' },
-    { title: 'Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing', imageUrl: null,
-      description: 'Early-2000s denim purse with a short shoulder strap. At the Campus Thrift Pop-Up today only.' },
+    { title: 'Vintage Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing', imageUrl: null,
+      description: 'Vintage early-2000s denim purse, faded wash, short shoulder strap. Pairs with any denim jacket. At the Campus Thrift Pop-Up today only.' },
   ],
 };
 
