@@ -23,7 +23,8 @@ import { MuseOrb, MuseStyles } from './MuseOrb';
 const firstName = (n: string) => n.split(' ')[0] ?? n;
 
 /** Out Here and Memories are where the companion lives. */
-const SHOWN_ON = /^\/(out-here|memories)(\/|$)/;
+/** Every page of the app: Muse introduces each one and can be asked anywhere. */
+const SHOWN_ON = /^\//;
 
 const STATE_LABEL: Record<string, string> = {
   approaching: 'Muse is coming over', listening: 'Muse is listening', thinking: 'Muse is thinking',

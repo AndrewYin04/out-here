@@ -72,6 +72,8 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
     else if (t === 'plans') setLevel((l) => (l === 0 ? 1 : l));
     tabRef.current = t;
     setTab(t);
+    // Muse says what this section is for (MuseDockButton).
+    window.dispatchEvent(new CustomEvent('muse:section', { detail: t }));
   }, [onMode]);
 
   useEffect(() => {
