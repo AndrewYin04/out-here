@@ -120,6 +120,8 @@ export type YourPlansResponse = { plans: YourPlan[] };
 export type CreateQuestBody = Omit<Quest, 'id' | 'memberIds' | 'status' | 'createdAt' | 'approxLocation' | 'isPublic'> & {
   /** Friends to invite; required for visibility 'friends' (invite only). */
   inviteIds?: ID[];
+  /** The invite's text (a Muse draft); defaults to "<emoji> <title>, want to come?". */
+  inviteMessage?: string;
 };
 export type QuestCheckinBody = { location: LatLng };
 export type QuestCheckinResponse = { hereCount: number };

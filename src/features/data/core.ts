@@ -743,7 +743,7 @@ export class CoreStore {
     for (const toId of inviteIds) {
       await this.createInvite(viewerId, {
         toId, questId: id, suggestionTitle: `${row.emoji} ${row.title}`,
-        message: `${row.emoji} ${row.title}, want to come?`,
+        message: body.inviteMessage?.trim() || `${row.emoji} ${row.title}, want to come?`,
       });
     }
     const after = await this.view();

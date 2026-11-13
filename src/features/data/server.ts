@@ -5,7 +5,7 @@ export { publish, publishAll, flushOutbox, subscribe, heartbeat, onlineUserIds, 
 export { HttpError, badRequest, forbidden, notFound, conflict } from './errors';
 export { supabaseEnv } from './env';
 export { createMemoryStore, buildMemoryDb } from './memory-store';
-export type { Db } from './db';
+export type { Db, TableKey } from './db';
 export type { View } from './view';
 export type { QuestDetail, AvailabilityItem, InviteView, PostWithShared } from './core';
 export { newScope, runInScope, currentScope, type RequestScope } from './request-scope';
