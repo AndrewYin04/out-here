@@ -24,12 +24,13 @@ export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElemen
   const c = useMuseCommentary();
   const encounter = useAgentEncounter();
   // In 3D the clouds are for the chat (the camera frames Jolly then); "I'm free" runs show in the sheet.
-  if (!c.open || c.source !== 'chat') return null;
+  // During a Muse-to-Muse encounter the scene's speech bubbles say what is happening instead.
+  if (!c.open || c.source !== 'chat' || encounter) return null;
   const text = c.current?.text;
   const [sx, sy] = SLOTS[c.index % SLOTS.length];
   return (
     <div ref={anchorRef} aria-hidden data-testid="muse-thoughts" data-thought-index={text ? c.index : undefined} data-thought-count={c.thoughts.length} className="pointer-events-none absolute left-0 top-0 z-[6]" style={{ ['--r' as string]: '110px' } as CSSProperties}>
-      {(c.working && !encounter?.outcome) && (
+      {c.working && (
         <>
           <span className="muse-thought-orbit" style={{ animationDuration: '5.2s' }}><i className="muse-thought-orb" style={{ width: 16, height: 16 }} /></span>
           <span className="muse-thought-orbit" style={{ animationDuration: '7.4s', animationDelay: '-2.1s' }}><i className="muse-thought-orb" style={{ width: 11, height: 11 }} /></span>

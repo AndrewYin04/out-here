@@ -231,6 +231,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const chatAreaHeight = useRef(450);
   const conversationCamera = useRef(false);
   const thoughtsRef = useRef<HTMLDivElement>(null);
+  /** The Muse-to-Muse scene overlay: speech bubbles and the envelope, placed each frame. */
+  const sceneRef = useRef<HTMLDivElement>(null);
   const petPos = useRef<LatLng>(start);
   const petAlt = useRef(1.7);
   const [hello, setHello] = useState(true);
@@ -639,7 +641,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       previousCamera = values;
       map.easeTo({center: [lng, lat], zoom, bearing, pitch, offset: [x, y], duration: 0});
     };
-    let flight: { id:number; peer:string; created:boolean; motion:EncounterMotion; origin:LatLng; altitude:number; scale:number; bearing:number; cursor:number; pulseAge:number;direction:'sent'|'received'|null } | null = null;
+    let flight: { id:number; peer:string; created:boolean; motion:EncounterMotion; origin:LatLng; altitude:number; scale:number; bearing:number; cursor:number; pulseAge:number;direction:'sent'|'received'|null;
+      /** After the ask arrives, their Muse carries the envelope off to its person and back (0..1; -1 = not out). */
+      deliver:number; delivered:boolean } | null = null;
     const clearFlight = () => {
       if (!flight) return;
       const layer=layerRef.current;
@@ -647,6 +651,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       layer?.setMuseTrailStyle('pet','walk');
       lastPet='';
       const id=flight.id; flight=null; finishAgentEncounter(id);
+      const scene=sceneRef.current; if(scene) scene.style.visibility='hidden';
     };
     const screenPoint = { x: 0, y: 0, elevation: 0 };
 
@@ -818,11 +823,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           const created=!layer.actorIds().includes(peer);
           layer.upsertActor(peer,'pet',request.recipient.id);
           layer.setMuseTrailStyle('pet','full'); layer.setMuseTrailStyle(peer,'full');
-          flight={id:request.id,peer,created,motion:new EncounterMotion(),origin:{...petPos.current},altitude:petAlt.current,scale,bearing:camBearing.current,cursor:0,pulseAge:1,direction:null};
+          flight={id:request.id,peer,created,motion:new EncounterMotion(),origin:{...petPos.current},altitude:petAlt.current,scale,bearing:camBearing.current,cursor:0,pulseAge:1,direction:null,deliver:-1,delivered:false};
         }
         const f=flight; f.pulseAge+=dt;
         const remaining=f.cursor<request.messages.length;
-        const safeToReturn=!remaining && f.pulseAge>.55;
+        // Hold the meeting so the reply bubble can be read before they part.
+        const safeToReturn=!remaining && f.pulseAge>(reducedMotion()?.55:3.2);
         const done=f.motion.update(dt, request.outcome === 'error' || request.outcome === 'cancelled' || safeToReturn ? request.outcome : null, reducedMotion());
         const mix=f.motion.mix;
         const midpoint=moveMeters(f.origin,1.5*f.scale,f.bearing+70);
@@ -830,7 +836,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const far=moveMeters(midpoint,.6*f.scale,f.bearing+90);
         const peerStart=moveMeters(f.origin,5*f.scale,f.bearing+80);
         const at=(a:LatLng,b:LatLng):LatLng=>({lat:a.lat+(b.lat-a.lat)*mix,lng:a.lng+(b.lng-a.lng)*mix});
-        const own=at(f.origin,near), other=at(peerStart,far);
+        const own=at(f.origin,near);
+        // Delivering: their Muse flies off with the envelope (toward its person, off to the side) and back.
+        if(f.deliver>=0&&f.deliver<1){f.deliver=reducedMotion()?1:Math.min(1,f.deliver+dt/2.4);if(f.deliver>=1)f.delivered=true;}
+        const out=f.deliver>=0&&f.deliver<1?Math.sin(f.deliver*Math.PI):0;
+        const other=moveMeters(at(peerStart,far),7*f.scale*out,f.bearing+95);
         const altitude=f.altitude+f.motion.arc;
         layer.setPose('pet',own,bearingDeg(own,other),altitude);
         layer.setPose(f.peer,other,bearingDeg(other,own),altitude+.04);
@@ -839,7 +849,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         layer.setState('pet',meeting ? (speaking&&f.direction==='sent'?'talk':'hover'):'fly');
         layer.setState(f.peer,meeting ? (speaking&&f.direction==='received'?'talk':'hover'):'fly');
         if (meeting && request.outcome !== 'error' && request.outcome !== 'cancelled') {
-          if (remaining && f.pulseAge>.65) {
+          // The reply waits until their Muse is back from delivering the ask.
+          const delivering=f.deliver>=0&&f.deliver<1;
+          if (f.direction==='sent'&&f.deliver<0&&f.pulseAge>.7) f.deliver=0;
+          if (remaining && f.pulseAge>.65 && !delivering && !(f.direction==='sent'&&!f.delivered)) {
             const received=request.messages[f.cursor++]==='received';
             f.direction=received?'received':'sent';
             layer.setState(received ? f.peer : 'pet','talk');
@@ -847,6 +860,33 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             layer.sendMusePulse(received ? f.peer : 'pet',received ? 'pet' : f.peer);
             f.pulseAge=0;
           }
+        }
+        // The scene overlay: both speech bubbles (the real envelope lines) and the envelope itself.
+        const scene=sceneRef.current;
+        if(scene){
+          const a={x:0,y:0,elevation:0},b={x:0,y:0,elevation:0};
+          const okA=layer.actorScreenPoint('pet',a),okB=layer.actorScreenPoint(f.peer,b);
+          const notes=request.notes??[];const who=request.recipient.name.split(' ')[0];
+          const sentLine=notes.find(n=>n.dir==='sent')?.text??`Is ${who} free?`;
+          const replyLine=notes.find(n=>n.dir==='received')?.text??`${who}’s Muse replied`;
+          const sentDone=request.messages.slice(0,f.cursor).includes('sent'),replyDone=request.messages.slice(0,f.cursor).includes('received');
+          const deliveringNow=f.deliver>=0&&f.deliver<1;
+          const ownText=!meeting?null:request.outcome&&replyDone&&f.pulseAge>1.4?(request.outcome==='success'?'Got it. Your answer is in the chat.':'No plan was confirmed.'):sentDone?sentLine:null;
+          const peerText=!meeting?null:replyDone?replyLine:deliveringNow?`Taking this to ${who}…`:sentDone&&!f.delivered?`Got your note`:null;
+          const put=(el:HTMLElement|null,ok:boolean,p:{x:number;y:number},text:string|null)=>{if(!el)return;if(!ok||!text){el.style.visibility='hidden';return;}if(el.dataset.text!==text){el.dataset.text=text;el.textContent=text;el.classList.remove('oh-enc-pop');void el.offsetWidth;el.classList.add('oh-enc-pop');}el.style.visibility='visible';const bw=el.offsetWidth,W=scene.clientWidth;const left=Math.min(Math.max(8,p.x-bw*(el.dataset.bubble==='own'?.88:.12)),Math.max(8,W-bw-8));const up=el.dataset.bubble==='peer'&&W<600?52:0;el.style.transform=`translate(${left.toFixed(1)}px,${(p.y-58-up).toFixed(1)}px) translateY(-100%)`;};
+          put(scene.querySelector<HTMLElement>('[data-bubble=own]'),okA,a,ownText);
+          put(scene.querySelector<HTMLElement>('[data-bubble=peer]'),okB,b,peerText);
+          // The envelope: across with each message, and riding with their Muse while it delivers.
+          const env=scene.querySelector<HTMLElement>('[data-envelope]');
+          if(env){
+            const flyT=f.pulseAge/.65,flying=meeting&&f.direction!==null&&flyT<1;
+            let at2:{x:number;y:number}|null=null,lift=0;
+            if(flying&&okA&&okB){const from=f.direction==='sent'?a:b,to=f.direction==='sent'?b:a;const t=flyT*flyT*(3-2*flyT);at2={x:from.x+(to.x-from.x)*t,y:from.y+(to.y-from.y)*t};lift=Math.sin(t*Math.PI)*50;}
+            else if(deliveringNow&&okB){at2={x:b.x+16,y:b.y-6};}
+            if(at2){env.style.visibility='visible';env.style.transform=`translate(${at2.x.toFixed(1)}px,${(at2.y-lift).toFixed(1)}px) translate(-50%,-50%) rotate(${(-8+16*Math.sin(now/180)).toFixed(1)}deg)`;}
+            else env.style.visibility='hidden';
+          }
+          scene.style.visibility='visible';
         }
         if (done) { petPos.current={...f.origin}; petAlt.current=f.altitude; clearFlight(); }
       }
@@ -920,7 +960,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         // The free space around that spot (nearest edge, doubled) is what Jolly's size has to fit in.
         chatAreaHeight.current = Math.max(80, 2 * Math.min(targetY - (area.y - area.height / 2), area.y + area.height / 2 - targetY));
         // A real encounter can widen the shot; ordinary request states retain the same framing.
-        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone ? 23.5 : 23.3;
+        const targetZoom = encounterRef.current ? (phone ? 22.7 : 23.0) : phone ? 23.5 : 23.3;
         // A slow ease so you can watch the camera move in on Jolly (about 2 s to settle).
         const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 1.5);
         const elevation = layer.actorCameraElevation('pet', boostTarget);
@@ -1201,6 +1241,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       {/* No loading screen: the map's own zoom into 3D (and back out) is the transition. */}
       {/* Muse's thought orbs and bubbles around Jolly (only while the chat is open). */}
       <MuseThoughts anchorRef={thoughtsRef} />
+      {/* Muse to Muse: what each envelope says, over each Muse, and the envelope going between them. */}
+      <div ref={sceneRef} aria-hidden data-testid="muse-encounter-scene" className="pointer-events-none absolute inset-0 z-[7] overflow-hidden" style={{ visibility: 'hidden' }}>
+        <span data-bubble="own" data-testid="encounter-bubble-own" className="oh-enc-bubble" style={{ visibility: 'hidden' }} />
+        <span data-bubble="peer" data-testid="encounter-bubble-peer" className="oh-enc-bubble oh-enc-bubble-peer" style={{ visibility: 'hidden' }} />
+        <span data-envelope data-testid="encounter-envelope" className="oh-enc-envelope" style={{ visibility: 'hidden' }}>✉️</span>
+      </div>
       {/* Walking: one capsule at the top. The plan, everyone's progress along the way, minutes left. */}
       {walk && walkMin != null && (
         <div role="status" data-testid="walk-countdown"

@@ -262,3 +262,14 @@ body {
 .muse-dock-row .muse-dock-spark { right: -1px; top: -1px; width: 7px; height: 7px; }
 .muse-nudge-up { transform-origin: 90% 100%; animation-name: muse-nudge-rise; }
 @keyframes muse-nudge-rise { from { opacity: 0; transform: translateY(10px) scale(.88); } to { opacity: 1; transform: none; } }
+
+/* Muse to Muse in 3D (World3D scene overlay): speech bubbles with what each envelope says, and the envelope. */
+.oh-enc-bubble { position: absolute; left: 0; top: 0; max-width: 220px; width: max-content; padding: 8px 12px; border-radius: 18px; background: #fff; color: #080809; font: 600 14px/18px var(--font-sans); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); text-wrap: balance; }
+.oh-enc-bubble::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg); background: inherit; }
+.oh-enc-bubble-peer { background: #E9F8EE; color: #0B5A2A; }
+.oh-enc-pop { animation: oh-enc-pop .35s cubic-bezier(.22, 1, .36, 1); }
+@keyframes oh-enc-pop { from { opacity: 0; scale: .8; } to { opacity: 1; scale: 1; } }
+.oh-enc-envelope { position: absolute; left: 0; top: 0; display: flex; width: 38px; height: 30px; align-items: center; justify-content: center; border-radius: 6px; background: #fff; font-size: 20px; line-height: 1; box-shadow: 0 0 0 2px #FFD54F, 0 0 16px 4px rgba(255, 213, 79, .7); }
+@media (prefers-reduced-motion: reduce) { .oh-enc-pop { animation: none; } }
+.oh-enc-bubble[data-bubble="own"]::after { left: 88%; }
+.oh-enc-bubble[data-bubble="peer"]::after { left: 12%; }
