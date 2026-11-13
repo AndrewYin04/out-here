@@ -350,6 +350,7 @@ export class View {
       case 'invite': return `/out-here?invite=${n.objectId}`;
       case 'thread': return `/messages/${n.objectId}`;
       case 'intro': return `/intros#${n.objectId}`;
+      case 'listing': return `/out-here?listing=${n.objectId}`;
       default: return '/';
     }
   }
