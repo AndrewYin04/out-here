@@ -34,7 +34,14 @@ export const LOCAL_CIRCLES = [
 
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
-export function deriveFriendGraph(people: readonly CirclePerson[], opts: GraphOptions = {}): SeedFriendship[] {
+/**
+ * Someone with no circles (for example Theo, the comics seller) knows nobody in the seed: they
+ * get no friendships, no bridges and no friend requests, and leave everyone else's graph as is.
+ */
+export const inFriendGraph = (p: { circles?: readonly string[] | null }) => (p.circles?.length ?? 0) > 0;
+
+export function deriveFriendGraph(allPeople: readonly CirclePerson[], opts: GraphOptions = {}): SeedFriendship[] {
+  const people = allPeople.filter(inFriendGraph);
   const {
     seed = 42,
     keepProbability = 0.85,

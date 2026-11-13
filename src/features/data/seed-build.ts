@@ -4,11 +4,10 @@ import { faker } from '@faker-js/faker/locale/en';
 import { z } from 'zod';
 import { DEMO_CENTER, demoDate, floorToHour, PERSONA_HANDLES } from '../../shared/demo';
 import { fuzzLocation, offsetPoint } from '../../shared/geo';
-import { deriveFriendGraph, friendAdjacency, LOCAL_CIRCLES } from '../../shared/seed/graph';
+import { deriveFriendGraph, friendAdjacency, inFriendGraph, LOCAL_CIRCLES } from '../../shared/seed/graph';
 import { mulberry32, profileId, seedId, shuffled } from '../../shared/seed/ids';
-import {
-  DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
-} from '../../shared/seed/story';
+import { DAILY_PROMPTS, DEMO_AVAILABILITY, NEVER_PRESEATED } from '../../shared/seed/story';
+import { SEED_PAST_HANGOUTS, SEED_QUESTS } from '../../shared/seed/comics';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
 import { SEED_INTRO_PROFILES } from '../../shared/seed/intros';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
@@ -39,6 +38,10 @@ export const SeedContentZ = z.object({
     isDemoUser: z.boolean().default(false),
     avatar: z.string().nullish(),
     cover: z.string().nullish(),
+    /** Fixed home instead of a random one near DEMO_CENTER (story people added after the first seed). */
+    home: z.object({ lat: z.number(), lng: z.number() }).nullish(),
+    /** Fixed account age in days instead of a random one. */
+    joinedDaysAgo: z.number().nullish(),
   })),
   groups: z.array(z.object({
     slug: z.string(),
@@ -155,14 +158,19 @@ export function buildSeed(
     if (!has(h)) warnings.push(`${where}: unknown handle "${h}" skipped`);
     return has(h);
   });
+  // People with a fixed home or account age (added to the story later) take no faker draws,
+  // so every value drawn for everyone else stays the same.
   const homes = new Map<string, { lat: number; lng: number }>();
   for (const p of people) {
-    const home = p.handle === 'alex'
+    const home = p.home ? p.home : p.handle === 'alex'
       ? DEMO_CENTER
       : offsetPoint(DEMO_CENTER, faker.number.int({ min: 300, max: 2800 }), faker.number.int({ min: 0, max: 359 }));
     homes.set(p.handle, { lat: Number(home.lat.toFixed(6)), lng: Number(home.lng.toFixed(6)) });
   }
   const isLocal = (h: string) => byHandle.get(h)?.circles.some((c) => LOCAL_CIRCLES.includes(c)) ?? false;
+  // Outside the friend graph (no circles): never used to fill seats or react to posts.
+  const isOutsider = (h: string) => { const p = byHandle.get(h); return !!p && !inFriendGraph(p); };
+  const joinedAt = (h: string) => addMin(refDate, -(byHandle.get(h)?.joinedDaysAgo ?? 30) * 24 * 60);
 
   // friend graph
   const friendships = deriveFriendGraph(people.map((p) => ({ handle: p.handle, circles: p.circles })));
@@ -222,7 +230,7 @@ export function buildSeed(
       hometown: p.hometown ?? null, current_city: p.currentCity ?? null, job: p.job ?? null,
       pronouns: p.pronouns ?? null, age: p.age ?? null,
       field_visibility: JSON.stringify(visibility),
-      created_at: iso(faker.date.past({ years: 4, refDate: addMin(refDate, -60 * 24 * 60) })),
+      created_at: iso(p.joinedDaysAgo != null ? joinedAt(p.handle) : faker.date.past({ years: 4, refDate: addMin(refDate, -60 * 24 * 60) })),
     });
   }
 
@@ -256,17 +264,18 @@ export function buildSeed(
     });
     members.forEach((m, i) => t.group_members.push({
       group_id: groupId(g.slug), user_id: pid(m), role: i === 0 ? 'admin' : 'member',
-      joined_at: iso(faker.date.past({ years: 1, refDate })),
+      joined_at: iso(isOutsider(m) ? joinedAt(m) : faker.date.past({ years: 1, refDate })),
     }));
   }
 
   // upcoming quests (the demo story)
   const nonSeatable = new Set(NEVER_PRESEATED);
-  const everyone = people.map((p) => p.handle).sort();
-  DEMO_QUESTS.forEach((q, qi) => {
+  const everyone = people.map((p) => p.handle).filter((h) => !isOutsider(h)).sort();
+  SEED_QUESTS.forEach((q, qi) => {
+    if (q.hostHandle && !has(q.hostHandle)) { warnings.push(`quest ${q.key}: host "${q.hostHandle}" missing, skipped`); return; }
     const place = requirePlace(q.placeName);
     const rng = mulberry32(1000 + qi);
-    const fromGroup = q.groupSlug ? groupMembers.get(q.groupSlug) ?? [] : [];
+    const fromGroup = (q.groupSlug ? groupMembers.get(q.groupSlug) ?? [] : []).filter((h) => !isOutsider(h));
     const order = [...new Set([
       ...q.preferredMembers.filter(has),
       ...shuffled(fromGroup, rng),
@@ -317,15 +326,17 @@ export function buildSeed(
   }
 
   // past hangouts: one a week for 6 weeks; the 3 most recent formed crews with memories
-  const imagePool = content.posts.map((p) => p.image).filter((x): x is string => !!x).sort();
+  const imagePool = content.posts.map((p) => p.image).filter((x): x is string => !!x && x.startsWith('/seed/posts/')).sort();
   const photo = (i: number) => imagePool.length ? imagePool[i % imagePool.length] : '/seed/posts/p001.webp';
   let photoIndex = 0;
   const localPool = [...alexLocalFriends, ...everyone.filter((h) => isLocal(h) && !alexLocalFriends.includes(h) && h !== 'alex' && h !== 'maya')];
-  PAST_HANGOUTS.forEach((h, hi) => {
-    if (!has('alex')) return;
+  SEED_PAST_HANGOUTS.forEach((h, hi) => {
+    const person = h.person ?? 'alex';
+    if (!has(person)) return;
+    if (person !== 'alex' && !h.withHandles.every(has)) { warnings.push(`past hangout ${h.key}: someone missing, skipped`); return; }
     const place = requirePlace(h.placeName);
-    const locals = localPool.slice(hi % Math.max(localPool.length, 1)).concat(localPool).filter((x) => !h.withHandles.includes(x));
-    const members = [...new Set(['alex', ...h.withHandles.filter(has), ...locals.slice(0, h.extraLocals)])];
+    const locals = localPool.slice(hi % Math.max(localPool.length, 1)).concat(localPool).filter((x) => !h.withHandles.includes(x) && x !== person);
+    const members = [...new Set([person, ...h.withHandles.filter(has), ...locals.slice(0, h.extraLocals)])];
     const id = seedId('quest', h.key);
     const starts = addMin(floorToHour(demoNow), -h.daysAgo * 24 * 60);
     const ends = addMin(starts, h.durationMin);
@@ -349,7 +360,7 @@ export function buildSeed(
       members.forEach((m) => t.crew_members.push({ crew_id: crewId, user_id: pid(m) }));
       h.crew.captions.forEach((caption, ci) => t.memories.push({
         id: seedId('memory', `${h.key}:${ci}`), crew_id: crewId, quest_id: id,
-        uploader_id: pid(members[ci % members.length]), photo_url: photo(photoIndex++), caption,
+        uploader_id: pid(members[ci % members.length]), photo_url: h.photos?.[ci] ?? photo(photoIndex++), caption,
         created_at: iso(addMin(ends, -10 + ci)),
       }));
     }

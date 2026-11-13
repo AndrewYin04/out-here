@@ -971,6 +971,60 @@
           ]
         ]
       }
+    },
+    {
+      "name": "Inkwell Comics Café",
+      "category": "cafe",
+      "address": "Ivy Dr",
+      "lat": 37.479662,
+      "lng": -122.145999,
+      "priceLevel": 1,
+      "typicalCostUsd": 5,
+      "description": "Coffee counter with long tables and shelves of small-press comics. Open table events most days.",
+      "hours": {
+        "mon": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "tue": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "wed": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "thu": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "fri": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "sat": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ],
+        "sun": [
+          [
+            "06:00",
+            "22:00"
+          ]
+        ]
+      }
     }
   ]
 }

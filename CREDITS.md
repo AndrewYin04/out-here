@@ -14,6 +14,13 @@ venue in the seed data is fictional. Venue names such as "Dumpling Den" and
 - Any image the model refused is replaced by a locally drawn SVG placeholder
   (initials on a solid color, or a plain gradient), logged in
   `docs/evidence/M1-content.md`.
+- Two images were added later for the comic open house story, outside
+  `scripts/gen-images.mjs`: `public/seed/people/theo.webp` is a
+  [DiceBear](https://www.dicebear.com/) `notionists` avatar (CC0, seed
+  "TheoNakamura"), and `public/seed/listings/l31.webp` is an SVG drawing of
+  invented comic covers rendered with `sharp`.
+- The comic open house text (Theo's profile, listing l31, post p301, the
+  Inkwell Comics Café plan) was written by hand. Its comic titles are invented.
 
 ## Text
 
