@@ -213,7 +213,7 @@ export function MuseChat() {
           data-nudge={nudge ? 'true' : undefined}
           aria-label="Ask Muse"
           onClick={openChat}
-          className="muse-dock group fixed right-3 z-30 flex size-[60px] items-center justify-center rounded-full bottom-[136px] max-md:bottom-auto max-md:top-[200px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue"
+          className="muse-dock group fixed right-3 z-30 flex size-[60px] items-center justify-center rounded-full bottom-[136px] max-md:bottom-[318px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue"
         >
           <span aria-hidden className="muse-dock-shadow" />
           <span className="muse-dock-float">
@@ -227,7 +227,7 @@ export function MuseChat() {
       )}
       {!snap.open && !planOpen && nudge && (
         // Muse speaking up from the dock, from a real event (a friend just shared that they're free).
-        <div key={nudge.id} role="status" data-testid="muse-nudge" className="muse-nudge fixed z-30 w-[248px] rounded-card bg-fb-surface p-3 shadow-popover right-[84px] bottom-[128px] max-md:bottom-auto max-md:top-[192px] max-md:right-[80px] max-md:w-[228px]">
+        <div key={nudge.id} role="status" data-testid="muse-nudge" className="muse-nudge fixed z-30 w-[248px] rounded-card bg-fb-surface p-3 shadow-popover right-[84px] bottom-[128px] max-md:bottom-[300px] max-md:right-[80px] max-md:w-[228px]">
           <p className="flex items-center gap-1 text-[12px] font-bold text-fb-blue"><span aria-hidden>✨</span>Muse</p>
           <p className="mt-0.5 text-[15px] font-semibold leading-5 text-fb-text">{nudge.title}</p>
           <p className="text-[13px] leading-[18px] text-fb-text-2">{nudge.detail}</p>
@@ -236,7 +236,7 @@ export function MuseChat() {
             <button type="button" data-testid="muse-nudge-ask" onClick={askFromNudge} className="oh-press flex-1 rounded-[6px] bg-fb-blue px-2 py-1.5 text-[14px] font-semibold text-white hover:brightness-95">{nudge.action}</button>
             <button type="button" data-testid="muse-nudge-dismiss" onClick={() => dismissMuseNudge(nudge.id)} className="rounded-[6px] bg-fb-hover px-2.5 py-1.5 text-[14px] font-semibold text-fb-text">Not now</button>
           </div>
-          <span aria-hidden className="absolute -right-1.5 top-6 size-3 rotate-45 bg-fb-surface max-md:top-5" />
+          <span aria-hidden className="absolute -right-1.5 bottom-6 size-3 rotate-45 bg-fb-surface" />
         </div>
       )}
 

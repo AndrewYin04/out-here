@@ -733,7 +733,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // The pet: walking beside you (a little behind your right shoulder), or in front of you
       // facing the camera while it talks. Further behind and he drops under the dashboard.
       const front = !photoFocus && petMode.current === 'front';
-      const stage=museStage(front);
+      // On a phone, outside the chat (the camera stays on you), his talking spot is pulled in so he
+      // stays on screen beside you; the chat frames him itself, so it keeps the full staging.
+      const narrowView=map.getContainer().clientWidth<600;
+      const staged=museStage(front);
+      const stage=front&&narrowView&&!chatOpen.current?{...staged,sideways:.5,towardViewer:.8,altitude:.45}:staged;
       const beside=moveMeters(pos.current,stage.sideways*scale,camBearing.current+90);
       const target=front?moveMeters(beside,stage.towardViewer*scale,camBearing.current+180):moveMeters(pos.current,.9*scale,heading.current+115);
       const gap = haversineMeters(petPos.current, target);
@@ -744,7 +748,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Beside you he is on the ground and walks when you do (floating is for flying over to you,
       // talking in front of you and thinking).
       const grounded = !front && !photoFocus && !flying && petState.current === 'hover';
-      petAlt.current += ((front ? stage.altitude : grounded ? 0 : .8) - petAlt.current) * kp;
+      // He walks on the ground. He only floats while flying over to you and while he meets a friend's
+      // Muse (an agent encounter); talking and thinking happen standing up.
+      const floating = flying || (front && !!encounterRef.current);
+      petAlt.current += ((floating ? (flying ? .8 : stage.altitude) : 0) - petAlt.current) * kp;
       const pState = flying ? 'fly' : grounded ? (moving ? 'walk' : 'stand') : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
       // Standing beside you he fidgets now and then: a wave, a nod, a jump or a spin.

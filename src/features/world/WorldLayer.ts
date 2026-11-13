@@ -469,7 +469,8 @@ export class WorldLayer implements CustomLayerInterface {
           a.trail.update(this.trailPos, dt, { result, camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
           // On the ground Jolly leaves sparkles from his feet instead of the energy ray; the ray is for
           // flying and for Muse's thinking.
-          const onGround = a.state === 'walk' || a.state === 'stand';
+          // On the ground (any pose, not only walk/stand): sparkles, and the ray only while he works.
+          const onGround = a.state !== 'fly' && a.altitude < .15;
           const working=a.trail.isProcessing();
           const ray = !onGround || working;
           if (!ray) a.trail.object.visible = false;
