@@ -15,7 +15,7 @@ type Box = { x: number; y: number; width: number; height: number };
 const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 async function openMap(page: Page, persona: string, extra = '') {
-  await page.goto(`/out-here?as=${persona}${extra}`);
+  await page.goto(`/out-here?as=${persona}${extra.includes('mode=') ? '' : '&mode=explore'}${extra}`);
   await expect(page.getByTestId('out-here-map')).toBeVisible();
 }
 

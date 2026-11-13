@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
-import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
+import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
@@ -67,7 +67,8 @@ export function OutHereView() {
   const now = useNow();
   const questsApi = useQuests(DEMO_CENTER, 5000);
   const ctxApi = useApi<MapContext>('/out-here/context', [], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
-  const [mode, setMode] = useState<MapMode>('explore');
+  // Out Here opens on Friends (who's around), then Explore (every plan). ?mode=explore opens Explore.
+  const [mode, setMode] = useState<MapMode>('friends');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
@@ -80,7 +81,7 @@ export function OutHereView() {
     saveView(v);
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
-  const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
+  const [creating, setCreating] = useState<{ at: LatLng; category: string } | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -103,6 +104,7 @@ export function OutHereView() {
 
   const ctx = ctxApi.data && ctxApi.data.viewer.id === persona.id ? ctxApi.data : null;
   const live = useMemo(() => (questsApi.data?.quests ?? []).filter((q) => q.status !== 'done' && new Date(q.endsAt) > now), [questsApi.data, now]);
+  useEffect(() => { if (questsApi.data) rememberCategories(questsApi.data.quests); }, [questsApi.data]);
   const visible: Quest[] = useMemo(() => {
     if (mode === 'explore') return live;
     const friends = new Set(ctx?.friendIds ?? []);
@@ -123,7 +125,7 @@ export function OutHereView() {
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
-  const reasonLabel = filter.closest ? 'Closest' : filter.source === 'fallback' ? 'Quick match' : filter.live ? '✨ Muse' : 'Muse (offline)';
+  const reasonLabel = filter.closest ? 'Closest' : filter.source === 'fallback' ? 'Quick match' : filter.live ? 'Muse' : 'Muse (offline)';
   const reasonFor = useCallback((id: string) => {
     const text = filter.on ? filter.reasons.get(id) : undefined;
     return text ? { label: reasonLabel, text } : null;
@@ -136,7 +138,7 @@ export function OutHereView() {
       const byId = new Map(visible.map((q) => [q.id, q]));
       return [...filter.reasons].flatMap(([id, reason]) => {
         const q = byId.get(id);
-        return q ? [{ id, icon: q.emoji, name: q.title, reason }] : [];
+        return q ? [{ id, icon: q.category, name: q.title, reason }] : [];
       });
     }
     const byId = new Map(allFriendPins.map((p) => [p.friend.id, p]));
@@ -227,10 +229,10 @@ export function OutHereView() {
     const spot = at ?? (c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
     setPlanOpen(false);
     select(null);
-    setCreating((cur) => ({ at: spot, emoji: cur?.emoji ?? '📍' }));
+    setCreating((cur) => ({ at: spot, category: cur?.category ?? 'other' }));
   }, [map, select]);
   const moveDraft = useCallback((at: LatLng) => setCreating((cur) => (cur ? { ...cur, at } : cur)), []);
-  const draftEmoji = useCallback((emoji: string) => setCreating((cur) => (cur && cur.emoji !== emoji ? { ...cur, emoji } : cur)), []);
+  const draftCategory = useCallback((category: string) => setCreating((cur) => (cur && cur.category !== category ? { ...cur, category } : cur)), []);
   const onPosted = useCallback((q: Quest) => {
     setCreating(null);
     setMode('explore');
@@ -475,7 +477,9 @@ export function OutHereView() {
                     }}
                     className="flex w-full items-start gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-fb-hover"
                   >
-                    <span className="w-6 shrink-0 text-center text-[18px] leading-6" aria-hidden>{it.icon}</span>
+                    {mode === 'explore'
+                      ? <CategoryIcon category={it.icon} size={24} />
+                      : <span className="w-6 shrink-0 text-center text-[18px] leading-6" aria-hidden>{it.icon}</span>}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold leading-5 text-fb-text">{it.name}</span>
                       <span className="block text-[13px] leading-4 text-fb-text-2">
@@ -567,7 +571,7 @@ export function OutHereView() {
           at={creating.at}
           friends={ctx?.friends ?? []}
           onMove={moveDraft}
-          onEmoji={draftEmoji}
+          onCategory={draftCategory}
           onClose={() => setCreating(null)}
           onPosted={onPosted}
         />

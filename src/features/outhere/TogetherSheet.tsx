@@ -3,9 +3,9 @@
 // every phone; each person taps "I'm in" on the ones they like, and it locks when everyone is in
 // on one. Nobody sees a "no": an unanswered plan expires quietly when the shared time ends.
 import { Check, Footprints, MapPin, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { apiPost, useApi, useViewer } from '@/features/data';
-import { Avatar, Button, IconButton, Skeleton, burst, cn } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, IconButton, Skeleton, categoryOf, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type TogetherResponse, type TogetherView } from '@/shared';
 import { useLetsGo } from './lets-go';
 import { MuseLabel } from './SuggestionCard';
@@ -124,7 +124,7 @@ function Sheet({ id }: { id: string }) {
                       style={{ animationDelay: `${80 + i * 90}ms` }}
                       className={cn('animate-rise rounded-card bg-fb-surface p-3 shadow-card transition-shadow', othersIn.length > 0 && !mine && 'ring-2 ring-fb-green')}>
                       <div className="flex items-start gap-3">
-                        <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px]">{o.emoji}</span>
+                        <CategoryIcon category={categoryOf(o.questId, o.emoji)} size={40} />
                         <div className="min-w-0 flex-1">
                           <h3 className="text-[15px] font-semibold leading-5 text-fb-text">{o.title}</h3>
                           <p className="mt-0.5 text-[13px] text-fb-text-2">{o.venueName} · {startsText(o.startsAt)}</p>
@@ -172,15 +172,7 @@ function Waiting({ plan, viewerId }: { plan: TogetherView; viewerId: string }) {
  */
 function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: string }) {
   const o = plan.options.find((x) => x.questId === plan.confirmedQuestId);
-  const emojiRef = useRef<HTMLSpanElement>(null);
-  const emoji = o?.emoji;
   const letsGo = useLetsGo();
-  // The moment everyone agrees: the card drops in and the plan's emoji bursts out of it.
-  useEffect(() => {
-    if (!emoji) return;
-    const t = window.setTimeout(() => burst(emojiRef.current, [emoji], 6), 180);
-    return () => window.clearTimeout(t);
-  }, [emoji]);
   if (!o) return null;
   const go = () => { openTogether(null); letsGo(o.questId); };
   const showOnMap = () => { openTogether(null); window.dispatchEvent(new CustomEvent('outhere:select-quest', { detail: o.questId })); };
@@ -188,7 +180,7 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
     <section aria-label="It's a plan" data-testid="together-confirmed"
       className="absolute inset-x-3 top-[60px] z-30 animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover md:left-auto md:right-4 md:top-4 md:w-[360px]">
       <div className="flex items-start gap-3">
-        <span ref={emojiRef} aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#E7F3E8] text-[26px]">{o.emoji}</span>
+        <CategoryIcon category={categoryOf(o.questId, o.emoji)} size={44} />
         <div className="min-w-0 flex-1">
           <p className="text-[16px] font-bold leading-5 text-fb-text">It’s a plan</p>
           <p className="mt-0.5 text-[14px] text-fb-text">{o.title} with {otherNames}</p>

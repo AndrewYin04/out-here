@@ -169,12 +169,11 @@ export function questPin(questId: string | null | undefined): HTMLElement | null
 
 /**
  * You joined: your avatar arcs from the button you tapped onto the quest's pin, the pin squashes
- * as it lands and a few of the quest's own emoji pop out (no generic confetti). With no pin on
- * screen, the pop comes from the button.
+ * as it lands. No confetti: Facebook marks a join with motion, not emoji. With no pin on screen,
+ * the button bumps.
  */
-export function celebrateJoin(from: Element | null, questId: string | null | undefined, avatarSrc: string, emoji: string) {
+export function celebrateJoin(from: Element | null, questId: string | null | undefined, avatarSrc: string) {
   const pin = questPin(questId);
-  const emojis = [emoji];
-  const flew = flyAvatar(from, pin, avatarSrc, () => { squash(pin); burst(pin, emojis, 5); });
-  if (!flew) burst(from, emojis, 5);
+  const flew = flyAvatar(from, pin, avatarSrc, () => squash(pin));
+  if (!flew) bump(from);
 }

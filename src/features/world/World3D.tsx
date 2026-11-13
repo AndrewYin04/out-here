@@ -9,7 +9,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrivalSelfie, OPEN_SELFIE } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
-import { cn, useDemoTools } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
+import { Footprints, LocateFixed, MapPin, Sparkles, Users, X } from 'lucide-react';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
@@ -72,10 +73,10 @@ const typing = (t: EventTarget | null) => {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 /** Muse's hello follows where you are in the journey: no "tap I'm free" once you have a plan. */
 function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
-  if (!next) return `Hi ${name}! Tap ✨ I’m free and I’ll find something nearby.`;
+  if (!next) return `Hi ${name}. Tap I’m free and I’ll find something nearby.`;
   const mins = Math.round((Date.parse(next.quest.startsAt) - Date.now()) / 60_000);
   const when = mins <= 0 ? 'is happening now' : `starts in ${mins} min`;
-  return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
+  return `${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
 }
 
 export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onWalkStop, onArrive }: World3DProps) {
@@ -349,7 +350,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!fresh) return;
     const q = quests.find((x) => x.id === fresh);
     layerRef.current?.setState('me', 'celebrate');
-    setCheer(q ? `You’re in! ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in!');
+    setCheer(q ? `You’re in: ${q.title}. I’ll keep your seat.` : 'You’re in.');
   }, [quests, viewer.id]);
 
   /** One step of free walking that slides along walls instead of entering a building. */
@@ -566,7 +567,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             moving = false;
             arrived.current.add(w.questId);
             layer.setState('me', 'wave');
-            setArrival({ id: w.questId, text: `You’re at ${w.emoji} ${w.title}` });
+            setArrival({ id: w.questId, text: `You’re at ${w.title}` });
             if (w.questId !== requestedWalk.current?.id) onSelect(w.questId);
           }
         }
@@ -652,7 +653,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           const d = haversineMeters(pos.current, q.location);
           if (d <= ARRIVE_METERS && !arrived.current.has(q.id)) {
             arrived.current.add(q.id);
-            if (!walkRef.current) setArrival({ id: q.id, text: `You’re at ${q.emoji} ${q.title}` });
+            if (!walkRef.current) setArrival({ id: q.id, text: `You’re at ${q.title}` });
           } else if (d > ARRIVE_METERS * 3) arrived.current.delete(q.id);
         }
         const w = walkRef.current;
@@ -836,7 +837,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       {!settled && (
         <div data-testid="world-loading" className="absolute inset-0 z-[1] flex items-center justify-center bg-[#EEF0F2]">
           <p role="status" className="flex items-center gap-2 rounded-pill bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-card">
-            <span aria-hidden className="animate-pulse">✨</span> Getting the street view ready…
+            <Sparkles size={16} aria-hidden className="animate-pulse text-fb-blue" /> Getting the street view ready…
           </p>
         </div>
       )}
@@ -844,7 +845,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       {walk && walkMin != null && (
         <div role="status" data-testid="walk-countdown"
           className="pointer-events-auto absolute left-1/2 top-3 z-20 flex w-[min(calc(100%-24px),460px)] -translate-x-1/2 animate-drop-in items-center gap-3 rounded-full bg-fb-surface/95 p-1.5 shadow-popover backdrop-blur">
-          <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E0] text-[22px]">{walk.emoji}</span>
+          <CategoryIcon category={categoryOf(walk.questId, walk.emoji)} size={40} />
           <span className="sr-only">{walkMin <= 1 ? 'Almost there' : `${walkMin} min`} to {walk.title}</span>
           <div className="relative mx-2 h-2 min-w-0 flex-1 rounded-full bg-[#E4E6EB]" aria-hidden>
             <div className="absolute inset-y-0 left-0 rounded-full bg-fb-blue transition-[width] duration-700" style={{ width: `${progressOf(pos.current) * 100}%` }} />
@@ -868,7 +869,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           <span className="shrink-0 text-[18px] font-bold tabular-nums text-fb-text">{walkMin <= 1 ? '<1m' : `${walkMin}m`}</span>
           <button type="button" onClick={stopWalk} aria-label="Stop walking" title="Stop"
             className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-secondary-btn text-[18px] font-semibold text-fb-text hover:brightness-95">
-            ✕
+            <X size={18} aria-hidden />
           </button>
         </div>
       )}
@@ -884,7 +885,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               onClick={() => setPlanOpen(true)}
               className="pointer-events-auto relative block max-w-[260px] rounded-[18px] bg-fb-surface px-3 py-2 text-left text-[14px] leading-[18px] text-fb-text shadow-popover"
             >
-              {bubble.tone === 'muse' && <span className="mb-0.5 block text-[12px] font-bold text-fb-blue">✨ Muse</span>}
+              {bubble.tone === 'muse' && <span className="mb-0.5 flex items-center gap-1 text-[12px] font-bold text-fb-blue"><Sparkles size={12} aria-hidden />Muse</span>}
               <span className={cn(bubble.pending && 'animate-pulse')}>{bubble.text}</span>
               <span aria-hidden className="absolute -bottom-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
             </button>
@@ -892,8 +893,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         {together.walkers.map((w) => (
           <div key={w.id} ref={bindLabel(`w:${w.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
-            <span data-testid="world-walker" className="block whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
-              🚶 {firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
+            <span data-testid="world-walker" className="flex items-center gap-1 whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
+              <Footprints size={14} aria-hidden />{firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
             </span>
           </div>
         ))}
@@ -946,7 +947,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         {/* One walk bar: while you walk, the countdown below says who you're walking with. */}
         {together.plan && !walk && (
           <div role="status" data-testid="walk-together" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text shadow-popover">
-            <span aria-hidden>👥</span>
+            <Users size={16} aria-hidden className="shrink-0 text-fb-text-2" />
             <span className="min-w-0 truncate">
               {together.walkers.length > 0
                 ? (
@@ -964,10 +965,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
                     }}
                     className="truncate text-left hover:underline"
                   >
-                    <b>Walking with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</b> to {together.plan.emoji} {clip(together.plan.title, 22)}
+                    <b>Walking with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</b> to {clip(together.plan.title, 22)}
                   </button>
                 )
-                : together.sharing ? <>Your walk to {together.plan.emoji} {clip(together.plan.title, 22)} is shown to the people going</> : <>Your walk is not shared</>}
+                : together.sharing ? <>Your walk to {clip(together.plan.title, 22)} is shown to the people going</> : <>Your walk is not shared</>}
             </span>
             <button type="button" data-testid="walk-share-toggle" onClick={() => together.setSharing(!together.sharing)} className="shrink-0 font-semibold text-fb-blue hover:underline">
               {together.sharing ? 'Stop sharing' : 'Share'}
@@ -975,14 +976,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           </div>
         )}
         {arrival && !walk && !selfieQuest && (
-          <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
-            📍 {arrival.text}
+          <div role="status" data-testid="arrival" className="pointer-events-auto flex items-center gap-1.5 rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
+            <MapPin size={16} aria-hidden />{arrival.text}
           </div>
         )}
         <ArrivalSelfie quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
-          <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
-            🚶 Walk there · {selectedMin} min
+          <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
+            <Footprints size={18} aria-hidden />Walk there · {selectedMin} min
           </button>
         )}
         {farKm != null && (
@@ -998,12 +999,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[156px]">
         {tools && hqLabels.length > 0 && !tour && (
           <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            🏢 Tour Meta HQ
+            Tour Meta HQ
           </button>
         )}
         {tools && !follow && (
-          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            ◎ Back to me
+          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
+            <LocateFixed size={16} aria-hidden />Back to me
           </button>
         )}
         {(tools || source === 'gps') && <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
@@ -1016,7 +1017,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               onClick={() => void chooseSource(s)}
               className={cn('h-8 rounded-pill px-3 text-[13px] font-semibold', source === s ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover')}
             >
-              {s === 'demo' ? '🕹️ Demo walk' : '📡 Live GPS'}
+              {s === 'demo' ? 'Demo walk' : 'Live GPS'}
             </button>
           ))}
         </div>}

@@ -8,7 +8,7 @@ const PLACEHOLDER = "hungry, got like 40 min, under $15";
 const DUMPLINGS = "Dumplings before the rush";
 
 async function openSheet(page: Page, persona: string) {
-  await page.goto(`/out-here?as=${persona}`);
+  await page.goto(`/out-here?as=${persona}&mode=explore`);
   await page.getByRole("button", { name: "I'm free" }).click();
   await expect(page.getByTestId("plan-sheet")).toBeVisible();
 }
@@ -117,7 +117,7 @@ test.describe("Out Here plan sheet", () => {
 
     const mayaCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const maya = await mayaCtx.newPage();
-    await maya.goto("/out-here?as=maya");
+    await maya.goto("/out-here?as=maya&mode=explore");
     const card = maya.getByTestId("invite-card").filter({ hasText: `One seat test ${t0}` });
     await expect(card.getByTestId("invite-one-seat")).toContainText("Only 1 seat is left");
     await card.getByRole("button", { name: "Join without Alex" }).click();
@@ -168,7 +168,7 @@ test.describe("Out Here plan sheet", () => {
     // maya is on Out Here in a second browser context
     const mayaCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const maya = await mayaCtx.newPage();
-    await maya.goto("/out-here?as=maya");
+    await maya.goto("/out-here?as=maya&mode=explore");
     await expect(maya.getByRole("button", { name: "I'm free" })).toBeVisible();
 
     await expect(top.getByRole("button", { name: "Go with Maya" })).toBeVisible();
@@ -185,7 +185,7 @@ test.describe("Out Here plan sheet", () => {
     expect(incoming.length).toBe(1);
 
     const card = maya.getByTestId("invite-card");
-    await expect(card).toContainText(`Alex invited you: 🥟 ${DUMPLINGS}`, { timeout: 5_000 });
+    await expect(card).toContainText(`Alex invited you: ${DUMPLINGS}`, { timeout: 5_000 });
     // Alex took a seat when he sent it ("Go with" = join + invite), so one is left for Maya
     await expect(card.getByTestId("seats-left")).toHaveText("1 left");
     await card.getByRole("button", { name: "Accept" }).click();

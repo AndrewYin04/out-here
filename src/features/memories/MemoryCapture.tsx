@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Camera, Image as ImageIcon, Lock, Sparkles } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
-import { Button, burst, flash } from '@/features/ui';
+import { Button, flash } from '@/features/ui';
 import type { CompleteQuestResponse, Memory } from '@/shared';
 
 const MAX_BYTES = 3_500_000;
@@ -43,7 +43,6 @@ export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
   const [savedCrew, setSavedCrew] = useState<string | null>(null);
   const [inputKey, setInputKey] = useState(0);
   const savedRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (savedCrew) burst(savedRef.current, ['📸', '✨', '💛'], 10); }, [savedCrew]);
 
   useEffect(() => {
     if (!photo) { setPreview(null); return; }

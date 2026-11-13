@@ -2,11 +2,11 @@
 // One plan card (#26, docs/UX_PLAN.md): the map sheet and /out-here/plan/<id> both show it.
 // Page 1 is everything you need to decide: the photo, who hosts, four numbers, who's going, one
 // action. People and Details are a swipe away (the dots), so nothing competes on page 1.
-import { Camera, MoreHorizontal, MessageCircle, Share2, X } from 'lucide-react';
+import { Camera, Clock, Footprints, MoreHorizontal, MessageCircle, Share2, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { QuestDetail } from '@/features/data';
-import { Avatar, IconButton, cn, useToast } from '@/features/ui';
+import { Avatar, CATEGORY_STYLE, CategoryGlyph, IconButton, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type Quest } from '@/shared';
 import type { PersonCard, PostView } from '@/shared/api';
 import { friendsGoingLine, priceLabel, startsLabel } from '../format';
@@ -103,13 +103,13 @@ export function PlanCard({
   const startsText = startsLabel(q, now);
   const moments = (posts ?? []).filter((p) => p.media.length > 0).slice(0, 6);
 
-  const tiles: { icon: string; value: string; sub: string; srOnly?: ReactNode }[] = [
-    { icon: '🕐', value: formatDemoTime(q.startsAt).replace(/\s?[AP]M$/i, ''), sub: /^Happening/i.test(startsText) ? 'now' : startsText.replace(/^Starts /, ''),
+  const tiles: { key: string; Icon: LucideIcon; value: string; sub: string; srOnly?: ReactNode }[] = [
+    { key: 'time', Icon: Clock, value: formatDemoTime(q.startsAt).replace(/\s?[AP]M$/i, ''), sub: /^Happening/i.test(startsText) ? 'now' : startsText.replace(/^Starts /, ''),
       srOnly: <span data-testid={`${prefix}-starts`} className="sr-only">{startsText}</span> },
-    ...(walkMinutes != null ? [{ icon: '🚶', value: `${walkMinutes}m`, sub: 'walk',
+    ...(walkMinutes != null ? [{ key: 'walk', Icon: Footprints, value: `${walkMinutes}m`, sub: 'walk',
       srOnly: <span data-testid="quest-walk" className="sr-only">{walkMinutes} min walk</span> }] : []),
-    { icon: '💵', value: q.priceMax > 0 ? `$${q.priceMax}` : 'Free', sub: q.priceMax > 0 ? 'up to' : 'no cost' },
-    { icon: '👥', value: `${going}/${capacity}`, sub: seatsLeft > 0 ? `${seatsLeft} left` : 'Full',
+    { key: 'price', Icon: Wallet, value: q.priceMax > 0 ? `$${q.priceMax}` : 'Free', sub: q.priceMax > 0 ? 'up to' : 'no cost' },
+    { key: 'people', Icon: Users, value: `${going}/${capacity}`, sub: seatsLeft > 0 ? `${seatsLeft} left` : 'Full',
       srOnly: <span ref={seatsRef} data-testid="quest-seats" className="sr-only">{seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}</span> },
   ];
 
@@ -134,7 +134,9 @@ export function PlanCard({
               // eslint-disable-next-line @next/next/no-img-element -- seed photo or user upload
               <img src={photo} alt="" className="absolute inset-0 size-full object-cover" />
             ) : (
-              <span aria-hidden className="absolute inset-0 flex items-center justify-center text-[72px]">{q.emoji}</span>
+              <span aria-hidden className="absolute inset-0 flex items-center justify-center" style={{ background: (CATEGORY_STYLE[q.category] ?? CATEGORY_STYLE.other).bg }}>
+                <CategoryGlyph category={q.category} size={72} strokeWidth={1.5} />
+              </span>
             )}
             <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
             {d.isLive && (
@@ -149,7 +151,7 @@ export function PlanCard({
               </IconButton>
             )}
             <Heading className="absolute inset-x-4 bottom-3 text-[24px] font-extrabold leading-7 text-white [text-shadow:0_2px_8px_rgba(0,0,0,.45)] md:text-[26px]">
-              <span aria-hidden>{q.emoji} </span>{q.title}
+              {q.title}
             </Heading>
           </div>
 
@@ -181,8 +183,8 @@ export function PlanCard({
           {/* Four numbers */}
           <ul className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }} aria-label="At a glance">
             {tiles.map((t) => (
-              <li key={t.icon} className="flex min-w-0 flex-col items-center rounded-[14px] bg-fb-input px-1 py-2 text-center">
-                <span aria-hidden className="text-[20px] leading-6">{t.icon}</span>
+              <li key={t.key} className="flex min-w-0 flex-col items-center rounded-[14px] bg-fb-input px-1 py-2 text-center">
+                <t.Icon size={20} aria-hidden className="h-6 text-fb-text-2" />
                 <span className="text-[17px] font-bold tabular-nums leading-6 text-fb-text">{t.value}</span>
                 <span className="w-full truncate text-[11px] text-fb-text-2">{t.sub}</span>
                 {t.srOnly}

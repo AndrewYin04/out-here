@@ -19,7 +19,7 @@ export type QuestPanelProps = {
   onClose: () => void;
   /** Called after a join or leave so the map and walking times refetch. */
   onChanged: () => void;
-  /** Muse filter on: why this plan was kept ("✨ Muse" and the reason), shown at the top. */
+  /** Muse filter on: why this plan was kept ("Muse" and the reason), shown at the top. */
   museReason?: { label: string; text: string } | null;
 };
 
@@ -67,7 +67,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   async function act(kind: 'join' | 'leave', e?: MouseEvent<HTMLButtonElement>) {
     const from = e?.currentTarget ?? null;
     setPending(kind);
-    if (kind === 'join') celebrateJoin(from, questId, viewer.avatarUrl, q?.emoji ?? '✨');
+    if (kind === 'join') celebrateJoin(from, questId, viewer.avatarUrl);
     toast.show(kind === 'join' ? "You're in. See you there." : 'You left this plan.');
     try {
       await apiPost(`/api/quests/${questId}/${kind}`, {});

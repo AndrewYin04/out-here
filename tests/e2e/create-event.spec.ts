@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 // The two-persona flow runs in the desktop project only; the phone project checks the sheet.
 
 async function openMap(page: Page, persona: string) {
-  await page.goto(`/out-here?as=${persona}`);
+  await page.goto(`/out-here?as=${persona}&mode=explore`);
   await expect(page.getByTestId("out-here-map")).toBeVisible();
   await expect(page.getByTestId("map-canvas")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('[data-map-marker="quest"]').first()).toBeAttached({ timeout: 20_000 });
@@ -25,7 +25,7 @@ test.describe("Post a plan", () => {
     await page.getByTestId("create-muse-btn").click();
     await expect(page.getByTestId("create-muse-pitch")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("create-title")).not.toHaveValue("");
-    await expect(page.getByTestId("draft-pin")).toHaveText("🧋");
+    await expect(page.getByTestId("draft-pin")).toHaveAttribute("data-category", "food");
     await expect(page.getByTestId("create-post")).toHaveText("Post");
 
     // Friends (invite only) needs at least one friend picked before Post.

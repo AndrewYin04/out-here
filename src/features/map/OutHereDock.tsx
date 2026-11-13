@@ -4,8 +4,8 @@
 //  - Above the panel: I'm free (the primary action), Post in Explore, then Back to you and 3D/Map.
 //  - The panel: a handle and one row of tabs. The selected tab shows its icon and label; the
 //    others show only their icon and keep their names for screen readers.
+//      Friends  friends' locations on the map, and the People list (the default)
 //      Explore  the plans on the map (the pins), as a list
-//      Friends  friends' locations on the map, and the People list
 //      Plans    the plans you joined and your past hangouts (Your plans)
 //      Memories opens the Memories page
 //  - Three heights: peek (tabs only, the default), half (the tab's list) and full. Drag or tap the
@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Poin
 import { PeopleList, SharingSheet, flyToPin, useFriendPins } from '@/features/map/friends';
 import { YourPlans } from '@/features/memories';
 import { ImFreeButton } from '@/features/outhere';
-import { cn } from '@/features/ui';
+import { CategoryIcon, cn } from '@/features/ui';
 import type { Quest } from '@/shared';
 import { seatBadge, seatsLeftOf, startsLabel, walkLabel } from './format';
 import type { MapMode } from './types';
@@ -48,7 +48,7 @@ type Props = {
 const SNAP_PX = 48;
 const FLICK = 0.5;
 
-const TAB = 'oh-press flex h-11 min-w-0 items-center justify-center gap-2 rounded-full transition-[flex-grow,background-color,color] duration-200 ease-out motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue';
+const TAB = 'oh-press flex h-11 min-w-0 items-center justify-center gap-2 rounded-full transition-[flex-grow,background-color,color] duration-500 ease-in-out motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue';
 const tabClass = (on: boolean) => cn(TAB, on ? 'min-w-fit grow-[2.4] bg-fb-blue-tint px-4 text-fb-blue' : 'grow text-fb-text-2 hover:bg-fb-hover');
 const ROUND = 'oh-press flex size-11 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue';
 
@@ -145,10 +145,10 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
           <ImFreeButton className="min-w-0 shrink whitespace-nowrap" />
           {tab === 'explore' && onCreate && (
             <button type="button" data-testid="create-plan-btn" aria-label="Post a plan" title="Post a plan (or long-press the map)" onClick={onCreate}
-              className="oh-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fb-surface px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue max-[359px]:px-3">
+              className="oh-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-fb-surface px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue max-[419px]:px-3">
               <Plus size={20} className="text-fb-blue" aria-hidden />
-              {/* Under 360 px the row would wrap: Post keeps only its icon (its name stays for screen readers). */}
-              <span className="max-[359px]:sr-only">Post</span>
+              {/* On phones I'm free can show your status ("Free till 1:15 AM"), so Post keeps only its icon there (its name stays for screen readers). */}
+              <span className="max-[419px]:sr-only">Post</span>
             </button>
           )}
           <span className="flex-1" />
@@ -189,8 +189,8 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
         </button>
 
         <nav aria-label="Out Here" className="flex shrink-0 gap-1 px-3 pb-3">
-          <TabButton id="explore" on={tab === 'explore'} label="Explore" icon={<MapPin size={22} aria-hidden />} onClick={() => choose('explore')} testId="map-mode-explore" />
           <TabButton id="friends" on={tab === 'friends'} label="Friends" icon={<Users size={22} aria-hidden />} onClick={() => choose('friends')} testId="map-mode-friends" />
+          <TabButton id="explore" on={tab === 'explore'} label="Explore" icon={<MapPin size={22} aria-hidden />} onClick={() => choose('explore')} testId="map-mode-explore" />
           <TabButton id="plans" on={tab === 'plans'} label="Plans" icon={<CalendarCheck size={22} aria-hidden />} onClick={() => choose('plans')} testId="dock-tab-plans" />
           <Link href="/memories" aria-label="Memories" title="Memories" className={tabClass(false)}>
             <Images size={22} aria-hidden />
@@ -222,7 +222,7 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
                     return (
                       <li key={q.id}>
                         <button type="button" data-testid="dock-quest" onClick={() => pickQuest(q.id)} className="flex w-full items-center gap-3 rounded-btn p-2 text-left hover:bg-fb-hover">
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-input text-[22px]" aria-hidden>{q.emoji}</span>
+                          <CategoryIcon category={q.category} size={40} />
                           <span className="min-w-0 flex-1">
                             <span className="block text-fb-body font-semibold leading-5 text-fb-text">{q.title}</span>
                             <span className="block text-fb-meta text-fb-text-2">{q.venueName} · {startsLabel(q, now)}{walk ? ` · ${walk}` : ''}</span>
@@ -255,7 +255,7 @@ function TabButton({ id, on, label, icon, onClick, testId }: { id: DockTab; on: 
   return (
     <button type="button" data-testid={testId} data-tab={id} aria-pressed={on} aria-label={label} title={label} onClick={onClick} className={tabClass(on)}>
       {icon}
-      {on && <span aria-hidden className="whitespace-nowrap text-[15px] font-semibold">{label}</span>}
+      {on && <span aria-hidden className="animate-[oh-tab-label_500ms_ease-in-out] whitespace-nowrap text-[15px] font-semibold motion-reduce:animate-none">{label}</span>}
     </button>
   );
 }

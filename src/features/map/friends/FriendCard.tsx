@@ -8,7 +8,7 @@ import { Clock, Footprints, Hand, MapPin, MessageCircle, Send, UserRound } from 
 import { useEffect, useState } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
 import type { HangSuggestion } from '@/features/data/locations';
-import { Avatar, Button, LinkButton, Sheet, Skeleton, useToast } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, LinkButton, Sheet, Skeleton, categoryOf, useToast } from '@/features/ui';
 import { formatDemoTime } from '@/shared/demo';
 import type { FriendPin } from '@/shared/types';
 
@@ -158,9 +158,7 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
             )}
             {suggestion && (
               <div className="flex gap-3 rounded-card border border-fb-divider-soft p-3" data-testid="hang-suggestion">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px] leading-none" aria-hidden>
-                  {suggestion.emoji}
-                </span>
+                <CategoryIcon category={categoryOf(suggestion.questId, suggestion.emoji)} size={40} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold leading-5 text-fb-text">{suggestion.title}</p>
                   {suggestion.kind === 'quest' && <p className="text-[13px] text-fb-text-2">{suggestion.venueName}</p>}

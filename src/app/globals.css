@@ -70,6 +70,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* The Out Here dashboard's selected tab: its label fades in while the pill widens. */
+@keyframes oh-tab-label {
+  0%, 30% { opacity: 0; }
+  100% { opacity: 1; }
+}
 @keyframes oh-sheet-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }

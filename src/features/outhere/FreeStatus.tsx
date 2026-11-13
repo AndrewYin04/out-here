@@ -344,7 +344,7 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
   const starter = plan.members.find((m) => m.id === plan.startedBy);
   const confirmed = plan.status === 'confirmed' ? plan.options.find((o) => o.questId === plan.confirmedQuestId) : null;
   const title = confirmed
-    ? `It’s a plan: ${confirmed.emoji} ${confirmed.title}`
+    ? `It’s a plan: ${confirmed.title}`
     : plan.startedBy !== viewerId && !iVoted && starter
       ? `${first(starter.name)} started a plan for you ${others.length === 1 ? 'two' : 'all'}`
       : iVoted ? `Waiting on ${who}…` : `Your plan with ${who}`;

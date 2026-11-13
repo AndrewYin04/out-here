@@ -6,7 +6,7 @@ import { ChevronDown, ImagePlus, Minus, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, currentPersona, uploadImage, useApi } from '@/features/data';
 import { MuseLabel } from '@/features/outhere';
-import { Avatar, Button, Chip, IconButton, cn } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, Chip, IconButton, cn } from '@/features/ui';
 import { DEMO_TZ, type LatLng, type Quest, type QuestCategory, type QuestVisibility } from '@/shared';
 import type { GroupView, MuseCreateQuestResponse } from '@/shared/api';
 import type { FriendFace } from '../types';
@@ -34,8 +34,8 @@ export type CreatePlanSheetProps = {
   friends: FriendFace[];
   /** Muse moved the plan to a real place: move the draft pin there. */
   onMove: (at: LatLng) => void;
-  /** The emoji changed: the draft pin shows it. */
-  onEmoji: (emoji: string) => void;
+  /** The type changed: the draft pin shows its icon. */
+  onCategory: (category: QuestCategory) => void;
   onClose: () => void;
   onPosted: (quest: Quest) => void;
 };
@@ -61,7 +61,7 @@ async function requestDraft(text: string, at: LatLng, signal: AbortSignal): Prom
   return { ...data, mode: h === 'mock' ? 'mock' : h === 'fallback' ? 'fallback' : 'live' };
 }
 
-export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPosted }: CreatePlanSheetProps) {
+export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPosted }: CreatePlanSheetProps) {
   const [line, setLine] = useState('');
   const [muse, setMuse] = useState<MuseState>({ status: 'idle' });
   const [title, setTitle] = useState('');
@@ -105,7 +105,7 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
     return () => window.removeEventListener('keydown', onKey);
   }, [pristine, onClose]);
   useEffect(() => () => inFlight.current?.abort(), []);
-  useEffect(() => { onEmoji(emoji); }, [emoji, onEmoji]);
+  useEffect(() => { onCategory(category); }, [category, onCategory]);
   // The host dragged the pin away from Muse's place: the plan is at the pin now.
   useEffect(() => {
     if (place && !sameSpot(place.at, at)) { setPlace(null); setVenueName('Dropped pin'); }
@@ -248,18 +248,9 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
           {muse.status === 'error' && <p role="alert" className="mt-2 px-1 text-[13px] text-fb-red">{muse.message}</p>}
         </form>
 
-        {/* Title and emoji */}
-        <div className="mt-3 flex gap-2">
-          <label className="w-14 shrink-0">
-            <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Emoji</span>
-            <input
-              value={emoji}
-              maxLength={8}
-              aria-label="Emoji"
-              onChange={(e) => setEmoji(e.target.value)}
-              className="h-10 w-full rounded-btn border border-fb-divider bg-fb-surface text-center text-[20px] outline-none focus:border-fb-blue"
-            />
-          </label>
+        {/* Title, with the icon its type gives the pin */}
+        <div className="mt-3 flex items-end gap-2">
+          <CategoryIcon category={category} size={40} />
           <label className="min-w-0 flex-1">
             <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Title</span>
             <input

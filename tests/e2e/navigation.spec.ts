@@ -7,6 +7,12 @@ async function openMap(page: Page) {
   await page.goto('/?as=alex');
   await page.getByRole('link', { name: /out here/i }).first().click();
   await expect(page).toHaveURL(/\/out-here/);
+  await expect(page.getByTestId('out-here-dock')).toBeVisible({ timeout: 20_000 });
+}
+
+/** Explore shows every plan's pin (Out Here opens on Friends). */
+async function toExplore(page: Page) {
+  await page.getByTestId('map-mode-explore').click();
   await expect(page.getByTestId('quest-pin-dumplings').first()).toBeVisible({ timeout: 20_000 });
 }
 const dock = (page: Page) => page.getByTestId('out-here-dock');
@@ -16,6 +22,12 @@ test.describe('Out Here navigation', () => {
     await openMap(page);
     const explore = dock(page).getByRole('button', { name: 'Explore', exact: true });
     const friends = dock(page).getByRole('button', { name: 'Friends', exact: true });
+    // Out Here opens on Friends, the first tab; Explore is next.
+    await expect(friends).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+    const order = await dock(page).locator('nav button').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')));
+    expect(order.slice(0, 3)).toEqual(['Friends', 'Explore', 'Plans']);
+    await explore.click();
     await expect(explore).toHaveAttribute('aria-pressed', 'true');
     await expect(dock(page)).toHaveAttribute('data-level', '0');
 
@@ -46,6 +58,7 @@ test.describe('Out Here navigation', () => {
 
   test('a plan card closes with X, Escape and browser Back without leaving Out Here', async ({ page }) => {
     await openMap(page);
+    await toExplore(page);
     const card = page.getByTestId('quest-sheet');
 
     await page.getByTestId('quest-pin-dumplings').first().click();
@@ -70,6 +83,7 @@ test.describe('Out Here navigation', () => {
 
   test("I'm free and Post close with Escape; a typed draft is kept", async ({ page }) => {
     await openMap(page);
+    await toExplore(page);
     await page.getByTestId('im-free').click();
     await expect(page.getByTestId('plan-sheet')).toBeVisible();
     await expect(dock(page)).toHaveCount(0); // one panel at a time
@@ -92,6 +106,7 @@ test.describe('Out Here navigation', () => {
 
   test('Memories and the plan page lead back to the map', async ({ page }) => {
     await openMap(page);
+    await toExplore(page);
     await page.getByRole('link', { name: 'Memories' }).click();
     await expect(page).toHaveURL(/\/memories/);
     await page.getByRole('link', { name: 'Back to the map' }).click();

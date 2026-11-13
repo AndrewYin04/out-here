@@ -202,8 +202,8 @@ function CrewCard({ crew, handle }: { crew: CrewRow; handle: string }) {
 
         {result && (
           <div className="mt-3 rounded-card border border-fb-divider bg-fb-bg p-3" data-testid="regroup-suggestion">
-            <p className="text-[12px] font-semibold text-fb-blue">
-              ✨ Muse{result.mock && <span className="ml-1 font-normal text-fb-text-2">(offline)</span>}
+            <p className="inline-flex items-center gap-1 text-[12px] font-semibold text-fb-blue">
+              <Sparkles size={12} aria-hidden />Muse{result.mock && <span className="ml-1 font-normal text-fb-text-2">(offline)</span>}
             </p>
             <p className="mt-1 text-[15px] font-semibold text-fb-text">{result.suggestion.title}</p>
             <p className="text-[13px] text-fb-text-2">{result.suggestion.whenText}</p>

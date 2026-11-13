@@ -4,7 +4,7 @@ import { Camera, ChevronDown, ChevronUp, Footprints, MapPin } from 'lucide-react
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { requestSelfie } from '@/features/memories';
-import { Avatar, cn, useToast } from '@/features/ui';
+import { Avatar, CategoryIcon, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
 
 /** Plans starting within this many minutes (or already happening) show as Up next. */
@@ -70,7 +70,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   useEffect(() => {
     if (phase !== 'go' || arrived || reminded.current === q.id) return;
     reminded.current = q.id;
-    toast.show(`Time to go: leave now for ${q.emoji} ${q.title} (${plan.walkMinutes} min walk)`);
+    toast.show(`Time to go: leave now for ${q.title} (${plan.walkMinutes} min walk)`);
     // toast is stable for the provider's lifetime
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, arrived, q.id]);
@@ -80,7 +80,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   const takePhoto = () => { if (!requestSelfie(q.id)) onSee(q.id); };
 
   const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
-  const leave = arrived ? `You’re here 🎉 ${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
+  const leave = arrived ? `You’re here${others.length > 0 ? ' · ' : ''}${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
     : walking ? `On your way · ${plan.walkMinutes} min walk`
       : phase === 'later' ? `Leave by ${formatDemoTime(new Date(leaveBy).toISOString())}${minsToLeave > 0 ? ` (in ${minsToLeave} min)` : ''} · ${plan.walkMinutes} min walk`
         : phase === 'go' ? `Time to go · ${plan.walkMinutes} min walk` : `${plan.walkMinutes} min walk away`;
@@ -89,8 +89,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
     <section aria-label="Up next" data-testid="up-next" data-phase={arrived ? 'arrived' : phase}
       className={cn('rounded-card bg-fb-surface shadow-popover animate-drop-in', className)}>
       <div className="flex items-center gap-3 p-2.5 pr-2">
-        <span aria-hidden className={cn('flex size-11 shrink-0 items-center justify-center rounded-full text-[24px]',
-          phase === 'go' && !arrived ? 'bg-fb-blue-tint ring-2 ring-fb-blue' : 'bg-[#E7F3E8]')}>{q.emoji}</span>
+        <CategoryIcon category={q.category} size={44} className={cn(phase === 'go' && !arrived && 'ring-2 ring-fb-blue')} />
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-fb-blue">Up next</p>
           <p className="truncate text-[15px] font-bold leading-5 text-fb-text" data-testid="up-next-title">{q.title} <span className="font-normal text-fb-text-2">{withWho}</span></p>

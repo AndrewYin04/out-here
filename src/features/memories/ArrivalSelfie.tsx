@@ -80,7 +80,7 @@ function ArrivalBody({ quest, onClose }: { quest: Quest; onClose: () => void }) 
 
   return (
     <div data-testid="arrival-selfie" className="space-y-2">
-      <p className="text-[17px] font-semibold leading-snug text-fb-text"><span aria-hidden>{quest.emoji}</span> {quest.title}</p>
+      <p className="text-[17px] font-semibold leading-snug text-fb-text">{quest.title}</p>
       <p className="text-[15px] text-fb-text-2">Take a photo together. It saves to your memories.</p>
       <MemoryCapture questId={quest.id} crewId={crewId} onSaved={setCrewId} onMemory={onMemory} />
     </div>
