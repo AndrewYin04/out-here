@@ -115,6 +115,7 @@ function buildPin(q: Quest, testId: string): PinParts {
 
   const faces = document.createElement('span');
   faces.setAttribute('aria-hidden', 'true');
+  faces.setAttribute('data-role', 'pin-faces');
   faces.style.cssText = 'position:absolute;left:-12px;top:-10px;display:none;pointer-events:none;';
 
   const more = document.createElement('button');

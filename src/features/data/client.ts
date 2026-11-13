@@ -30,6 +30,16 @@ export function currentPersona(): string {
   return stored && isPersonaHandle(stored) ? stored : DEFAULT_PERSONA;
 }
 
+/**
+ * The persona this tab will act as, without writing anything: a valid ?as= in the URL wins,
+ * else the stored one. apiFetch sends this on its first call, so hooks compare against it.
+ */
+export function tabPersona(): string {
+  if (typeof window === 'undefined') return DEFAULT_PERSONA;
+  const as = new URLSearchParams(window.location.search).get('as')?.toLowerCase();
+  return isPersonaHandle(as) ? as : currentPersona();
+}
+
 /** Switches this tab to another persona, keeps ?as= in the URL in sync, and tells hooks. */
 export function setPersona(handle: string): void {
   if (!isPersonaHandle(handle) || typeof window === 'undefined') return;

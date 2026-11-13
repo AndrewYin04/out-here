@@ -3,10 +3,13 @@
 // shares with the viewer, plus the viewer's own pin. Below zoom 13 nearby pins merge into a
 // cluster (tap zooms in); at closer zooms pins that would overlap fan out around their point.
 // Chips never overlap: in order of distance (then most recently updated), each chip takes the
-// first mode and side (above the avatar, then below) whose box is clear of every avatar and every
-// chip already placed, else it is hidden. Desktop: the full thought wrapped to 2 lines (200 px
-// wide), then the short form. Phones: the emoji plus the first 18 characters and an ellipsis, then
-// the first 10; never the emoji alone.
+// first side (above the avatar, then below) whose box is clear of every avatar, every chip already
+// placed and every quest label, else it is hidden; the thought is never cut short (2 lines, 200 px
+// wide). Below zoom 15 and on phones only the 2 nearest friends on screen and the open one get a
+// chip; the rest show the avatar alone, as Find My does.
+// Quest pins stay tappable: an avatar that would cover one steps sideways off it, a chip looks for
+// a spot clear of every quest pin first, and quest pins draw above friend markers. The viewer's You pin replaces the map's blue dot (both sit on the same point).
+// An open card is kept in ?friend=<handle>, so Back from Messenger or a profile reopens it.
 // Markers are MapLibre HTML markers whose content React renders through portals.
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -14,7 +17,7 @@ import { createPortal } from 'react-dom';
 import { Avatar, cn } from '@/features/ui';
 import type { FriendPin, LatLng, Profile } from '@/shared/types';
 import { freeStatus, freeStatusLabel } from '@/shared/status';
-import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type ChipOptions, type ChipSide } from './chips';
+import { CHIP_WRAP_W, chipText, clearOfQuests, placeChipsSided, questBox, thoughtFor, type Box, type ChipMode, type ChipOptions, type ChipSide } from './chips';
 import { FriendCard } from './FriendCard';
 import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMyShare, PANEL_PX } from './useFindMy';
 
@@ -25,6 +28,8 @@ export type FriendsLayerProps = {
   keepIds?: ReadonlySet<string> | null;
   /** Muse filter: the reason row for a kept friend's card. */
   reasonFor?: ((friendId: string) => { label: string; text: string } | null) | null;
+  /** Points of the quest pins on the map; friend avatars and chips keep off them. */
+  questPoints?: LatLng[] | null;
 };
 
 type MapLib = typeof import('maplibre-gl');
@@ -34,9 +39,13 @@ const CLUSTER_PX = 56;
 const OVERLAP_PX = 44;
 /** Maps narrower than this get the short chip only. */
 const NARROW_MAP_PX = 600;
-// A chip that collides tries the other side of the avatar, then a shorter form, before it hides.
-const WIDE_CHIPS: ChipOptions = { maxW: CHIP_WRAP_W, lines: 2, modes: ['full', 'short', 'mini'], sides: ['above', 'below'], shift: true };
-const NARROW_CHIPS: ChipOptions = { modes: ['short', 'mini'], sides: ['above', 'below'], shift: true };
+// A chip shows the whole thought (2 lines at most). One that collides tries the other side of the
+// avatar, then hides; it is never cut short.
+const CHIPS: ChipOptions = { maxW: CHIP_WRAP_W, lines: 2, modes: ['full'], sides: ['above', 'below'], shift: true };
+/** Below this zoom, and on phones, only the nearest few friends and the open one carry a chip (Find My style). */
+const CHIP_ALL_ZOOM = 15;
+const FEW_CHIPS = 2;
+const PHONE_PX = 768;
 /** On phones, Friends mode first frames the friends within this distance so their chips separate. */
 const LOCAL_KM = 3;
 
@@ -56,11 +65,17 @@ function useViewTick(map: MapLibreMap | null): number {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!map) return;
-    const on = () => setTick((t) => t + 1);
+    let timer = 0;
+    // again shortly after: the quest layer places its labels on the next frame, and chips avoid them
+    const on = () => {
+      setTick((t) => t + 1);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setTick((t) => t + 1), 150);
+    };
     map.on('moveend', on);
     map.on('resize', on);
     on();
-    return () => { map.off('moveend', on); map.off('resize', on); };
+    return () => { window.clearTimeout(timer); map.off('moveend', on); map.off('resize', on); };
   }, [map]);
   return tick;
 }
@@ -88,6 +103,19 @@ export function MapMarker({ map, lib, at, offset = [0, 0], z = 1, children, labe
 
 type Group = { key: string; pins: FriendPin[]; at: LatLng };
 
+/** Screen boxes (map-container px) of the quest labels and joined-friend faces the quest layer shows right now. */
+function visibleQuestLabels(container: HTMLElement): Box[] {
+  const base = container.getBoundingClientRect();
+  const out: Box[] = [];
+  container.querySelectorAll<HTMLElement>('[data-role="pin-label"], [data-role="pin-faces"]').forEach((el) => {
+    if (el.style.display === 'none') return;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    out.push({ x0: r.left - base.left - 2, y0: r.top - base.top - 1, x1: r.right - base.left + 2, y1: r.bottom - base.top + 1 });
+  });
+  return out;
+}
+
 /** Greedy screen-space grouping: pins within `px` of a group's first pin join it. */
 function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
   const groups: (Group & { x: number; y: number })[] = [];
@@ -102,7 +130,7 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
 
 type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
 
-export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: FriendsLayerProps) {
+export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, questPoints = null }: FriendsLayerProps) {
   const lib = useMapLib();
   const tick = useViewTick(map);
   const { data } = useFriendPins();
@@ -128,9 +156,29 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
     const lats = pts.map((p) => p.lat);
     const lngs = pts.map((p) => p.lng);
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
-      padding: { top: 150, bottom: 120, left: 36, right: 36 }, maxZoom: 16, duration: 0,
+      // top: the toggle row plus the You pin's 64 px above its point; bottom: I'm free and People
+      padding: { top: 140, bottom: 170, left: 60, right: 60 }, maxZoom: 16, duration: 0,
     });
   }, [map, pins, me, framed]);
+
+  // ?friend=<handle> follows the open card; on load it reopens that card once the pins are in.
+  const [restored, setRestored] = useState(false);
+  useEffect(() => {
+    if (restored || pins.length === 0) return;
+    setRestored(true);
+    const handle = new URLSearchParams(window.location.search).get('friend');
+    const pin = handle ? pins.find((p) => p.friend.handle === handle) : null;
+    // next tick: the findmy:open listener re-attaches in this same commit
+    if (pin) window.setTimeout(() => window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id: pin.friend.id } })), 0);
+  }, [pins, restored]);
+  const openHandle = openPin?.friend.handle ?? null;
+  useEffect(() => {
+    if (!restored) return;
+    const url = new URL(window.location.href);
+    if (openHandle) url.searchParams.set('friend', openHandle);
+    else url.searchParams.delete('friend');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [openHandle, restored]);
 
   // Opens a friend's card and flies the map so their pin is clear of the card:
   // window event "findmy:open" { detail: { id, zoom? } } (the People sheet sends it).
@@ -153,7 +201,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
     // Move only when the card would cover the pin.
     const pt = map.project([pin.location.lng, pin.location.lat]);
     const c = map.getContainer();
-    const covered = isDesktop() ? pt.x > c.clientWidth - PANEL_PX - 24 : pt.y > c.clientHeight * 0.5;
+    const covered = isDesktop() ? pt.x > c.clientWidth - PANEL_PX - 24 : pt.y > c.clientHeight * 0.5 || pt.y < 110;
     if (covered) map.easeTo({ center: [pin.location.lng, pin.location.lat], padding: panelPadding('right'), duration: 400 });
   }
 
@@ -162,10 +210,12 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
     map?.easeTo({ padding: panelPadding(null), duration: 300 });
   }
 
+  const questKey = (questPoints ?? []).map((q) => `${q.lat},${q.lng}`).join(';');
   const layout = useMemo(() => {
     const empty = { clusters: [] as Group[], singles: [] as Single[] };
     if (!map) return empty;
     void tick;
+    void questKey;
     const zoom = map.getZoom();
     const c = map.getContainer();
     const view = { w: c.clientWidth, h: c.clientHeight };
@@ -185,12 +235,35 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
         });
       }
     }
+    // Keep quest pins tappable and their labels readable: an avatar over one steps sideways off it.
+    const questBoxes = (questPoints ?? []).map((q) => questBox(map.project([q.lng, q.lat])));
+    const labelBoxes = visibleQuestLabels(c);
+    const avoid = [...questBoxes, ...labelBoxes];
+    const at = (s: { pin: FriendPin; offset: [number, number] }) => {
+      const pt = map.project([s.pin.location.lng, s.pin.location.lat]);
+      return { x: pt.x + s.offset[0], y: pt.y + s.offset[1] };
+    };
+    for (const s of placed) {
+      const p = at(s);
+      const others = placed.filter((o) => o !== s).map(at);
+      const [dx, dy] = clearOfQuests(p.x, p.y, avoid, view, others);
+      if (dx || dy) s.offset = [s.offset[0] + dx, s.offset[1] + dy];
+    }
     const screen = placed.map(({ pin, offset }) => {
       const pt = map.project([pin.location.lng, pin.location.lat]);
       return { pin, x: pt.x + offset[0], y: pt.y + offset[1] };
     });
     const mePt = me ? map.project([me.location.lng, me.location.lat]) : null;
-    const opts = view.w < NARROW_MAP_PX ? NARROW_CHIPS : WIDE_CHIPS;
+    // Overview zooms and phones: chips for the nearest friends on screen and the open card only.
+    const few = zoom < CHIP_ALL_ZOOM || view.w < PHONE_PX;
+    const only = few
+      ? new Set([
+        ...screen.filter((x) => x.x >= 0 && x.x <= view.w && x.y >= 0 && x.y <= view.h)
+          .sort((a, b) => a.pin.distanceKm - b.pin.distanceKm).slice(0, FEW_CHIPS).map((x) => x.pin.friend.id),
+        ...(openId ? [openId] : []),
+      ])
+      : null;
+    const opts: ChipOptions = { ...CHIPS, obstacles: questBoxes, hard: labelBoxes, only };
     const chips = placeChipsSided(screen, mePt ? { x: mePt.x, y: mePt.y } : null, view, false, opts);
     return {
       clusters,
@@ -199,18 +272,24 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
         return { ...s, chip: c?.mode ?? 'none', side: c?.side ?? 'above', dx: c?.dx ?? 0 };
       }),
     };
-  }, [map, pins, tick, me]);
+    // questPoints is read through questKey, so a new array with the same points does not re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, pins, tick, me, questKey, openId]);
 
   if (!map || !lib) return null;
   return (
     <>
+      {/* Quest markers (MapCanvas sets their z-index 1 to 4 inline) draw above friend markers (3 to 5). */}
+      <style>{'.maplibregl-marker[data-quest-id]{z-index:6!important}'}</style>
       {me && viewer && (
         <MapMarker map={map} lib={lib} at={me.location} z={2} label="Your location">
-          <div className="flex flex-col items-center" data-testid="my-pin">
-            <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-blue">
+          {/* The You pin sits on the map's origin point, so it replaces the blue dot there. */}
+          <style>{'[data-map-marker="me"]{display:none}'}</style>
+          <div className="pointer-events-none flex flex-col items-center" data-testid="my-pin" data-paused={me.paused ? 'true' : undefined}>
+            <span className={cn('rounded-full bg-white p-[2px] shadow-card ring-[3px]', me.paused ? 'opacity-60 grayscale ring-fb-divider' : 'ring-fb-blue')}>
               <Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />
             </span>
-            <span className="mt-0.5 rounded-full bg-fb-blue px-1.5 text-[11px] font-semibold leading-4 text-white">
+            <span className={cn('mt-0.5 rounded-full px-1.5 text-[11px] font-semibold leading-4 text-white', me.paused ? 'bg-fb-text-2' : 'bg-fb-blue')}>
               {me.paused ? 'Paused' : 'You'}
             </span>
           </div>
@@ -272,7 +351,8 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       {chip !== 'none' && (
         <span
           className={cn(
-            'pointer-events-none absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            // The chip opens the card like the avatar; the layout never places one over a quest pin.
+            'absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
             side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
           style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}

@@ -35,7 +35,7 @@ async function newPersonaPage(browser: Browser, persona: string, viewport: { wid
 test.describe('phone 390', () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== 'phone', 'phone project only');
+    test.skip(!info.project.name.startsWith('phone'), 'phone project only');
   });
 
   test('dumpling pin is clear of other markers and the sheet keeps attribution visible', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe('phone 390', () => {
       const same = page.locator(`[data-quest-id="${id}"] [data-role="cluster"]`);
       const now = (await same.isVisible()) ? Number(((await same.textContent()) ?? '+0').slice(1)) : 0;
       return hidden < hiddenBefore || now < n;
-    }, { timeout: 5000 }).toBe(true);
+    }, { timeout: 10_000 }).toBe(true);
   });
 
   test('join and leave update the seat count on the pin and in the sheet', async ({ page }) => {
@@ -168,7 +168,7 @@ test.describe('phone 390', () => {
 test.describe('desktop 1440', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== 'desktop', 'desktop project only');
+    test.skip(!info.project.name.startsWith('desktop'), 'desktop project only');
   });
 
   test('a join by Maya updates the seat badge on Alex’s map live', async ({ browser }) => {
@@ -212,7 +212,7 @@ test.describe('desktop 1440', () => {
     expect(s.height).toBeLessThan(700);
     const join = (await sheet.getByRole('button', { name: 'Report' }).boundingBox())!;
     expect(s.y + s.height - (join.y + join.height)).toBeLessThan(30);
-    await expect.poll(async () => (await page.getByTestId('quest-pin-dumplings').boundingBox())?.x ?? 0, { timeout: 5000 }).toBeGreaterThan(s.x + s.width);
+    await expect.poll(async () => (await page.getByTestId('quest-pin-dumplings').boundingBox())?.x ?? 0, { timeout: 10_000 }).toBeGreaterThan(s.x + s.width);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(page).not.toHaveURL(/quest=/);

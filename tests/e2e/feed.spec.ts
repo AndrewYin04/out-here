@@ -27,7 +27,7 @@ async function openHome(page: Page, as = 'alex') {
   await expect(page.getByTestId('post-card').first()).toBeVisible({ timeout: 20_000 });
 }
 
-const isPhone = (name: string) => name === 'phone';
+const isPhone = (name: string) => name.startsWith('phone');
 
 test('collapsed posts preview at most one comment and no replies', async ({ page }) => {
   await openHome(page);
@@ -51,7 +51,7 @@ test('Out Here card shows live friends and open seats, and opens the map', async
   const card = page.getByTestId('home-outhere');
   await expect(card.getByTestId('home-outhere-free')).toContainText(/plans? near you/, { timeout: 15_000 });
   await expect(card.getByTestId('home-outhere-seats')).toHaveText(/^\d+ seats? left$/);
-  await expect(card.getByRole('link', { name: "I'm free" })).toHaveAttribute('href', '/out-here');
+  await expect(card.getByRole('link', { name: "I'm free" })).toHaveAttribute('href', '/out-here?free=1');
   await card.getByTestId('home-outhere-plan').click();
   await expect(page).toHaveURL(/\/out-here\?quest=/);
 });
@@ -127,8 +127,9 @@ test('create a post with audience and photo', async ({ page }) => {
 
 test('like, pick a reaction, and remove it', async ({ page }, info) => {
   await openHome(page);
-  // pin the post by id: other tests add posts above it while this one runs
-  const id = await page.getByTestId('post-card').first().getAttribute('data-post-id');
+  // pin the post by id: other tests add posts above it while this one runs. Each project takes
+  // its own post, because phone and desktop run this test at the same time as the same persona.
+  const id = await page.getByTestId('post-card').nth(isPhone(info.project.name) ? 1 : 0).getAttribute('data-post-id');
   const post = page.locator(`[data-post-id="${id}"]`);
   const like = post.getByTestId('like-button');
   // start from no reaction

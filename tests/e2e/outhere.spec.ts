@@ -182,7 +182,8 @@ test.describe("Out Here plan sheet", () => {
     const incoming = (await inv.json()).incoming.filter((i: { suggestionTitle: string; status: string }) => i.suggestionTitle === DUMPLINGS && i.status === "pending");
     expect(incoming.length).toBe(1);
 
-    const card = maya.getByTestId("invite-card");
+    // other specs' invites to Maya may still be pending; pick this one by its title
+    const card = maya.getByTestId("invite-card").filter({ hasText: DUMPLINGS });
     await expect(card).toContainText(`Alex invited you: 🥟 ${DUMPLINGS}`, { timeout: 5_000 });
     // Alex took a seat when he sent it ("Go with" = join + invite), so one is left for Maya
     await expect(card.getByTestId("seats-left")).toHaveText("1 left");
