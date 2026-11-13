@@ -195,6 +195,7 @@ export function OutHereView() {
           walkMinutes={ctx?.walkMinutes ?? null}
           friendFaces={friendFaces}
           picks={picks}
+          picksByMuse={planPicks?.byMuse ?? false}
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}

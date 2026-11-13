@@ -79,7 +79,7 @@ describe('store-backed plan context', () => {
     // the bubble is paraphrased, never pasted with its quotes and separators
     expect(top.reason).toContain("Maya's craving dumplings");
     expect(top.reason).not.toMatch(/"|·|status says/);
-    expect(top.reason).toMatch(/Free till \d+:\d\d [AP]M/);
+    expect(top.reason).toMatch(/Maya's free till \d+:\d\d [AP]M/);
     // a pick with no friend names a concrete fit, never the budget alone
     for (const s of out.plan.suggestions.slice(1)) {
       expect(s.reason).not.toBe('');

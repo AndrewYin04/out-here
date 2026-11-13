@@ -47,6 +47,8 @@ export type MapCanvasProps = {
   friendFaces: Record<ID, FriendFace[]> | null;
   /** Quest ids of the Muse plan on screen: those pins get a blue ring and a "Muse pick" tag, others dim. */
   picks: ID[] | null;
+  /** The live model ranked the picks: the tag reads "✨ Muse pick"; otherwise "Top pick". */
+  picksByMuse: boolean;
   /** Extra points the plan framing includes (the top suggestion's friends, from their Find My pins). */
   fitTo: LatLng[] | null;
   now: Date;
@@ -135,7 +137,7 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
 }
 
 /** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null) {
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, byMuse: boolean) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
@@ -143,7 +145,7 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
   p.label.textContent = `${shortTitle(q.title)} · ${time}`;
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${picked ? (byMuse ? 'Muse pick: ' : 'Top pick: ') : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
   const ring = selected || picked ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
@@ -154,6 +156,7 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.button.style.opacity = dimmed ? '0.4' : '1';
   p.button.style.transition = 'opacity .2s';
   p.root.toggleAttribute('data-dimmed', dimmed);
+  p.pick.textContent = byMuse ? '✨ Muse pick' : 'Top pick';
   if (picked && !p.pick.isConnected) p.button.append(p.pick);
   else if (!picked && p.pick.isConnected) p.pick.remove();
   paintFaces(p, faces);
@@ -167,7 +170,7 @@ function pulse(el: HTMLElement) {
   );
 }
 
-export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
+export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, picksByMuse, fitTo, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pins = useRef(new Map<string, PinRefs>());
@@ -224,6 +227,18 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       } else {
         ref.more.style.display = 'none';
       }
+    }
+    // Two picks side by side on a phone would stack their tags into "✨ Muse✨ Muse pick": the
+    // higher-ranked pick keeps its tag and a tag that would overlap it is hidden.
+    const tags: DOMRect[] = [];
+    for (const id of order.current) {
+      const ref = pins.current.get(id);
+      if (!ref || !ref.pick.isConnected || !g.has(id)) continue;
+      ref.pick.style.display = '';
+      const r = ref.pick.getBoundingClientRect();
+      const clash = tags.some((t) => r.left < t.right + 4 && t.left < r.right + 4 && r.top < t.bottom && t.top < r.bottom);
+      if (clash) ref.pick.style.display = 'none';
+      else tags.push(r);
     }
   };
   const schedule = () => {
@@ -317,15 +332,16 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref.badge); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, picksByMuse);
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }
     }
-    const rank = (q: Quest) => (q.id === selectedId ? 0 : pickSet?.has(q.id) ? 1 : viewerId && q.memberIds.includes(viewerId) ? 2 : 3);
+    // Picks keep the plan's order, so the top suggestion keeps its tag when two tags collide.
+    const rank = (q: Quest) => (q.id === selectedId ? 0 : picks?.includes(q.id) ? 1 + picks.indexOf(q.id) / 10 : viewerId && q.memberIds.includes(viewerId) ? 2 : 3);
     order.current = [...quests].sort((a, b) => rank(a) - rank(b) || a.startsAt.localeCompare(b.startsAt)).map((q) => q.id);
     schedule();
-  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces, picks]);
+  }, [quests, selectedId, viewerId, testIdFor, now, friendFaces, picks, picksByMuse]);
 
   // A new Muse plan: frame the viewer, the picked plans and the top suggestion's friends,
   // clear of the plan sheet (left panel on desktop, bottom sheet on phones).

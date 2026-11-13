@@ -23,13 +23,14 @@ export function usePlanOpen(): boolean {
 
 // The suggestions of the plan on screen, so the map can highlight their pins. PlanSheet sets
 // them when a plan returns; closing the sheet clears them.
-export type PlanPicks = { questIds: string[]; topFriendIds: string[] };
+/** byMuse: the live model ranked these; otherwise code did, and the map says "Top pick" without ✨. */
+export type PlanPicks = { questIds: string[]; topFriendIds: string[]; byMuse: boolean };
 let picks: PlanPicks | null = null;
 const pickListeners = new Set<() => void>();
 
-export function setPlanSuggestions(next: { questId: string | null; friendIds: string[] }[] | null): void {
+export function setPlanSuggestions(next: { questId: string | null; friendIds: string[] }[] | null, byMuse = false): void {
   const value = next && next.length > 0
-    ? { questIds: next.flatMap((s) => (s.questId ? [s.questId] : [])), topFriendIds: [...next[0].friendIds] }
+    ? { questIds: next.flatMap((s) => (s.questId ? [s.questId] : [])), topFriendIds: [...next[0].friendIds], byMuse }
     : null;
   if (JSON.stringify(value) === JSON.stringify(picks)) return;
   picks = value;

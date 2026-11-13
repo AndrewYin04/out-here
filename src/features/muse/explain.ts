@@ -49,7 +49,7 @@ const joinNames = (names: string[]) =>
 /**
  * Why this plan, for this person. With a free friend it leads with their bubble in a few words,
  * then when they are free and how far it is: "Maya's craving dumplings and wants to try Dumpling
- * Den. Free till 4:44 PM, and it's a 9 min walk." The card then drops its overlap line.
+ * Den. Maya's free till 4:44 PM, and it's a 9 min walk." The card then drops its overlap line.
  */
 export function reasonText(c: PlanCandidate, friendIds: string[]): string {
   const friends = c.friendOverlap.filter((f) => friendIds.includes(f.friendId));
@@ -57,7 +57,7 @@ export function reasonText(c: PlanCandidate, friendIds: string[]): string {
     const f = friends[0];
     const shared = f.sharedWithQuest[0];
     const said = statusPhrase(f.firstName, f.status);
-    if (said) return `${said}. Free till ${formatDemoTime(f.freeUntil)}, and it's a ${c.travelMinutes} min walk.`;
+    if (said) return `${said}. ${f.firstName}'s free till ${formatDemoTime(f.freeUntil)}, and it's a ${c.travelMinutes} min walk.`;
     const room = c.seatsLeft >= friends.length + 1 ? ' and there is room for both of you' : '';
     return `You and ${joinNames(friends.map((x) => x.firstName))} both like ${shared}${room}.`;
   }

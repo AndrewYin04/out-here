@@ -93,7 +93,7 @@ export function PlanSheet({ className }: { className?: string }) {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
       setPreviousIds(result ? result.plan.suggestions.flatMap((s) => (s.questId ? [s.questId] : [])) : []);
-      setResult(r); setPlanSuggestions(r.plan.suggestions);
+      setResult(r); setPlanSuggestions(r.plan.suggestions, r.museSource === 'muse');
       setStatus('done');
       // Only the ask whose results are shown becomes the viewer's availability.
       void shareAvailability(t, r.plan);
