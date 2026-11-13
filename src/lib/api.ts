@@ -12,7 +12,10 @@ export type Ctx<P extends Record<string, string> = Record<string, string>> = { p
 export const json = <T>(data: T, status = 200) => NextResponse.json(data, { status });
 
 function errorResponse(err: unknown) {
-  if (err instanceof HttpError) return json({ error: err.message }, err.status);
+  // Also by name: after a dev hot reload errors.ts can load twice, and instanceof then fails.
+  if (err instanceof HttpError || (err instanceof Error && err.name === 'HttpError' && typeof (err as HttpError).status === 'number')) {
+    return json({ error: err.message }, (err as HttpError).status);
+  }
   if (err instanceof ZodError) {
     const first = err.issues[0];
     return json({ error: first ? `${first.path.join('.') || 'input'}: ${first.message}` : 'invalid input' }, 400);
