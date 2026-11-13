@@ -68,7 +68,7 @@ for (const width of [390, 1440]) {
         await maya.hover();
         await expect(text).toBeVisible();
       }
-      await expect(text).toHaveText('craving dumplings');
+      await expect(text).toHaveText('free after class');
       // Not clipped: the whole thought fits inside its box.
       const clipped = await text.evaluate((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
       expect(clipped).toBe(false);

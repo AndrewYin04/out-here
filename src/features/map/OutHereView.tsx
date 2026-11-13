@@ -8,8 +8,14 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast, sfx } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
+import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
+import { ListingSheet } from './market/ListingSheet';
+import { ListingsLayer } from './market/ListingsLayer';
+import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
+import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
+import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
 import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
@@ -61,12 +67,22 @@ const QUEST_ENTRY = 'ohQuest';
 function setQuestParam(id: string | null) {
   const url = new URL(window.location.href);
   const had = url.searchParams.has('quest');
+  if (!id && !had) return;
   if (id) url.searchParams.set('quest', id);
   else url.searchParams.delete('quest');
   const state = window.history.state as Record<string, unknown> | null;
   if (!id && state?.[QUEST_ENTRY]) { window.history.back(); return; }
   if (id && !had) window.history.pushState({ ...(state ?? {}), [QUEST_ENTRY]: true }, '', url.toString());
   else window.history.replaceState(state, '', url.toString());
+}
+
+/** ?listing=<id>: the open Marketplace listing. It replaces the entry, so Back stays with plans
+ *  and never pops the plan entry from under an open listing. */
+function setListingParam(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('listing', id);
+  else url.searchParams.delete('listing');
+  window.history.replaceState(window.history.state, '', url.toString());
 }
 
 export function OutHereView() {
@@ -89,6 +105,13 @@ export function OutHereView() {
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
   const [creating, setCreating] = useState<{ at: LatLng; category: string } | null>(null);
+  // Marketplace pickup: "Sell for pickup" draft spot, the open listing sheet, whether listings
+  // show, and Muse finds the viewer dismissed.
+  const [selling, setSelling] = useState<LatLng | null>(null);
+  const [popUp, setPopUp] = useState(false);
+  const [listingId, setListingId] = useState<string | null>(null);
+  const [showListings, setShowListings] = useState(true);
+  const [dismissedFinds, setDismissedFinds] = useState<ReadonlySet<string>>(() => new Set());
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -98,6 +121,14 @@ export function OutHereView() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('quest');
     if (id) setSelectedId(id);
+    const lid = params.get('listing');
+    if (lid && !id) { setListingId(lid); setMode('explore'); }
+    // ?sell=popup: the demo seller's tab opens the Campus Thrift Pop-Up, items filled in.
+    if (params.get('sell') === 'popup') {
+      setPopUp(true);
+      setMode('explore');
+      setSelling(DEMO_CENTER);
+    }
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
     // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
@@ -214,7 +245,59 @@ export function OutHereView() {
     return pts.length > 0 ? pts : null;
   }, [planPicks, mode, friendPins.data]);
 
-  const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id);
+    setQuestParam(id);
+    if (id) { setListingId(null); setListingParam(null); }
+  }, []);
+  const openListing = useCallback((id: string | null) => {
+    setListingId(id);
+    setListingParam(id);
+    if (id) { setSelectedId(null); setQuestParam(null); }
+  }, []);
+
+  // Marketplace pickup on the map (Explore only), and what Muse found for the viewer's wants.
+  // Listings are fetched in every mode so a Muse find can arrive while you walk on the Friends map.
+  const listingsApi = useMapListings(true);
+  const mapListings: MapListing[] = useMemo(
+    () => (mode === 'explore' && showListings ? listingsApi.data?.listings ?? [] : []), [mode, showListings, listingsApi.data],
+  );
+  const wantsApi = useMuseWants();
+  const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
+  const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
+  // A want find ("track jacket under $25") first, then a pick from what the viewer watches.
+  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings);
+  const allFinds = useMemo(() => [...(findsApi.data?.finds ?? []), ...watchFinds], [findsApi.data, watchFinds]);
+  const find = allFinds.find((f) => !dismissedFinds.has(f.listingId)) ?? null;
+  const watchFor = useCallback((listing: string | null) => {
+    const f = listing ? allFinds.find((x) => x.listingId === listing) : null;
+    const w = f ? wants.find((x) => x.id === f.wantId) : null;
+    return w ? watchLabel(w) : null;
+  }, [allFinds, wants]);
+  const viewFind = useCallback((id: string, at: LatLng | null) => {
+    setMode('explore');
+    setShowListings(true);
+    openListing(id);
+    if (map && at && !map.getContainer().hasAttribute('data-view3d')) {
+      // The listing sheet covers the bottom ~62% on a phone and the left 400 px on desktop: put the
+      // pin in the part of the map that stays visible.
+      const el = map.getContainer();
+      const phone = el.clientWidth < 768;
+      const offset: [number, number] = phone ? [0, -Math.round(el.clientHeight * 0.32)] : [200, 0];
+      map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700, offset });
+    }
+  }, [map, openListing]);
+  // Muse's line stays on the sheet while it is open: once you request the item the want find drops
+  // it, and a different reason (or none) must not replace what you just read.
+  const [pinnedLine, setPinnedLine] = useState<{ id: string; line: string; watch: string | null } | null>(null);
+  const liveLine = listingId ? allFinds.find((f) => f.listingId === listingId)?.line ?? null : null;
+  useEffect(() => {
+    if (listingId && liveLine && pinnedLine?.id !== listingId) setPinnedLine({ id: listingId, line: liveLine, watch: watchFor(listingId) });
+  }, [listingId, liveLine, pinnedLine?.id, watchFor]);
+  const sheetLine = pinnedLine && pinnedLine.id === listingId ? pinnedLine : liveLine ? { line: liveLine, watch: watchFor(listingId) } : null;
+  const openedListing = listingId ?listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
+  const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
+  const walkMin = openedListing?.listing.location && ctx?.origin ? walkingMinutes(ctx.origin, openedListing.listing.location) : null;
   // Back and Forward: the plan in the URL is the plan on screen.
   useEffect(() => {
     const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
@@ -253,6 +336,23 @@ export function OutHereView() {
     select(q.id);
     toast.show('Your plan is live on the map.');
   }, [questsApi, select, toast]);
+  // "Sell for pickup" from the Marketplace menu: a draft pin at the map centre and the sell sheet.
+  const startSell = useCallback(() => {
+    const c = map?.getCenter();
+    setPlanOpen(false);
+    select(null);
+    openListing(null);
+    setCreating(null);
+    setSelling(c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
+  }, [map, select, openListing]);
+  const onListed = useCallback((l: MapListing) => {
+    setSelling(null);
+    setMode('explore');
+    setShowListings(true);
+    void listingsApi.refetch();
+    openListing(l.listing.id);
+    toast.show('Your listing is on the map.');
+  }, [listingsApi, openListing, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
   const noSelect = useCallback(() => {}, []);
@@ -342,6 +442,8 @@ export function OutHereView() {
   }, [letsGo]);
   /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
   const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
+  // Up next steps aside for an open plan, a sheet, the create and sell sheets, and the walk.
+  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !!upNext && !upNextClosed;
   // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
   const recenter = useCallback(() => {
     if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }
@@ -373,12 +475,12 @@ export function OutHereView() {
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
-          onSelect={creating ? noSelect : select}
+          onSelect={creating || selling ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
           onPickLocation={startCreate}
-          draft={creating}
-          onDraftMove={moveDraft}
+          draft={creating ?? (selling ? { at: selling, category: 'other' } : null)}
+          onDraftMove={selling ? setSelling : moveDraft}
         />
       )}
 
@@ -539,7 +641,7 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
+      {upNextShown && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
         // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
         // at this height and covered Let's go.
@@ -567,8 +669,26 @@ export function OutHereView() {
 
       {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
-      {!unsupported && !creating && !sheetOpen && (
-        <div className={cn(selectedId && 'max-md:hidden')}>
+      {mode === 'explore' && !unsupported && (
+        <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
+      )}
+
+      {/* Muse found something the viewer is looking for: a card above the dashboard. */}
+      {find && !creating && !selling && !sheetOpen && !listingId && !selectedId && (
+        <div className={cn('pointer-events-none absolute inset-x-3 z-30 flex justify-center max-md:right-[68px]',
+          !upNextShown ? 'top-[84px]' : filter.on ? 'top-[190px]' : tools ? 'top-[150px]' : 'top-[102px]')}>
+          <MuseFindCard
+            key={find.listingId}
+            find={find}
+            watch={watchFor(find.listingId)}
+            onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
+            onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
+          />
+        </div>
+      )}
+
+      {!unsupported && !creating && !selling && !sheetOpen && (
+        <div className={cn((selectedId || listingId) && 'max-md:hidden')}>
           <OutHereDock
             mode={mode}
             onMode={setMode}
@@ -581,6 +701,15 @@ export function OutHereView() {
             now={now}
             onSelect={select}
             showActions={!walkingNow}
+            extraActions={mode === 'explore' ? (
+              <MarketMenu
+                wants={wants}
+                onWantsChanged={() => { void wantsApi.refetch(); }}
+                onSell={startSell}
+                showListings={showListings}
+                onShowListings={setShowListings}
+              />
+            ) : null}
           />
         </div>
       )}
@@ -605,8 +734,27 @@ export function OutHereView() {
         />
       )}
 
+      {selling && (
+        <SellSheet at={selling} now={now} popUp={popUp ? CAMPUS_THRIFT_POPUP : null}
+          onClose={() => { setSelling(null); setPopUp(false); }} onPosted={(l) => { setPopUp(false); onListed(l); }} />
+      )}
+
       {!unsupported && (
-        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', selectedId && 'max-md:hidden')} />
+        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', (selectedId || listingId) && 'max-md:hidden')} />
+      )}
+
+      {listingId && !creating && !selling && (
+        <ListingSheet
+          key={listingId}
+          listingId={listingId}
+          viewerId={persona.id}
+          driveMin={driveMin}
+          walkMin={walkMin}
+          museLine={sheetLine?.line ?? null}
+          museWatch={sheetLine?.watch ?? null}
+          onClose={() => openListing(null)}
+          onChanged={() => { void listingsApi.refetch(); }}
+        />
       )}
 
       {selectedId && !creating && (

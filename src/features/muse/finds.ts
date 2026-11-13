@@ -9,7 +9,7 @@
 //    It's a 12-minute drive, and the seller is around until 5:00 PM."). Code checks every number
 //    in it against the facts and falls back to its own line.
 import { z } from 'zod';
-import { drivingMinutes, formatDemoTime, type ID, type LatLng, type MuseWant } from '@/shared';
+import { drivingMinutes, formatDemoTime, walkingMinutes, type ID, type LatLng, type MuseWant } from '@/shared';
 import type { MapListing, MuseFind } from '@/shared/api';
 import { museJSON, reportFallback } from './client';
 import { findLineMessages, wantMessages, type FindLineFacts } from './prompts/finds';
@@ -79,7 +79,10 @@ export async function parseWant(text: string, userId: ID | null): Promise<{ want
 
 // ---------- 2. match listings (code) ----------
 
-export type FindCandidate = Omit<MuseFind, 'line' | 'source'> & { want: MuseWant };
+export type FindCandidate = Omit<MuseFind, 'line' | 'source'> & { want: MuseWant; walkMin?: number };
+
+/** Up to this many minutes on foot, Muse says "a 4-minute walk" instead of the drive. */
+export const WALKABLE_MIN = 15;
 
 /** Minutes of slack needed between arriving and the end of the pickup window. */
 export const ARRIVE_BEFORE_END_MIN = 5;
@@ -108,13 +111,14 @@ export function matchListings(
       if (!titleMatches(`${l.title} ${l.category}`, w.keywords.length ? w.keywords : [w.item])) continue;
       if (w.maxPrice !== null && l.priceUsd > w.maxPrice) continue;
       const driveMin = drivingMinutes(origin, l.location);
+      const walkMin = walkingMinutes(origin, l.location);
       if (w.maxDriveMin !== null && driveMin > w.maxDriveMin) continue;
       const left = (new Date(l.pickupUntil).getTime() - at.getTime()) / 60_000;
       if (left < driveMin + ARRIVE_BEFORE_END_MIN) continue;
       seen.add(l.id);
       out.push({
         listingId: l.id, wantId: w.id, title: cleanTitle(l.title), priceUsd: l.priceUsd, imageUrl: l.imageUrl,
-        driveMin, pickupUntil: l.pickupUntil, sellerFirstName: m.seller.name.split(' ')[0] ?? m.seller.name,
+        driveMin, walkMin, pickupUntil: l.pickupUntil, sellerFirstName: m.seller.name.split(' ')[0] ?? m.seller.name,
         listedMinAgo: Math.max(0, Math.round((at.getTime() - new Date(l.createdAt).getTime()) / 60_000)), want: w,
       });
     }
@@ -130,7 +134,7 @@ const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 export function findFacts(c: FindCandidate): FindLineFacts {
   return {
     title: c.title, price: money(c.priceUsd), budget: c.want.maxPrice !== null ? money(c.want.maxPrice) : null,
-    driveMin: c.driveMin, maxDriveMin: c.want.maxDriveMin, availableUntil: formatDemoTime(c.pickupUntil),
+    driveMin: c.driveMin, walkMin: c.walkMin !== undefined && c.walkMin <= WALKABLE_MIN ? c.walkMin : null, maxDriveMin: c.want.maxDriveMin, availableUntil: formatDemoTime(c.pickupUntil),
     listedMinAgo: c.listedMinAgo, sellerFirstName: c.sellerFirstName, wanted: c.want.text,
   };
 }
@@ -139,7 +143,8 @@ export function findFacts(c: FindCandidate): FindLineFacts {
 export function codeLine(c: FindCandidate): string {
   const f = findFacts(c);
   const fresh = c.listedMinAgo <= 15 ? 'was just listed' : c.listedMinAgo < 60 ? `was listed ${c.listedMinAgo} min ago` : 'is up for pickup';
-  return `That ${f.price} ${f.title.toLowerCase()} ${fresh}. It's a ${f.driveMin}-minute drive, and the seller is around until ${f.availableUntil}.`;
+  const trip = f.walkMin !== null ? `${f.walkMin}-minute walk` : `${f.driveMin}-minute drive`;
+  return `That ${f.price} ${f.title.toLowerCase()} ${fresh}. It's a ${trip}, and the seller is around until ${f.availableUntil}.`;
 }
 
 const FIELD_NAMES = /\b(driveMin|maxDriveMin|listedMinAgo|availableUntil|sellerFirstName|maxPrice|priceUsd)\b/;
@@ -153,7 +158,7 @@ export function checkFindLine(text: string, f: FindLineFacts): string | null {
     const p = `$${Number(m[0].replace(/[$,\s]/g, '')).toString()}`;
     if (!prices.has(p) && !prices.has(m[0].replace(/\s/g, ''))) return `quoted ${m[0]}`;
   }
-  const mins = new Set([f.driveMin, f.maxDriveMin, f.listedMinAgo].filter((n): n is number => n !== null));
+  const mins = new Set([f.driveMin, f.walkMin, f.maxDriveMin, f.listedMinAgo].filter((n): n is number => n !== null));
   for (const m of text.matchAll(/(\d+)\s?-?\s?(?:min|minute)/gi)) if (!mins.has(Number(m[1]))) return `quoted ${m[0]}`;
   for (const m of text.matchAll(/\b(\d{1,2}(?::\d{2})?)\s?(AM|PM|am|pm)\b/g)) {
     const [h, mm = '00'] = m[1].split(':');
@@ -166,7 +171,7 @@ const lineCache = new Map<string, { line: string; source: MuseFind['source'] }>(
 
 export async function explainFind(c: FindCandidate, userId: ID | null): Promise<{ line: string; source: MuseFind['source'] }> {
   const f = findFacts(c);
-  const key = JSON.stringify([c.listingId, c.wantId, f.driveMin, f.availableUntil, c.listedMinAgo <= 15]);
+  const key = JSON.stringify([c.listingId, c.wantId, f.driveMin, f.walkMin, f.availableUntil, c.listedMinAgo <= 15]);
   const hit = lineCache.get(key);
   if (hit) return hit;
   const route = '/api/muse/finds';
