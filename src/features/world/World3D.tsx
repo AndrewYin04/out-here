@@ -214,6 +214,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
+  const petBoost = useRef(1);
   const petPos = useRef<LatLng>(start);
   const petAlt = useRef(1.7);
   const [hello, setHello] = useState(true);
@@ -698,20 +699,31 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         layer.setPose(id, cur.at, cur.heading, 0);
       }
 
-      // The pet: close behind your shoulder, or in front of you facing the camera while it talks.
+      // The pet: walking beside you (a little behind your right shoulder), or in front of you
+      // facing the camera while it talks. Further behind and he drops under the dashboard.
       const front = !photoFocus && petMode.current === 'front';
       const stage=museStage(front);
       const beside=moveMeters(pos.current,stage.sideways*scale,camBearing.current+90);
-      const target=moveMeters(beside,stage.towardViewer*scale,camBearing.current+180);
+      const target=front?moveMeters(beside,stage.towardViewer*scale,camBearing.current+180):moveMeters(pos.current,.9*scale,heading.current+115);
       const gap = haversineMeters(petPos.current, target);
-      const kp = reducedMotion() ? 1 : 1 - Math.exp(-dt * 5);
+      const groundFollow = !front && !photoFocus && petState.current === 'hover';
+      const kp = reducedMotion() ? 1 : 1 - Math.exp(-dt * (groundFollow ? 18 : 5));
       petPos.current = gap > 0.05 ? moveMeters(petPos.current, gap * kp, bearingDeg(petPos.current, target)) : target;
-      petAlt.current += (stage.altitude - petAlt.current) * kp;
       const flying = gap > 2.5 * scale;
-      const pState = flying ? 'fly' : petState.current;
+      // Beside you he is on the ground and walks when you do (floating is for flying over to you,
+      // talking in front of you and thinking).
+      const grounded = !front && !photoFocus && !flying && petState.current === 'hover';
+      petAlt.current += ((front ? stage.altitude : grounded ? 0 : .8) - petAlt.current) * kp;
+      const pState = flying ? 'fly' : grounded ? (moving ? 'walk' : 'stand') : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
       let petBearing=front ? normalizeDeg(camBearing.current + 180) : heading.current;
       if(photoFocus){layer.actorScreenPoint('pet',screenPoint);const b=cameraRects.current?.bounds;if(b)petBearing=photoFocusBearing({x:screenPoint.x+b.left,y:screenPoint.y+b.top},photoFocus.rect,camBearing.current);}
+      // With the chat open Jolly flies up toward the screen: he grows until he almost fills the map
+      // above the chat (the camera is already framing him). Back to size when it closes.
+      const phoneView = (cameraRects.current?.bounds.width ?? window.innerWidth) < 768;
+      const boostTarget = chatOpen.current && !encounterRef.current && !photoFocus ? (phoneView ? 6 : 3.6) : 1;
+      petBoost.current += (boostTarget - petBoost.current) * (reducedMotion() ? 1 : 1 - Math.exp(-dt * 3));
+      layer.setBoost('pet', petBoost.current);
       layer.setPose('pet', petPos.current, petBearing, petAlt.current);
 
       // One logical companion per user, in the same scene/frame loop. Origins are visual
@@ -1076,6 +1088,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   return (
     <div
       data-testid="world-3d"
+      // While the Muse chat is open the friends' photos and plan labels step aside, so Jolly is in front.
+      data-muse-chat={companion.open ? 'true' : undefined}
       data-scene-ready={layerRef.current ? 'true' : 'false'}
       data-agent-peers={layerRef.current?.actorIds().filter(id => id.startsWith('muse:')).length ?? 0}
       data-follow={follow ? 'true' : 'false'}
@@ -1162,7 +1176,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           </div>
         )}
         {together.walkers.map((w) => (
-          <div key={w.id} ref={bindLabel(`w:${w.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
+          <div key={w.id} ref={bindLabel(`w:${w.id}`, 0.2)} data-world-label style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
             <span data-testid="world-walker" className="flex items-center gap-1 whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
               <Footprints size={14} aria-hidden />{firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
             </span>
@@ -1170,7 +1184,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           </div>
         ))}
         {nearFriends.map((f) => (
-          <div key={f.id} ref={bindLabel(`f:${f.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
+          <div key={f.id} ref={bindLabel(`f:${f.id}`, 0.2)} data-world-label style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
             <button
               type="button"
               data-testid="world-friend"

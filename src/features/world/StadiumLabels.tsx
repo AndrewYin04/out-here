@@ -26,7 +26,7 @@ export function StadiumLabels({ labels, where, layer, onSelect }: {
         const pos = where.get(l.id);
         if (!pos) return null;
         return (
-          <div key={l.id} ref={(el) => layer.bindAnchor(`st:${l.id}`, pos, LABEL_ALT, el)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-1">
+          <div key={l.id} ref={(el) => layer.bindAnchor(`st:${l.id}`, pos, LABEL_ALT, el)} data-world-label style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-1">
             <button
               type="button"
               data-testid="stadium-label"

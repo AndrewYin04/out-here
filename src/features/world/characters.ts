@@ -11,7 +11,9 @@ import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
-export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy';
+// 'stand' and 'walk' keep Jolly on the ground beside you (the hover platform hides, and walking adds a
+// waddle in code, since the model has no walk clip); the others are the floating poses.
+export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy' | 'stand' | 'walk';
 
 export interface Character {
   /** Positioned, turned and scaled by the world layer. */
@@ -259,6 +261,7 @@ const AVATAR_CLIPS: Record<AvatarState, string[]> = {
 };
 const PET_CLIPS: Record<PetState, string[]> = {
   hover: ['Hover', 'Idle'], fly: ['Fly', 'Hover', 'Idle'], talk: ['Talk', 'Hover', 'Idle'], think: ['Think', 'Hover', 'Idle'], happy: ['Happy', 'Wave', 'Hover'],
+  stand: ['Stand', 'Hover', 'Idle'], walk: ['Walk', 'Run', 'Hover', 'Idle'],
 };
 
 export type CharacterSpec = {
@@ -306,6 +309,8 @@ function adaptClip(clip: THREE.AnimationClip, keep: Set<string>, rootName: strin
   return tracks.length ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : null;
 }
 
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
@@ -320,8 +325,20 @@ class GltfCharacter implements Character {
   private oneShotLeft = 0;
   private hopLeft = 0;
   private owned: THREE.Material[] = [];
+  // Pet only: on the ground (no platform), and the waddle's phase and strength.
+  private kind: 'avatar' | 'pet';
+  private platform: THREE.Object3D | null = null;
+  private glow: THREE.ShaderMaterial | null = null;
+  private glowTime = 0;
+  private walking = false;
+  private gait = 0;
+  private gaitAmp = 0;
+  // Jolly's arm and leg nodes (no clip drives them), swung in code while he walks.
+  private limbs: { node: THREE.Object3D; base: THREE.Quaternion; leg: boolean; side: 1 | -1 }[] = [];
+  private limbQ = new THREE.Quaternion();
 
   constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
+    this.kind = kind;
     const scene = cloneSkinned(spec.gltf.scene);
     let model: THREE.Object3D = scene;
     if (spec.node) {
@@ -350,6 +367,16 @@ class GltfCharacter implements Character {
       mesh.frustumCulled = false;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const next = mats.map((m) => {
+        // Jolly's fur is a warm cream in the model, but the scene's cool daylight and tone mapping turn
+        // it gray. A warm self-light and a slightly richer base bring the cream back.
+        if (kind === 'pet' && /Fur/.test(m.name) && (m as THREE.MeshStandardMaterial).color) {
+          const fur = (m as THREE.MeshStandardMaterial).clone();
+          fur.color.set('#F2DDB9');
+          fur.emissive.set('#F0CFA2');
+          fur.emissiveIntensity = 0.32;
+          this.owned.push(fur);
+          return fur;
+        }
         const tint = kind === 'avatar' ? tints[m.name] : undefined;
         if (!tint || !(m as THREE.MeshStandardMaterial).color) return m;
         const copy = (m as THREE.MeshStandardMaterial).clone();
@@ -360,6 +387,27 @@ class GltfCharacter implements Character {
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
     });
 
+    this.platform = kind === 'pet' ? model.getObjectByName('Muse_Platform') ?? null : null;
+    const plat = this.platform as THREE.Mesh | null;
+    if (plat?.isMesh) {
+      // The hover platform is a soft pool of light, not a solid disc: bright in the middle, fading to
+      // nothing at the edge, added onto the ground behind it.
+      plat.geometry.computeBoundingBox();
+      const bb = plat.geometry.boundingBox!;
+      const r = Math.max(0.05, Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2);
+      this.glow = new THREE.ShaderMaterial({
+        uniforms: { uColor: { value: new THREE.Color('#3FD2FF') }, uR: { value: r }, uC: { value: new THREE.Vector2((bb.max.x + bb.min.x) / 2, (bb.max.z + bb.min.z) / 2) }, uTime: { value: 0 } },
+        vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform vec3 uColor; uniform float uR; uniform vec2 uC; uniform float uTime; varying vec3 vP; void main(){ float d = length(vP.xz - uC) / uR; float a = pow(clamp(1.0 - d, 0.0, 1.0), 1.5); a *= 0.85 + 0.15 * sin(uTime * 2.2); gl_FragColor = vec4(uColor * (0.55 + 0.9 * a), a * 0.95); }',
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      });
+      plat.material = this.glow;
+      plat.renderOrder = 2;
+    }
+    if (kind === 'pet') {
+      const roles: Record<string, [boolean, 1 | -1]> = { Muse_LegL: [true, 1], Muse_LegR: [true, -1], Muse_ArmL: [false, 1], Muse_ArmR: [false, -1] };
+      model.traverse((o) => { const r = roles[o.name]; if (r) this.limbs.push({ node: o, base: o.quaternion.clone(), leg: r[0], side: r[1] }); });
+    }
     this.effectBody = model.getObjectByName('Muse_Body') as THREE.Mesh | undefined ?? null;
     if (this.effectBody?.isMesh) this.effectBody.geometry.computeBoundingBox();
     else this.effectBody = null;
@@ -401,6 +449,11 @@ class GltfCharacter implements Character {
 
   setState(s: string) {
     const once = ONE_SHOT.has(s);
+    if (this.kind === 'pet' && !once) {
+      const grounded = s === 'walk' || s === 'stand';
+      this.walking = s === 'walk';
+      if (this.platform) this.platform.visible = !grounded;
+    }
     if (!once) {
       this.base = s;
       if (this.oneShotLeft > 0) return;
@@ -413,14 +466,39 @@ class GltfCharacter implements Character {
 
   update(dt: number) {
     this.mixer.update(dt);
+    if (this.glow) { this.glowTime += dt; this.glow.uniforms.uTime.value = this.glowTime; }
     if (this.oneShotLeft > 0) {
       this.oneShotLeft -= dt;
       if (this.oneShotLeft <= 0) { this.oneShotLeft = 0; this.play(this.base, false); }
     }
+    let y = 0;
     if (this.hopLeft > 0) {
       this.hopLeft = Math.max(0, this.hopLeft - dt);
-      this.hop.position.y = Math.abs(Math.sin(this.hopLeft * 9)) * 0.22;
-    } else this.hop.position.y = 0;
+      y = Math.abs(Math.sin(this.hopLeft * 9)) * 0.22;
+    }
+    if (this.kind === 'pet') {
+      // The waddle: a bounce on every step, a rock side to side, a lean into the walk. It eases in
+      // and out so Jolly settles when you stop.
+      this.gaitAmp += ((this.walking ? 1 : 0) - this.gaitAmp) * (1 - Math.exp(-dt * 7));
+      if (this.gaitAmp > 0.004) {
+        // A jog: about 2.9 steps a second. The body bounces on each step, rocks and leans in, and
+        // the limbs swing: each leg with the opposite arm, arms bent forward.
+        this.gait += dt * Math.PI * 2 * 1.45;
+        const a = this.gaitAmp, sw = Math.sin(this.gait);
+        y += Math.abs(sw) * 0.09 * a;
+        this.hop.rotation.set(0.16 * a, sw * 0.05 * a, sw * 0.09 * a);
+        for (const l of this.limbs) {
+          const dir = l.leg ? l.side : -l.side;
+          const ang = (l.leg ? 0.9 : 0.75) * sw * dir * a + (l.leg ? 0 : -0.4 * a);
+          this.limbQ.setFromAxisAngle(AXIS_X, ang);
+          l.node.quaternion.copy(l.base).multiply(this.limbQ);
+        }
+      } else {
+        this.hop.rotation.set(0, 0, 0);
+        for (const l of this.limbs) l.node.quaternion.copy(l.base);
+      }
+    }
+    this.hop.position.y = y;
   }
 
   getEffectCenter(out: THREE.Vector3): void {
@@ -431,7 +509,7 @@ class GltfCharacter implements Character {
     } else out.set(0, this.height / 2, 0).applyMatrix4(this.root.matrixWorld);
   }
 
-  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); }
+  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); this.glow?.dispose(); }
 }
 
 // ---- Loading ----

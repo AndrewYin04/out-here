@@ -77,6 +77,13 @@
 [data-mode="friends"] .oh-quest-pin:hover [data-role="pin-label"],
 [data-mode="friends"] .oh-quest-pin:focus-visible [data-role="pin-label"] { visibility: visible; }
 
+/* World labels (friends' photos, plan labels) fade out while the Muse chat is open, so Jolly is in front. */
+[data-world-label] { transition: opacity .25s ease; }
+[data-muse-chat="true"] [data-world-label] { opacity: 0; pointer-events: none; }
+/* The 2D map's markers (friends' photos, plan pins) also step aside for the chat. */
+body:has([data-muse-chat="true"]) .maplibregl-marker { opacity: 0 !important; pointer-events: none; transition: opacity .25s ease; }
+@media (prefers-reduced-motion: reduce) { [data-world-label] { transition: none; } }
+
 /* The 3D loading screen: Jolly bobs while thinking, and the bubble's dots pulse. */
 @keyframes oh-jolly-bob {
   0%, 100% { transform: translateY(0); }

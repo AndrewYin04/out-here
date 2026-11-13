@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
-import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
+import { MuseTrail, SparkleWake, type MuseTrailModeSetting } from './muse-trail';
 import { stadiumSeats } from './stadiums';
 import type { TreeSpot } from './trees';
 import {buildTreeBatch,type TreeBatch} from './vegetation';
@@ -35,6 +35,11 @@ type Actor = {
   trail: MuseTrail | null;
   /** A soft ground shadow (avatars). Depth-tested in the main scene, so buildings still cover it. */
   shadow: THREE.Mesh | null;
+  /** Size multiplier (Jolly grows toward the screen while the Muse chat is open). */
+  boost: number;
+  /** Jolly's sparkle trail on the ground, and whether his thinking effect is on. */
+  sparkles: SparkleWake | null;
+  processing: 'off' | 'pending' | 'success' | 'fade';
 };
 export type BeaconSpec = {
   id: string; pos: LatLng; color: string; height: number; strong: boolean;
@@ -84,6 +89,8 @@ export class WorldLayer implements CustomLayerInterface {
 
   private map: MapLibreMap | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
+  private feet = new THREE.Vector3();
+  private bufSize = new THREE.Vector2();
   /** Trees and beacons: depth-tested against the 3D buildings. */
   private scene = new THREE.Scene();
   /** Characters: drawn after a depth clear, so a building never hides you (as in Pokémon GO). */
@@ -168,15 +175,17 @@ export class WorldLayer implements CustomLayerInterface {
     // The walking view gets the calm wake; the showpiece style is for flights and later animations.
     const trail = kind === 'pet' ? new MuseTrail({ style: 'walk' }) : null;
     if (trail) this.charScene.add(trail.object);
+    const sparkles = kind === 'pet' ? new SparkleWake() : null;
+    if (sparkles) this.charScene.add(sparkles.object);
     let shadow: THREE.Mesh | null = null;
-    if (kind === 'avatar') {
+    {
       shadow = new THREE.Mesh(this.shadowGeo, this.shadowMat);
       shadow.rotation.x = -Math.PI / 2;
       shadow.renderOrder = 1;
       shadow.frustumCulled = false;
       this.scene.add(shadow);
     }
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow });
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, sparkles, processing: 'off' });
   }
 
   removeActor(id: string) {
@@ -184,6 +193,7 @@ export class WorldLayer implements CustomLayerInterface {
     if (!a) return;
     this.charScene.remove(a.char.root);
     a.trail?.dispose();
+    if (a.sparkles) { this.charScene.remove(a.sparkles.object); a.sparkles.dispose(); }
     if (a.shadow) this.scene.remove(a.shadow);
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
@@ -191,6 +201,8 @@ export class WorldLayer implements CustomLayerInterface {
   }
 
   actorIds(): string[] { return [...this.actors.keys()]; }
+
+  setBoost(id: string, boost: number) { const a = this.actors.get(id); if (a) a.boost = boost; }
 
   setPose(id: string, pos: LatLng, heading: number, altitude = 0) {
     const a = this.actors.get(id);
@@ -211,7 +223,7 @@ export class WorldLayer implements CustomLayerInterface {
   }
   setMuseTrailStyle(id: string, style: 'walk' | 'full') { this.actors.get(id)?.trail?.setConfig({style, seed:id, ...(id.startsWith('muse:') ? {brightBlue:'#23D9F5',cyanAccent:'#B8F7FF'} : {})}); }
 
-  setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { this.actors.get(id)?.trail?.setProcessing(phase); }
+  setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { const a = this.actors.get(id); if (a) a.processing = phase; a?.trail?.setProcessing(phase); }
 
   /** Actual animated body centre, in map-canvas pixels, for the existing camera rig. */
   actorScreenPoint(id: string, out: { x: number; y: number; elevation: number }): boolean {
@@ -402,7 +414,7 @@ export class WorldLayer implements CustomLayerInterface {
 
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
-      const s = a.kind === 'pet' ? scale * 0.9 : scale;
+      const s = (a.kind === 'pet' ? scale * 0.9 : scale) * a.boost;
       a.char.root.visible = showChars;
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
       const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
@@ -415,7 +427,9 @@ export class WorldLayer implements CustomLayerInterface {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
         a.shadow.visible = showChars;
         a.shadow.position.set(o.east, 0.04, -o.north);
-        a.shadow.scale.set(s * 1.05, s * 1.05, 1);
+        // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
+        const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;
+        a.shadow.scale.set(s * foot, s * foot, 1);
       }
       if (a.trail) {
         if (showChars) {
@@ -434,7 +448,18 @@ export class WorldLayer implements CustomLayerInterface {
             y: 1 - ((Math.max(canvasRect.top, rect.top) + Math.min(rect.height / 2, 70) - canvasRect.top) / h) * 2,
           } : undefined;
           a.trail.update(this.trailPos, dt, { result, camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
-        } else a.trail.object.visible = false;
+          // On the ground Jolly leaves sparkles from his feet instead of the energy ray; the ray is for
+          // flying and for Muse's thinking.
+          const onGround = a.state === 'walk' || a.state === 'stand';
+          const ray = !onGround || a.processing !== 'off' || a.trail.isReleasing();
+          if (!ray) a.trail.object.visible = false;
+          if (a.sparkles) {
+            this.feet.set(o.east, a.altitude * scale, -o.north);
+            const still = !!this.motionQuery?.matches;
+            a.sparkles.object.visible = true;
+            a.sparkles.update(dt, this.feet, onGround && a.state === 'walk' && !still && a.processing === 'off', s, this.renderer?.getDrawingBufferSize(this.bufSize).y ?? 800);
+          }
+        } else { a.trail.object.visible = false; if (a.sparkles) a.sparkles.object.visible = false; }
       }
       if (a.label) {
         // Project the point just above the head into screen pixels.
