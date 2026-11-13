@@ -6,13 +6,14 @@ import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
+import { museSteps } from './muse-steps';
+import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
 import { StatusDot, StatusRow, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
-import { MuseThinking, PLAN_STEPS } from './MuseThinking';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
 const CHIPS = ['15 min', '40 min', 'tonight', 'cheap eats', 'meet people'] as const;
@@ -111,7 +112,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -129,6 +130,7 @@ export function PlanSheet({ className }: { className?: string }) {
     setError(null);
     setWhyOpen(false);
     setAsked(t);
+    setPlanAsk(t);
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
@@ -153,6 +155,7 @@ export function PlanSheet({ className }: { className?: string }) {
   const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
+  const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
 
   return (
     <>
@@ -217,9 +220,9 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'loading' && (
               <div data-testid="plan-loading" aria-live="polite">
-                <MuseThinking steps={PLAN_STEPS} />
-                {[0, 1].map((i) => (
-                  <div key={i} className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card" style={{ animationDelay: `${i * 90}ms` }}>
+                <MuseStepsLoading />
+                {[0].map((i) => (
+                  <div key={i} className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card" style={{ animationDelay: '90ms' }}>
                     <div className="flex gap-3">
                       <Skeleton shape="circle" width={40} height={40} />
                       <div className="flex-1"><Skeleton width="60%" className="h-4" /><Skeleton width="40%" className="mt-2 h-3" /></div>
@@ -235,6 +238,7 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
+                {steps.length > 0 && <MuseStepsDone steps={steps} showMuse={showMuse} />}
                 {summary && (
                   <div data-testid="plan-summary" className="mb-3 animate-step-in px-1">
                     {showMuse && <MuseLabel className="mb-1" />}

@@ -103,7 +103,7 @@ export async function openOrCreateTogether(store: DataStore, viewerId: ID, frien
   if (running) {
     // Someone in the group is already opening it: wait, then read it from this viewer's side.
     await running.catch(() => undefined);
-    const theirs = await store.openTogether(viewerId, friendIds);
+    const theirs = await store.openTogether(viewerId, friendIds, { fresh: true });
     if (theirs) return theirs;
   }
   // Registered synchronously (no await before set), so a request arriving a tick later waits.

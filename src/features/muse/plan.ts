@@ -47,6 +47,8 @@ export type PlanMeta = {
   candidateCount: number;
   /** Pre-check: how many friends' agents were asked (all friends; busy ones just answer nothing). */
   friendsChecked: number;
+  /** Friends free in the window: first name and end time only, from availability they shared with the viewer. */
+  friendsFree: { firstName: string; freeUntil: string }[];
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -105,6 +107,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     budgetMs,
     candidateCount: 0,
     friendsChecked: ctx.friends.length,
+    friendsFree: [],
     dropped: [],
     issues: [],
     ...rest,
@@ -126,12 +129,13 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     friendAvailability: ctx.friendAvailability, quests: ctx.quests, location: ctx.location, now,
   });
   const t3 = Date.now();
+  const friendsFree = result.friendsFree.map((f) => ({ firstName: f.firstName, freeUntil: f.freeUntil }));
 
   if (result.candidates.length === 0) {
     const summary = summaryText([], parsed.intent, result.friendsFree.map((f) => f.firstName));
     return {
       plan: { intent: parsed.intent, suggestions: [], summary: label(summary) },
-      meta: base({ dropped: result.dropped }, { candidatesMs: t3 - t2, totalMs: Date.now() - t0 }),
+      meta: base({ dropped: result.dropped, friendsFree }, { candidatesMs: t3 - t2, totalMs: Date.now() - t0 }),
     };
   }
 
@@ -166,6 +170,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
         rankFallback: ranked.fallback,
         rankError: ranked.error,
         candidateCount: result.candidates.length,
+        friendsFree,
         dropped: result.dropped,
         issues: checked.issues,
       },

@@ -4,14 +4,6 @@
 // The steps name the real pipeline stages; the last one holds until the answer arrives.
 import { useEffect, useState } from 'react';
 
-export const PLAN_STEPS = [
-  'Reading what you’re up for…',
-  'Checking which friends are free…',
-  'Asking your friends’ Muse…',
-  'Fitting walk times to your window…',
-  'Picking the best few…',
-] as const;
-
 export const TOGETHER_STEPS = [
   'Lining up when you’re all free…',
   'Finding what you all like…',

@@ -21,6 +21,9 @@ export type ValidationIssue = {
   field?: 'reason' | 'bridge' | 'inviteDraft';
 };
 
+/** Field names from the rank prompt's JSON; model text that echoes one is replaced by code text. */
+const LEAKED_FIELD = /\b(priceMax|walkMin|freeUntil|startsInMin|startsAt|seatsLeft|youLike|friendsWhoCanCome|friendsAlreadyGoing)\b/;
+
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** First names from `known` that appear in `text` but are not in `allowed`. */
@@ -232,7 +235,8 @@ export function validate(
     const checked = (
       field: NonNullable<ValidationIssue['field']>, text: string, fallback: () => string | null,
     ): string | null => {
-      const problem = claimIssue(text, facts, field);
+      // prompt field names ("priceMax 12", "Her freeUntil is…") must never reach users
+      const problem = LEAKED_FIELD.test(text) ? 'leaked a data field name' : claimIssue(text, facts, field);
       if (!problem) return text;
       issues.push({ questId: s.questId, issue: problem, field });
       return fallback();

@@ -8,5 +8,6 @@ export { BothFreeNudge, StatusRow, useMyAvailability, useMyStatus } from './Free
 export { TogetherSheet } from './TogetherSheet';
 export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, SeatsBadge } from './SuggestionCard';
-export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, type PlanPicks } from './plan-state';
+export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, usePlanAsk, type PlanPicks } from './plan-state';
+export { useMuseFilter, MUSE_FILTER_KEY, type MuseFilter, type MuseFilterMode } from './filter-state';
 export { dropText, shownDrops, type DroppedView, type DropReasonCode } from './dropped';
