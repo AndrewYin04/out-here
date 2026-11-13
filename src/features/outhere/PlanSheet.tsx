@@ -10,7 +10,7 @@ import { museSteps } from './muse-steps';
 import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
 import { StatusCard, StatusDot, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
@@ -182,7 +182,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -213,11 +213,21 @@ export function PlanSheet({ className }: { className?: string }) {
     setWhyOpen(false);
     setAsked(t);
     setPlanAsk(t);
+    setPlanStatus({ state: 'loading', summary: null, topTitle: null, topReason: null, error: null, live: false });
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions);
       setStatus('done');
+      const top = r.plan.suggestions[0];
+      setPlanStatus({
+        state: 'done',
+        summary: r.plan.summary.replace(/^\[mock\]\s*/, ''),
+        topTitle: top?.title ?? null,
+        topReason: top?.reason ?? null,
+        error: null,
+        live: r.museSource === 'muse',
+      });
       // Only the ask whose results are shown becomes the viewer's availability (unless a time
       // was picked, which already set it).
       if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
@@ -225,6 +235,7 @@ export function PlanSheet({ className }: { className?: string }) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error'); setPlanSuggestions(null);
+      setPlanStatus({ state: 'error', summary: null, topTitle: null, topReason: null, error: errorText(err, 'Muse could not make a plan right now.'), live: false });
     }
   };
 

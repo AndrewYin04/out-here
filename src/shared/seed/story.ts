@@ -6,7 +6,7 @@
 // inside the window: Dumpling Den (fits: ~9 min walk, $12, 2 seats left), Noodle Theory
 // (~28 min walk, over the 25 min cap) and Kaiten Bay ($26, over budget). With 15 minutes,
 // only the Bobalicious Corner boba quest (~4 min walk, $7, starts in 10) fits.
-import type { QuestCategory } from '../types';
+import type { QuestCategory, QuestVisibility } from '../types';
 
 export type QuestSpec = {
   key: string;                 // stable key for the seed id
@@ -24,6 +24,12 @@ export type QuestSpec = {
   groupSlug: string | null;
   /** Hosts/members tried first, in order; the rest come from the group, then anyone. */
   preferredMembers: string[];
+  /** Who can see it; default 'community'. 'group' needs groupSlug. */
+  visibility?: QuestVisibility;
+  /** Pop-up text bubble shown above the pin. */
+  bubbleText?: string;
+  /** Seeded members already checked in (the first N members), for a plan that is live now. */
+  checkedIn?: number;
 };
 
 /** People never pre-seated in upcoming quests: the demo driver joins live, Maya via invite. */
@@ -148,6 +154,14 @@ export const DEMO_QUESTS: QuestSpec[] = [
     placeName: 'Bay Trail Start (Bayfront)', startsInMin: 60, durationMin: 45, capacity: 10, memberCount: 3,
     priceMax: 0, tags: ['running', 'outdoors'], groupSlug: 'sunset-runners-bayfront',
     preferredMembers: ['sam'],
+  },
+  {
+    // Group-only and already live: Alex (a member) sees it, Maya (not a member) does not.
+    key: 'new-grads-frisbee', title: 'New grads frisbee on the lawn', emoji: '🥏', category: 'sports',
+    description: 'Casual ultimate on the grass by the trail. Teams get picked on the spot, all levels.',
+    placeName: 'Bay Trail Start (Bayfront)', startsInMin: -20, durationMin: 90, capacity: 10, memberCount: 6,
+    priceMax: 0, tags: ['frisbee', 'new grads', 'outdoors'], groupSlug: 'menlo-park-new-grads',
+    preferredMembers: ['sam'], visibility: 'group', bubbleText: 'We brought extra discs 🥏', checkedIn: 4,
   },
 ];
 

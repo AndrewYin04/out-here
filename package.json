@@ -19,7 +19,9 @@
     "gen:content": "node --env-file=.env.local scripts/gen-content.mjs",
     "gen:images": "node --env-file=.env.local scripts/gen-images.mjs",
     "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs",
-    "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs"
+    "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs",
+    "watch:3d": "node scripts/watch-3d.mjs",
+    "models:sync": "node -e \"require('fs').copyFileSync('assets/muse-companion/muse-companion.glb','public/models/muse-companion.glb'); console.log('copied muse-companion.glb to public/models')\""
   },
   "dependencies": {
     "@supabase/supabase-js": "2.119.0",
@@ -33,6 +35,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sharp": "0.35.5",
+    "three": "0.186.1",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -44,6 +47,7 @@
     "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "0.186.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
     "tailwindcss": "^4",
