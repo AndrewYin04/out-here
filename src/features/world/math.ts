@@ -8,14 +8,15 @@ import { haversineMeters, walkingMinutesExact, type LatLng } from '@/shared';
 export const FLAT_ZOOM = 15;
 /** At this zoom the camera reaches STREET_PITCH. */
 export const STREET_ZOOM = 18.5;
-export const STREET_PITCH = 54;
+export const STREET_PITCH = 60;
 /** Zoomed in closer than street level, the camera drops lower toward the horizon. */
 export const CLOSE_ZOOM = 21.5;
-export const CLOSE_PITCH = 62;
+// Close behind the avatar the camera looks further ahead, toward the street and the horizon.
+export const CLOSE_PITCH = 72;
 /** Zoom the 3D view eases to when it opens: close behind the avatar. */
 export const ENTER_ZOOM = 21.3;
 export const MAX_3D_ZOOM = 22.5;
-export const MAX_3D_PITCH = 65;
+export const MAX_3D_PITCH = 75;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */
 export const CHARACTER_MIN_ZOOM = 18.2;
 /**
