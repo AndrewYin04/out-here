@@ -69,6 +69,8 @@ export const POST = route(async ({ req, viewer }) => {
         headers: {
           'x-muse-total-ms': String(out.meta.timings.totalMs), 'x-muse-mode': out.meta.mode,
           'x-muse-source': museSource, 'x-muse-context': contextSource,
+          // which model steps came from muse_cache (real Muse answers stored by the warm-up)
+          'x-muse-cache': [out.meta.cache.parse && 'parse', out.meta.cache.rank && 'rank'].filter(Boolean).join(',') || 'none',
         },
       },
     );
