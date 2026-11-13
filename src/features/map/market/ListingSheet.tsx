@@ -4,7 +4,7 @@
 // the seller accepts, they get a countdown, the exact spot and directions. The seller answers
 // requests in one tap, then marks it sold (the pin leaves every map) or releases the hold.
 import { Car, Check, Clock, Footprints, MapPin, Navigation, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type LatLng } from '@/shared';
@@ -131,7 +131,7 @@ export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, mu
               </span>
             </li>
             {!isSeller && walkMin !== null && walkMin <= WALKABLE_MIN ? (
-              <li className="flex items-center gap-2"><Footprints size={18} className="shrink-0 text-fb-text-2" aria-hidden />{walkMin} min walk</li>
+              <li className="flex items-center gap-2"><Footprints size={18} className="shrink-0 text-fb-text-2" aria-hidden />{Math.max(1, walkMin)} min walk</li>
             ) : driveMin !== null && !isSeller && (
               <li className="flex items-center gap-2"><Car size={18} className="shrink-0 text-fb-text-2" aria-hidden />{driveMin} min drive</li>
             )}
@@ -254,11 +254,15 @@ function ReserveForm({ m, at, busy, run, onCancel }: { m: MapListing; at: Date; 
   const [offer, setOffer] = useState(String(l.priceUsd));
   const auto = useMemo(() => `${money(Number(offer) || 0)}, I can be there in ${eta} minutes.`, [offer, eta]);
   const [message, setMessage] = useState<string | null>(null);
+  // On a phone the sheet is short: bring the form (and Send request) into view when it opens.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => { formRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
   const body: HoldRequestBody = { offerUsd: Math.max(0, Number(offer) || 0), etaMin: eta, message: message ?? auto };
 
   if (etas.length === 0) return <p className="text-[15px] text-fb-text-2">The pickup window is about to close.</p>;
   return (
     <form
+      ref={formRef}
       data-testid="reserve-form"
       className="flex flex-col gap-2.5 rounded-card border border-fb-divider p-3"
       onSubmit={(e) => {

@@ -45,8 +45,8 @@ export function MuseFindCard({ find, watch = null, onView, onDismiss }: {
         )}
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-2">
-            {find.source === 'muse' ? <MuseLabel className="py-0" /> : <span className="text-[12px] font-semibold text-fb-blue">✨ Found for you</span>}
-            <span className="truncate text-[13px] text-fb-text-2">{find.title} · {money(find.priceUsd)}</span>
+            {find.source === 'muse' ? <MuseLabel className="shrink-0 py-0" /> : <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-fb-blue">✨ Found for you</span>}
+            <span className="min-w-0 truncate text-[13px] text-fb-text-2">{find.title} · {money(find.priceUsd)}</span>
           </div>
           {watch && <p data-testid="muse-find-watch" className="mb-0.5 text-[13px] font-semibold leading-4 text-fb-text">Fits the watch you set: {watch}</p>}
           <p data-testid="muse-find-line" className="text-[15px] leading-5 text-fb-text">{find.line}</p>

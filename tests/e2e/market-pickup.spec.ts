@@ -111,6 +111,8 @@ test('beat 3: pop-up goes live, Alex reserves the jacket, Leo accepts, Maya gets
 
   await alex.getByTestId('reserve-send').click();
   await expect(alex.getByTestId('hold-requested')).toBeVisible();
+  // Muse's reason stays the one Alex read; it doesn't swap to another find's line.
+  await expect(alex.getByTestId('listing-muse-line')).toContainText(/track jacket under \$25/i);
   await expect(listing).not.toContainText(SPOT);
   await expect(alexPhone.getByTestId('hold-requested')).toBeVisible({ timeout: 10_000 });
   await shot(alex, 'reserve-requested-1440');

@@ -272,9 +272,22 @@ export function OutHereView() {
     setShowListings(true);
     openListing(id);
     if (map && at && !map.getContainer().hasAttribute('data-view3d')) {
-      map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700 });
+      // The listing sheet covers the bottom ~62% on a phone and the left 400 px on desktop: put the
+      // pin in the part of the map that stays visible.
+      const el = map.getContainer();
+      const phone = el.clientWidth < 768;
+      const offset: [number, number] = phone ? [0, -Math.round(el.clientHeight * 0.32)] : [200, 0];
+      map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700, offset });
     }
   }, [map, openListing]);
+  // Muse's line stays on the sheet while it is open: once you request the item the want find drops
+  // it, and a different reason (or none) must not replace what you just read.
+  const [pinnedLine, setPinnedLine] = useState<{ id: string; line: string; watch: string | null } | null>(null);
+  const liveLine = listingId ? allFinds.find((f) => f.listingId === listingId)?.line ?? null : null;
+  useEffect(() => {
+    if (listingId && liveLine && pinnedLine?.id !== listingId) setPinnedLine({ id: listingId, line: liveLine, watch: watchFor(listingId) });
+  }, [listingId, liveLine, pinnedLine?.id, watchFor]);
+  const sheetLine = pinnedLine && pinnedLine.id === listingId ? pinnedLine : liveLine ? { line: liveLine, watch: watchFor(listingId) } : null;
   const openedListing = listingId ?listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
   const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
   const walkMin = openedListing?.listing.location && ctx?.origin ? walkingMinutes(ctx.origin, openedListing.listing.location) : null;
@@ -411,6 +424,8 @@ export function OutHereView() {
   }, [letsGo]);
   /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
   const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
+  // Up next steps aside for an open plan, a sheet, the create and sell sheets, and the walk.
+  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !!upNext && !upNextClosed;
   // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
   const recenter = useCallback(() => {
     if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }
@@ -608,7 +623,7 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
+      {upNextShown && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
         // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
         // at this height and covered Let's go.
@@ -642,7 +657,8 @@ export function OutHereView() {
 
       {/* Muse found something the viewer is looking for: a card above the dashboard. */}
       {find && !creating && !selling && !sheetOpen && !listingId && !selectedId && (
-        <div className="pointer-events-none absolute inset-x-3 top-[84px] z-30 flex justify-center">
+        <div className={cn('pointer-events-none absolute inset-x-3 z-30 flex justify-center max-md:right-[68px]',
+          !upNextShown ? 'top-[84px]' : filter.on ? 'top-[190px]' : tools ? 'top-[150px]' : 'top-[102px]')}>
           <MuseFindCard
             key={find.listingId}
             find={find}
@@ -716,8 +732,8 @@ export function OutHereView() {
           viewerId={persona.id}
           driveMin={driveMin}
           walkMin={walkMin}
-          museLine={allFinds.find((f) => f.listingId === listingId)?.line ?? null}
-          museWatch={watchFor(listingId)}
+          museLine={sheetLine?.line ?? null}
+          museWatch={sheetLine?.watch ?? null}
           onClose={() => openListing(null)}
           onChanged={() => { void listingsApi.refetch(); }}
         />

@@ -6,7 +6,7 @@ import { ImagePlus, X } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, uploadImage } from '@/features/data';
 import { Button, IconButton, cn } from '@/features/ui';
-import { formatDemoTime, type LatLng } from '@/shared';
+import { formatDemoTime, offsetPoint, type LatLng } from '@/shared';
 import type { CreateListingBody, MapListing, MapListingResponse } from '@/shared/api';
 import { nextAtClock } from '../create/time';
 
@@ -67,10 +67,11 @@ function PopUpSheet({ at, now, onClose, onPosted, popUp }: SellSheetProps & { po
     setError(null);
     try {
       let first: MapListing | null = null;
-      for (const it of popUp.items) {
+      for (const [i, it] of popUp.items.entries()) {
         const body: CreateListingBody = {
           title: it.title, priceUsd: it.priceUsd, category: it.category, imageUrl: it.imageUrl, description: it.description,
-          location: at, pickupLabel: popUp.name, pickupSpot: popUp.spot, pickupUntil: until,
+          // Each table a few metres along, so the seller's own pins don't sit on top of each other.
+          location: i === 0 ? at : offsetPoint(at, 25 * i, 90), pickupLabel: popUp.name, pickupSpot: popUp.spot, pickupUntil: until,
         };
         const r = await apiPost<MapListingResponse>('/api/listings', body);
         first ??= r.listing;
@@ -89,7 +90,7 @@ function PopUpSheet({ at, now, onClose, onPosted, popUp }: SellSheetProps & { po
       data-testid="popup-sheet"
       className={cn(
         'absolute inset-x-0 bottom-0 z-30 flex max-h-[78%] flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
-        'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
+        'md:inset-x-auto md:bottom-auto md:left-4 md:top-4 md:max-h-[calc(100%-32px)] md:w-[400px] md:rounded-card',
       )}
     >
       <header className="flex shrink-0 items-start justify-between px-4 pb-1 pt-3">
@@ -174,7 +175,7 @@ function SingleSellSheet({ at, now, onClose, onPosted }: SellSheetProps) {
       data-testid="sell-sheet"
       className={cn(
         'absolute inset-x-0 bottom-0 z-30 flex max-h-[78%] flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
-        'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
+        'md:inset-x-auto md:bottom-auto md:left-4 md:top-4 md:max-h-[calc(100%-32px)] md:w-[400px] md:rounded-card',
       )}
     >
       <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-fb-divider md:hidden" aria-hidden />
