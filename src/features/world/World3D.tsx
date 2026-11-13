@@ -7,7 +7,6 @@
 // GPS. Neither writes a position to the server; Find My keeps doing location sharing.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { LocateFixed } from 'lucide-react';
 import { ArrivalSelfie, OPEN_SELFIE } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
 import { cn, useDemoTools } from '@/features/ui';
@@ -28,7 +27,7 @@ import { WorldLayer, type BeaconSpec } from './WorldLayer';
 
 export type World3DProps = {
   map: MapLibreMap;
-  viewer: { id: string; name: string };
+  viewer: { id: string; name: string; avatarUrl?: string };
   /** Where the demo walk starts: the viewer's home on the seeded map. */
   home: LatLng | null;
   quests: Quest[];
@@ -73,7 +72,7 @@ const typing = (t: EventTarget | null) => {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 /** Muse's hello follows where you are in the journey: no "tap I'm free" once you have a plan. */
 function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
-  if (!next) return `Hi ${name}. Tap I’m free and I’ll find something nearby.`;
+  if (!next) return `Hi ${name}! Tap ✨ I’m free and I’ll find something nearby.`;
   const mins = Math.round((Date.parse(next.quest.startsAt) - Date.now()) / 60_000);
   const when = mins <= 0 ? 'is happening now' : `starts in ${mins} min`;
   return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
@@ -350,7 +349,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!fresh) return;
     const q = quests.find((x) => x.id === fresh);
     layerRef.current?.setState('me', 'celebrate');
-    setCheer(q ? `You’re in: ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in.');
+    setCheer(q ? `You’re in! ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in!');
   }, [quests, viewer.id]);
 
   /** One step of free walking that slides along walls instead of entering a building. */
@@ -800,6 +799,23 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     layerRef.current?.bindLabel(id, el, lift);
   }, []);
 
+  // "Back to you" from the map's control stack.
+  useEffect(() => {
+    const on = () => { stopTour(); entering.current = true; setFollow(true); };
+    window.addEventListener('outhere:recenter', on);
+    return () => window.removeEventListener('outhere:recenter', on);
+  }, [stopTour, setFollow]);
+  // The walking capsule measures progress from where the walk started.
+  const walkStart = useRef<{ id: string; meters: number } | null>(null);
+  if (walk && walkStart.current?.id !== walk.questId) {
+    walkStart.current = { id: walk.questId, meters: Math.max(1, haversineMeters(pos.current, walk.to)) };
+  }
+  if (!walk) walkStart.current = null;
+  const progressOf = (at: LatLng) => {
+    if (!walk || !walkStart.current) return 0;
+    return Math.min(1, Math.max(0, 1 - haversineMeters(at, walk.to) / walkStart.current.meters));
+  };
+
   const gpsLine = source !== 'gps' ? null
     : gps.status === 'asking' ? 'Finding you…'
       : gps.status === 'weak' ? 'GPS signal is weak here'
@@ -822,6 +838,38 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           <p role="status" className="flex items-center gap-2 rounded-pill bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-card">
             <span aria-hidden className="animate-pulse">✨</span> Getting the street view ready…
           </p>
+        </div>
+      )}
+      {/* Walking: one capsule at the top. The plan, everyone's progress along the way, minutes left. */}
+      {walk && walkMin != null && (
+        <div role="status" data-testid="walk-countdown"
+          className="pointer-events-auto absolute left-1/2 top-3 z-20 flex w-[min(calc(100%-24px),460px)] -translate-x-1/2 animate-drop-in items-center gap-3 rounded-full bg-fb-surface/95 p-1.5 shadow-popover backdrop-blur">
+          <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E0] text-[22px]">{walk.emoji}</span>
+          <span className="sr-only">{walkMin <= 1 ? 'Almost there' : `${walkMin} min`} to {walk.title}</span>
+          <div className="relative mx-2 h-2 min-w-0 flex-1 rounded-full bg-[#E4E6EB]" aria-hidden>
+            <div className="absolute inset-y-0 left-0 rounded-full bg-fb-blue transition-[width] duration-700" style={{ width: `${progressOf(pos.current) * 100}%` }} />
+            {together.plan?.id === walk.questId && together.walkers.map((w) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={w.id} src={w.avatarUrl} alt="" title={firstName(w.name)}
+                className="absolute top-1/2 size-8 -translate-x-1/2 -translate-y-1/2 rounded-full object-cover ring-2 ring-white transition-[left] duration-700"
+                style={{ left: `${progressOf(walkerPos.current.get(`w:${w.id}`)?.at ?? w.location) * 100}%` }} />
+            ))}
+            {viewer.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={viewer.avatarUrl} alt="" className="absolute top-1/2 z-[1] size-8 -translate-x-1/2 -translate-y-1/2 rounded-full object-cover ring-2 ring-fb-blue transition-[left] duration-700"
+                style={{ left: `${progressOf(pos.current) * 100}%` }} />
+            ) : (
+              <span className="absolute top-1/2 z-[1] size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fb-blue ring-2 ring-white" style={{ left: `${progressOf(pos.current) * 100}%` }} />
+            )}
+          </div>
+          {together.plan?.id === walk.questId && together.walkers.length > 0 && (
+            <span data-testid="walk-with" className="sr-only">with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</span>
+          )}
+          <span className="shrink-0 text-[18px] font-bold tabular-nums text-fb-text">{walkMin <= 1 ? '<1m' : `${walkMin}m`}</span>
+          <button type="button" onClick={stopWalk} aria-label="Stop walking" title="Stop"
+            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-secondary-btn text-[18px] font-semibold text-fb-text hover:brightness-95">
+            ✕
+          </button>
         </div>
       )}
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
@@ -926,24 +974,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             </button>
           </div>
         )}
-        {walk && walkMin != null && (
-          <div role="status" data-testid="walk-countdown" className="pointer-events-auto flex items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-popover">
-            <span>{walkMin <= 1 ? 'Almost there' : `${walkMin} min`} to {walk.emoji} {clip(walk.title, 28)}</span>
-            {together.plan?.id === walk.questId && together.walkers.length > 0 && (
-              <span data-testid="walk-with" className="font-normal text-fb-text-2">· with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</span>
-            )}
-            <button type="button" onClick={stopWalk} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
-          </div>
-        )}
         {arrival && !walk && !selfieQuest && (
           <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
-            {arrival.text}
+            📍 {arrival.text}
           </div>
         )}
         <ArrivalSelfie quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
-            Walk there · {selectedMin} min
+            🚶 Walk there · {selectedMin} min
           </button>
         )}
         {farKm != null && (
@@ -956,15 +995,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       </div>
 
       {/* Bottom right: the HQ tour, "Back to me", and the location source. */}
-      <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[160px]">
+      <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[136px]">
         {tools && hqLabels.length > 0 && !tour && (
           <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            Tour Meta HQ
+            🏢 Tour Meta HQ
           </button>
         )}
-        {!follow && (
-          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            <LocateFixed size={16} aria-hidden /> Back to me
+        {tools && !follow && (
+          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
+            ◎ Back to me
           </button>
         )}
         {(tools || source === 'gps') && <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
@@ -977,7 +1016,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               onClick={() => void chooseSource(s)}
               className={cn('h-8 rounded-pill px-3 text-[13px] font-semibold', source === s ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover')}
             >
-              {s === 'demo' ? 'Demo walk' : 'Live GPS'}
+              {s === 'demo' ? '🕹️ Demo walk' : '📡 Live GPS'}
             </button>
           ))}
         </div>}
@@ -985,7 +1024,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       </div>
 
       {/* Bottom left, above the view toggle: the joystick (demo walk only). */}
-      {source === 'demo' && <Joystick stick={stick} />}
+      {/* The joystick is a rehearsal tool: Let's go walks you there on its own. */}
+      {source === 'demo' && tools && <Joystick stick={stick} />}
     </div>
   );
 }
@@ -1007,7 +1047,7 @@ function Joystick({ stick }: { stick: MutableRefObject<{ x: number; y: number }>
   };
   const end = () => { active.current = null; setKnob({ x: 0, y: 0 }); stick.current = { x: 0, y: 0 }; };
   return (
-    <div className="absolute bottom-[88px] left-3 max-md:bottom-[160px]">
+    <div className="absolute bottom-[88px] left-3 max-md:bottom-[136px]">
       <div
         ref={base}
         data-testid="joystick"

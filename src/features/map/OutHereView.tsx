@@ -2,16 +2,18 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { CalendarCheck, LocateFixed, Map as MapIcon } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
+import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { Plus } from 'lucide-react';
 import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
-import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
@@ -297,6 +299,17 @@ export function OutHereView() {
     setMode('explore');
     letsGo(id);
   }, [letsGo]);
+  /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
+  const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
+  // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
+  const recenter = useCallback(() => {
+    if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }
+    const at = ctx?.origin ?? DEMO_CENTER;
+    map?.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
+  }, [show3d, ctx?.origin, map]);
+  // Tests drive the tools directly, so the Demo pill only shows for people.
+  const [navigatorIsTest, setNavigatorIsTest] = useState(true);
+  useEffect(() => setNavigatorIsTest(navigator.webdriver === true), []);
   const onArrive = useCallback((questId: string) => {
     finishWalk(questId);
     setArrivedId(questId);
@@ -331,7 +344,7 @@ export function OutHereView() {
       {show3d && map && (
         <World3D
           map={map}
-          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name }}
+          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name, avatarUrl: ctx?.viewer.avatarUrl ?? persona.avatarUrl }}
           home={ctx?.origin ?? null}
           quests={shown}
           picks={picks}
@@ -353,8 +366,26 @@ export function OutHereView() {
         </p>
       )}
 
-      {/* The Muse filter at the top; Explore / Friends live in the dock at the bottom. */}
-      <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">
+      {/* Explore / Friends, and the Muse filter chip beside them: the flat map only. The 3D street
+          view keeps just your avatar, Muse and one button (docs/UX_PLAN.md). */}
+      <div className={cn('absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2', show3d && 'hidden')}>
+        <div role="group" aria-label="Map view" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
+          {(['explore', 'friends'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              data-testid={`map-mode-${m}`}
+              onClick={() => setMode(m)}
+              className={cn(
+                'h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors',
+                mode === m ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
+              )}
+            >
+              {m === 'explore' ? 'Explore' : 'Friends'}
+            </button>
+          ))}
+        </div>
         {tools && <button
           type="button"
           aria-pressed={filter.on}
@@ -366,7 +397,7 @@ export function OutHereView() {
             filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
           )}
         >
-          Muse filter
+          <span aria-hidden>✨</span> Muse filter
         </button>}
       </div>
 
@@ -464,6 +495,7 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
+          <PeopleButton map={map} />
           {visible.length > 0 && (
             <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
@@ -486,7 +518,7 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && upNext && (
+      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered.
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
           mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
@@ -503,37 +535,57 @@ export function OutHereView() {
       )}
 
       {/* Dock the availability card at the edge to leave room for the map and avatar. */}
-      {!selectedId && !creating && !sheetOpen && !upNext && (
+      {!selectedId && !creating && !sheetOpen && !upNext && !show3d && (
         <div className={cn(
           'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
           show3d
             ? mode === 'friends' && visible.length > 0
               ? filter.on ? 'top-32' : 'top-24'
               : filter.on ? 'top-24' : 'top-[60px]'
-            : 'bottom-[148px] md:bottom-auto',
+            : 'bottom-[136px] md:bottom-auto',
         )}>
           <BothFreeNudge className="pointer-events-auto w-full" />
         </div>
       )}
 
-      {/* The dock: I'm free, one contextual action, Map/3D, and the Explore / Friends / Your plans /
-          Memories pills in one sheet. One panel at a time: it steps aside for the composer, the
-          create sheet, and (on phones) a quest's sheet. */}
-      {!sheetOpen && !creating && (
-        <div className={cn(selectedId && 'max-md:hidden')}>
-          <OutHereDock
-            mode={mode}
-            onMode={setMode}
-            view={view}
-            onToggleView={unsupported ? null : () => setView(view === '3d' ? 'map' : '3d')}
-            onCreate={unsupported ? null : () => startCreate()}
-            map={map}
-            quests={shown}
-            walkMinutes={ctx?.walkMinutes ?? {}}
-            now={now}
-            onSelect={select}
-          />
+      {/* One button at the bottom: I'm free (it also shows your status). Hidden while you walk. */}
+      {!sheetOpen && !creating && !walkingNow && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
+          <ImFreeButton className="pointer-events-auto" />
         </div>
+      )}
+
+      {/* Right-side stack: 3D / Map, back to you, your plans, post a plan. */}
+      {!unsupported && !creating && !walkingNow && (
+        <div role="group" aria-label="Map controls"
+          className={cn('absolute right-3 z-20 flex flex-col overflow-hidden rounded-[22px] bg-fb-surface shadow-popover', sheetOpen ? 'max-md:hidden md:bottom-6' : 'bottom-24 max-md:bottom-[150px]', selectedId && 'max-md:hidden')}>
+          <button type="button" data-testid={view === '3d' ? 'view-map' : 'view-3d'} aria-label={view === '3d' ? 'Flat map' : '3D street view'} title={view === '3d' ? 'Flat map' : '3D street view'}
+            onClick={() => setView(view === '3d' ? 'map' : '3d')}
+            className="flex size-12 items-center justify-center text-[15px] font-bold text-fb-text hover:bg-fb-hover">
+            {view === '3d' ? <MapIcon size={22} aria-hidden /> : '3D'}
+          </button>
+          <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={recenter}
+            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-text hover:bg-fb-hover">
+            <LocateFixed size={22} aria-hidden />
+          </button>
+          <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
+            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-text hover:bg-fb-hover">
+            <CalendarCheck size={21} aria-hidden />
+          </Link>
+          <button type="button" data-testid="create-plan-btn" aria-label="Post a plan" title="Post a plan (or long-press the map)"
+            onClick={() => startCreate()}
+            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-blue hover:bg-fb-hover">
+            <Plus size={24} aria-hidden />
+          </button>
+        </div>
+      )}
+
+      {/* Rehearsal tools are on (?tools=1): say so, and offer the way out. */}
+      {tools && !navigatorIsTest && (
+        <a href="?tools=0" data-testid="demo-pill" title="Demo tools are on. Tap to hide them."
+          className="absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-2 rounded-pill bg-[#1C1E21]/75 px-3 text-[14px] font-semibold text-white backdrop-blur hover:bg-[#1C1E21]/90">
+          <span aria-hidden className="size-2.5 rounded-full bg-[#31A24C]" />Demo
+        </a>
       )}
       <PlanSheet />
       <TogetherSheet />
