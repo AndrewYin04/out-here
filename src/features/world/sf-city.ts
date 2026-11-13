@@ -46,16 +46,19 @@ export function cityDistrictLayout(index: number): CityPlacement[] {
   // Four interior blocks, with storefronts facing streets, gardens in the courtyards.
   let building = 0;
   for (const x of [-33, 33]) for (const z of [-33, 33]) {
-    for (const [dx, dz, angle] of [[-14, -14, Math.PI], [14, -14, Math.PI], [-14, 14, 0], [14, 14, 0]]) {
+    // A ring of eight buildings round each courtyard (corners and mid-sides), facing the streets.
+    for (const [dx, dz, angle] of [[-17, -17, Math.PI], [0, -17, Math.PI], [17, -17, Math.PI], [-17, 0, -Math.PI / 2], [17, 0, Math.PI / 2], [-17, 17, 0], [0, 17, 0], [17, 17, 0]]) {
       const n = building++;
       const house = index === 1 && n % 3 === 0;
-      add(house ? HOUSES[(n + index) % HOUSES.length] : SHOPS[(n + index * 2) % SHOPS.length], x + dx, z + dz, house ? 14 : 16, angle, TINTS[(n + index) % TINTS.length], true);
+      add(house ? HOUSES[(n + index) % HOUSES.length] : SHOPS[(n + index * 2) % SHOPS.length], x + dx, z + dz, house ? 11 : 12, angle, TINTS[(n + index) % TINTS.length], true);
     }
     for (const [dx, dz] of [[-5, -4], [6, 5], [0, 9]]) add('tree', x + dx, z + dz, 7.5 + (index % 2));
     add('planter', x, z - 7, 1.4);
   }
   // The skyline is behind the shopfronts, so towers do not enclose the spawn or chat camera.
-  const skyline: [number, number, number][] = [[-89, -33, 21], [89, -33, 23], [-89, 33, 18], [89, 33, 19], [-33, -89, 20], [33, -89, 22], [-33, 89, 19], [33, 89, 21]];
+  const skyline: [number, number, number][] = [[-89, -33, 21], [89, -33, 23], [-89, 33, 18], [89, 33, 19], [-33, -89, 20], [33, -89, 22], [-33, 89, 19], [33, 89, 21],
+    // and a tower on every corner of the district
+    [-89, -89, 19], [89, -89, 20], [-89, 89, 21], [89, 89, 18]];
   skyline.forEach(([x, z, width], n) => add(TOWERS[(n + index) % 3], x, z, width, x < 0 ? Math.PI / 2 : -Math.PI / 2, TINTS[(n + index * 2) % TINTS.length], true));
   for (const road of [-66, 0, 66]) for (const along of [-88, -44, -22, 22, 44, 88]) {
     // Six-metre trees and lights have pedestrian clearance from both road and building fronts.

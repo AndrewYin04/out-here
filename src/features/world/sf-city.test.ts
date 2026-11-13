@@ -19,10 +19,10 @@ describe('authored SF kit districts', () => {
       expect(layout).toEqual(cityDistrictLayout(district));
       expect(layout.length).toBeLessThan(260);
       expect(layout.some(p => p.asset === 'crossroad' && p.x === 0 && p.z === 0)).toBe(true);
-      expect(layout.filter(p => p.building)).toHaveLength(24);
+      expect(layout.filter(p => p.building)).toHaveLength(44);
       expect(layout.filter(p => p.building).every(p => Math.abs(p.x) > 15 && Math.abs(p.z) > 15)).toBe(true);
       expect(layout.every(p => Math.abs(p.x) <= 100 && Math.abs(p.z) <= 100 && p.size > 0)).toBe(true);
-      expect(layout.filter(p => p.asset.startsWith('tower'))).toHaveLength(8);
+      expect(layout.filter(p => p.asset.startsWith('tower'))).toHaveLength(12);
     }
     expect(cityDistrictLayout(1).some(p => p.asset.startsWith('house'))).toBe(true);
   });
@@ -30,7 +30,7 @@ describe('authored SF kit districts', () => {
     const centers = [{ id: 'alex', center: origin }, { id: 'maya', center: moveMeters(origin, 400, 0) }, { id: 'leo', center: moveMeters(origin, 450, 130) }];
     const city = await buildSfCity(origin, centers);
     expect(city.bounds).toHaveLength(3); expect(city.stats.drawCalls).toBeLessThanOrEqual(90);
-    expect(city.stats.instances).toBeGreaterThan(600); expect(city.stats.instances).toBeLessThan(780);
+    expect(city.stats.instances).toBeGreaterThan(660); expect(city.stats.instances).toBeLessThan(820);
     for (const center of centers) {
       expect(city.isBlocked(center.center)).toBe(false);
       expect(city.isBlocked(moveMeters(center.center, 60, 0))).toBe(false);
