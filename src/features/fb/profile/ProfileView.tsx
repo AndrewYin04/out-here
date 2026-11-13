@@ -429,7 +429,7 @@ function FriendsTabView({ data, initialMutual }: { data: ProfileResponse; initia
     <Card flushOnMobile className="p-4" data-testid="friends-tab">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[20px] font-bold text-fb-text">Friends</h2>
-        <label className="flex h-9 w-full items-center gap-2 rounded-pill bg-fb-input px-3 md:w-[240px]">
+        <label className="flex h-9 w-full items-center gap-2 rounded-pill bg-fb-input px-3 md:w-[240px] focus-within:ring-2 focus-within:ring-fb-blue">
           <Search size={16} className="shrink-0 text-fb-text-2" aria-hidden />
           <span className="sr-only">Search {firstName(p.name)}&apos;s friends</span>
           <input

@@ -62,7 +62,7 @@ export function EditProfileModal({ data, open, onClose, onSaved }: {
           onChange={(e) => setBio(e.target.value)}
           rows={3}
           placeholder="Describe who you are"
-          className="w-full resize-none rounded-btn bg-fb-input p-3 text-center text-[15px] text-fb-text outline-none placeholder:text-fb-text-2"
+          className="w-full resize-none rounded-btn bg-fb-input p-3 text-center text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus-visible:ring-2 focus-visible:ring-fb-blue"
           data-testid="bio-input"
         />
       </label>

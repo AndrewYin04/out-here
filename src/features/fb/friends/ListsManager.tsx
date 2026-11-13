@@ -56,7 +56,7 @@ function ListEditor({ list, friends, onChange }: { list: FriendList; friends: Pe
         <ul aria-label={`Members of ${list.name}`}>{members.map((f) => row(f, 'remove'))}</ul>
       )}
       <h3 className="px-2 pb-1 pt-3 text-[15px] font-semibold text-fb-text-2">Add friends</h3>
-      <label className="mx-2 mb-1 flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3">
+      <label className="mx-2 mb-1 flex h-9 items-center gap-2 rounded-pill bg-fb-input px-3 focus-within:ring-2 focus-within:ring-fb-blue">
         <Search size={16} className="shrink-0 text-fb-text-2" aria-hidden />
         <span className="sr-only">Search friends to add</span>
         <input
@@ -118,7 +118,7 @@ export function ListsManager() {
       <PageHeader title="Custom lists" subtitle="Choose who sees your posts and your location on Out Here." />
       <Card flushOnMobile className="mb-3 p-3">
         <form onSubmit={submit} className="flex items-center gap-2">
-          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-btn bg-fb-input px-3">
+          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-btn bg-fb-input px-3 focus-within:ring-2 focus-within:ring-fb-blue">
             <ListPlus size={18} className="shrink-0 text-fb-text-2" aria-hidden />
             <span className="sr-only">List name</span>
             <input
