@@ -18,7 +18,6 @@ create table public.side_quest_drops (
   window_start_min  integer not null check (window_start_min between 0 and 1439),
   window_end_min    integer not null check (window_end_min between 1 and 1440),
   tz                text not null,
-  demo              boolean not null default false,
   created_at        timestamptz not null default now(),
   primary key (date, user_id),
   check (deadline_at > drop_at)

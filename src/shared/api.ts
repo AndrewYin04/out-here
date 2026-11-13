@@ -211,7 +211,6 @@ export type ThreadsResponse = { threads: ThreadView[] };
 // GET    /api/daily/side-quest/history          -> SideQuestHistoryResponse
 // GET|PUT /api/daily/side-quest/prefs           -> SideQuestPrefs   (active window / quiet hours)
 // GET    /api/daily/photo?date&userId           -> image bytes (owner, or anyone when shared with the community)
-// POST   /api/daily/side-quest/demo             body: SideQuestDemoBody (403 unless demo controls are enabled)
 export type SideQuestPrefs = { startMin: number; endMin: number; tz: string };
 
 /** A person's own entry for a date (private unless shared). */
@@ -242,8 +241,6 @@ export type SideQuestState = {
   crews: { id: string; name: string }[];
   /** The viewer's weekly in-person streak (existing meaning, unchanged). */
   weeklyStreak: { weeks: number; thisWeekDone: boolean };
-  /** Demo controls are enabled on this server. */
-  demo: boolean;
 };
 
 export type SideQuestBoardEntry = {
@@ -281,9 +278,3 @@ export type SideQuestHistoryResponse = {
   /** Completed entries, newest first (the personal Side Quest memories). */
   memories: (SideQuestEntry & { title: string; emoji: string })[];
 };
-
-export type SideQuestDemoBody =
-  | { action: 'trigger'; deadlineSeconds?: number }
-  | { action: 'deadline'; deadlineSeconds: number }
-  | { action: 'reset' }
-  | { action: 'seed' };

@@ -2,11 +2,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { dateInZone, profileId, setNow, SUBMIT_GRACE_MS, zonedTimeToUtc } from '@/shared';
 import { createMemoryStore } from '@/features/data/memory-store';
 import type { CoreStore } from '@/features/data/core';
-import { demoControlsEnabled } from '@/features/data/sidequest';
 import { HttpError } from '@/features/data/errors';
 
 // Daily Side Quests against the in-process store: schedule persistence, server-side deadlines,
-// duplicates, privacy, the board, Memories, demo controls and reset isolation.
+// duplicates, privacy, the board, Memories and the weekly streak.
 const alex = profileId('alex');
 const maya = profileId('maya');
 const jordan = profileId('jordan');
@@ -292,87 +291,5 @@ describe('progress, Memories and the weekly streak', () => {
     const r = await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: '', crewId: null });
     expect(await store.streak(alex)).toEqual(before);
     expect(r.state.weeklyStreak).toEqual(before);
-  });
-});
-
-describe('demo controls', () => {
-  it('are disabled in production unless the server enables them', () => {
-    expect(demoControlsEnabled({ NODE_ENV: 'production' })).toBe(false);
-    expect(demoControlsEnabled({ NODE_ENV: 'production', OUTHERE_DEMO_CONTROLS: '0' })).toBe(false);
-    expect(demoControlsEnabled({ NODE_ENV: 'production', OUTHERE_DEMO_CONTROLS: '1' })).toBe(true);
-    expect(demoControlsEnabled({ NODE_ENV: 'development' })).toBe(true);
-    expect(demoControlsEnabled({ NODE_ENV: 'development', OUTHERE_DEMO_CONTROLS: '0' })).toBe(false);
-  });
-
-  it('are refused by the server when disabled, for every action', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    for (const body of [{ action: 'trigger' }, { action: 'deadline', deadlineSeconds: 60 }, { action: 'reset' }, { action: 'seed' }] as const) {
-      expect(await status(store.sideQuestDemo(alex, body))).toBe(403);
-    }
-    expect((await store.sideQuestState(alex)).demo).toBe(false);
-  });
-
-  it('trigger opens the quest now with a short countdown, and the deadline can be reset', async () => {
-    const s = await store.sideQuestDemo(alex, { action: 'trigger', deadlineSeconds: 120 });
-    expect(s.demo).toBe(true);
-    expect(s.phase).toBe('active');
-    expect(new Date(s.deadlineAt).getTime() - NOW.getTime()).toBe(120_000);
-    const again = await store.sideQuestDemo(alex, { action: 'deadline', deadlineSeconds: 300 });
-    expect(new Date(again.deadlineAt).getTime() - NOW.getTime()).toBe(300_000);
-    expect(await status(store.sideQuestDemo(alex, { action: 'deadline', deadlineSeconds: 5 }))).toBe(400);
-  });
-
-  it('runs the whole two-persona loop and resets cleanly', async () => {
-    await store.sideQuestDemo(alex, { action: 'trigger', deadlineSeconds: 120 });
-    const a = await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: 'alex', crewId: null });
-    expect(a.state.boardCount).toBe(1);
-    await store.sideQuestDemo(maya, { action: 'trigger', deadlineSeconds: 120 });
-    await store.sideQuestSubmit(maya, { file: photo(), audience: 'community', caption: 'maya', crewId: null });
-    expect((await store.sideQuestBoard(alex, DATE)).entries).toHaveLength(2);
-
-    const reset = await store.sideQuestDemo(alex, { action: 'reset' });
-    expect(reset.entry).toBeNull();
-    expect(reset.boardCount).toBe(0);
-    expect(await store.sideQuestDemo(alex, { action: 'reset' })).toMatchObject({ boardCount: 0 }); // idempotent
-    const again = await store.sideQuestDemo(alex, { action: 'trigger', deadlineSeconds: 60 });
-    expect(again.phase).toBe('active');
-    expect(again.entry).toBeNull();
-  });
-
-  it('reset touches only today\'s Side Quest records', async () => {
-    const [crew] = await store.crews(alex);
-    const snap = async () => {
-      const db = (await store.view()).db;
-      return {
-        posts: db.posts.filter((p) => p.targetType !== 'sidequest').length, memories: db.memories.length, quests: db.quests.length,
-        crews: db.crews.length, comments: db.comments.length, reactions: db.reactions.length, profiles: db.profiles.length,
-        legacyEntries: db.dailyEntries.filter((e) => !e.challengeId).length, legacyQuests: db.dailyQuests.length,
-      };
-    };
-    const before = await snap();
-    await store.sideQuestDemo(alex, { action: 'trigger', deadlineSeconds: 120 });
-    await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: '', crewId: crew.id });
-    await store.sideQuestDemo(alex, { action: 'seed' });
-    await store.sideQuestDemo(alex, { action: 'reset' });
-    const after = await snap();
-    // The crew memory the entry created is removed too; everything else is exactly as before.
-    expect(after).toEqual({ ...before, legacyQuests: after.legacyQuests });
-    expect((await store.view()).db.dailyEntries.some((e) => !!e.challengeId)).toBe(false);
-    // Only the viewer has a drop afterwards: a fresh, ordinary one (the state read rolls it), not a demo one.
-    const drops = (await store.view()).db.sideQuestDrops.filter((d) => d.date === DATE);
-    expect(drops.map((d) => d.userId)).toEqual([alex]);
-    expect(drops[0].demo).toBe(false);
-  });
-
-  it('seed fills the board with fictional personas and is idempotent', async () => {
-    await store.sideQuestDemo(alex, { action: 'trigger', deadlineSeconds: 120 });
-    await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: 'mine', crewId: null });
-    await store.sideQuestDemo(alex, { action: 'seed' });
-    const once = await store.sideQuestBoard(alex, DATE);
-    expect(once.count).toBe(6); // alex + 5 fictional personas
-    expect(once.entries.some((e) => e.userId === maya)).toBe(false); // maya enters live in the demo
-    await store.sideQuestDemo(alex, { action: 'seed' });
-    expect((await store.sideQuestBoard(alex, DATE)).count).toBe(6);
-    expect(once.entries.every((e) => e.photoUrl.startsWith('/seed/') || e.photoUrl.startsWith('/api/daily/photo'))).toBe(true);
   });
 });

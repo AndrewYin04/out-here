@@ -19,8 +19,6 @@ export const ROUTES = {
   saved: '/saved',
   /** Memories: crew albums and 'Get this group together again' (memories area). */
   memories: '/memories',
-  /** Daily Side Quest: the surprise challenge, camera capture and community board (daily area). */
-  sideQuest: '/side-quest',
 } as const;
 
 export type CenterTabId = 'home' | 'friends' | 'out-here' | 'groups' | 'marketplace';

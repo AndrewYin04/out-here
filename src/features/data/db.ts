@@ -36,8 +36,6 @@ export type SideQuestDropRow = {
   date: string; userId: ID; challengeId: string;
   dropAt: string; deadlineAt: string; durationMinutes: number;
   windowStartMin: number; windowEndMin: number; tz: string;
-  /** Set by the demo controls (a triggered drop), so a reset can tell it from a real one. */
-  demo: boolean;
   createdAt: string;
 };
 /** A person's active window (quiet hours are everything outside it). */

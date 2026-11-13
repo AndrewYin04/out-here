@@ -10,17 +10,16 @@
 //   anyone while the owner shares them with the community. Default: only me.
 // - The community board holds explicitly shared entries only. Sharing makes a public post of the
 //   new 'sidequest' target (so the existing reactions work) that never reaches the home feed.
-// - Demo controls exist only where the server enables them (see demoControlsEnabled).
 import {
   canSubmitOnTime, challengeById, challengeFor, dateInZone, DEFAULT_WINDOW, now, phaseOf, pickSchedule,
   shiftDate, sideQuestBoardId, SIDE_QUEST_AUDIENCES, validWindow,
   type ActiveWindow, type Rand, type SideQuestAudience,
 } from '@/shared';
 import type {
-  SideQuestBoardEntry, SideQuestBoardResponse, SideQuestDemoBody, SideQuestEntry, SideQuestHistoryItem,
+  SideQuestBoardEntry, SideQuestBoardResponse, SideQuestEntry, SideQuestHistoryItem,
   SideQuestHistoryResponse, SideQuestPrefs, SideQuestState, SideQuestSubmitResponse,
 } from '@/shared/api';
-import type { Memory, Post, Profile } from '@/shared';
+import type { Memory, Post } from '@/shared';
 import type { CoreStore } from './core';
 import type { DailyEntryRow, SideQuestDropRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
@@ -31,39 +30,12 @@ const iso = () => now().toISOString();
 const uuid = () => crypto.randomUUID();
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_CAPTION = 140;
-/** Seeded demo photos (public/seed, fictional people and places). */
-const DEMO_PHOTOS = ['/seed/posts/p005.webp', '/seed/posts/p006.webp', '/seed/posts/p025.webp', '/seed/posts/p026.webp', '/seed/posts/p036.webp'];
-const DEMO_CAPTIONS = [
-  'A drainpipe that looks like a violin.', 'Three blue bikes, one blue door.', 'The loading dock at golden hour.',
-  'My shadow made a friend.', 'This crack looks like a river map.',
-];
-/** Demo personas that fill the board (Alex and Maya are the live demo drivers). */
-const DEMO_BOARD_HANDLES = ['priya', 'sam', 'leo', 'nina', 'kai'];
-
 /** Random integer in [0, max). The only randomness in the feature, used once per person per day. */
 const rand: Rand = (max) => {
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
   return buf[0] % max;
 };
-
-// ---------------------------------------------------------------- demo guard
-/**
- * Demo controls (trigger, deadline, reset, seed) are allowed only where the server says so:
- * OUTHERE_DEMO_CONTROLS=1 enables them anywhere (the demo deployment sets it), =0 disables them
- * everywhere, and unset means "development only" (never in production). The client only hides
- * buttons; every action is checked again here.
- */
-export function demoControlsEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  if (env.OUTHERE_DEMO_CONTROLS === '1') return true;
-  if (env.OUTHERE_DEMO_CONTROLS === '0') return false;
-  return env.NODE_ENV !== 'production';
-}
-
-function assertDemo(viewer: Profile | undefined): void {
-  if (!demoControlsEnabled()) throw forbidden('demo controls are not enabled here');
-  if (!viewer?.isDemoUser) throw forbidden('demo controls are for demo personas only');
-}
 
 // ---------------------------------------------------------------- locks
 // Serialises work per (person, date) inside one server instance, so a double tap cannot create
@@ -115,7 +87,7 @@ async function ensureDrop(store: CoreStore, userId: string, date: string, window
     const row: SideQuestDropRow = {
       date, userId, challengeId: challenge.id, dropAt: s.dropAt.toISOString(), deadlineAt: s.deadlineAt.toISOString(),
       durationMinutes: s.durationMinutes, windowStartMin: window.startMin, windowEndMin: window.endMin, tz: window.tz,
-      demo: false, createdAt: iso(),
+      createdAt: iso(),
     };
     try {
       await store.backend.insert('sideQuestDrops', [row]);
@@ -159,7 +131,6 @@ async function buildState(store: CoreStore, viewerId: string, date: string, drop
     boardCount: communityEntries(v, date).length,
     crews: crews.map((c) => ({ id: c.id, name: c.name })),
     weeklyStreak,
-    demo: demoControlsEnabled() && !!v.profileById.get(viewerId)?.isDemoUser,
   };
 }
 
@@ -349,106 +320,4 @@ export async function setSideQuestPrefs(store: CoreStore, viewerId: string, p: S
   if (!validWindow(p)) throw badRequest('Choose an active window of at least 2 hours inside one day.');
   await store.backend.upsert('sideQuestPrefs', [{ userId: viewerId, windowStartMin: p.startMin, windowEndMin: p.endMin, tz: p.tz, updatedAt: iso() }]);
   return p; // applies to days that have no drop yet; today's persisted drop never changes
-}
-
-// ---------------------------------------------------------------- demo controls
-export async function sideQuestDemo(store: CoreStore, viewerId: string, body: SideQuestDemoBody): Promise<SideQuestState> {
-  const v0 = await store.view();
-  assertDemo(v0.profileById.get(viewerId));
-  const window = windowOf(v0, viewerId);
-  const date = dateInZone(now(), window.tz);
-
-  switch (body.action) {
-    case 'reset': {
-      await resetDemoDay(store, date);
-      break;
-    }
-    case 'trigger': {
-      await withLock(`submit:${viewerId}:${date}`, async () => {
-        await removeEntry(store, viewerId, date);
-        await setDemoDrop(store, viewerId, date, window, body.deadlineSeconds ?? 120);
-      });
-      break;
-    }
-    case 'deadline': {
-      await withLock(`submit:${viewerId}:${date}`, async () => { await setDemoDrop(store, viewerId, date, window, body.deadlineSeconds); });
-      break;
-    }
-    case 'seed': {
-      await seedBoard(store, viewerId, date);
-      break;
-    }
-  }
-  const drop = await ensureDrop(store, viewerId, date, window);
-  return buildState(store, viewerId, date, drop);
-}
-
-/** The drop is open now and ends `seconds` from now. Replaces (never stacks on) the persisted row. */
-async function setDemoDrop(store: CoreStore, userId: string, date: string, window: ActiveWindow, seconds: number): Promise<void> {
-  if (!Number.isInteger(seconds) || seconds < 10 || seconds > 3600) throw badRequest('deadline must be 10 to 3600 seconds');
-  const at = now();
-  const row: SideQuestDropRow = {
-    date, userId, challengeId: challengeFor(date).id,
-    dropAt: new Date(at.getTime() - 1000).toISOString(), deadlineAt: new Date(at.getTime() + seconds * 1000).toISOString(),
-    durationMinutes: Math.max(5, Math.ceil(seconds / 60)), windowStartMin: window.startMin, windowEndMin: window.endMin, tz: window.tz,
-    demo: true, createdAt: iso(),
-  };
-  await store.backend.upsert('sideQuestDrops', [row]);
-}
-
-async function removeEntry(store: CoreStore, userId: string, date: string): Promise<void> {
-  const v = await store.view();
-  const e = v.db.dailyEntries.find((x) => x.date === date && x.userId === userId && isSideQuestEntry(x));
-  if (!e) return;
-  if (e.postId) await removePost(store, e.postId);
-  if (e.crewMemoryId) await store.backend.remove('memories', { id: e.crewMemoryId });
-  await store.backend.remove('dailyEntries', { date, userId });
-  await store.backend.remove('dailyReports', { date, userId });
-}
-
-/**
- * Reset ONLY today's Side Quest records of demo personas: their entries (with board posts and
- * crew memories), their drops, reports about them. Other dates, quests, crews, photos, map data
- * and Facebook content are untouched. Safe to run twice.
- */
-async function resetDemoDay(store: CoreStore, date: string): Promise<void> {
-  const v = await store.view();
-  const demoIds = v.db.profiles.filter((p) => p.isDemoUser).map((p) => p.id);
-  for (const id of demoIds) {
-    await removeEntry(store, id, date);
-    if (v.db.sideQuestDrops.some((d) => d.date === date && d.userId === id)) {
-      await store.backend.remove('sideQuestDrops', { date, userId: id });
-    }
-  }
-}
-
-/** Fill today's board with clearly fictional entries from the other demo personas. */
-async function seedBoard(store: CoreStore, viewerId: string, date: string): Promise<void> {
-  await ensureDailyQuest(store, date);
-  const v = await store.view();
-  const challenge = challengeFor(date);
-  let i = 0;
-  for (const handle of DEMO_BOARD_HANDLES) {
-    const p = v.db.profiles.find((x) => x.handle === handle && x.isDemoUser);
-    const k = i++;
-    if (!p || p.id === viewerId) continue;
-    if (v.db.dailyEntries.some((e) => e.date === date && e.userId === p.id && isSideQuestEntry(e))) continue;
-    const at = new Date(now().getTime() - (k + 2) * 7 * 60_000);
-    const postId = uuid();
-    await store.backend.upsert('sideQuestDrops', [{
-      date, userId: p.id, challengeId: challenge.id, dropAt: new Date(at.getTime() - 20 * 60_000).toISOString(),
-      deadlineAt: new Date(at.getTime() + 10 * 60_000).toISOString(), durationMinutes: 30,
-      windowStartMin: DEFAULT_WINDOW.startMin, windowEndMin: DEFAULT_WINDOW.endMin, tz: DEFAULT_WINDOW.tz, demo: true, createdAt: at.toISOString(),
-    }]);
-    const photoUrl = DEMO_PHOTOS[k % DEMO_PHOTOS.length];
-    const caption = DEMO_CAPTIONS[k % DEMO_CAPTIONS.length];
-    await store.backend.insert('posts', [{
-      id: postId, authorId: p.id, targetType: 'sidequest', targetId: sideQuestBoardId(date), audience: 'public',
-      text: caption, media: [photoUrl], sharedPostId: null, createdAt: at.toISOString(),
-    }]);
-    await store.backend.upsert('dailyEntries', [{
-      date, userId: p.id, photoUrl, verified: null, museNote: '', createdAt: at.toISOString(),
-      challengeId: challenge.id, audience: 'community', caption, onTime: true, photoKey: null, postId, crewMemoryId: null, submittedAt: at.toISOString(),
-    }]);
-  }
 }

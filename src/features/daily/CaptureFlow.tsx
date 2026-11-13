@@ -100,7 +100,7 @@ export function CaptureFlow({ open, onClose, live, onSeeBoard }: { open: boolean
           <p className="mt-1 text-[15px] text-fb-text-2">Time ran out for this one. You can still browse the board, and add an ordinary memory any time.</p>
           <div className="mt-3 flex justify-center gap-2">
             <Button onClick={() => { onClose(); onSeeBoard(); }}>See the board</Button>
-            <Link href="/memories" className="inline-flex items-center rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:bg-fb-secondary-btn-hover">Open Memories</Link>
+            <Link href="/memories#side-quest-mine" className="inline-flex items-center rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:bg-fb-secondary-btn-hover">Open Memories</Link>
           </div>
         </div>
       )}
@@ -182,8 +182,8 @@ function Celebration({ result, onClose, onSeeBoard }: { result: SideQuestSubmitR
         ))}
       </ul>
       <div className="mt-1 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-        <Button onClick={onSeeBoard} data-testid="see-board">See how others did it</Button>
-        <Link href="/memories" onClick={onClose} className="inline-flex h-9 items-center justify-center rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:bg-fb-secondary-btn-hover">View memory</Link>
+        <Button onClick={onSeeBoard} data-testid="see-board">See the community board</Button>
+        <Link href="/memories#side-quest-mine" onClick={onClose} className="inline-flex h-9 items-center justify-center rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:bg-fb-secondary-btn-hover">View memory</Link>
       </div>
     </div>
   );

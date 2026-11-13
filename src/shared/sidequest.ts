@@ -208,6 +208,3 @@ export const sideQuestBoardId = (date: string): string => seedId('sidequest-boar
 export const SIDE_QUEST_AUDIENCES = ['only_me', 'community'] as const;
 export type SideQuestAudience = (typeof SIDE_QUEST_AUDIENCES)[number];
 
-// ---------------------------------------------------------------- demo controls
-/** Demo deadline choices the presenter can pick (seconds). */
-export const DEMO_DEADLINES_SEC = [60, 120, 300] as const;

@@ -20,10 +20,10 @@ import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
-  setSideQuestPrefs, sideQuestBoard, sideQuestDemo, sideQuestHistory, sideQuestPhoto, sideQuestPrefs, sideQuestReport,
+  setSideQuestPrefs, sideQuestBoard, sideQuestHistory, sideQuestPhoto, sideQuestPrefs, sideQuestReport,
   sideQuestState, sideQuestSubmit, sideQuestUnshare, type SubmitInput,
 } from './sidequest';
-import type { SideQuestDemoBody, SideQuestPrefs } from '@/shared/api';
+import type { SideQuestPrefs } from '@/shared/api';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -971,5 +971,4 @@ export class CoreStore {
   sideQuestPhoto(viewerId: ID, date: string, userId: ID) { return sideQuestPhoto(this, viewerId, date, userId); }
   sideQuestPrefs(viewerId: ID) { return sideQuestPrefs(this, viewerId); }
   setSideQuestPrefs(viewerId: ID, prefs: SideQuestPrefs) { return setSideQuestPrefs(this, viewerId, prefs); }
-  sideQuestDemo(viewerId: ID, body: SideQuestDemoBody) { return sideQuestDemo(this, viewerId, body); }
 }

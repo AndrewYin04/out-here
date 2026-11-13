@@ -7,7 +7,7 @@ import type { Crew, Memory, PersonCard } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
-import { SideQuestMemories } from '@/features/daily';
+import { SideQuestSection } from '@/features/daily';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
 type CrewMeta = { crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null };
@@ -64,7 +64,7 @@ function MemoriesView({ handle }: { handle: string | null }) {
         <h1 className="text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
         <p className="mt-1 text-[15px] text-fb-text-2">Crews from your Out Here hangouts, their albums, and the next plan.</p>
       </div>
-      <div className="mb-3"><SideQuestMemories variant="strip" /></div>
+      <SideQuestSection />
       {error && <Card padded className="text-fb-text-2" role="alert">Could not load memories: {error}</Card>}
       {!error && crews === null && (
         <div className="flex flex-col gap-3" aria-busy="true">
