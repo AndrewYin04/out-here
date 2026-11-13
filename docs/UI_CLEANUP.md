@@ -65,6 +65,16 @@ These files are claimed by #56, #45 and #12, and Codex's Phase 5 branches touch 
 | Memories capture burst | `memories/MemoryCapture.tsx` | #47 |
 | The "both free" nudge card covers the top of the 3D view on phones | `BothFreeNudge` | It is a demo scene, so it was left as is |
 
+## Round 3: the dock (Life360-style), merged with main
+
+- **The dock** replaces the map's bottom row and the Explore/Friends toggle at the top. See `docs/OUTHERE_DASHBOARD.md`.
+- **Draggable handles** on the I'm free and quest sheets.
+- **Merged `origin/main` (#59, `feat/ux-journey`)** into this branch:
+  - Kept main's Up Next card, Let's go, the selfie flow and `useDemoTools` (Muse filter, Tour Meta HQ and Demo walk / Live GPS only with `?tools=1`).
+  - Dropped this branch's own `?tools=1` check in favour of main's.
+  - Removed the ✨ and "!" from main's new hello line.
+- **The 3D joystick and the right-hand column** sit above the dock on phones.
+
 ## Verification
 
 - Typecheck, lint, all unit tests (293) and the production build pass.

@@ -15,18 +15,20 @@ Codex is wiring Muse-to-Muse encounters into `World3D.tsx` and the companion con
 
 A dashboard that absorbs those panels replaces exactly what the demo shows. Doing that the night before would put the demo at risk and collide with all four streams of work.
 
-## What shipped instead (low risk, on `feature/ui-cleanup`)
+## What shipped instead (on `feature/ui-cleanup`, Out Here only)
 
-- **`useSheetDrag`** (`src/features/ui/useSheetDrag.ts`) handles the gestures for any bottom sheet:
-  - **Drag the handle:** up snaps the sheet to full height, down returns it to half or closes it from half. A quick flick counts.
+- **The dock** (`src/features/map/OutHereDock.tsx`):
+  - **Above the sheet:** "I'm free", one contextual action (Post in Explore, People in Friends) and a round Map/3D button.
+  - **The sheet:** a handle and one row of pills: Explore, Friends, Your plans and Memories. The selected pill is wide and filled with its icon and label; the others are tinted and show only their icon, and each keeps its name for screen readers. The pills ease between widths, with no animation under reduced motion.
+  - **The handle:** drag it, tap it, or press Enter or the arrow keys to open a list of the plans on the map, then fold it again.
+  - **What it replaced:** the old bottom row and the Explore/Friends toggle at the top. With demo tools off, the top of the map is empty.
+- **`useSheetDrag`** (`src/features/ui/useSheetDrag.ts`), used by the dock, the I'm free sheet and the quest sheet:
+  - **Dragging:** up snaps to full height; down returns to half, or closes from half. A quick flick counts.
   - **Mouse, touch and keyboard:** a tap or Enter toggles; ArrowUp expands and ArrowDown collapses.
   - **Reduced motion:** the snap is instant.
-  - **Used by:** the I'm free sheet and the quest sheet. Their default positions are unchanged.
-- **Compact tab bar inside Out Here** (`fb/shell/MobileTabBar.tsx`) on `/out-here*` and `/memories`:
-  - The active tab shows its icon and label in a soft blue pill; the other tabs show icons only.
-  - Accessible names stay, and the height stays 56 px.
-  - The pill's width eases between tabs; the transition is off under reduced motion.
-  - It is the same Facebook tab bar, not a second nav.
+- **Facebook's tab bar is unchanged.** The compact active-tab pattern lives in the dock's pills instead.
+
+The dock is the peek state of the dashboard below. What is still missing is the half state hosting the contexts: composer, results, quest, Muse chat.
 
 ## The dashboard
 
