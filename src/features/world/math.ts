@@ -8,16 +8,17 @@ import { haversineMeters, walkingMinutesExact, type LatLng } from '@/shared';
 export const FLAT_ZOOM = 15;
 /** At this zoom the camera reaches STREET_PITCH. */
 export const STREET_ZOOM = 18.5;
-export const STREET_PITCH = 65;
+export const STREET_PITCH = 60;
 /** Zoomed in closer than street level, the camera drops lower toward the horizon. */
-export const CLOSE_ZOOM = 20;
-export const CLOSE_PITCH = 76;
+export const CLOSE_ZOOM = 21.5;
+// Close behind the avatar the camera looks further ahead, toward the street and the horizon.
+export const CLOSE_PITCH = 72;
 /** Zoom the 3D view eases to when it opens: close behind the avatar. */
-export const ENTER_ZOOM = 19.6;
-export const MAX_3D_ZOOM = 20.6;
-export const MAX_3D_PITCH = 78;
+export const ENTER_ZOOM = 21.3;
+export const MAX_3D_ZOOM = 22.5;
+export const MAX_3D_PITCH = 75;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */
-export const CHARACTER_MIN_ZOOM = 15.8;
+export const CHARACTER_MIN_ZOOM = 18.2;
 /**
  * One zoom, two views. Pinching the 3D view out past this zoom (the camera is flat by then) hands
  * over to the 2D map. The map area's ENTER_3D_ZOOM (map/view3d.ts) is the way back in; the gap
@@ -39,14 +40,8 @@ export function pitchForZoom(zoom: number): number {
   return Math.round(p * 10) / 10;
 }
 
-/**
- * How much bigger than life the characters are drawn. Zoomed out they grow so they still read;
- * zoomed in close they shrink toward a believable size next to the buildings (never below 5x).
- */
-export function characterScale(zoom: number): number {
-  if (zoom <= STREET_ZOOM) return Math.min(40, 9 * 2 ** (STREET_ZOOM - zoom));
-  return Math.max(5, 9 * 2 ** (-(zoom - STREET_ZOOM) * 0.5));
-}
+/** Metre-authored models stay at their authored scale. Markers serve distant map views. */
+export function characterScale(zoom: number): number { void zoom;return 1; }
 
 // ---- Angles (compass degrees: 0 = north, 90 = east) ----
 
@@ -153,9 +148,5 @@ export function fixHeading(fix: GpsFix): number | null {
 /** Farther than this from the demo area, the 3D view says the plans are elsewhere. */
 export const FAR_FROM_DEMO_M = 5000;
 
-/** How tall buildings are drawn at a zoom: mapped height from a distance, 25% right behind the
- *  avatar (matches the map's own building layer in cityTheme.ts). */
-export function buildingFlatten(zoom: number): number {
-  const t = clamp01((zoom - 18) / (19.6 - 18));
-  return 1 - 0.75 * t;
-}
+/** Geographic buildings and campus floors retain their real heights at every camera zoom. */
+export function buildingFlatten(zoom: number): number { void zoom;return 1; }

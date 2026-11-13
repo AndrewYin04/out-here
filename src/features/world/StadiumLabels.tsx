@@ -2,7 +2,8 @@
 // Floating labels over the quest stadiums (#23): emoji, title, spots left and the walk from your
 // avatar, counting down live as you walk. Tapping one opens the plan, as a 2D pin does.
 // While these show, the flat 2D pins for the same plans are hidden so nothing is drawn twice.
-import { cn } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn } from '@/features/ui';
+import { Footprints, Sparkles } from 'lucide-react';
 import { seatText, walkText, type StadiumLabel } from './stadiums';
 import type { WorldLayer } from './WorldLayer';
 import type { LatLng } from '@/shared';
@@ -38,14 +39,14 @@ export function StadiumLabels({ labels, where, layer, onSelect }: {
                 l.pick && !l.selected && 'ring-2 ring-[#F5B800]',
               )}
             >
-              <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-full bg-fb-bg text-[17px] leading-none">{l.emoji}</span>
+              <CategoryIcon category={categoryOf(l.id, l.emoji)} size={28} />
               <span className="flex flex-col leading-[15px]">
                 <span className="max-w-[150px] truncate text-[13px] font-semibold text-fb-text">
-                  {l.pick && <span className="text-[#B07F00]">✨ </span>}{l.title}
+                  {l.pick && <Sparkles size={12} aria-hidden className="mr-0.5 inline align-[-1px] text-[#B07F00]" />}{l.title}
                 </span>
                 <span className="text-[12px] text-fb-text-2">
                   <span className={cn('font-semibold', l.seatsLeft <= 1 ? 'text-fb-red' : 'text-fb-blue')}>{seatText(l.seatsLeft)}</span>
-                  {' · '}🚶 {walkText(l.minutes, l.meters)}
+                  {' · '}<Footprints size={11} aria-hidden className="mr-0.5 inline align-[-1px]" />{walkText(l.minutes, l.meters)}
                 </span>
               </span>
             </button>

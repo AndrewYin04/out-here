@@ -354,6 +354,7 @@ export class View {
 
   // ---------- notifications ----------
   notificationHref(n: Notification): string {
+    if (n.type === 'hangout_rate') return `/memories?rate=${n.objectId}`;
     switch (n.objectType) {
       case 'post': return `/posts/${n.objectId}`;
       case 'comment': {

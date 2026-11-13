@@ -2,11 +2,11 @@
 // "Post a plan": the host drops a pin (long-press or ＋), optionally lets Muse draft the plan
 // from one line, picks who can see it, adds a pop-up (poster, text bubble) and taps Post.
 // Muse fills the form; the human always posts. Non-modal so the map and the pin stay visible.
-import { ImagePlus, Minus, Plus, X } from 'lucide-react';
+import { ChevronDown, ImagePlus, Minus, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, currentPersona, uploadImage, useApi } from '@/features/data';
-import { MuseLabel, MuseStepsLoading } from '@/features/outhere';
-import { Avatar, Button, Chip, IconButton, cn } from '@/features/ui';
+import { MuseLabel } from '@/features/outhere';
+import { Avatar, Button, CategoryIcon, Chip, IconButton, cn } from '@/features/ui';
 import { DEMO_TZ, type LatLng, type Quest, type QuestCategory, type QuestVisibility } from '@/shared';
 import type { GroupView, MuseCreateQuestResponse } from '@/shared/api';
 import type { FriendFace } from '../types';
@@ -19,7 +19,6 @@ const CATEGORIES: { value: QuestCategory; label: string }[] = [
   { value: 'study', label: 'Study' }, { value: 'thrift', label: 'Thrifting' }, { value: 'other', label: 'Other' },
 ];
 const DURATIONS = [30, 60, 90, 120, 180];
-const DRAFT_STEPS = ['Reading your idea', 'Looking at places near your pin', 'Picking a time and spots'] as const;
 const BUBBLE_MAX = 80;
 const MAX_POSTER_BYTES = 8 * 1024 * 1024;
 
@@ -35,8 +34,8 @@ export type CreatePlanSheetProps = {
   friends: FriendFace[];
   /** Muse moved the plan to a real place: move the draft pin there. */
   onMove: (at: LatLng) => void;
-  /** The emoji changed: the draft pin shows it. */
-  onEmoji: (emoji: string) => void;
+  /** The type changed: the draft pin shows its icon. */
+  onCategory: (category: QuestCategory) => void;
   onClose: () => void;
   onPosted: (quest: Quest) => void;
 };
@@ -62,7 +61,7 @@ async function requestDraft(text: string, at: LatLng, signal: AbortSignal): Prom
   return { ...data, mode: h === 'mock' ? 'mock' : h === 'fallback' ? 'fallback' : 'live' };
 }
 
-export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPosted }: CreatePlanSheetProps) {
+export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPosted }: CreatePlanSheetProps) {
   const [line, setLine] = useState('');
   const [muse, setMuse] = useState<MuseState>({ status: 'idle' });
   const [title, setTitle] = useState('');
@@ -81,6 +80,8 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
   const [invites, setInvites] = useState<Set<string>>(new Set());
   const [poster, setPoster] = useState<{ local: string; url: string | null; error: string | null } | null>(null);
   const [bubble, setBubble] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
+  const showMore = moreOpen || !!bubble || !!description || !!poster;
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lineRef = useRef<HTMLInputElement>(null);
@@ -94,8 +95,17 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
   }, [visibility, groupId, myGroups]);
 
   useEffect(() => { lineRef.current?.focus(); }, []);
+  // Escape closes the sheet while it is still empty; once you've typed or added a poster it stays,
+  // so a stray key never throws a draft away (the X still closes it).
+  const pristine = !line.trim() && !title.trim() && !poster && !bubble.trim() && !description.trim();
+  useEffect(() => {
+    if (!pristine) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pristine, onClose]);
   useEffect(() => () => inFlight.current?.abort(), []);
-  useEffect(() => { onEmoji(emoji); }, [emoji, onEmoji]);
+  useEffect(() => { onCategory(category); }, [category, onCategory]);
   // The host dragged the pin away from Muse's place: the plan is at the pin now.
   useEffect(() => {
     if (place && !sameSpot(place.at, at)) { setPlace(null); setVenueName('Dropped pin'); }
@@ -220,10 +230,11 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
               className="h-9 min-w-0 flex-1 rounded-btn bg-fb-surface px-3 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus:ring-2 focus:ring-fb-blue"
             />
             <Button type="submit" size="sm" data-testid="create-muse-btn" disabled={line.trim().length < 2 || muse.status === 'loading'}>
-              ✨ Draft
+              {muse.status === 'loading' ? 'Drafting…' : 'Draft'}
             </Button>
           </div>
-          {muse.status === 'loading' && <MuseStepsLoading steps={DRAFT_STEPS} className="mb-0 mt-2" />}
+          {/* One honest status line: the request is running, nothing more is claimed. */}
+          {muse.status === 'loading' && <p role="status" className="mt-2 px-1 text-[13px] text-fb-text-2">Muse is drafting your plan…</p>}
           {muse.status === 'done' && (
             <div data-testid="create-muse-pitch" className="mt-2 flex flex-wrap items-center gap-1.5 px-1 text-[13px] text-fb-text">
               {muse.mode === 'live' ? <MuseLabel /> : (
@@ -237,18 +248,9 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
           {muse.status === 'error' && <p role="alert" className="mt-2 px-1 text-[13px] text-fb-red">{muse.message}</p>}
         </form>
 
-        {/* Title and emoji */}
-        <div className="mt-3 flex gap-2">
-          <label className="w-14 shrink-0">
-            <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Emoji</span>
-            <input
-              value={emoji}
-              maxLength={8}
-              aria-label="Emoji"
-              onChange={(e) => setEmoji(e.target.value)}
-              className="h-10 w-full rounded-btn border border-fb-divider bg-fb-surface text-center text-[20px] outline-none focus:border-fb-blue"
-            />
-          </label>
+        {/* Title, with the icon its type gives the pin */}
+        <div className="mt-3 flex items-end gap-2">
+          <CategoryIcon category={category} size={40} />
           <label className="min-w-0 flex-1">
             <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Title</span>
             <input
@@ -349,7 +351,7 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
                   visibility === o.value ? 'border-fb-blue bg-fb-blue-tint' : 'border-fb-divider hover:bg-fb-hover',
                 )}
               >
-                <span className="block text-[15px] font-semibold text-fb-text"><span aria-hidden>{o.icon}</span> {o.label}</span>
+                <span className="flex items-center gap-1.5 text-[15px] font-semibold text-fb-text"><o.icon size={16} aria-hidden className="shrink-0 text-fb-text-2" />{o.label}</span>
                 <span className="block text-[12px] leading-4 text-fb-text-2">{o.hint}</span>
               </button>
             ))}
@@ -395,69 +397,85 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
           )}
         </fieldset>
 
-        {/* Pop-up */}
-        <fieldset className="mt-3">
-          <legend className="mb-1 text-[13px] font-semibold text-fb-text-2">Pop-up on the map</legend>
-          <div className="flex items-start gap-2">
-            {poster ? (
-              <div className="relative size-20 shrink-0 overflow-hidden rounded-card bg-fb-bg">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
-                <img src={poster.local} alt="Poster preview" className={cn('size-full object-cover', !poster.url && 'opacity-60')} />
-                <button
-                  type="button"
-                  aria-label="Remove poster"
-                  onClick={() => setPoster(null)}
-                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white"
-                >
-                  <X size={14} aria-hidden />
-                </button>
-                {poster.error && <span className="absolute inset-x-0 bottom-0 bg-fb-red px-1 text-[11px] text-white">Failed</span>}
+        {/* Optional extras stay folded until wanted (or Muse filled one in). */}
+        {showMore ? (
+          <>
+            {/* Pop-up */}
+            <fieldset className="mt-3">
+              <legend className="mb-1 text-[13px] font-semibold text-fb-text-2">Pop-up on the map</legend>
+              <div className="flex items-start gap-2">
+                {poster ? (
+                  <div className="relative size-20 shrink-0 overflow-hidden rounded-card bg-fb-bg">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                    <img src={poster.local} alt="Poster preview" className={cn('size-full object-cover', !poster.url && 'opacity-60')} />
+                    <button
+                      type="button"
+                      aria-label="Remove poster"
+                      onClick={() => setPoster(null)}
+                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-black/60 text-white"
+                    >
+                      <X size={14} aria-hidden />
+                    </button>
+                    {poster.error && <span className="absolute inset-x-0 bottom-0 bg-fb-red px-1 text-[11px] text-white">Failed</span>}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    data-testid="create-poster-btn"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-fb-divider text-[12px] font-semibold text-fb-text-2 hover:bg-fb-hover"
+                  >
+                    <ImagePlus size={20} aria-hidden />
+                    Poster
+                  </button>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  data-testid="create-poster-input"
+                  onChange={(e) => { pickPoster(e.target.files?.[0]); e.target.value = ''; }}
+                />
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">Text bubble</span>
+                  <textarea
+                    data-testid="create-bubble"
+                    value={bubble}
+                    rows={3}
+                    maxLength={BUBBLE_MAX}
+                    placeholder="Text bubble, like “Bring a pen”"
+                    onChange={(e) => setBubble(e.target.value)}
+                    className="w-full resize-none rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 text-[15px] text-fb-text outline-none focus:border-fb-blue"
+                  />
+                  <span className="block text-right text-[12px] text-fb-text-2">{bubble.length}/{BUBBLE_MAX}</span>
+                </label>
               </div>
-            ) : (
-              <button
-                type="button"
-                data-testid="create-poster-btn"
-                onClick={() => fileRef.current?.click()}
-                className="flex size-20 shrink-0 flex-col items-center justify-center gap-1 rounded-card border border-dashed border-fb-divider text-[12px] font-semibold text-fb-text-2 hover:bg-fb-hover"
-              >
-                <ImagePlus size={20} aria-hidden />
-                Poster
-              </button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              data-testid="create-poster-input"
-              onChange={(e) => { pickPoster(e.target.files?.[0]); e.target.value = ''; }}
-            />
-            <label className="min-w-0 flex-1">
-              <span className="sr-only">Text bubble</span>
+            </fieldset>
+
+            <label className="mt-2 block">
+              <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Details (optional)</span>
               <textarea
-                data-testid="create-bubble"
-                value={bubble}
-                rows={3}
-                maxLength={BUBBLE_MAX}
-                placeholder="Text bubble, like “Bring a pen 🎨”"
-                onChange={(e) => setBubble(e.target.value)}
+                value={description}
+                rows={2}
+                maxLength={400}
+                onChange={(e) => setDescription(e.target.value)}
                 className="w-full resize-none rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 text-[15px] text-fb-text outline-none focus:border-fb-blue"
               />
-              <span className="block text-right text-[12px] text-fb-text-2">{bubble.length}/{BUBBLE_MAX}</span>
             </label>
-          </div>
-        </fieldset>
-
-        <label className="mt-2 block">
-          <span className="mb-1 block text-[13px] font-semibold text-fb-text-2">Details (optional)</span>
-          <textarea
-            value={description}
-            rows={2}
-            maxLength={400}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full resize-none rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 text-[15px] text-fb-text outline-none focus:border-fb-blue"
-          />
-        </label>
+          </>
+        ) : (
+          <button
+            type="button"
+            data-testid="create-more"
+            aria-expanded={false}
+            onClick={() => setMoreOpen(true)}
+            className="mt-3 flex h-9 items-center gap-1 rounded-btn px-1 text-[15px] font-semibold text-fb-blue hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue"
+          >
+            Add a poster, map note or details
+            <ChevronDown size={16} aria-hidden />
+          </button>
+        )}
       </div>
 
       <footer className="shrink-0 border-t border-fb-divider px-4 py-3">

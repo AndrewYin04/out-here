@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ToastProvider } from '@/features/ui';
 import { InviteInbox } from '@/features/outhere';
+import { RateHangoutListener } from '@/features/memories';
 import { LeftNav } from './LeftNav';
 import { MobileTabBar } from './MobileTabBar';
 import { ROUTES, layoutFor, sectionFor, type ShellLayout } from './nav';
@@ -66,6 +67,7 @@ export function AppShell({ children, layout }: { children: ReactNode; layout?: S
         )}
       </div>
       <InviteInbox />
+      <RateHangoutListener />
       <MobileTabBar />
     </ToastProvider>
   );

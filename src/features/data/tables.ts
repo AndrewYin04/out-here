@@ -21,7 +21,8 @@ export const TABLES = {
   questDetail: [...QUEST_VIS, 'questCheckins', 'posts'],
   availability: ['availability'],
   friendAvailability: [...PEOPLE, 'availability'],
-  notifications: [...PEOPLE, 'notifications', 'comments', 'groups', 'events'],
+  // quests, questMembers and hangoutRatings: the lazy "How was it?" prompt (ratings.ts promptEndedHangouts).
+  notifications: [...PEOPLE, 'notifications', 'comments', 'groups', 'events', 'quests', 'questMembers', 'hangoutRatings'],
   together: [...PEOPLE, 'togetherPlans'],
   myLocation: ['locationShares'],
   locations: [...PEOPLE, 'locationShares', 'availability'],

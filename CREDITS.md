@@ -33,3 +33,7 @@ venue in the seed data is fictional. Venue names such as "Dumpling Den" and
 ## 3D characters
 
 The Muse companion "Jolly" is by Ally Chen (`assets/muse-companion/`). The person model and its idle/run animations are from Kenney's "Animated Characters Protagonists" pack (CC0, https://kenney.nl).
+
+## 3D street scenery
+
+Kenney, City Kit Roads 2.2 (`light-curved`) and City Kit Suburban 2.0 (`tree-large`), CC0. Source: https://kenney.nl/assets/city-kit-roads and https://kenney.nl/assets/city-kit-suburban. Only selected normalized, vertex-colour GLBs are included in `public/models/world/`, with the supplied licenses and source hashes. Rounded deciduous tree prototypes and placement code are project-generated; their real geographic context is OpenStreetMap / OpenFreeMap, credited by the existing map attribution. Stylized streetlight placement is visual scenery, not surveyed infrastructure.

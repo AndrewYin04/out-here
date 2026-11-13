@@ -19,7 +19,7 @@ test('a plan you joined shows as Up next with Let\'s go and See plan', async ({ 
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
   expect(soonest).toBeTruthy();
 
-  await page.goto(`/out-here?as=${persona}&view=map`);
+  await page.goto(`/out-here?as=${persona}&view=map&mode=explore`);
   const card = page.getByTestId('up-next');
   await expect(card).toBeVisible({ timeout: 45_000 }); // the first load after a server start compiles the page
   await expect(page.getByTestId('up-next-title')).toContainText(soonest.title);

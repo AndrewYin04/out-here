@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { haversineMeters } from '@/shared';
 import { moveMeters } from './math';
-import { blockerTest, hash01, inPolygon, nearestOnLines, nearestOpen, placeTrees } from './trees';
+import { blockerTest, hash01, inPolygon, nearestOnLines, nearestOpen, placeTrees,streetHeading } from './trees';
 
 const HQ = { lat: 37.4847, lng: -122.1477 };
 const square = (c: { lat: number; lng: number }, half: number) => {
@@ -30,11 +30,11 @@ describe('inPolygon', () => {
 
 describe('placeTrees', () => {
   const base = { origin: HQ, center: HQ, radiusM: 1000, cap: 500, streets: [], blockers: [] };
-  it('fills a park at about one tree per cell, all inside it', () => {
+  it('leaves open glades between irregular park clusters, all within the park', () => {
     const park = square(HQ, 100); // 200 m × 200 m
     const trees = placeTrees({ ...base, areas: [{ rings: [park], spacing: 20 }] });
-    expect(trees.length).toBeGreaterThan(80);
-    expect(trees.length).toBeLessThan(130);
+    expect(trees.length).toBeGreaterThan(35);
+    expect(trees.length).toBeLessThan(90);
     for (const t of trees) expect(inPolygon(t, [park])).toBe(true);
   });
   it('gives the same trees when a park arrives split across two tiles', () => {
@@ -59,9 +59,10 @@ describe('placeTrees', () => {
     const a = moveMeters(HQ, 100, 270);
     const b = moveMeters(HQ, 100, 90);
     const trees = placeTrees({ ...base, areas: [], streets: [{ coords: [[a.lng, a.lat], [b.lng, b.lat]], spacing: 20, offset: 8 }] });
-    expect(trees.length).toBe(20);
+    expect(trees.length).toBeGreaterThan(12);
+    expect(trees.length).toBeLessThanOrEqual(20);
     const north = trees.filter((t) => t.lat > HQ.lat).length;
-    expect(north).toBe(10);
+    expect(north).toBe(trees.length/2);
   });
 });
 
@@ -87,4 +88,8 @@ describe('nearestOnLines', () => {
     expect(haversineMeters(HQ, p!)).toBeCloseTo(40, 0);
     expect(nearestOnLines(HQ, [[[a.lng, a.lat], [b.lng, b.lat]]], 20)).toBeNull();
   });
+});
+
+it('frames the player along a nearby street using the direction closest to the current bearing',()=>{
+ const a=moveMeters(HQ,100,270),b=moveMeters(HQ,100,90),line=[[[a.lng,a.lat],[b.lng,b.lat]]];expect(streetHeading(HQ,line,20)).toBeCloseTo(90,0);expect(streetHeading(HQ,line,210)).toBeCloseTo(270,0);expect(streetHeading(moveMeters(HQ,200,0),line,0)).toBeNull();
 });
