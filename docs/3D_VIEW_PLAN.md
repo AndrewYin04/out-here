@@ -205,7 +205,7 @@ Each phase ends with something demoable, merged into `overnight` and deployed as
 | ✅ **W1 — Avatar walks** | three.js custom layer, placeholder avatar with Idle/Walk, joystick + WASD, tap-a-pin-to-walk with countdown, quest panel opens on arrival | No (placeholder) |
 | ✅ **W2 — Muse pet talks** | Pet follows; `listen` / `think` / `talk` wired to the real plan pipeline; speech bubble shows the real summary and reason; tap → plan card | No (placeholder) |
 | ✅ **GPS** | Live GPS / demo walk switch, zoom continuum, arrival (section 4a). Server check-in not built | No |
-| **W3 — Ally's models in** | Swap the manifest to Ally's `.glb` files; clip names verified; scale tuned. The loader is built: edit `public/models/manifest.json` | **Yes, v1 rough** |
+| ✅ **W3 — Ally's models in** | Jolly (Muse) and the Kenney person from `assets/muse-companion` are live via `public/models/manifest.json`, which maps her nodes and clips (`follow_back`, `thinking`, `talk_front`, `person_idle`, `person_run`) to the view's states; `npm run models:sync` copies a new export. See `public/models/README.md` | Done |
 | ◐ **W4 — Stadiums + friends** | ✅ Quest beacons (Muse picks and the selected plan in blue, full plans have none); ✅ friend avatars within 600 m (nearest 12) with name + status labels; ✅ tap a friend → your avatar waves and their Find My card opens. Not yet: the wave on the friend's own screen (realtime) | Avatar variants nice-to-have |
 | **W5 — Negotiate + celebrate** | Invite sent → pet flies to Maya's avatar, bubbles, returns; accepted → `Celebrate`/`Happy` on both screens | No |
 | **W6 — Polish** | Camera easing, reduced motion, performance fallbacks, Playwright smoke (`3d-toggle` testid, bubble text present), reviewer + ui-critic pass | Polished models |

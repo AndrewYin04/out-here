@@ -29,3 +29,7 @@ venue in the seed data is fictional. Venue names such as "Dumpling Den" and
 ## Meta HQ 3D data
 
 `public/geo/meta-hq.json` (building footprints and floor counts, MPK 20's rooftop park, plazas and individually mapped trees around 1 Hacker Way) is derived from OpenStreetMap by `scripts/fetch-hq-osm.mjs`. © OpenStreetMap contributors, available under the Open Database License (ODbL 1.0): https://www.openstreetmap.org/copyright. The 3D models built from it (facades, roofs, trees) are generated in code; OSM has no floor count for MPK 21, so it is drawn with 3 floors.
+
+## 3D characters
+
+The Muse companion "Jolly" is by Ally Chen (`assets/muse-companion/`). The person model and its idle/run animations are from Kenney's "Animated Characters Protagonists" pack (CC0, https://kenney.nl).

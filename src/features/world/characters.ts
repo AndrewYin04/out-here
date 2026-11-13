@@ -247,6 +247,10 @@ class PlaceholderPet implements Character {
 }
 
 // ---- glTF characters (Ally's models) ----
+// The manifest (public/models/manifest.json) says which file and node is the avatar and which
+// is the pet, which clip plays for each state, and which nodes to hide. Ally's Blender export
+// (assets/muse-companion) keeps both in one file: `Person` and `Muse`, with clips
+// follow_back / thinking / talk_front / person_idle / person_run.
 
 const AVATAR_CLIPS: Record<AvatarState, string[]> = {
   idle: ['Idle'], walk: ['Walk', 'Run', 'Idle'], wave: ['Wave', 'Celebrate'], celebrate: ['Celebrate', 'Wave'], talk: ['Talk', 'Idle'],
@@ -255,20 +259,85 @@ const PET_CLIPS: Record<PetState, string[]> = {
   hover: ['Hover', 'Idle'], fly: ['Fly', 'Hover', 'Idle'], talk: ['Talk', 'Hover', 'Idle'], think: ['Think', 'Hover', 'Idle'], happy: ['Happy', 'Wave', 'Hover'],
 };
 
+export type CharacterSpec = {
+  gltf: GLTF;
+  /** Keep only this top-level node (and its children); null keeps the whole scene. */
+  node: string | null;
+  scale: number;
+  /** State → clip name(s), first one present wins; falls back to the contract names above. */
+  clips: Partial<Record<string, string | string[]>>;
+  timeScale: Partial<Record<string, number>>;
+  /**
+   * The kept node's own position/rotation tracks are made relative to each clip's first frame:
+   * the bob and sway stay, the placement baked in for Blender (beside or in front of the person)
+   * goes, because the 3D view places and turns the character itself.
+   */
+  relativeRoot: boolean;
+  hide: string[];
+};
+
+/** Clip tracks for nodes inside `keep`; the root's own motion optionally made relative. */
+function adaptClip(clip: THREE.AnimationClip, keep: Set<string>, rootName: string | null, relativeRoot: boolean, hide: Set<string>): THREE.AnimationClip | null {
+  const tracks: THREE.KeyframeTrack[] = [];
+  for (const t of clip.tracks) {
+    const { nodeName, propertyName } = THREE.PropertyBinding.parseTrackName(t.name);
+    if (!keep.has(nodeName) || hide.has(nodeName)) continue;
+    if (relativeRoot && nodeName === rootName && (propertyName === 'position' || propertyName === 'quaternion')) {
+      const v = Float32Array.from(t.values);
+      if (propertyName === 'position') {
+        const [x0, y0, z0] = [v[0], v[1], v[2]];
+        for (let i = 0; i < v.length; i += 3) { v[i] -= x0; v[i + 1] -= y0; v[i + 2] -= z0; }
+        tracks.push(new THREE.VectorKeyframeTrack(t.name, Array.from(t.times), Array.from(v)));
+      } else {
+        const q0inv = new THREE.Quaternion(v[0], v[1], v[2], v[3]).invert();
+        const q = new THREE.Quaternion();
+        for (let i = 0; i < v.length; i += 4) {
+          q.set(v[i], v[i + 1], v[i + 2], v[i + 3]).premultiply(q0inv);
+          v[i] = q.x; v[i + 1] = q.y; v[i + 2] = q.z; v[i + 3] = q.w;
+        }
+        tracks.push(new THREE.QuaternionKeyframeTrack(t.name, Array.from(t.times), Array.from(v)));
+      }
+      continue;
+    }
+    tracks.push(t);
+  }
+  return tracks.length ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : null;
+}
+
 class GltfCharacter implements Character {
-  readonly root: THREE.Object3D;
+  readonly root = new THREE.Group();
   readonly height: number;
+  private hop = new THREE.Group();
   private mixer: THREE.AnimationMixer;
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
   private base = '';
   private clipMap: Record<string, string[]>;
+  private timeScale: Partial<Record<string, number>>;
   private oneShotLeft = 0;
+  private hopLeft = 0;
   private owned: THREE.Material[] = [];
 
-  constructor(gltf: GLTF, kind: 'avatar' | 'pet', scale: number, seed: string) {
-    const model = cloneSkinned(gltf.scene);
-    model.scale.setScalar(scale);
+  constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
+    const scene = cloneSkinned(spec.gltf.scene);
+    let model: THREE.Object3D = scene;
+    if (spec.node) {
+      const keepNode = scene.getObjectByName(spec.node);
+      if (keepNode) {
+        // Drop the other top-level nodes (Ally's file holds the person and the Muse together).
+        for (const child of [...scene.children]) if (child !== keepNode) scene.remove(child);
+        if (spec.relativeRoot) { keepNode.position.set(0, 0, 0); keepNode.quaternion.identity(); }
+        model = scene;
+      }
+    }
+    const hide = new Set(spec.hide);
+    const keepNames = new Set<string>();
+    model.traverse((o) => {
+      keepNames.add(o.name);
+      if (hide.has(o.name)) o.visible = false;
+    });
+    model.scale.setScalar(spec.scale);
+
     // Persona tint on the materials named for it (Mat_Primary / Mat_Secondary / Mat_Accent).
     const c = colorsFor(seed);
     const tints: Record<string, string> = { Mat_Primary: c.primary, Mat_Secondary: c.secondary, Mat_Accent: c.accent };
@@ -287,26 +356,38 @@ class GltfCharacter implements Character {
       });
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
     });
-    this.root = new THREE.Group();
-    this.root.add(model);
+
+    this.hop.add(model);
+    this.root.add(this.hop);
     const box = new THREE.Box3().setFromObject(model);
     this.height = Math.max(0.3, box.max.y);
     this.mixer = new THREE.AnimationMixer(model);
-    for (const clip of gltf.animations) this.actions.set(clip.name, this.mixer.clipAction(clip));
-    this.clipMap = kind === 'avatar' ? AVATAR_CLIPS : PET_CLIPS;
+    for (const clip of spec.gltf.animations) {
+      const adapted = adaptClip(clip, keepNames, spec.node, spec.relativeRoot, hide);
+      if (adapted) this.actions.set(clip.name, this.mixer.clipAction(adapted));
+    }
+    const defaults: Record<string, string[]> = kind === 'avatar' ? AVATAR_CLIPS : PET_CLIPS;
+    this.clipMap = Object.fromEntries(Object.entries(defaults).map(([state, names]) => {
+      const custom = spec.clips[state];
+      return [state, custom ? (Array.isArray(custom) ? custom : [custom]) : names];
+    }));
+    this.timeScale = spec.timeScale;
     this.setState(kind === 'avatar' ? 'idle' : 'hover');
   }
 
-  private play(names: string[], once: boolean) {
-    const action = names.map((n) => this.actions.get(n)).find(Boolean);
-    if (!action || action === this.current) return;
+  private play(state: string, once: boolean): boolean {
+    const action = (this.clipMap[state] ?? []).map((n) => this.actions.get(n)).find(Boolean);
+    if (!action) return false;
+    action.timeScale = this.timeScale[state] ?? 1;
+    if (action === this.current) return true;
     action.reset();
     action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
     action.clampWhenFinished = once;
     action.play();
     if (this.current) this.current.crossFadeTo(action, 0.25, false);
     this.current = action;
-    this.oneShotLeft = once ? action.getClip().duration : 0;
+    this.oneShotLeft = once ? action.getClip().duration / Math.max(0.05, action.timeScale) : 0;
+    return true;
   }
 
   setState(s: string) {
@@ -314,16 +395,23 @@ class GltfCharacter implements Character {
     if (!once) {
       this.base = s;
       if (this.oneShotLeft > 0) return;
+      this.play(s, false);
+      return;
     }
-    this.play(this.clipMap[s] ?? [], once);
+    // A one-shot the model has no clip for (wave, celebrate, happy): a small hop instead.
+    if (!this.play(s, true)) this.hopLeft = ONE_SHOT_SECONDS[s] ?? 1.2;
   }
 
   update(dt: number) {
     this.mixer.update(dt);
     if (this.oneShotLeft > 0) {
       this.oneShotLeft -= dt;
-      if (this.oneShotLeft <= 0) { this.oneShotLeft = 0; this.play(this.clipMap[this.base] ?? [], false); }
+      if (this.oneShotLeft <= 0) { this.oneShotLeft = 0; this.play(this.base, false); }
     }
+    if (this.hopLeft > 0) {
+      this.hopLeft = Math.max(0, this.hopLeft - dt);
+      this.hop.position.y = Math.abs(Math.sin(this.hopLeft * 9)) * 0.22;
+    } else this.hop.position.y = 0;
   }
 
   dispose() { this.mixer.stopAllAction(); this.owned.forEach((m) => m.dispose()); }
@@ -331,8 +419,18 @@ class GltfCharacter implements Character {
 
 // ---- Loading ----
 
-export type ModelManifest = { avatar?: string; pet?: string; scale?: { avatar?: number; pet?: number }; version?: number };
-export type ModelSet = { avatar: GLTF | null; pet: GLTF | null; scale: { avatar: number; pet: number } };
+export type ModelManifest = {
+  version?: number;
+  avatar?: string | null; pet?: string | null;
+  avatarNode?: string | null; petNode?: string | null;
+  scale?: { avatar?: number; pet?: number };
+  clips?: { avatar?: Record<string, string | string[]>; pet?: Record<string, string | string[]> };
+  timeScale?: { avatar?: Record<string, number>; pet?: Record<string, number> };
+  /** Make the pet node's own motion relative (see CharacterSpec.relativeRoot). Default true. */
+  petRelativeMotion?: boolean;
+  hide?: string[];
+};
+export type ModelSet = { avatar: CharacterSpec | null; pet: CharacterSpec | null };
 
 let modelsPromise: Promise<ModelSet> | null = null;
 
@@ -340,30 +438,42 @@ let modelsPromise: Promise<ModelSet> | null = null;
 export function loadModels(): Promise<ModelSet> {
   if (modelsPromise) return modelsPromise;
   modelsPromise = (async () => {
-    const none: ModelSet = { avatar: null, pet: null, scale: { avatar: 1, pet: 1 } };
-    let manifest: ModelManifest;
+    const none: ModelSet = { avatar: null, pet: null };
+    let m: ModelManifest;
     try {
       const r = await fetch('/models/manifest.json', { cache: 'no-cache' });
       if (!r.ok) return none;
-      manifest = (await r.json()) as ModelManifest;
+      m = (await r.json()) as ModelManifest;
     } catch {
       return none;
     }
     const loader = new GLTFLoader();
-    const load = async (file?: string) => {
-      if (!file || !/^[\w.-]+\.glb$/.test(file)) return null;
-      try { return await loader.loadAsync(`/models/${file}`); } catch { return null; }
+    const files = new Map<string, Promise<GLTF | null>>();
+    const load = (file?: string | null) => {
+      if (!file || !/^[\w.-]+\.glb$/.test(file)) return Promise.resolve(null);
+      if (!files.has(file)) files.set(file, loader.loadAsync(`/models/${file}`).catch(() => null));
+      return files.get(file)!;
     };
-    const [avatar, pet] = await Promise.all([load(manifest.avatar), load(manifest.pet)]);
-    return { avatar, pet, scale: { avatar: manifest.scale?.avatar ?? 1, pet: manifest.scale?.pet ?? 1 } };
+    const [avatar, pet] = await Promise.all([load(m.avatar), load(m.pet)]);
+    const hide = m.hide ?? [];
+    return {
+      avatar: avatar ? {
+        gltf: avatar, node: m.avatarNode ?? null, scale: m.scale?.avatar ?? 1,
+        clips: m.clips?.avatar ?? {}, timeScale: m.timeScale?.avatar ?? {}, relativeRoot: false, hide,
+      } : null,
+      pet: pet ? {
+        gltf: pet, node: m.petNode ?? null, scale: m.scale?.pet ?? 1,
+        clips: m.clips?.pet ?? {}, timeScale: m.timeScale?.pet ?? {}, relativeRoot: m.petRelativeMotion ?? true, hide,
+      } : null,
+    };
   })();
   return modelsPromise;
 }
 
 export function makeAvatar(models: ModelSet | null, seed: string): Character {
-  return models?.avatar ? new GltfCharacter(models.avatar, 'avatar', models.scale.avatar, seed) : new PlaceholderAvatar(seed);
+  return models?.avatar ? new GltfCharacter(models.avatar, 'avatar', seed) : new PlaceholderAvatar(seed);
 }
 
 export function makePet(models: ModelSet | null, seed: string): Character {
-  return models?.pet ? new GltfCharacter(models.pet, 'pet', models.scale.pet, seed) : new PlaceholderPet();
+  return models?.pet ? new GltfCharacter(models.pet, 'pet', seed) : new PlaceholderPet();
 }

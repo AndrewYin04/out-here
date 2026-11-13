@@ -48,7 +48,7 @@ export class WorldLayer implements CustomLayerInterface {
   private origin: LatLng;
   private originMerc: MercatorCoordinate;
   private models: ModelSet | null = null;
-  private clock = new THREE.Clock();
+  private clock = new THREE.Timer();
   private elapsed = 0;
   private full = new THREE.Matrix4();
   private tmp = new THREE.Vector4();
@@ -79,7 +79,9 @@ export class WorldLayer implements CustomLayerInterface {
   /** Swap in loaded models; existing placeholder characters are rebuilt from them. */
   setModels(models: ModelSet) {
     this.models = models;
-    for (const [id, a] of this.actors) {
+    // Loop over a copy: each actor is removed and re-added, and a live Map iterator would visit
+    // the re-added entries again forever.
+    for (const [id, a] of [...this.actors]) {
       const label = a.label;
       this.removeActor(id);
       this.upsertActor(id, a.kind, a.seed);
@@ -204,7 +206,6 @@ export class WorldLayer implements CustomLayerInterface {
     this.map = map;
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
-    this.clock.start();
   }
 
   onRemove() {
@@ -225,6 +226,7 @@ export class WorldLayer implements CustomLayerInterface {
     const map = this.map;
     const renderer = this.renderer;
     if (!map || !renderer) return;
+    this.clock.update();
     const dt = Math.min(0.1, this.clock.getDelta());
     this.elapsed += dt;
 
