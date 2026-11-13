@@ -482,7 +482,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Real downtown towers (OSM extrusions) would swallow the Kenney blocks: hide every building
       // with a corner inside a district, by id (MapLibre's 'within' does not filter polygons).
       // Re-checked when new tiles arrive; the colorful real skyline stays everywhere else.
-      const hidden=new Set<number>(),checked=new Set<number>();
+      const hidden=new Set<number>();
       // The districts' outer box: most buildings are rejected by four comparisons, never a polygon test.
       const xs=city.bounds.flat().map(p=>p[0]),ys=city.bounds.flat().map(p=>p[1]);
       const box={w:Math.min(...xs),e:Math.max(...xs),s:Math.min(...ys),n:Math.max(...ys)};
@@ -490,7 +490,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const src=tileSourceId(map);if(!src||!map.getLayer(BUILDINGS_ID))return;
         const before=hidden.size;
         for(const f of map.querySourceFeatures(src,{sourceLayer:'building'})){
-          if(f.id==null)continue;const id=Number(f.id);if(checked.has(id))continue;checked.add(id);
+          // Every piece is checked: a building split across tiles may only reach a district in one piece.
+          if(f.id==null)continue;const id=Number(f.id);if(hidden.has(id))continue;
           const g=f.geometry;const rings=g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.flat():[];
           if(rings.some(r=>r.some(([lng,lat])=>lng>=box.w&&lng<=box.e&&lat>=box.s&&lat<=box.n&&cityContains.current({lat,lng}))))hidden.add(id);
         }
