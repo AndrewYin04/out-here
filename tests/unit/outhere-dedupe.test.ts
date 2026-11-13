@@ -6,7 +6,7 @@ import type { PlanSuggestion } from '@/shared';
 const UNTIL = '2026-11-12T23:44:00.000Z';
 const top = {
   kind: 'join_quest', questId: 'q1', friendIds: ['maya'], title: 'Dumplings before the rush', emoji: '🥟',
-  reason: "Maya's craving dumplings and wants to try Dumpling Den. Free till 3:44 PM, and it's a 9 min walk.",
+  reason: "Maya's craving dumplings and wants to try Dumpling Den. Maya's free till 3:44 PM.",
   bridge: "Maya's free till 3:44 PM and is into dumplings too.", startsAt: UNTIL, travelMinutes: 9,
   fitsWindow: true, seatsLeft: 2, inviteDraft: null,
 } as PlanSuggestion;

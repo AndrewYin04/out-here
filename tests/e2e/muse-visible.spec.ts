@@ -6,7 +6,6 @@ import { mkdirSync } from "node:fs";
 // ramen (too far) and sushi (over budget) ruled out with numbers, and the dumpling pick
 // with its why, all with no click after "Find a plan". Code counts and filters, so only the
 // rank line may carry ✨ Muse, and only when the live model ranked.
-const PLACEHOLDER = "hungry, got like 40 min, under $15";
 const SHOTS = ".verify/muse-visible";
 
 // Headless Chromium's default GL backend drops the map canvas after a few idle seconds at phone
@@ -26,7 +25,7 @@ test("Muse's reasoning is visible on the plan sheet without a tap", async ({ pag
 
   await page.goto("/out-here?as=alex");
   await page.getByRole("button", { name: "I'm free" }).click();
-  await page.getByPlaceholder(PLACEHOLDER).fill("hungry, 40 min, under $15");
+  await page.locator("#imfree-text").fill("hungry, 40 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
 
   const loading = page.getByTestId("muse-steps-loading");
@@ -125,23 +124,23 @@ test("Muse filter: the why stays clear of the map", async ({ page }, info) => {
   await expect(line).toHaveCount(0);
 });
 
-test("a time chip replaces the time in the ask, and 15 min narrows to boba", async ({ page }, info) => {
-  const phone = info.project.name === "phone";
-  test.skip(phone, "phones hide the chips while picks show; the chip text logic is unit-tested");
+test("the 15 min time picker narrows the picks to boba, and the work panel reads it", async ({ page }) => {
   mkdirSync(SHOTS, { recursive: true });
   await page.goto("/out-here?as=alex");
   await page.getByRole("button", { name: "I'm free" }).click();
-  const box = page.getByPlaceholder(PLACEHOLDER);
+  const box = page.locator("#imfree-text");
   await box.fill("hungry, 40 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("suggestion").first()).toContainText("Dumplings before the rush", { timeout: 15_000 });
+  // After an ask the composer folds into one line; "Change" opens the pickers again.
+  await page.getByTestId("picked-summary").getByRole("button", { name: "Change" }).click();
   await page.getByRole("button", { name: "15 min", exact: true }).click();
-  await expect(box).toHaveValue("hungry, 15 min, under $15");
+  await box.fill("hungry, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("muse-work-read")).toContainText("15 min", { timeout: 15_000 });
   await expect(page.getByTestId("suggestion")).toHaveCount(1);
   await expect(page.getByTestId("suggestion").first()).toContainText(/boba/i);
-  await page.screenshot({ path: `${SHOTS}/chip15-1440.png` });
+  await page.screenshot({ path: `${SHOTS}/time15-${page.viewportSize()!.width}.png` });
 });
 
 test("a shorter ask explains the pick that dropped out first, and the map strip keeps its tiles", async ({ page }, info) => {
@@ -150,7 +149,7 @@ test("a shorter ask explains the pick that dropped out first, and the map strip 
   mkdirSync(SHOTS, { recursive: true });
   await page.goto("/out-here?as=alex");
   await page.getByRole("button", { name: "I'm free" }).click();
-  const box = page.getByPlaceholder(PLACEHOLDER);
+  const box = page.locator("#imfree-text");
   await box.fill("hungry, 40 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("suggestion").first()).toContainText("Dumplings before the rush", { timeout: 15_000 });
@@ -197,7 +196,7 @@ test("live mode credits Muse for reading the words, and keeps the default walk c
   });
   await page.goto("/out-here?as=alex");
   await page.getByRole("button", { name: "I'm free" }).click();
-  await page.getByPlaceholder(PLACEHOLDER).fill("hungry, got like 40 min, under $15");
+  await page.locator("#imfree-text").fill("hungry, got like 40 min, under $15");
   await page.getByRole("button", { name: "Find a plan" }).click();
   const read = page.getByTestId("muse-work-read");
   await expect(read).toHaveAttribute("data-by", "muse", { timeout: 15_000 });
