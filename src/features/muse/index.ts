@@ -3,6 +3,13 @@
 export {
   MIN_ATTEMPT_MS, MuseError, MuseTimeoutError, MUSE_TIMEOUT_MS, extractJSON, reportFallback, hashInput, isMockMode, modelFor, museJSON, onRun, setMuseTransport,
 } from './client';
+export {
+  MUSE_CACHE_HEADER, NORMALIZED, PREBAKE_MAX_AGE_MIN, STAGE_TIMEOUT_MS, canonicalJSON, normalizeContent, prebakeMode, stableHash,
+  stableKeyMaterial, stageTimeoutMs,
+} from './prebake';
+export type { PrebakeMode, StableKeyInput } from './prebake';
+export { createMemoryMuseStore, createSupabaseMuseStore, museStore, setMuseStore } from './persist';
+export type { CacheEntry, CacheKey, MuseStore, RunSummary, StoredRun } from './persist';
 export type {
   MuseEffort, MuseJSONOptions, MuseMessage, MuseModelRole, MuseResult, MuseRunRecord, MuseTransport, MuseUsage,
 } from './client';

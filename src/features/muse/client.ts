@@ -4,6 +4,10 @@
 import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import type { z } from 'zod';
+import { background, museStore, newRunId, within, type CacheEntry } from './persist';
+import {
+  cacheWriteEnabled, prebakeMaxAgeMs, prebakeMode, requestDirective, stableHash, stageTimeoutMs,
+} from './prebake';
 
 export type MuseModelRole = 'fast' | 'smart';
 export type MuseEffort = 'minimal' | 'low' | 'medium' | 'high';
@@ -23,13 +27,22 @@ export type MuseRunRecord = {
   ok: boolean;
   error: string | null;
   mock: boolean;
+  /** Answered from a cache instead of a new model call (the dev file cache or the pre-baked cache). */
   cached: boolean;
+  /** Answered from the pre-baked cache (muse_cache). The output is a stored, genuine Muse answer. */
+  prebaked: boolean;
+  /** For a pre-baked answer: muse_runs.id of the live call that produced it. */
+  cacheRunId: string | null;
   createdAt: string;
 };
 
 export type MuseUsage = { promptTokens: number | null; completionTokens: number | null };
 
-export type MuseResult<T> = { data: T; model: string; latencyMs: number; usage: MuseUsage; mock: boolean };
+export type MuseResult<T> = {
+  data: T; model: string; latencyMs: number; usage: MuseUsage; mock: boolean;
+  /** True when the answer came from the pre-baked cache (still a genuine stored Muse answer). */
+  prebaked?: boolean;
+};
 
 export type MuseJSONOptions<T> = {
   schemaName: string;
@@ -107,18 +120,33 @@ let runLogger: (run: MuseRunRecord) => void | Promise<void> = (run) => {
   }
 };
 
-/** Replaces the run logger. The data layer plugs in a muse_runs writer here. */
+/**
+ * Replaces the extra run logger (console by default; tests collect runs here). Writing muse_runs
+ * does not depend on it: emit() always hands each run to the muse store (persist.ts) as well,
+ * so every Muse call on the server is logged without anything registering at startup.
+ */
 export function onRun(logger: (run: MuseRunRecord) => void | Promise<void>): void {
   runLogger = logger;
 }
 
-function emit(run: MuseRunRecord): void {
+/** Logs one run: the extra logger now, the muse_runs row in the background. Returns the row id. */
+function emit(run: MuseRunRecord): string {
+  const id = newRunId();
   try {
     const r = runLogger(run);
     if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => {});
   } catch {
     // a broken logger must never break a plan
   }
+  if (process.env.MUSE_RUNS_LOG !== '0') background(async () => (await museStore()).logRun({ ...run, id }));
+  return id;
+}
+
+/** The cache lookup gets this long; past it the call goes live as if nothing were stored. */
+const CACHE_LOOKUP_MS = 1_000;
+
+async function lookupPrebaked(route: string, model: string, inputHash: string): Promise<CacheEntry | null> {
+  return within(CACHE_LOOKUP_MS, museStore().then((s) => s.getCache({ route, model, inputHash }, prebakeMaxAgeMs())), null);
 }
 
 /**
@@ -132,7 +160,7 @@ export function reportFallback(info: { route: string; step: string; error: strin
   emit({
     route: info.route, schemaName: info.step, model: 'heuristic', userId: info.userId ?? null, latencyMs: 0,
     inputHash: '', output: null, promptTokens: null, completionTokens: null, ok: false, error,
-    mock: false, cached: false, createdAt: new Date().toISOString(),
+    mock: false, cached: false, prebaked: false, cacheRunId: null, createdAt: new Date().toISOString(),
   });
 }
 
@@ -272,7 +300,10 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
   const mock = isMockMode();
   const model = mock ? 'mock' : modelFor(opts.model);
   const effort = opts.effort ?? 'minimal';
-  const inputHash = hashInput({ model, effort, schema: opts.schemaName, messages: opts.messages });
+  // exactHash keys the dev file cache (.cache/muse): any change, the time included, is a miss.
+  // inputHash is the stable key (prebake.ts): the same ask later in the day hashes the same.
+  const exactHash = hashInput({ model, effort, schema: opts.schemaName, messages: opts.messages });
+  const inputHash = stableHash({ model, effort, schemaName: opts.schemaName, jsonSchema: opts.jsonSchema, messages: opts.messages });
   const base = {
     route: opts.route ?? 'muse',
     schemaName: opts.schemaName,
@@ -280,6 +311,8 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     userId: opts.userId ?? null,
     inputHash,
     mock,
+    prebaked: false,
+    cacheRunId: null as string | null,
   };
   const usage: MuseUsage = { promptTokens: null, completionTokens: null };
 
@@ -290,15 +323,39 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     return { data, model, latencyMs, usage, mock: true };
   }
 
+  // Pre-baked answers (docs/MUSE_PREBAKE.md). Off: nothing is read. Cache first: a stored answer
+  // is served at once. Fallback: the live call gets MUSE_STAGE_TIMEOUT_MS, then the stored answer.
+  // The warm-up's "x-muse-cache: refresh" header always goes live, with no fallback.
+  const mode = prebakeMode();
+  const directive = mode === 'off' ? null : await requestDirective();
+  let stored: { entry: CacheEntry; data: T } | null = null;
+  if (mode !== 'off' && directive !== 'refresh') {
+    const entry = await lookupPrebaked(base.route, model, inputHash);
+    const parsed = entry ? opts.schema.safeParse(entry.output) : null;
+    if (entry && parsed?.success) stored = { entry, data: parsed.data };
+  }
+  const servePrebaked = (hit: { entry: CacheEntry; data: T }, note: string | null): MuseResult<T> => {
+    const latencyMs = Date.now() - started;
+    emit({
+      ...base, prebaked: true, cacheRunId: hit.entry.sourceRunId, latencyMs, output: hit.data,
+      promptTokens: null, completionTokens: null, ok: true, error: note, cached: true, createdAt: new Date().toISOString(),
+    });
+    return { data: hit.data, model, latencyMs, usage: { promptTokens: null, completionTokens: null }, mock: false, prebaked: true };
+  };
+  if (stored && mode === 'cache-first') return servePrebaked(stored, null);
+  const stageDeadline = stored ? started + stageTimeoutMs() : undefined;
+  const deadline = stageDeadline === undefined ? opts.deadline
+    : opts.deadline === undefined ? stageDeadline : Math.min(opts.deadline, stageDeadline);
+
   let lastError: unknown = null;
   let cached = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      let reply = attempt === 0 ? await cacheRead(inputHash) : null;
+      let reply = attempt === 0 ? await cacheRead(exactHash) : null;
       cached = reply !== null;
       if (!reply) {
         const cap = opts.timeoutMs ?? MUSE_TIMEOUT_MS;
-        const left = opts.deadline === undefined ? cap : opts.deadline - Date.now();
+        const left = deadline === undefined ? cap : deadline - Date.now();
         if (left < MIN_ATTEMPT_MS) throw new MuseTimeoutError(Math.max(0, Date.now() - started));
         const timeoutMs = Math.min(cap, left);
         const res = await attemptWithTimeout(timeoutMs, (signal) => transport({
@@ -317,9 +374,17 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
       usage.completionTokens = reply.usage.completionTokens;
       const parsed = opts.schema.safeParse(extractJSON(reply.content));
       if (!parsed.success) throw new MuseError(`invalid JSON for ${opts.schemaName}: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`);
-      if (!cached) await cacheWrite(inputHash, reply);
+      if (!cached) await cacheWrite(exactHash, reply);
       const latencyMs = Date.now() - started;
-      emit({ ...base, latencyMs, output: parsed.data, ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
+      const runId = emit({ ...base, latencyMs, output: parsed.data, ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
+      if (!cached && cacheWriteEnabled()) {
+        const entry: CacheEntry = {
+          route: base.route, model, inputHash, schemaName: opts.schemaName, output: parsed.data,
+          promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, latencyMs, sourceRunId: runId,
+          createdAt: new Date().toISOString(),
+        };
+        background(async () => (await museStore()).putCache(entry));
+      }
       return { data: parsed.data, model, latencyMs, usage, mock: false };
     } catch (err) {
       lastError = err;
@@ -329,7 +394,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
         (err as Error)?.message === 'reply is not JSON');
       if (!retryable || attempt === 1) break;
       if (status === 429 || status === 504) {
-        if (opts.deadline !== undefined && opts.deadline - Date.now() < 800 + MIN_ATTEMPT_MS) break;
+        if (deadline !== undefined && deadline - Date.now() < 800 + MIN_ATTEMPT_MS) break;
         await sleep(800);
       }
     }
@@ -337,6 +402,8 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
   const latencyMs = Date.now() - started;
   const error = safeError(lastError);
   emit({ ...base, latencyMs, output: null, ...usage, ok: false, error, cached, createdAt: new Date().toISOString() });
+  // Stage fallback: the live call was too slow or failed, and this same ask was answered earlier.
+  if (stored) return servePrebaked(stored, `stage fallback: ${error}`.slice(0, 240));
   if (lastError instanceof MuseTimeoutError) throw lastError;
   throw new MuseError(error, statusOf(lastError));
 }
