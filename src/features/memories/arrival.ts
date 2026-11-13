@@ -5,7 +5,7 @@
 //     reaches the *other* crew members, so the uploader's own board listens for this).
 //   - RATE_HANGOUT: "Rate it" after the selfie. The rating questionnaire (#18) listens, opens for
 //     `questId`, and pre-fills `photoIds`. It calls preventDefault() to say it handled it.
-import type { ID } from '@/shared';
+import { EARLY_PHOTO_MS, type ID } from '@/shared';
 
 export const MEMORY_SAVED = 'outhere:memory-saved';
 export const RATE_HANGOUT = 'outhere:rate-hangout';
@@ -25,12 +25,22 @@ export function requestRating(detail: RateHangoutDetail): boolean {
 }
 
 /**
- * Before a plan starts the server won't make its crew album yet (`complete` is attendees only,
- * after the start), so an early arrival waits with a countdown. The demo walk is sped up, so this
- * happens on stage.
+ * Up to EARLY_PHOTO_MS before the start the photo opens right away: you walked there together and
+ * the server forms the crew early (docs/UX_PLAN.md). Earlier than that, the arrival waits with a
+ * countdown to the start. `minutes` is always the time until the start.
  */
 export function arrivalWait(startsAt: string, now: number): { early: boolean; minutes: number } {
   const ms = new Date(startsAt).getTime() - now;
   if (!Number.isFinite(ms) || ms <= 0) return { early: false, minutes: 0 };
-  return { early: true, minutes: Math.max(1, Math.ceil(ms / 60_000)) };
+  return { early: ms > EARLY_PHOTO_MS, minutes: Math.max(1, Math.ceil(ms / 60_000)) };
+}
+
+/** "Take a photo together" from anywhere (the Up next card): the 3D view opens its selfie. */
+export const OPEN_SELFIE = 'outhere:open-selfie';
+
+/** Asks the arrival selfie to open for `questId`. Returns false when nothing on the page handled it. */
+export function requestSelfie(questId: ID): boolean {
+  const e = new CustomEvent<ID>(OPEN_SELFIE, { detail: questId, cancelable: true });
+  window.dispatchEvent(e);
+  return e.defaultPrevented;
 }

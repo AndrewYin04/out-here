@@ -8,9 +8,9 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, SharingButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Plus } from 'lucide-react';
-import { Button, cn, EmptyState, useToast } from '@/features/ui';
+import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
@@ -83,6 +83,7 @@ export function OutHereView() {
   const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
+  const tools = useDemoTools();
 
   // ?quest=<id> deep link opens that quest's sheet; ?mode=friends|explore sets the toggle.
   useEffect(() => {
@@ -277,7 +278,10 @@ export function OutHereView() {
   // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();
   const nextQuest = upNext?.quest;
-  const walkQuest = walkTo && nextQuest?.id === walkTo.questId ? nextQuest : null;
+  // Let's go can come from any plan you joined (a plan's panel, an accepted invite), not only Up next.
+  const walkQuest = !walkTo ? null
+    : nextQuest?.id === walkTo.questId ? nextQuest
+      : (questsApi.data?.quests ?? []).find((q) => q.id === walkTo.questId) ?? null;
   const [arrivedId, setArrivedId] = useState<string | null>(null);
   const letsGo = useCallback((questId: string) => {
     if (unsupported) { select(questId); return; }
@@ -289,6 +293,21 @@ export function OutHereView() {
   const finishWalk = useCallback((questId: string) => {
     setWalkTo((current) => current?.questId === questId ? null : current);
   }, []);
+  // Every "Let's go" in the app (accepted invite, "Maya's in", a joined plan's panel) lands here;
+  // from another page it arrives as ?go=<questId>.
+  useEffect(() => listenLetsGo(letsGo), [letsGo]);
+  const goParam = useRef(false);
+  useEffect(() => {
+    if (goParam.current) return;
+    goParam.current = true;
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('go');
+    if (!id) return;
+    url.searchParams.delete('go');
+    window.history.replaceState(window.history.state, '', url.toString());
+    setMode('explore');
+    letsGo(id);
+  }, [letsGo]);
   const onArrive = useCallback((questId: string) => {
     finishWalk(questId);
     setArrivedId(questId);
@@ -386,7 +405,7 @@ export function OutHereView() {
             </button>
           ))}
         </div>
-        <button
+        {tools && <button
           type="button"
           aria-pressed={filter.on}
           data-testid="muse-filter-toggle"
@@ -398,7 +417,7 @@ export function OutHereView() {
           )}
         >
           <span aria-hidden>✨</span> Muse filter
-        </button>
+        </button>}
       </div>
 
       {filter.on && (
@@ -523,9 +542,12 @@ export function OutHereView() {
         </>
       )}
 
-      {/* Up Next is the primary action when a plan is coming up. */}
-      {!selectedId && !creating && upNext && (
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
+      {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
+          which already shows the plan (one next step on screen at a time). */}
+      {!selectedId && !creating && !sheetOpen && upNext && (
+        // Below the Muse filter status and the Friends chip, so neither is ever covered.
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
+          mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
           <UpNextCard
             key={upNext.quest.id}
             plan={upNext}
@@ -539,7 +561,7 @@ export function OutHereView() {
       )}
 
       {/* Dock the availability card at the edge to leave room for the map and avatar. */}
-      {!selectedId && !creating && !upNext && (
+      {!selectedId && !creating && !sheetOpen && !upNext && (
         <div className={cn(
           'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
           show3d
