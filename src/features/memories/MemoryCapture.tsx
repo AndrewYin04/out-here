@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Camera, Sparkles } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
-import { Button, burst, flash } from '@/features/ui';
+import { Button, burst, cn, flash } from '@/features/ui';
 import type { CompleteQuestResponse, Memory } from '@/shared';
 
 const MAX_BYTES = 3_500_000;
@@ -25,6 +25,73 @@ async function preparePhoto(file: File): Promise<Blob> {
     if (result && result.size <= MAX_BYTES) return result;
   } catch { /* The picker can supply a smaller image if decoding fails. */ }
   throw new Error('Choose a smaller JPG, PNG, or WebP photo.');
+}
+
+/** Uploads one photo to the hangout's crew album, completing the quest first when it has no crew yet. */
+async function uploadPhoto(photo: File, questId: string, crewId: string | null, caption: string): Promise<{ crewId: string; memory: Memory }> {
+  const file = await preparePhoto(photo);
+  const id = crewId ?? (await apiPost<CompleteQuestResponse>(`/api/quests/${questId}/complete`, {})).crew.id;
+  const form = new FormData();
+  form.set('photo', file, file instanceof File ? file.name : 'hangout.jpg');
+  form.set('questId', questId);
+  form.set('crewId', id);
+  form.set('caption', caption);
+  const { memory } = await apiFetch<{ memory: Memory }>('/api/memories', { method: 'POST', body: form });
+  return { crewId: id, memory };
+}
+
+/**
+ * The rating questionnaire's photo step: a dashed "Add photos" tile over a visually hidden file
+ * input. Each pick uploads straight to the crew album (no caption form) and is reported through
+ * onMemory; the questionnaire shows the thumbnails.
+ */
+export function AddPhotoTile({ questId, crewId, onMemory }: {
+  questId: string; crewId: string | null; onMemory: (memory: Memory) => void;
+}) {
+  const inputId = useId();
+  const [crew, setCrew] = useState(crewId);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [inputKey, setInputKey] = useState(0);
+
+  async function pick(files: FileList | null) {
+    const list = [...(files ?? [])];
+    setInputKey((k) => k + 1);
+    if (!list.length) return;
+    setError(null);
+    setUploading(true);
+    let id = crew;
+    try {
+      for (const f of list) {
+        const res = await uploadPhoto(f, questId, id, '');
+        id = res.crewId;
+        setCrew(id);
+        onMemory(res.memory);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t save your photo.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <input key={inputKey} id={inputId} type="file" accept="image/*" multiple className="peer sr-only"
+        aria-label="Take a photo together" disabled={uploading}
+        onChange={(event) => { void pick(event.currentTarget.files); }} />
+      <label htmlFor={inputId} data-testid="add-photos-tile" aria-hidden
+        className={cn(
+          'flex min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[16px] border-2 border-dashed border-fb-divider bg-fb-input px-4 py-3 text-center hover:bg-fb-secondary-btn peer-focus-visible:ring-2 peer-focus-visible:ring-fb-blue',
+          uploading && 'pointer-events-none opacity-70',
+        )}>
+        <Camera size={24} aria-hidden className="text-fb-text" />
+        <span className="text-[15px] font-semibold text-fb-text">{uploading ? 'Adding photo…' : 'Add photos'}</span>
+        <span className="text-[13px] text-fb-text-2">Shared with the people from this hangout</span>
+      </label>
+      {error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{error}</p>}
+    </div>
+  );
 }
 
 /**
@@ -71,15 +138,8 @@ export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
     setPending('save');
     setError(null);
     try {
-      const file = await preparePhoto(photo);
-      const id = crewId ?? (await apiPost<CompleteQuestResponse>(`/api/quests/${questId}/complete`, {})).crew.id;
+      const { crewId: id, memory } = await uploadPhoto(photo, questId, crewId, caption);
       onSaved(id);
-      const form = new FormData();
-      form.set('photo', file, file instanceof File ? file.name : 'hangout.jpg');
-      form.set('questId', questId);
-      form.set('crewId', id);
-      form.set('caption', caption);
-      const { memory } = await apiFetch<{ memory: Memory }>('/api/memories', { method: 'POST', body: form });
       setPhoto(null);
       if (onMemory) {
         onMemory(memory);

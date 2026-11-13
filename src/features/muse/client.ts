@@ -51,6 +51,11 @@ export type MuseJSONOptions<T> = {
    * min(timeoutMs, time left); no attempt starts with less than MIN_ATTEMPT_MS left.
    */
   deadline?: number;
+  /**
+   * Extra facts logged with the output in muse_runs (as output.signals), so "why did Muse suggest
+   * this" can show what it used. Counts and labels only: never names, ids, or someone's answer.
+   */
+  logSignals?: Record<string, unknown>;
 };
 
 /** Raw chat call, replaceable in tests. Returns the message text and usage. */
@@ -282,11 +287,13 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     mock,
   };
   const usage: MuseUsage = { promptTokens: null, completionTokens: null };
+  const logged = (data: T): unknown =>
+    opts.logSignals && data && typeof data === 'object' ? { ...(data as object), signals: opts.logSignals } : data;
 
   if (mock) {
     const data = opts.schema.parse(opts.mock());
     const latencyMs = Date.now() - started;
-    emit({ ...base, latencyMs, output: data, ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
+    emit({ ...base, latencyMs, output: logged(data), ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
     return { data, model, latencyMs, usage, mock: true };
   }
 
@@ -319,7 +326,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
       if (!parsed.success) throw new MuseError(`invalid JSON for ${opts.schemaName}: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`);
       if (!cached) await cacheWrite(inputHash, reply);
       const latencyMs = Date.now() - started;
-      emit({ ...base, latencyMs, output: parsed.data, ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
+      emit({ ...base, latencyMs, output: logged(parsed.data), ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
       return { data: parsed.data, model, latencyMs, usage, mock: false };
     } catch (err) {
       lastError = err;
