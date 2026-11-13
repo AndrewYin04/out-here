@@ -82,6 +82,9 @@ export function InviteInbox() {
 
   const respond = async (inv: Shown, status: 'accepted' | 'declined', from: HTMLElement | null = null) => {
     if (inv.busy) return;
+    // Keep the cards open after a tap, so a sheet or dialog that opens next (the join, a rating
+    // prompt) does not fold away the answer the viewer is waiting for.
+    setExpanded(true);
     patch(inv.id, { busy: true, error: undefined });
     try {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
