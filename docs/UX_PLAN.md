@@ -22,7 +22,7 @@ idle → I'm free → choosing → invite sent → **it's a plan → Let's go** 
 
 The Up next card (Ally, feat/up-next) is that next-step bar. Every confirmation leads into it.
 
-## Changes on this branch
+## Changes on this branch (all built; walked through as Alex and Maya in two tabs)
 
 1. **Merge feat/up-next** (Up next card, demo reset #15) as the base.
 2. **One "Let's go" everywhere.** A shared `outhere:lets-go` event: the map switches to 3D and walks there.
