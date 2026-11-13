@@ -36,6 +36,14 @@ Its own milestone deploys use the same command on the `overnight` branch.
 
 - Previews only. Never `vercel deploy --prod` overnight; production is promoted by hand at handoff
   (Vercel dashboard → Deployments → the chosen preview → Promote).
-- Previews use the **demo** Supabase project's env vars (`DATA_TARGET=demo`). Don't point tests at it.
+- **Previews read the dev database; only Production reads demo.** Since about 1 AM PT on Fri Nov 13 the
+  Preview environment has `DATA_TARGET=dev` and the three `_DEV` Supabase variables, and Production
+  has `DATA_TARGET=demo` and the plain demo variables. Previews built before then still point at
+  demo. Check which one a deployment uses with `curl <url>/api/realtime/config`: the `url` field
+  names the Supabase project.
+- Because previews and Production read different databases, a migration has to be applied to both
+  (`npm run db:migrate:dev` and `npm run db:migrate:demo`) before a preview is promoted.
+- Muse (`MUSE_*`) and `DEMO_RESET_TOKEN` are the same in both environments.
 - Env vars live in Vercel → out-here → Settings → Environment Variables (Production and Preview).
-  Ask Andrew to add or change one; never put secrets in a comment.
+  Ask Andrew to add or change one; never put secrets in a comment. A Vercel env change reaches only
+  deployments built after it: redeploy (or promote a new preview) to pick it up.
