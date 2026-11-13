@@ -14,7 +14,7 @@ import {
   hangMessages, hangPlaces, mockHang, museJSON, RAW_HANG_JSON_SCHEMA, RawHangZ, reportFallback, validateHang,
   type HangContext,
 } from '@/features/muse';
-import { body, IdZ, route } from '@/lib/api';
+import { body, IdZ, LIVE_TABLES, route } from '@/lib/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -76,4 +76,4 @@ export const POST = route(async ({ store, viewer, req }) => {
     reportFallback({ route: routeName, step: 'draft', error: msg, userId: viewer.id });
     return NextResponse.json({ draft: validateHang(mockHang(ctx), ctx), friend: item.friend, others, mode: 'fallback' }, { headers: { 'x-muse-mode': 'fallback' } });
   }
-});
+}, { refresh: LIVE_TABLES });
