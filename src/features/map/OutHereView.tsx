@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
-import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
+import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast, sfx } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
@@ -294,6 +294,8 @@ export function OutHereView() {
     return () => window.clearTimeout(t);
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
+  // The map is up: a soft open cue (dropped before the first tap; once a minute at most).
+  useEffect(() => { if (map) sfx('map_open'); }, [map]);
   // Let's go should open the street at once: warm it a few seconds after the map is up.
   useEffect(() => {
     if (!map || unsupported) return;
@@ -313,6 +315,9 @@ export function OutHereView() {
     if (unsupported) { select(questId); return; }
     select(null);
     setArrivedId(null);
+    // The go beat, then the camera dives into the street.
+    sfx('lets_go');
+    window.setTimeout(() => sfx('zoom_whoosh'), 380);
     setView('3d');
     setWalkTo({ questId });
   }, [select, setView, unsupported]);

@@ -5,6 +5,7 @@
 import { apiFetch, apiPost } from '@/features/data';
 import type { CompleteQuestResponse, Memory } from '@/shared';
 import { emitMemorySaved } from './arrival';
+import { sfx } from '@/features/ui';
 
 /** The crew for this plan, making it if needed. */
 export async function crewFor(questId: string): Promise<string> {
@@ -20,5 +21,7 @@ export async function saveToAlbum(questId: string, file: File | Blob, caption = 
   form.set('caption', caption);
   const { memory } = await apiFetch<{ memory: Memory }>('/api/memories', { method: 'POST', body: form });
   emitMemorySaved({ questId, crewId, memoryId: memory.id });
+  sfx('polaroid_develop');
+  window.setTimeout(() => sfx('pin_board'), 420);
   return memory;
 }

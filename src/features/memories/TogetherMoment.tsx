@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApi, type QuestDetail } from '@/features/data';
-import { Avatar, burst, cn, flash, useDemoTools, useToast } from '@/features/ui';
+import { Avatar, burst, cn, flash, sfx, useDemoTools, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
 import type { PersonCard } from '@/shared/api';
 import { rememberHere } from './arrival';
@@ -86,7 +86,11 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
   // Confetti when you arrive, and again each time someone else gets there.
   const lastCount = useRef(0);
   useEffect(() => {
-    if (here.length > lastCount.current) burst(folded ? capsuleRef.current : sheetRef.current, [quest.emoji, '🎉', '✨', '🎊'], lastCount.current === 0 ? 24 : 14);
+    if (here.length > lastCount.current) {
+      burst(folded ? capsuleRef.current : sheetRef.current, [quest.emoji, '🎉', '✨', '🎊'], lastCount.current === 0 ? 24 : 14);
+      // You made it: the stamp + sting once; each friend who gets there after you, a lighter cheer.
+      sfx(lastCount.current === 0 ? 'arrival_made_it' : 'friend_joined');
+    }
     lastCount.current = here.length;
   }, [here.length, quest.emoji, folded]);
   useEffect(() => { if (allHere && togetherSince === null) setTogetherSince(Date.now()); }, [allHere, togetherSince]);

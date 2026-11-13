@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, ChevronUp, Loader2, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { cn } from '@/features/ui';
+import { cn, sfx } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
 import { MuseLabel } from './SuggestionCard';
 
@@ -21,7 +21,7 @@ export function MuseStepsLoading({ steps = LOADING_STEPS, className, title, sub 
   const [shown, setShown] = useState(1);
   useEffect(() => {
     const id = window.setInterval(() => {
-      setShown((n) => (n >= steps.length ? n : n + 1));
+      setShown((n) => { if (n < steps.length) sfx('muse_step'); return n >= steps.length ? n : n + 1; });
     }, LOADING_STEP_MS);
     return () => window.clearInterval(id);
   }, [steps.length]);

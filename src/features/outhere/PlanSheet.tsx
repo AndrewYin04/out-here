@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, Coffee, Timer, CupSoda, Dumbbell, Footprints, G
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 import { useApi, useViewer } from '@/features/data';
-import { CategoryIcon, categoryOf, cn, IconButton, Skeleton } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn, IconButton, Skeleton, sfx } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
@@ -119,7 +119,7 @@ export function ImFreeButton({ className, quiet = false }: {
   return (
     <button
       type="button"
-      onClick={() => setPlanOpen(true)}
+      onClick={() => { sfx('free_tap'); setPlanOpen(true); }}
       aria-label={label ? `I'm free · ${label}` : "I'm free"}
       data-status={status.kind}
       data-testid="im-free"
@@ -251,6 +251,8 @@ export function PlanSheet({ className }: { className?: string }) {
       if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
+      sfx('muse_done');
+      if (r.plan.suggestions.length > 0) window.setTimeout(() => sfx('results_reveal'), 260);
       const top = r.plan.suggestions[0];
       setPlanStatus({
         state: 'done',

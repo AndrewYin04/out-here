@@ -3,7 +3,7 @@
 import { Footprints, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, IconButton, celebrateJoin } from '@/features/ui';
+import { Avatar, Button, IconButton, celebrateJoin, sfx } from '@/features/ui';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
@@ -25,6 +25,8 @@ export function InviteInbox() {
   const { viewer } = useViewer();
   const [items, setItems] = useState<Shown[]>([]);
   const dismissed = useRef<Set<string>>(new Set());
+  // No chime for invites already waiting when the page opens; only for ones that arrive live.
+  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -33,9 +35,12 @@ export function InviteInbox() {
       setItems((prev) => {
         const kept = new Map(prev.filter((p) => p.result).map((p) => [p.id, p]));
         const pending = data.incoming.filter((i) => i.status === 'pending' && Date.parse(i.createdAt) > cutoff && !dismissed.current.has(i.id));
+        const fresh = pending.filter((p) => !kept.has(p.id) && !prev.some((x) => x.id === p.id));
+        if (fresh.length > 0 && prev.length + kept.size >= 0 && loadedOnce.current) sfx('invite_received');
         for (const p of pending) if (!kept.has(p.id)) kept.set(p.id, p);
         pendingInviteQuests.clear();
         for (const p of pending) if (p.quest?.id) pendingInviteQuests.add(p.quest.id);
+        loadedOnce.current = true;
         return [...kept.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
       });
     } catch {
@@ -67,6 +72,7 @@ export function InviteInbox() {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
         `/api/invites/${inv.id}/respond`, { status });
       if (status === 'accepted' && out.quest) celebrateJoin(from, out.quest.id, viewer.avatarUrl);
+      sfx(status === 'accepted' ? 'accept_stamp' : 'soft_no');
       const who = inv.from?.name.split(' ')[0] ?? 'your friend';
       const result = status === 'declined'
         ? 'Declined.'

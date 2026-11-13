@@ -3,7 +3,7 @@
 import { Check, CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Sparkles, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, CategoryIcon, categoryOf, celebrateJoin, cn } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, categoryOf, celebrateJoin, cn, sfx } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
@@ -134,6 +134,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
       if (joining) await apiPost(`/api/quests/${s.questId}/join`, {});
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: p.id, questId: s.questId, suggestionTitle: s.title, message: message.trim() });
       setSentTo((prev) => new Map(prev).set(p.id, out.invite.id));
+      sfx('invite_send');
       setInviteFor(null);
       await quest.refetch();
       onJoined?.();
@@ -154,6 +155,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
     try {
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: inviteFor.id, questId: s.questId, suggestionTitle: s.title, message: draft.trim() });
       celebrate(false);
+      sfx('invite_send');
       setSentTo((prev) => new Map(prev).set(inviteFor.id, out.invite.id));
       setInviteFor(null);
     } catch (e) {
@@ -184,6 +186,13 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
 
   const venue = quest.data?.quest.venueName ?? null;
   const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
+  // Alex's side: the moment a friend says yes.
+  const joinedCount = answered.filter(({ o }) => o.together).length;
+  const lastJoined = useRef(0);
+  useEffect(() => {
+    if (joinedCount > lastJoined.current) sfx('friend_joined');
+    lastJoined.current = joinedCount;
+  }, [joinedCount]);
 
   return (
     <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"

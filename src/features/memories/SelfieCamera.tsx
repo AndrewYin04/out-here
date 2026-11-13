@@ -4,7 +4,7 @@
 // falls back to the plan's photo, so the shutter always works.
 import { ImagePlus, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, cn } from '@/features/ui';
+import { Avatar, cn, sfx } from '@/features/ui';
 import type { Quest } from '@/shared';
 
 export type Face = { id: string; name: string; avatarUrl: string };
@@ -43,6 +43,7 @@ export function SelfieCamera({ here, quest, onTake, onPickFile }: {
   }, [facing]);
 
   const shoot = async () => {
+    sfx('selfie_shutter');
     const v = videoRef.current;
     if (camera === 'on' && v && v.videoWidth > 0) {
       const c = document.createElement('canvas');
