@@ -16,8 +16,9 @@ test('two attendees can find a joined hangout and share one crew album', async (
   expect(created.ok()).toBeTruthy();
   const { quest } = await created.json();
 
-  await page.goto('/out-here?as=alex');
-  await page.getByRole('link', { name: 'Your plans' }).click();
+  await page.goto('/out-here?as=alex&mode=explore');
+  // Your plans is the Plans tab of the Out Here dashboard.
+  await page.getByTestId('dock-tab-plans').click();
   const alexPlan = page.getByRole('article', { name: title });
   await expect(alexPlan).toBeVisible();
   await expect(alexPlan.getByRole('link', { name: 'Walk there' })).toHaveAttribute('href', /travelmode=walking/);
@@ -51,10 +52,15 @@ test('two attendees can find a joined hangout and share one crew album', async (
     await expect(album.getByText('No photos in this album yet.')).toBeVisible();
 
     await past.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');
-    await past.getByRole('button', { name: 'Suggest caption' }).click();
-    await expect(past.getByLabel('Caption (optional)')).toHaveValue(/Crew photo test/);
+    await past.getByLabel('Caption (optional)').fill(title);
     await past.getByRole('button', { name: 'Save to crew album' }).click();
     await expect(past.getByRole('status')).toContainText('Photo saved');
+    await past.getByRole('button', { name: 'Ask Muse for a caption' }).click();
+    await expect(past.getByTestId('photo-observation')).toContainText('not been analyzed');
+    await expect(past.getByLabel('Saved photo caption')).toHaveValue(title);
+    await past.getByLabel('Saved photo caption').fill(`${title} together`);
+    await past.getByRole('button', { name: 'Save caption', exact:true }).click();
+    await expect(past.getByRole('button', { name: 'Save caption', exact:true })).toHaveCount(0);
     const photo = album.getByRole('img', { name: /Crew photo test/ });
     await expect(photo).toBeVisible();
     await expect.poll(() => photo.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);

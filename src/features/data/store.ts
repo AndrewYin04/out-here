@@ -93,6 +93,8 @@ export interface DataStore {
   memoryPhoto: CoreStore['memoryPhoto'];
   renameCrew: CoreStore['renameCrew'];
   captionMemory: CoreStore['captionMemory'];
+  updateMemoryCaption: CoreStore['updateMemoryCaption'];
+
   daily: CoreStore['daily'];
   dailyEntry: CoreStore['dailyEntry'];
   streak: CoreStore['streak'];

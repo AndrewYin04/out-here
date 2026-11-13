@@ -14,7 +14,7 @@ describe('pitchForZoom', () => {
     expect(pitchForZoom(STREET_ZOOM)).toBe(STREET_PITCH);
     expect(pitchForZoom(19.25)).toBeGreaterThan(STREET_PITCH);
     expect(pitchForZoom(CLOSE_ZOOM)).toBe(CLOSE_PITCH);
-    expect(pitchForZoom(21)).toBe(CLOSE_PITCH);
+    expect(pitchForZoom(24)).toBe(CLOSE_PITCH);
   });
   it('rises smoothly in between', () => {
     const z = [15.5, 16, 16.5, 17, 17.5, 18].map(pitchForZoom);
@@ -24,17 +24,8 @@ describe('pitchForZoom', () => {
   });
 });
 
-describe('characterScale', () => {
-  it('grows as the camera pulls out, capped', () => {
-    expect(characterScale(STREET_ZOOM)).toBe(9);
-    expect(characterScale(17.5)).toBe(18);
-    expect(characterScale(10)).toBe(40);
-  });
-  it('shrinks toward life size when zoomed in close, never below 5x', () => {
-    expect(characterScale(19.5)).toBeLessThan(9);
-    expect(characterScale(19.5)).toBeGreaterThan(5);
-    expect(characterScale(24)).toBe(5);
-  });
+describe('characterScale',()=>{
+  it('preserves metre-authored characters across the full camera range',()=>{for(const zoom of [10,15,17.5,18.5,19.5,21.5,24])expect(characterScale(zoom)).toBe(1);});
 });
 
 describe('angles', () => {
@@ -106,11 +97,6 @@ describe('GPS fixes', () => {
   });
 });
 
-describe('buildingFlatten', () => {
-  it('is full height zoomed out and a quarter right behind the avatar', () => {
-    expect(buildingFlatten(16)).toBe(1);
-    expect(buildingFlatten(18)).toBe(1);
-    expect(buildingFlatten(19.6)).toBeCloseTo(0.25);
-    expect(buildingFlatten(21)).toBeCloseTo(0.25);
-  });
+describe('buildingFlatten',()=>{
+  it('preserves full geographic and campus heights at every zoom',()=>{for(const z of [12,16,18,19.6,22,24])expect(buildingFlatten(z)).toBe(1);});
 });

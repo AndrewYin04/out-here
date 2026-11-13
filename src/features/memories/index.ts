@@ -6,6 +6,7 @@ export { MemoriesPage } from './MemoriesPage';
 export { RateHangoutListener } from './RateHangoutListener';
 export { YourPlans } from './YourPlans';
 export { MemoryCapture } from './MemoryCapture';
+export { SavedPhotoReview } from './SavedPhotoReview';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';

@@ -122,6 +122,7 @@ describe('plan with a live model that misbehaves', () => {
           usage: { promptTokens: 1, completionTokens: 1 },
         };
       }
+      if (typeof req.messages[1].content !== 'string') throw new Error('Expected text ranking input');
       const user = JSON.parse(req.messages[1].content) as { candidates: { id: string; title: string; friendsWhoCanCome: { id: string }[] }[] };
       const d = user.candidates.find((c) => c.title.startsWith('Dumplings'))!;
       return {

@@ -1,9 +1,9 @@
 'use client';
 
-import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Sparkles, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, categoryOf, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
@@ -12,12 +12,12 @@ import { setPlanOpen } from './plan-state';
 export function MuseLabel({ className }: { className?: string }) {
   return (
     <span data-testid="muse-label" className={cn('inline-flex items-center gap-1 rounded-full bg-fb-blue-tint px-2 py-0.5 text-[12px] font-semibold text-fb-blue', className)}>
-      ✨ Muse
+      <Sparkles size={12} aria-hidden />Muse
     </span>
   );
 }
 
-/** Shown in place of the ✨ Muse label when the text came from the offline heuristic (MUSE_MOCK). */
+/** Shown in place of the Muse label when the text came from the offline heuristic (MUSE_MOCK). */
 export function OfflineLabel({ className }: { className?: string }) {
   return (
     <span data-testid="offline-label" className={cn('inline-flex items-center rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[12px] font-semibold text-fb-text-2', className)}>
@@ -57,9 +57,10 @@ type Props = {
   friends: Map<string, PersonCard>;
   showMuse: boolean;
   onJoined?: () => void;
+  approvalRequired?: boolean;
 };
 
-export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
+export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequired = false }: Props) {
   const quest = useQuest(s.questId);
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
   const price = quest.data?.quest.priceMax;
@@ -82,9 +83,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const inFlight = useRef(false);
   /** The button the viewer last tapped in this card: joins fly from it to the pin. */
   const tapped = useRef<HTMLElement | null>(null);
+  // Joining flies your avatar to the pin. An invite needs no confetti: the card says it was sent.
   const celebrate = (joined: boolean) => {
-    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl, s.emoji);
-    else burst(tapped.current, ['💌', '✨'], 6);
+    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl);
   };
 
   const openInvite = (p: PersonCard) => {
@@ -188,16 +189,15 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"
       onClickCapture={(e) => { tapped.current = (e.target as HTMLElement).closest('button'); }}>
       <div className="flex items-start gap-3">
-        <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px]">{s.emoji}</span>
+        <CategoryIcon category={categoryOf(s.questId, s.emoji)} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-[15px] font-semibold leading-5 text-fb-text">{s.title}</h3>
             {seats !== null && <SeatsBadge seats={seats} />}
           </div>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-fb-text-2">
-            <span className="inline-flex items-center gap-1"><Footprints size={14} aria-hidden />{s.travelMinutes} min walk</span>
-            <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden />{startsText(s.startsAt)}</span>
+            {s.questId && <><span className="inline-flex items-center gap-1"><Footprints size={14} aria-hidden />{s.travelMinutes} min walk</span><span aria-hidden>·</span></>}
+            <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden />{s.kind === 'friend_hang' && !s.questId ? 'Time to be confirmed' : startsText(s.startsAt)}</span>
             {price !== undefined && (<><span aria-hidden>·</span><span>{price === 0 ? 'Free' : `Up to $${price}`}</span></>)}
           </p>
         </div>
@@ -214,7 +214,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
             data-testid="suggestion-why"
             className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
           >
-            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
+            {showMuse ? 'Why Muse picked this' : 'Why this plan'}
             {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
           </button>
           {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}
@@ -230,7 +230,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
               <li key={c.friendId} title={c.because.join(' · ')}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F3E8] py-0.5 pl-0.5 pr-2.5 text-[13px] font-semibold text-fb-green">
                 <Avatar src={p.avatarUrl} name={p.name} size={24} decorative />
-                ✓ {p.name.split(' ')[0]}&apos;s likely down
+                <Check size={14} aria-hidden />{p.name.split(' ')[0]}&apos;s likely down
               </li>
             )];
           })}
@@ -241,7 +241,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
           <div className="flex -space-x-1.5">
             {people.map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={24} ring />)}
           </div>
-          <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} can make it</span>
+          <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} {approvalRequired ? 'still needs to approve' : 'can make it'}</span>
         </div>
       )}
 
@@ -290,6 +290,13 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       {!inviteFor && (() => {
         const lead = people.find((p) => !outcomes.has(p.id));
         const sent = lead ? sentTo.has(lead.id) : false;
+        if (lead && approvalRequired && !s.questId) return (
+          <div className="mt-3">
+            <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null} onClick={() => openInvite(lead)}>
+              {sent ? `Invite sent to ${lead.name.split(' ')[0]}` : `Invite ${lead.name.split(' ')[0]}`}
+            </Button>
+          </div>
+        );
         // With a friend: one main action, "Go with Maya" (join + Muse's invite). Without: Join.
         if (lead && s.questId) return (
           <div className="mt-3">
@@ -343,6 +350,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
 /** "Maya's in. You're both going to Dumpling Den, 4:43 PM · leave by 4:34 PM for the 9 min walk." */
 function outcomeText(name: string, o: Outcome, venue: string | null, s: PlanSuggestion): string {
   if (o.status === 'declined') return `${name} can't make it this time.`;
+  if (!s.questId) return `${name} accepted your invitation. Confirm the time together.`;
   if (!o.together) return `${name} accepted, but only one seat was left, so ${name} took it.`;
   const leaveBy = new Date(Date.parse(s.startsAt) - s.travelMinutes * 60_000).toISOString();
   const where = venue ?? s.title;

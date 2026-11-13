@@ -2,7 +2,7 @@
 // A plan's own page (Partiful-style): cover, host, time and place, who can see it, live stats
 // ("12 going · 3 spots left · 🔴 Live · 5 here"), join and check in, the guest list (friends
 // first; strangers see the count only), the host's pop-up, and an activity feed of posts.
-import { ArrowLeft, Footprints } from 'lucide-react';
+import { ArrowLeft, Camera, Check, Footprints, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
@@ -116,7 +116,7 @@ export function PlanPage({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-[680px] px-0 pb-10 md:px-4 md:pt-4" data-testid="plan-page">
-      <Link href={`/out-here?quest=${q.id}`} className="mb-2 hidden items-center gap-1 text-fb-meta font-semibold text-fb-text-2 hover:underline md:inline-flex">
+      <Link href={`/out-here?quest=${q.id}`} data-testid="plan-page-back" className="mb-2 inline-flex min-h-10 items-center gap-1 px-4 text-fb-meta font-semibold text-fb-text-2 hover:underline md:min-h-0 md:px-0">
         <ArrowLeft size={14} aria-hidden /> Back to the map
       </Link>
 
@@ -132,16 +132,16 @@ export function PlanPage({ id }: { id: string }) {
               {d.seatsLeft === 0 ? 'Full' : 'Join'}
             </Button>
           ) : checkinOpen && !d.viewerCheckedIn ? (
-            <Button data-testid="plan-checkin" disabled={busy} onClick={() => void checkIn(null)}>📍 I&apos;m here</Button>
+            <Button data-testid="plan-checkin" icon={<MapPin size={20} />} disabled={busy} onClick={() => void checkIn(null)}>I&apos;m here</Button>
           ) : d.viewerCheckedIn ? (
-            <Button variant="tint" onClick={addMoment}>📸 Add a moment</Button>
+            <Button variant="tint" icon={<Camera size={20} />} onClick={addMoment}>Add a moment</Button>
           ) : (
             <Button icon={<Footprints size={20} />} onClick={() => letsGo(q.id)}>Let&rsquo;s go</Button>
           )}
           below={
             <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
               {isMember && d.viewerCheckedIn && (
-                <span data-testid="plan-checked-in" className="rounded-pill bg-[#E6F4EA] px-3 py-1 text-fb-meta font-semibold text-fb-green">✓ You&apos;re here</span>
+                <span data-testid="plan-checked-in" className="rounded-pill bg-[#E6F4EA] px-3 py-1 text-fb-meta font-semibold text-fb-green"><Check size={14} aria-hidden className="mr-1 inline align-[-2px]" />You&apos;re here</span>
               )}
               {isMember && checkinOpen && !d.viewerCheckedIn && demoCheckin && (
                 <button type="button" data-testid="plan-demo-checkin" disabled={busy} onClick={() => void checkIn(q.location)}

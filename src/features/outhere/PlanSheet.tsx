@@ -1,9 +1,10 @@
 'use client';
 
-import { ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Coffee, Timer, CupSoda, Dumbbell, Footprints, Gamepad2, Hand, Music, Palette, SendHorizontal, Sparkles, Utensils, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+
 import { useApi, useViewer } from '@/features/data';
-import { IconButton, Skeleton, cn } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn, IconButton, Skeleton } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
@@ -29,11 +30,11 @@ const BUDGETS = [{ id: '$', ask: 'under $15', label: 'Under $15' }, { id: '$$', 
 type BudgetId = (typeof BUDGETS)[number]['id'];
 type DurationId = (typeof DURATIONS)[number]['id'];
 const MOODS = [
-  { id: 'hungry', emoji: '🥟', label: 'Food', ask: 'hungry' }, { id: 'coffee', emoji: '☕', label: 'Coffee', ask: 'coffee' },
-  { id: 'boba', emoji: '🧋', label: 'Boba', ask: 'boba' }, { id: 'sports', emoji: '🧗', label: 'Active', ask: 'sports' },
-  { id: 'games', emoji: '🎮', label: 'Games', ask: 'games' }, { id: 'art', emoji: '🎨', label: 'Art', ask: 'art' },
-  { id: 'music', emoji: '🎵', label: 'Music', ask: 'live music' }, { id: 'walk', emoji: '🚶', label: 'Walk', ask: 'a walk' },
-  { id: 'people', emoji: '👋', label: 'New people', ask: 'meet people' },
+  { id: 'hungry', Icon: Utensils, label: 'Food', ask: 'hungry' }, { id: 'coffee', Icon: Coffee, label: 'Coffee', ask: 'coffee' },
+  { id: 'boba', Icon: CupSoda, label: 'Boba', ask: 'boba' }, { id: 'sports', Icon: Dumbbell, label: 'Active', ask: 'sports' },
+  { id: 'games', Icon: Gamepad2, label: 'Games', ask: 'games' }, { id: 'art', Icon: Palette, label: 'Art', ask: 'art' },
+  { id: 'music', Icon: Music, label: 'Music', ask: 'live music' }, { id: 'walk', Icon: Footprints, label: 'Walk', ask: 'a walk' },
+  { id: 'people', Icon: Hand, label: 'New people', ask: 'meet people' },
 ] as const;
 /** Picking a time and something you're up for asks Muse on its own after this pause. */
 const AUTO_ASK_MS = 700;
@@ -79,15 +80,15 @@ function Chip({ on, onClick, children, label }: { on: boolean; onClick: () => vo
   );
 }
 
-/** What you're up for: a big round emoji with a small label, so the row reads at a glance. */
-function Activity({ on, onClick, emoji, label }: { on: boolean; onClick: () => void; emoji: string; label: string }) {
+/** What you're up for: a round line icon with a small label, so the row reads at a glance. */
+function Activity({ on, onClick, Icon, label }: { on: boolean; onClick: () => void; Icon: LucideIcon; label: string }) {
   return (
     <button type="button" aria-pressed={on} aria-label={label} onClick={onClick}
       className="oh-press flex w-[62px] shrink-0 flex-col items-center gap-1">
       <span aria-hidden className={cn(
-        'flex size-[54px] items-center justify-center rounded-full text-[28px] transition-all',
-        on ? 'bg-fb-blue shadow-[0_4px_12px_rgba(8,102,255,.35)] [&]:scale-105' : 'bg-fb-secondary-btn',
-      )}>{emoji}</span>
+        'flex size-[54px] items-center justify-center rounded-full transition-all',
+        on ? 'bg-fb-blue text-white shadow-[0_4px_12px_rgba(8,102,255,.35)] [&]:scale-105' : 'bg-fb-secondary-btn text-fb-text',
+      )}><Icon size={24} /></span>
       <span className={cn('text-[11px] font-semibold', on ? 'text-fb-blue' : 'text-fb-text-2')}>{label}</span>
     </button>
   );
@@ -131,7 +132,7 @@ export function ImFreeButton({ className, quiet = false }: {
       {label ? (
         <><StatusDot s={status} className={cn('size-3', !quiet && 'ring-2 ring-white')} />{label}</>
       ) : (
-        <><span aria-hidden>✨</span> I&apos;m free</>
+        <><Sparkles size={18} aria-hidden /> I&apos;m free</>
       )}
     </button>
   );
@@ -280,6 +281,18 @@ export function PlanSheet({ className }: { className?: string }) {
     return () => window.clearTimeout(t);
   }, [open, autoKey]);
 
+  // Escape closes the sheet (like its X), and focus returns to I'm free.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      setPlanOpen(false);
+      window.setTimeout(() => document.querySelector<HTMLElement>('[data-testid="im-free"]')?.focus(), 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';
@@ -328,7 +341,7 @@ export function PlanSheet({ className }: { className?: string }) {
               <Row label="For how long">
                 {DURATIONS.map((d) => (
                   <Chip key={d.id} on={duration === d.id} label={d.label} onClick={() => setDuration((cur) => (cur === d.id ? null : d.id))}>
-                    {d.id === '15' && <span aria-hidden>⏱️</span>}{d.short}
+                    {d.id === '15' && <Timer size={16} aria-hidden />}{d.short}
                   </Chip>
                 ))}
                 {BUDGETS.map((b) => (
@@ -337,7 +350,7 @@ export function PlanSheet({ className }: { className?: string }) {
               </Row>
               <Row label="Up for">
                 {MOODS.map((m) => (
-                  <Activity key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} emoji={m.emoji} label={m.label} />
+                  <Activity key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} Icon={m.Icon} label={m.label} />
                 ))}
               </Row>
               <div className="mt-2 flex items-center gap-2 rounded-full bg-fb-secondary-btn py-1 pl-4 pr-1 ring-fb-blue focus-within:ring-2">
@@ -407,7 +420,7 @@ export function PlanSheet({ className }: { className?: string }) {
                     <div className="flex flex-col gap-2">
                       {(othersOpen ? picks : picks.slice(0, 1)).map((s, i) => (
                         <div key={`${s.questId ?? s.title}-${i}`} className="animate-rise" style={{ animationDelay: `${80 + i * 90}ms` }}>
-                          {i === 0 && <p className="mb-1 px-1 text-[12px] font-bold uppercase tracking-wide text-fb-blue">{showMuse ? '✨ Muse’s pick' : 'Best fit'}</p>}
+                          {i === 0 && <p className="mb-1 px-1 text-[12px] font-bold uppercase tracking-wide text-fb-blue">{showMuse ? <span className="inline-flex items-center gap-1"><Sparkles size={12} aria-hidden />Muse’s pick</span> : 'Best fit'}</p>}
                           <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} />
                         </div>
                       ))}
@@ -435,7 +448,7 @@ export function PlanSheet({ className }: { className?: string }) {
                         <ul data-testid="why-not" className="px-3 pb-3">
                           {drops.map((d) => (
                             <li key={d.questId} className="flex gap-2 py-1 text-[13px] text-fb-text-2">
-                              <span aria-hidden>{d.emoji}</span>
+                              <CategoryIcon category={categoryOf(d.questId, d.emoji)} size={20} />
                               <span><span className="font-semibold text-fb-text">{d.venueName}</span>: {d.text}</span>
                             </li>
                           ))}
