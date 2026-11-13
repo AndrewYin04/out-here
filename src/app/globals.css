@@ -77,6 +77,15 @@
 [data-mode="friends"] .oh-quest-pin:hover [data-role="pin-label"],
 [data-mode="friends"] .oh-quest-pin:focus-visible [data-role="pin-label"] { visibility: visible; }
 
+/* Muse's thought orbs and bubbles (MuseThoughts): blue, glowing, sheer. */
+.muse-thought { position: absolute; transform: translate(-50%, -50%); max-width: 140px; padding: 6px 12px; border-radius: 9999px; font: 600 13px/17px var(--font-sans); color: #0A57D6; text-align: center; background: rgba(226, 241, 255, .82); border: 1px solid rgba(76, 168, 255, .45); box-shadow: 0 0 16px rgba(35, 217, 245, .35); backdrop-filter: blur(2px); animation: muse-thought-in .5s cubic-bezier(.22, 1, .36, 1) both, muse-thought-float 3.4s ease-in-out .5s infinite; }
+.muse-thought-orbit { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: muse-thought-spin linear infinite; }
+.muse-thought-orb { position: absolute; left: calc(var(--r) * .95); top: 0; border-radius: 9999px; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #B8F7FF 0%, #23D9F5 40%, rgba(8, 102, 255, .85) 100%); box-shadow: 0 0 12px 3px rgba(35, 217, 245, .5); opacity: .85; }
+@keyframes muse-thought-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.7); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes muse-thought-float { 50% { translate: 0 -4px; } }
+@keyframes muse-thought-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .muse-thought { animation: none; } .muse-thought-orbit { animation: none; } }
+
 /* World labels (friends' photos, plan labels) fade out while the Muse chat is open, so Jolly is in front. */
 [data-world-label] { transition: opacity .25s ease; }
 [data-muse-chat="true"] [data-world-label] { opacity: 0; pointer-events: none; }

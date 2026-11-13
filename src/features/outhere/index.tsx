@@ -11,7 +11,7 @@ export { listenLetsGo, useLetsGo, LETS_GO } from './lets-go';
 export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, OfflineLabel, SeatsBadge } from './SuggestionCard';
 export { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
-export type { MuseStep } from './muse-steps';
+export { museSteps, type MuseStep } from './muse-steps';
 export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, usePlanAsk, setPlanStatus, usePlanStatus, type PlanPicks, type PlanStatus } from './plan-state';
 export { requestPlan, errorText, type PlanResponse } from './plan-api';
 export { openPlanWith } from './plan-state';

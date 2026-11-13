@@ -193,7 +193,7 @@ export function MuseChat() {
             // desktop: a compact card anchored bottom right, the map stays the focus
             'md:bottom-4 md:right-4 md:w-[380px] md:max-h-[min(580px,calc(100dvh-96px))] md:rounded-card',
             // mobile: a bottom sheet that stops short of the top bar
-            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[min(52dvh,calc(100dvh-176px))] max-md:rounded-t-[16px]',
+            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[min(42dvh,calc(100dvh-176px))] max-md:rounded-t-[16px]',
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">

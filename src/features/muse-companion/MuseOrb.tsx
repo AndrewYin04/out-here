@@ -56,7 +56,7 @@ export function MuseStyles() {
 @keyframes muse-unfold{from{opacity:0;transform:translateY(12px) scale(.92)}to{opacity:1;transform:none}}
 @keyframes muse-fade{from{opacity:0}to{opacity:1}}
 @keyframes muse-msg{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.muse-panel{transform-origin:100% 100%;animation:muse-unfold .38s cubic-bezier(.22,1,.36,1) .28s both}
+.muse-panel{transform-origin:100% 100%;animation:muse-unfold .6s cubic-bezier(.22,1,.36,1) 1.1s both}
 .muse-msg{animation:muse-msg .28s ease-out both}
 .muse-result-reveal{animation:muse-result .35s ease-out both}
 @keyframes muse-result{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:none}}

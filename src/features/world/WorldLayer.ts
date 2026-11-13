@@ -37,6 +37,8 @@ type Actor = {
   shadow: THREE.Mesh | null;
   /** Size multiplier (Jolly grows toward the screen while the Muse chat is open). */
   boost: number;
+  /** Hidden (the avatar steps out of frame while Jolly fills the chat view). */
+  hidden: boolean;
   /** Jolly's sparkle trail on the ground, and whether his thinking effect is on. */
   sparkles: SparkleWake | null;
   processing: 'off' | 'pending' | 'success' | 'fade';
@@ -185,7 +187,7 @@ export class WorldLayer implements CustomLayerInterface {
       shadow.frustumCulled = false;
       this.scene.add(shadow);
     }
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, sparkles, processing: 'off' });
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, hidden: false, sparkles, processing: 'off' });
   }
 
   removeActor(id: string) {
@@ -201,6 +203,8 @@ export class WorldLayer implements CustomLayerInterface {
   }
 
   actorIds(): string[] { return [...this.actors.keys()]; }
+
+  setHidden(id: string, hidden: boolean) { const a = this.actors.get(id); if (a) a.hidden = hidden; }
 
   setBoost(id: string, boost: number) { const a = this.actors.get(id); if (a) a.boost = boost; }
 
@@ -415,7 +419,7 @@ export class WorldLayer implements CustomLayerInterface {
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
       const s = (a.kind === 'pet' ? scale * 0.9 : scale) * a.boost;
-      a.char.root.visible = showChars;
+      a.char.root.visible = showChars && !a.hidden;
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
       const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
       const delta=Math.atan2(Math.sin(target-current),Math.cos(target-current));
@@ -425,7 +429,7 @@ export class WorldLayer implements CustomLayerInterface {
       if(showChars)a.char.update(reduced?0:dt, reduced?0:this.elapsed);
       if (a.shadow) {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
-        a.shadow.visible = showChars;
+        a.shadow.visible = showChars && !a.hidden;
         a.shadow.position.set(o.east, 0.04, -o.north);
         // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
         const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;

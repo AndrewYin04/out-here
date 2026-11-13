@@ -14,7 +14,7 @@ import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
 import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
-import {museCameraArea, museChatZoom, museStage} from './muse-layout';
+import {museCameraArea, museStage} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
 import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
@@ -32,6 +32,7 @@ import {
 } from './math';
 import { headThereLine, walkLine } from './museLines';
 import { StadiumLabels } from './StadiumLabels';
+import { MuseThoughts } from './MuseThoughts';
 import { stadiumLabels } from './stadiums';
 import { useGps } from './useGps';
 import { useWalkTogether } from './useWalkTogether';
@@ -215,6 +216,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petBoost = useRef(1);
+  const chatAreaHeight = useRef(450);
+  const thoughtsRef = useRef<HTMLDivElement>(null);
   const petPos = useRef<LatLng>(start);
   const petAlt = useRef(1.7);
   const [hello, setHello] = useState(true);
@@ -707,7 +710,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const target=front?moveMeters(beside,stage.towardViewer*scale,camBearing.current+180):moveMeters(pos.current,.9*scale,heading.current+115);
       const gap = haversineMeters(petPos.current, target);
       const groundFollow = !front && !photoFocus && petState.current === 'hover';
-      const kp = reducedMotion() ? 1 : 1 - Math.exp(-dt * (groundFollow ? 18 : 5));
+      const kp = reducedMotion() ? 1 : 1 - Math.exp(-dt * (groundFollow ? 18 : 1.8));
       petPos.current = gap > 0.05 ? moveMeters(petPos.current, gap * kp, bearingDeg(petPos.current, target)) : target;
       const flying = gap > 2.5 * scale;
       // Beside you he is on the ground and walks when you do (floating is for flying over to you,
@@ -721,9 +724,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // With the chat open Jolly flies up toward the screen: he grows until he almost fills the map
       // above the chat (the camera is already framing him). Back to size when it closes.
       const phoneView = (cameraRects.current?.bounds.width ?? window.innerWidth) < 768;
-      const boostTarget = chatOpen.current && !encounterRef.current && !photoFocus ? (phoneView ? 6 : 3.6) : 1;
-      petBoost.current += (boostTarget - petBoost.current) * (reducedMotion() ? 1 : 1 - Math.exp(-dt * 3));
+      // He fills the space the chat leaves (the camera pulls back as the chat grows, so he gets the most the layout allows).
+      const fit = phoneView ? Math.max(2.6, Math.min(6, chatAreaHeight.current / 30)) : 3.6;
+      const boostTarget = chatOpen.current && !encounterRef.current && !photoFocus ? fit : 1;
+      petBoost.current += (boostTarget - petBoost.current) * (reducedMotion() ? 1 : 1 - Math.exp(-dt * 1.2));
       layer.setBoost('pet', petBoost.current);
+      // Once Jolly fills the view the avatar steps out, so the chat shows just his front.
+      layer.setHidden('me', chatOpen.current && !encounterRef.current && petBoost.current > 1.8);
       layer.setPose('pet', petPos.current, petBearing, petAlt.current);
 
       // One logical companion per user, in the same scene/frame loop. Origins are visual
@@ -832,10 +839,19 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const {bounds,area}=measured;
         const phone = bounds.width < 768;
         if(!area)return;
-        const targetX=area.x,targetY=area.y;
-        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : museChatZoom(area,phone);
-        const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 4);
+        // The focus point may only move so far up the screen: at this near-level tilt a bigger shift (a
+        // tall reply card) swings the camera into the nearest wall instead of keeping Jolly in view.
+        const targetX = area.x, targetY = Math.max(area.y, bounds.height / 2 - 100);
+        // The free space around that spot (nearest edge, doubled) is what Jolly's size has to fit in.
+        chatAreaHeight.current = Math.max(80, 2 * Math.min(targetY - (area.y - area.height / 2), area.y + area.height / 2 - targetY));
+        // The zoom stays put however tall the chat gets (a smaller zoom pulls the camera back into the
+        // buildings); Jolly's size follows the free space instead (see petBoost).
+        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone ? 23.5 : 23.8;
+        // A slow ease so you can watch the camera move in on Jolly (about 2 s to settle).
+        const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 1.5);
         layer.actorScreenPoint('pet', screenPoint);
+        const thoughts = thoughtsRef.current;
+        if (thoughts) { thoughts.style.transform = `translate(${screenPoint.x.toFixed(1)}px, ${screenPoint.y.toFixed(1)}px)`; thoughts.style.setProperty('--r', `${Math.round(Math.min(bounds.width * 0.28, 125))}px`); }
         map.setCenterElevation(map.getCenterElevation() + (screenPoint.elevation - map.getCenterElevation()) * easing);
         const cameraFocus=flight ? moveMeters(flight.origin,1.5*flight.scale,flight.bearing+70) : petPos.current;
         map.easeTo({
@@ -845,9 +861,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         });
         return;
       }
-      if(chatCamera){returnCamera=chatCamera;chatCamera=null;restoringUntil=now+(reducedMotion()?0:1100);}
+      if(chatCamera){returnCamera=chatCamera;chatCamera=null;restoringUntil=now+(reducedMotion()?0:1900);}
       if(returnCamera){
-        const target=returnCamera,c=map.getCenter(),k=reducedMotion()?1:1-Math.exp(-dt*8);
+        const target=returnCamera,c=map.getCenter(),k=reducedMotion()?1:1-Math.exp(-dt*3);
         map.setCenterElevation(map.getCenterElevation()+(target.elevation-map.getCenterElevation())*k);
         map.easeTo({center:[c.lng+(target.center[0]-c.lng)*k,c.lat+(target.center[1]-c.lat)*k],zoom:zoom+(target.zoom-zoom)*k,bearing:lerpDeg(map.getBearing(),target.bearing,k),duration:0});
         if(reducedMotion()||now>=restoringUntil||Math.abs(map.getZoom()-target.zoom)<.005){
@@ -1101,6 +1117,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       className="pointer-events-none absolute inset-0 z-[5]"
     >
       {/* No loading screen: the map's own zoom into 3D (and back out) is the transition. */}
+      {/* Muse's thought orbs and bubbles around Jolly (only while the chat is open). */}
+      <MuseThoughts anchorRef={thoughtsRef} />
       {/* Walking: one capsule at the top. The plan, everyone's progress along the way, minutes left. */}
       {walk && walkMin != null && (
         <div role="status" data-testid="walk-countdown"

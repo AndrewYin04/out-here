@@ -33,8 +33,9 @@ let seq = 0;
 const nextId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 const reduced = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-export const APPROACH_MS = 700;
-const RETURN_MS = 900;
+// Slow enough to watch: Jolly flies up toward the screen while the camera zooms in (about 2 s).
+export const APPROACH_MS = 2200;
+const RETURN_MS = 1800;
 const SETTLE_MS = 3500;
 
 // ---- the conversation survives a reload of the tab (per persona, per tab) ----
