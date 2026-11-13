@@ -1,5 +1,5 @@
 // POST /api/muse/draft-hang  body: { text, friendId?, budgetMax?, excludePlaceIds?, now? }
-//   -> { draft: HangDraft | null, friend: PersonCard | null, others: PersonCard[], reason?: string, mode?: 'live'|'mock'|'fallback' }
+//   -> { draft: HangDraft | null, work?: HangWork | null, friend: PersonCard | null, others: PersonCard[], reason?: string, mode?: 'live'|'mock'|'fallback' }
 //   `others`: the other friends free with you, so the card can redraft with one of them.
 // When nothing posted fits but a friend is free with you, Muse drafts a hangout for the two of
 // you. Code lists the real places that are open, under budget and walkable for both in time;
@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { DEMO_CENTER, now as demoNow, type LatLng } from '@/shared';
 import {
-  hangMessages, hangPlaces, mockHang, museJSON, RAW_HANG_JSON_SCHEMA, RawHangZ, reportFallback, validateHang,
+  hangFunnel, hangMessages, hangPlaces, hangWork, mockHang, museJSON, RAW_HANG_JSON_SCHEMA, RawHangZ, reportFallback, validateHang,
   type HangContext,
 } from '@/features/muse';
 import { body, IdZ, LIVE_TABLES, route } from '@/lib/api';
@@ -62,6 +62,7 @@ export const POST = route(async ({ store, viewer, req }) => {
   if (places.length === 0) return { draft: null, friend: item.friend, others, reason: 'no_place_fits' };
   const friendAt = locOf(item.friend.id) ?? DEMO_CENTER;
   const until = new Date(item.until);
+  const funnel = hangFunnel(db.places.filter((p) => !excluded.has(p.id)), meAt, friendAt, at, until, b.budgetMax ?? null, { ignoreHours });
 
   const ctx: HangContext = {
     text: b.text, now: at, until, budgetMax: b.budgetMax ?? null, places,
@@ -80,12 +81,16 @@ export const POST = route(async ({ store, viewer, req }) => {
       messages: hangMessages(ctx), model: 'fast', effort: 'minimal',
       mock: () => mockHang(ctx), route: routeName, userId: viewer.id, deadline: Date.now() + 8_000,
     });
-    return NextResponse.json({ draft: validateHang(res.data, ctx), friend: item.friend, others, mode: res.mock ? 'mock' : 'live' }, {
+    const draft = validateHang(res.data, ctx);
+    const work = draft ? hangWork(funnel, draft, ctx) : null;
+    return NextResponse.json({ draft, work, friend: item.friend, others, mode: res.mock ? 'mock' : 'live' }, {
       headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model },
     });
   } catch (err) {
     const msg = String((err as Error)?.message ?? err).slice(0, 200);
     reportFallback({ route: routeName, step: 'draft', error: msg, userId: viewer.id });
-    return NextResponse.json({ draft: validateHang(mockHang(ctx), ctx), friend: item.friend, others, mode: 'fallback' }, { headers: { 'x-muse-mode': 'fallback' } });
+    const draft = validateHang(mockHang(ctx), ctx);
+    const work = draft ? hangWork(funnel, draft, ctx) : null;
+    return NextResponse.json({ draft, work, friend: item.friend, others, mode: 'fallback' }, { headers: { 'x-muse-mode': 'fallback' } });
   }
 }, { refresh: LIVE_TABLES });
