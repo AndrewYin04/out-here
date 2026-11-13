@@ -10,6 +10,7 @@ import { Avatar, IconButton, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type Quest } from '@/shared';
 import type { PersonCard, PostView } from '@/shared/api';
 import { friendsGoingLine, priceLabel, startsLabel } from '../format';
+import { visibilityChip } from '../visibility';
 import { Bubble, ReportButton, VisibilityChip } from './parts';
 
 /** The plan's photo: its own poster, else the seeded photo that matches it, else none. */
@@ -284,7 +285,7 @@ export function PlanCard({
             <div className="flex gap-2"><dt className="w-16 shrink-0 text-fb-text-2">When</dt><dd className="text-fb-text">{formatDemoTime(q.startsAt)} to {formatDemoTime(q.endsAt)}</dd></div>
             <div className="flex gap-2"><dt className="w-16 shrink-0 text-fb-text-2">Where</dt><dd className="text-fb-text">{q.venueName}{!d.viewerIsMember && <span className="text-fb-text-2"> · the exact spot is shared after you join</span>}</dd></div>
             <div className="flex gap-2"><dt className="w-16 shrink-0 text-fb-text-2">Cost</dt><dd className="text-fb-text">{priceLabel(q.priceMax)}</dd></div>
-            <div className="flex gap-2"><dt className="w-16 shrink-0 text-fb-text-2">Who</dt><dd className="text-fb-text"><VisibilityChip quest={q} groupName={d.group?.name} /></dd></div>
+            <div className="flex gap-2"><dt className="w-16 shrink-0 text-fb-text-2">Who</dt><dd className="text-fb-text">{visibilityChip(q.visibility, d.group?.name)}</dd></div>
           </dl>
           {!d.viewerIsMember && <ReportButton questId={q.id} onReported={() => onReported?.()} className="mt-4" />}
         </section>

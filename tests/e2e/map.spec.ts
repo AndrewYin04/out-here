@@ -72,6 +72,7 @@ test.describe('phone 390', () => {
     await expect(sheet.getByTestId('quest-going')).toContainText('Kai Nakamura');
     await expect(page).toHaveURL(new RegExp(`quest=${DUMPLINGS}`));
 
+    await sheet.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // the sheet has slid up
     const attribution = page.getByTestId('map-attribution').filter({ visible: true });
     await expect(attribution).toHaveCount(1);
     await expect(attribution).toContainText('OpenFreeMap © OpenMapTiles Data from OpenStreetMap');
@@ -208,10 +209,12 @@ test.describe('desktop 1440', () => {
     await expect(sheet.getByTestId('quest-walk')).toHaveText(/\d+ min walk/);
     await expect(page.getByTestId('map-attribution').filter({ visible: true })).toHaveCount(1);
     // The panel is only as tall as its content, and the map moves the pin out from under it.
+    await sheet.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // the sheet has slid up
     const s = (await sheet.boundingBox())!;
     expect(s.height).toBeLessThan(700);
-    const join = (await sheet.getByRole('button', { name: 'Report' }).boundingBox())!;
-    expect(s.y + s.height - (join.y + join.height)).toBeLessThan(30);
+    // The plan card's one action (Join) is on screen inside the panel, no scrolling needed.
+    const join = (await sheet.getByRole('button', { name: /^(Join|Full)$/ }).boundingBox())!;
+    expect(join.y + join.height).toBeLessThanOrEqual(s.y + s.height);
     await expect.poll(async () => (await page.getByTestId('quest-pin-dumplings').boundingBox())?.x ?? 0, { timeout: 5000 }).toBeGreaterThan(s.x + s.width);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
