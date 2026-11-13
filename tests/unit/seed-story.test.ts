@@ -48,15 +48,14 @@ describe('demo story: "hungry, got like 40 min, under $15"', () => {
     expect(d.groupSlug).toBe('cheap-eats-south-bay');
   });
 
-  it('with 15 minutes no food quest fits and the boba quest does (~4 min walk, $7, starts in 10)', () => {
+  it('the boba quest is in the afternoon, so "45 minutes, boba" has no posted plan and Muse drafts one', () => {
     expect(inWindow(15)).toHaveLength(0);
     const b = quest('boba');
     expect(walk(b.placeName)).toBe(4);
     expect(b.priceMax).toBe(7);
-    expect(b.startsInMin).toBe(10);
-    const nonSportsIn15 = DEMO_QUESTS.filter((q) => q.startsInMin <= 15 && q.category !== 'sports'
-      && walk(q.placeName) <= q.startsInMin && q.priceMax <= budget);
-    expect(nonSportsIn15.map((q) => q.key)).toEqual(['boba']);
+    expect(b.startsInMin).toBe(150);
+    const bobaIn45 = DEMO_QUESTS.filter((q) => q.startsInMin <= 45 && q.tags.includes('boba'));
+    expect(bobaIn45).toEqual([]);
   });
 
   it('has the kit 15 quests plus the ramen and sushi decoys, and one live Group-only plan', () => {
@@ -85,10 +84,10 @@ describe('buildSeed with the fixture content', () => {
     expect(q.approx_lat === q.lat && q.approx_lng === q.lng).toBe(false);
   });
 
-  it("Maya's availability runs now to now+50 (lunch break), friends-only", () => {
+  it("Maya's availability runs now to now+90 (free after class), friends-only", () => {
     const a = tables.availability.find((r) => r.user_id === profileId('maya'))!;
     expect(new Date(a.starts_at as string).getTime() - now.getTime()).toBe(0);
-    expect(new Date(a.ends_at as string).getTime() - now.getTime()).toBe(50 * 60_000);
+    expect(new Date(a.ends_at as string).getTime() - now.getTime()).toBe(90 * 60_000);
     expect(a.audience).toBe('friends');
   });
 
