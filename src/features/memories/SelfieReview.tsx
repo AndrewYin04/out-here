@@ -80,7 +80,7 @@ export function SelfieReview({ file, people, viewerId, caption, emoji, saving, o
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur">
           <Sparkles size={13} aria-hidden className="text-[#B9A6FF]" />{boxes && boxes.length > 0 ? 'Muse vision' : 'Muse tagged who’s here'}
         </span>
-        <span data-testid="selfie-in-shot" className="absolute right-3 top-3 rounded-full bg-[#31A24C] px-2.5 py-1 text-[12px] font-bold text-white">{inShot} in shot</span>
+        <span data-testid="selfie-in-shot" className="absolute right-3 top-3 rounded-full bg-[#31A24C] px-2.5 py-1 text-[12px] font-bold text-white">{inShot} {boxes && boxes.length > 0 ? 'in shot' : 'here'}</span>
         <button type="button" onClick={onRetake} className="absolute bottom-3 right-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-black/50 px-3 text-[13px] font-semibold text-white backdrop-blur hover:bg-black/65">
           <RotateCcw size={14} aria-hidden />Retake
         </button>

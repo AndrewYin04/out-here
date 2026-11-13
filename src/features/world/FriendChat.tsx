@@ -124,7 +124,8 @@ function Sheet({ friend, viewerId, incoming, onReply, onWalk, walking, onClose }
   };
 
   const picks = suggestions(friend, theyAsked);
-  const showPicks = theyAsked || mine.length === 0;
+  // Incoming: wait for their message before offering replies (no flash of the wrong set).
+  const showPicks = !!msgs.data && (theyAsked || (!incoming && mine.length === 0));
   const name = first(friend.name);
 
   return (
@@ -162,7 +163,7 @@ function Sheet({ friend, viewerId, incoming, onReply, onWalk, walking, onClose }
             </li>
           )}
         </ul>
-        {mine.length > 0 && !replied && !theyAsked && (
+        {!incoming && mine.length > 0 && !replied && !theyAsked && (
           <p className="mt-1 text-right text-[12px] text-fb-text-2" data-testid="friend-chat-sent">Sent · {name}’s reply shows up here and over their head</p>
         )}
 
@@ -191,13 +192,11 @@ function Sheet({ friend, viewerId, incoming, onReply, onWalk, walking, onClose }
             <Footprints size={17} aria-hidden />{walking ? 'On your way' : 'Walk there'}{friend.walkMin != null && ` · ${friend.walkMin}m`}
           </button>
         )}
-        <div className="grid grid-cols-2 gap-2">
-          {!incoming && (
-            <button type="button" data-testid="friend-chat-hang" onClick={() => void hang()} disabled={inviting || !!invite}
+        <div className={cn('grid gap-2', friend.handle ? 'grid-cols-2' : 'grid-cols-1')}>
+          <button type="button" data-testid="friend-chat-hang" onClick={() => void hang()} disabled={inviting || !!invite}
               className="flex h-9 items-center justify-center gap-1 rounded-[10px] bg-fb-secondary-btn text-[13px] font-semibold text-fb-text hover:brightness-95 disabled:opacity-50">
               <Hand size={14} aria-hidden />{invite ? 'Invited' : inviting ? 'Inviting…' : 'Invite'}
-            </button>
-          )}
+          </button>
           {friend.handle && (
             <Link href={`/profile/${encodeURIComponent(friend.handle)}`} className="flex h-9 items-center justify-center gap-1 rounded-[10px] bg-fb-secondary-btn text-[13px] font-semibold text-fb-text hover:brightness-95">
               <UserRound size={14} aria-hidden />Profile
