@@ -24,86 +24,54 @@ Branch `feature/ui-cleanup`, cut from `origin/main` (4eb3cc8). Rules: `.claude/r
 - The red Live dot.
 - Seeded posts: fictional users' own words.
 
-## Deferred: the files are claimed or being edited
+## Round 2: the Out Here mobile screens (claimed files, edited at the session owner's request)
 
-Each item names its owner. Apply these when that work lands.
+These files are claimed by #56, #45 and #12, and Codex's Phase 5 branches touch `OutHereView.tsx`, `World3D.tsx` and `SuggestionCard.tsx`. Expect merge conflicts there.
 
-### Map controls
+### Map (`map/OutHereView.tsx`)
 
-**Where:** `OutHereView.tsx`, `World3D.tsx`. **Owners:** #56 (Alan), and Codex's Phase 3–5 branches. Codex also has uncommitted edits to `World3D.tsx`.
+- **The fix:** one bottom row (Map/3D, I'm free, Your plans, +). The old two-part Map/3D toggle sat under "I'm free" at 390 px; it is now one round button at the start of the row.
+- "Muse filter" has no sparkle.
 
-The 3D view shows 11 controls at once. Proposed classification:
+### 3D (`world/World3D.tsx`)
 
-| Control | Class | Proposal |
+- **Moved behind `?tools=1`:** Tour Meta HQ and Demo walk / Live GPS. The demo walk is the default, and the switch stays visible while GPS is on.
+- **Fewer emoji:** none on Walk there, the walk countdown or the arrival pill. Back to me uses a line icon.
+- **Calmer Muse lines:**
+  - "Hi Alex. Tap I'm free and I'll find something nearby."
+  - "You're in: …"
+
+### I'm free sheet (`outhere/PlanSheet.tsx`)
+
+- Sentence-case labels ("For how long?", "What are you up for?") and text-only mood chips.
+- **One primary action:** Find plans. "Just show I'm free" is a text button.
+- **Before the first ask:** no explainer paragraph and no empty grey area. On desktop the panel fits the form.
+- **Loading:** one status line instead of timed fake steps.
+- **Results:** the summary, then the plans. "How Muse picked these" and "Why not others?" come last.
+
+### Other copy and confetti (`FreeStatus.tsx`, `TogetherSheet.tsx`, `SuggestionCard.tsx`, `MuseSteps.tsx`)
+
+- **No sparkles** on Asking…, Muse is asking everyone…, Muse picked N options, Why Muse picked this, How Muse picked these, or the I'm free button.
+- **Less confetti:** "It's a plan" bursts the quest emoji only, and invites have no confetti.
+
+### Quest sheet (`map/QuestPanel.tsx`, `map/event/parts.tsx`)
+
+- The seat count is shown once (the stat line no longer repeats it).
+
+### Kept on purpose
+
+- The "✨ Muse" label on live Muse output and the "✨ Muse pick" pin tag: rule 10 asks for them.
+
+### Still open
+
+| Item | Where | Why it is still open |
 |---|---|---|
-| I'm free | Primary | Keep. Drop the ✨ from the label |
-| Explore / Friends | Navigation | Keep |
-| Map / 3D | Navigation | Keep. On phones, "I'm free" covers it (the bottom row overlaps at 390 px): move it above the bottom row or into the top chip row |
-| Zoom + / − | Navigation | Keep on desktop; phones can pinch |
-| Muse filter | Secondary | Keep, without the ✨ (the filter's status line already says Muse) |
-| Your plans (calendar) | Secondary | Keep as an icon button |
-| Post a plan (+) | Secondary | Keep |
-| Joystick | Contextual (3D) | Keep in 3D only |
-| Tour Meta HQ | Demo utility | Behind `?tools=1`; #56 already plans this |
-| Demo walk / Live GPS | Demo utility | Behind `?tools=1`; #56 already plans this |
-| Ask Muse / Talk to Muse (Phase 2, not on main) | Duplicate | One entry point: tap Jolly in 3D, the orb in 2D |
-
-### Copy and emoji in the planning sheets
-
-**Where:** `outhere/PlanSheet.tsx`, `FreeStatus.tsx`, `TogetherSheet.tsx`, `MuseSteps.tsx`, `MuseThinking.tsx`. **Owners:** #56 (Alan) and #12 (Andrew).
-
-| Location | Text now | Proposed text |
-|---|---|---|
-| `PlanSheet.tsx:317` | ✨ Find plans | Find plans |
-| `PlanSheet.tsx:111` | ✨ I'm free | I'm free |
-| `PlanSheet.tsx:130` | ✨ Asked your friends' Muse · … | Asked your friends' Muse · … |
-| `MuseSteps.tsx:31` | ✨ Muse is working | Muse is thinking… |
-| `FreeStatus.tsx:276` | ✨ Asking… | Asking… |
-| `FreeStatus.tsx:326` | ✨ Muse is asking everyone… | Muse is asking everyone… |
-| `FreeStatus.tsx:353` | ✨ Muse picked N options… | Muse picked N options… |
-| `TogetherSheet.tsx:186` | It's a plan! | It's a plan |
-| `TogetherSheet.tsx:175` | 🎉 ✨ burst | The quest emoji only, as `motion.ts` now does |
-
-Two structural problems:
-
-- **Timed fake steps:** `MuseStepsLoading` steps through labels on a 600 ms timer, whatever Muse is actually doing. Replace it with one status line, as the create sheet now does. `MuseStepsDone`, which shows real steps, can stay.
-- **Mood chips:** `PlanSheet` lists 9 mood chips with emoji next to the duration chips, all at equal weight. Show the duration first and the moods as text chips, or fold moods behind "Add a mood".
-
-### Muse output
-
-**Where:** `SuggestionCard.tsx`. **Owners:** #12 (Andrew) and Codex, who has uncommitted edits to this file.
-
-| Location | Text now | Proposed change |
-|---|---|---|
-| `SuggestionCard.tsx:214` | ✨ Why Muse picked this | Why Muse picked this |
-| `SuggestionCard.tsx:84` | Invite burst 💌 ✨ | Remove it; the "Invite sent" state already confirms |
-
-### 3D speech
-
-**Where:** `World3D.tsx`. **Owners:** Codex and #45 (Alan).
-
-| Location | Text now | Proposed text |
-|---|---|---|
-| `World3D.tsx:143` | Hi Alex! Tap ✨ I'm free… | Hi Alex. Tap me if you want a plan. |
-| `World3D.tsx:289` | You're in! … | You're in. … |
-| `World3D.tsx:717–763` | 🚶 📍 🏢 🕹️ 📡 on buttons | Remove the emoji; the words carry the meaning |
-
-### Plan page
-
-**Where:** `map/event/PlanPage.tsx`. **Owner:** `wt/event-intro`.
-
-| Problem | Proposed change |
-|---|---|
-| The group name appears twice next to each other: the visibility chip, then the group link | Drop the link text or the chip text for Group plans |
-| Toast "You're checked in. Have fun!" | "You're checked in." |
-
-### Elsewhere
-
-| Item | Owner and reason |
-|---|---|
-| Memories capture burst (📸 ✨ 💛) in `memories/MemoryCapture.tsx` | #47 (Alan) |
-| Messenger and Marketplace skeleton pages | Their own branches: `overnight` and `feat/marketplace-pickup` |
-| Top bar search sends people to the Search page, which has no results yet | #29 (free): render `/api/search` results there |
+| The group name appears twice on the plan page | `map/event/PlanPage.tsx` | `wt/event-intro` |
+| Toast "You're checked in. Have fun!" | `map/event/PlanPage.tsx` | `wt/event-intro` |
+| Memories capture burst | `memories/MemoryCapture.tsx` | #47 |
+| Messenger and Marketplace skeleton pages | their own pages | Their own branches |
+| Search results (the page says it isn't available) | Search page | #29 |
+| The "both free" nudge card covers the top of the 3D view on phones | `BothFreeNudge` | It is a demo scene, so it was left as is |
 
 ## Verification
 
