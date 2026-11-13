@@ -16,6 +16,16 @@ test.describe("Memories", () => {
     await expect(s.getByRole("button", { name: "Send to crew" })).toBeEnabled();
   });
 
+  test("the first load reads the cache, not a forced reload of every table (#65)", async ({ page }) => {
+    const fresh: string[] = [];
+    page.on("request", (r) => {
+      if (/\/api\/(crews|muse\/regroup|memories)/.test(r.url()) && r.headers()["x-outhere-fresh"] === "1") fresh.push(r.url());
+    });
+    await page.goto("/memories?as=alex");
+    await expect(page.getByTestId("crew-card").first()).toBeVisible({ timeout: 15_000 });
+    expect(fresh).toEqual([]);
+  });
+
   test("regroup API returns a suggestion with a real quest id or null", async ({ request }) => {
     const headers = { "x-persona": "alex" };
     const { crews } = await (await request.get("/api/crews", { headers })).json();
