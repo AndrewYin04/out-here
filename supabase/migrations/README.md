@@ -13,4 +13,5 @@ Plain SQL files in this folder are applied by `scripts/db-migrate.mjs`, not by t
 - `0002_location_shares.sql`: Find My shares and status bubbles.
 - `0003_quest_events.sql`: plan visibility (`quests.visibility`), pop-up (`poster_url`, `bubble_text`), `quest_checkins`, `quest_reports`, and posts on a plan (`posts.target_type = 'quest'`). Apply before `npm run seed` / `seed:demo`: the seed writes the new columns.
 - `0007_listing_pickups.sql`: Marketplace pickup on the map: `listings.pickup_until/pickup_label/pickup_spot`, `listing_holds`, `muse_wants`, and the `listing_hold` / `listing_update` notification types. Apply before seeding: the seed writes the new columns.
+- `0008_notification_types_union.sql`: the one list of allowed `notifications.type` and `object_type` values, the union of every branch's list. A later migration that rebuilds either check must keep every value in it; `tests/unit/migrations-notifications.test.ts` enforces this.
 - `0009_watch_events.sql`: `watch_events` (what a person watched and for how long), read by Muse's Marketplace picks.
