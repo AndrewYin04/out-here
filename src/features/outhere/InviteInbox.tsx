@@ -1,9 +1,10 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { Footprints, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, IconButton, celebrateJoin } from '@/features/ui';
+import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
 
@@ -88,6 +89,7 @@ function InviteCard({ inv, onRespond, onDismiss }: {
   inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined', from?: HTMLElement | null) => void; onDismiss: (id: string) => void;
 }) {
   const from = inv.from?.name.split(' ')[0] ?? 'A friend';
+  const letsGo = useLetsGo();
   // Live seats: the quest channel updates this card when someone else takes a seat.
   const live = useQuest(inv.quest?.id ?? null);
   const q = live.data?.quest ?? inv.quest;
@@ -125,7 +127,18 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       )}
       {inv.error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{inv.error}</p>}
       {inv.result ? (
-        <p data-testid="invite-result" className="mt-2 animate-step-in text-[13px] font-semibold text-fb-text">{inv.result}</p>
+        <>
+          <p data-testid="invite-result" className="mt-2 animate-step-in text-[13px] font-semibold text-fb-text">{inv.result}</p>
+          {/* Never a dead end: once you're in, the next step is getting there (docs/UX_PLAN.md). */}
+          {inv.status === 'accepted' && q && (
+            <div className="mt-2 flex gap-2">
+              <Button block icon={<Footprints size={18} />} data-testid="invite-lets-go" onClick={() => { onDismiss(inv.id); letsGo(q.id); }}>
+                Let&rsquo;s go
+              </Button>
+              <Button variant="secondary" onClick={() => onDismiss(inv.id)}>Later</Button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="mt-3 flex gap-2">
           <Button block disabled={inv.busy || seats === 0} onClick={(e) => onRespond(inv, 'accepted', e.currentTarget)}>

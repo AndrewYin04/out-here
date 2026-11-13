@@ -7,9 +7,13 @@ describe('arrivalWait', () => {
     expect(arrivalWait('2026-11-13T17:59:00Z', now)).toEqual({ early: false, minutes: 0 });
     expect(arrivalWait('2026-11-13T18:00:00Z', now)).toEqual({ early: false, minutes: 0 });
   });
-  it('counts whole minutes up to the start', () => {
-    expect(arrivalWait('2026-11-13T18:00:20Z', now)).toEqual({ early: true, minutes: 1 });
-    expect(arrivalWait('2026-11-13T18:14:01Z', now)).toEqual({ early: true, minutes: 15 });
+  it('opens the photo up to 30 min before the start', () => {
+    expect(arrivalWait('2026-11-13T18:00:20Z', now)).toEqual({ early: false, minutes: 1 });
+    expect(arrivalWait('2026-11-13T18:14:01Z', now)).toEqual({ early: false, minutes: 15 });
+    expect(arrivalWait('2026-11-13T18:30:00Z', now)).toEqual({ early: false, minutes: 30 });
+  });
+  it('waits, counting whole minutes to the start, when more than 30 min early', () => {
+    expect(arrivalWait('2026-11-13T18:30:01Z', now)).toEqual({ early: true, minutes: 31 });
   });
   it('treats a bad date as started', () => {
     expect(arrivalWait('nope', now).early).toBe(false);

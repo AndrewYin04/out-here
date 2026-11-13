@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
+import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 
@@ -63,6 +64,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
   const price = quest.data?.quest.priceMax;
   const isMember = quest.data?.viewerIsMember ?? false;
+  const letsGo = useLetsGo();
+  const go = (id: string) => { setPlanOpen(false); letsGo(id); };
   const people = s.friendIds.map((id) => friends.get(id)).filter((p): p is PersonCard => !!p);
 
   const { viewer } = useViewer();
@@ -275,9 +278,10 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
               <span>{outcomeText(p.name.split(' ')[0] ?? p.name, o, venue, s)}</span>
             </p>
           ))}
-          {answered.some(({ o }) => o.together) && (
+          {answered.some(({ o }) => o.together) && s.questId && (
             <div className="mt-2 flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
+              <Button block icon={<Footprints size={18} />} data-testid="suggestion-lets-go" onClick={() => go(s.questId!)}>Let&rsquo;s go</Button>
+              <Button variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
             </div>
           )}
         </div>
@@ -301,11 +305,19 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
             )}
           </div>
         );
+        // Already going: the outcome above carries Let's go when a friend said yes; otherwise it's here.
+        if (s.questId && isMember && answered.some(({ o }) => o.together)) return null;
         return s.questId ? (
           <div className="mt-3">
-            <Button block disabled={isMember || seats === 0 || busy === 'join'} onClick={() => void join()}>
-              {isMember || busy === 'join' ? "You're going" : seats === 0 ? 'Full' : 'Join'}
-            </Button>
+            {isMember ? (
+              <Button block icon={<Footprints size={18} />} data-testid="suggestion-lets-go" onClick={() => go(s.questId!)}>
+                Let&rsquo;s go &middot; you&rsquo;re in
+              </Button>
+            ) : (
+              <Button block disabled={seats === 0 || busy === 'join'} onClick={() => void join()}>
+                {busy === 'join' ? 'Joining…' : seats === 0 ? 'Full' : 'Join'}
+              </Button>
+            )}
           </div>
         ) : null;
       })()}

@@ -20,6 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* The 3D companion is large; fetch it while the browser is idle so Out Here opens fast. */}
+        <link rel="prefetch" href="/models/muse-companion.glb" />
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
