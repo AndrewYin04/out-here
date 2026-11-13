@@ -172,7 +172,7 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
   // The moment everyone agrees: the card drops in and the plan's emoji bursts out of it.
   useEffect(() => {
     if (!emoji) return;
-    const t = window.setTimeout(() => burst(emojiRef.current, [emoji, '🎉', '✨', emoji], 14), 180);
+    const t = window.setTimeout(() => burst(emojiRef.current, [emoji], 6), 180);
     return () => window.clearTimeout(t);
   }, [emoji]);
   if (!o) return null;
@@ -183,7 +183,7 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
       <div className="flex items-start gap-3">
         <span ref={emojiRef} aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#E7F3E8] text-[26px]">{o.emoji}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[16px] font-bold leading-5 text-fb-text">It’s a plan!</p>
+          <p className="text-[16px] font-bold leading-5 text-fb-text">It’s a plan</p>
           <p className="mt-0.5 text-[14px] text-fb-text">{o.title} with {otherNames}</p>
           <p className="mt-0.5 flex items-center gap-1 text-[13px] text-fb-text-2">
             <MapPin size={13} aria-hidden />{o.venueName} · {startsText(o.startsAt)}

@@ -3,7 +3,7 @@
 import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
+import { Avatar, Button, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
@@ -79,9 +79,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const inFlight = useRef(false);
   /** The button the viewer last tapped in this card: joins fly from it to the pin. */
   const tapped = useRef<HTMLElement | null>(null);
+  // Joining flies your avatar to the pin. An invite needs no confetti: the card says it was sent.
   const celebrate = (joined: boolean) => {
     if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl, s.emoji);
-    else burst(tapped.current, ['💌', '✨'], 6);
   };
 
   const openInvite = (p: PersonCard) => {
@@ -211,7 +211,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
             data-testid="suggestion-why"
             className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
           >
-            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
+            {showMuse ? 'Why Muse picked this' : 'Why this plan'}
             {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
           </button>
           {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}

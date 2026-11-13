@@ -149,7 +149,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               </div>
             )}
             {shown.isLive && (
-              <StatLine memberCount={shown.memberCount} seatsLeft={shown.seatsLeft} isLive hereCount={shown.hereCount} className="mb-2" />
+              <StatLine memberCount={shown.memberCount} isLive hereCount={shown.hereCount} className="mb-2" />
             )}
             {museReason && (
               <p data-testid="quest-muse-reason" className="mb-2 rounded-card bg-fb-blue-tint px-3 py-2 text-fb-meta text-fb-text">

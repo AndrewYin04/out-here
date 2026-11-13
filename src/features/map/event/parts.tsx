@@ -61,15 +61,20 @@ export function VisibilityChip({ quest, groupName, className }: { quest: Pick<Qu
 
 /** "12 going · 3 spots left · 🔴 Live · 5 here" */
 export function StatLine({ memberCount, seatsLeft, isLive, hereCount, className }: {
-  memberCount: number; seatsLeft: number; isLive: boolean; hereCount: number; className?: string;
+  /** Leave seatsLeft out where the seat count is already shown (the quest sheet's own row). */
+  memberCount: number; seatsLeft?: number; isLive: boolean; hereCount: number; className?: string;
 }) {
   return (
     <p data-testid="quest-stats" className={cn('flex flex-wrap items-center gap-x-1.5 text-fb-body', className)}>
       <span className="font-semibold text-fb-text">{memberCount} going</span>
-      <span className="text-fb-text-2" aria-hidden>·</span>
-      <span className={seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
-        {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
-      </span>
+      {seatsLeft !== undefined && (
+        <>
+          <span className="text-fb-text-2" aria-hidden>·</span>
+          <span className={seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
+            {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
+          </span>
+        </>
+      )}
       {isLive && (
         <>
           <span className="text-fb-text-2" aria-hidden>·</span>

@@ -7,7 +7,7 @@ import { IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
-import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
+import { MuseStepsDone } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
@@ -75,7 +75,7 @@ function Pill({ on, onClick, children, label }: { on: boolean; onClick: () => vo
 function PickerRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mt-2">
-      <p className="text-[12px] font-semibold uppercase tracking-wide text-fb-text-2">{label}</p>
+      <p className="text-[13px] font-semibold text-fb-text-2">{label}</p>
       <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-24px),transparent)] [scrollbar-width:none]">
         {children}
       </div>
@@ -108,7 +108,7 @@ export function ImFreeButton({ className }: { className?: string }) {
       {label ? (
         <><StatusDot s={status} className="size-3 ring-2 ring-white" />{label}</>
       ) : (
-        <><span aria-hidden>✨</span> I&apos;m free</>
+        <>I&apos;m free</>
       )}
     </button>
   );
@@ -127,7 +127,7 @@ function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Ma
     : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
   return (
     <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
-      ✨ Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
+      Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
     </p>
   );
 }
@@ -255,7 +255,9 @@ export function PlanSheet({ className }: { className?: string }) {
           className={cn(
             'absolute inset-x-0 bottom-0 z-30 flex animate-sheet-up flex-col rounded-t-[16px] bg-fb-surface shadow-popover md:animate-panel-in',
             result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[82%]',
-            'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
+            // Desktop: fit the form until there are results, then take the full height.
+            status === 'idle' ? 'md:inset-x-auto md:bottom-auto md:left-4 md:top-4 md:max-h-[calc(100%-32px)] md:w-[400px] md:rounded-card'
+              : 'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
         >
@@ -288,11 +290,9 @@ export function PlanSheet({ className }: { className?: string }) {
                 <Pill key={d.id} on={duration === d.id} onClick={() => setDuration((cur) => (cur === d.id ? null : d.id))}>{d.label}</Pill>
               ))}
             </PickerRow>
-            <PickerRow label="Up for">
+            <PickerRow label="What are you up for?">
               {MOODS.map((m) => (
-                <Pill key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} label={m.label}>
-                  <span aria-hidden>{m.emoji}</span>{m.label}
-                </Pill>
+                <Pill key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)}>{m.label}</Pill>
               ))}
             </PickerRow>
             <div className="mt-2 rounded-[14px] bg-fb-secondary-btn px-3 py-2 ring-fb-blue focus-within:ring-2">
@@ -311,29 +311,25 @@ export function PlanSheet({ className }: { className?: string }) {
                 className="block max-h-24 min-h-6 w-full resize-none bg-transparent text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"
               />
             </div>
-            <div className="mt-2 flex gap-2 pb-3">
+            <div className="mt-3 flex flex-col items-center gap-1 pb-3">
               <button type="submit" aria-label="Find a plan" disabled={!ask.trim()}
-                className="oh-press h-10 flex-1 rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-50">
-                ✨ Find plans
+                className="oh-press h-11 w-full rounded-btn bg-fb-blue text-[16px] font-semibold text-white hover:bg-fb-blue-hover disabled:bg-fb-secondary-btn disabled:text-fb-text-2">
+                Find plans
               </button>
               <button type="button" onClick={justFree} disabled={myStatus.busy} data-testid="just-free"
-                className="oh-press h-10 rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:brightness-95 disabled:opacity-50">
+                className="h-9 rounded-btn px-3 text-[15px] font-semibold text-fb-blue hover:bg-fb-hover disabled:opacity-50">
                 {myStatus.status.kind === 'busy' ? 'Just show I’m free' : 'Update status'}
               </button>
             </div>
           </form>
           </>)}
 
+          {status !== 'idle' && (
           <div className="min-h-0 flex-1 overflow-y-auto bg-fb-bg px-3 pb-4 pt-3 md:rounded-b-card">
-            {status === 'idle' && (
-              <p className="px-1 text-[15px] text-fb-text-2">
-                Pick a time and what you&apos;re up for. Muse checks which friends are free and what fits, walk included.
-              </p>
-            )}
 
             {status === 'loading' && (
               <div data-testid="plan-loading" aria-live="polite">
-                <MuseStepsLoading />
+                <p role="status" className="mb-2 px-1 text-[15px] text-fb-text-2">Muse is checking who’s free and what fits…</p>
                 {[0].map((i) => (
                   <div key={i} className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card" style={{ animationDelay: '90ms' }}>
                     <div className="flex gap-3">
@@ -351,7 +347,6 @@ export function PlanSheet({ className }: { className?: string }) {
 
             {status === 'done' && result && (
               <div aria-live="polite">
-                {steps.length > 0 && <MuseStepsDone steps={steps} showMuse={showMuse} />}
                 {summary && (
                   <div data-testid="plan-summary" className="mb-3 animate-step-in px-1">
                     {showMuse && <MuseLabel className="mb-1" />}
@@ -374,6 +369,8 @@ export function PlanSheet({ className }: { className?: string }) {
                     ))}
                   </div>
                 )}
+                {/* How Muse worked and what it ruled out come after the plans: there if you want them. */}
+                {steps.length > 0 && <div className="mt-3"><MuseStepsDone steps={steps} showMuse={showMuse} /></div>}
                 {drops.length > 0 && (
                   <div className="mt-3 rounded-card bg-fb-surface shadow-card">
                     <button
@@ -400,6 +397,7 @@ export function PlanSheet({ className }: { className?: string }) {
               </div>
             )}
           </div>
+          )}
         </section>
       )}
     </>
