@@ -20,6 +20,9 @@ import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow, TogetherRow } f
 import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
+import {
+  addMuseWant, createListing, mapListing, mapListings, markSold, museWants, publicListing, releaseHold, removeMuseWant, requestHold, respondHold,
+} from './market';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import { postWalkStep, walkers } from './walkers';
 
@@ -94,7 +97,8 @@ export class CoreStore {
   }
 
   // ---------- notifications (internal) ----------
-  private async notify(
+  /** Internal: also used by the market and locations helpers. */
+  async notify(
     v: View, recipientId: ID, type: NotificationType, actorId: ID | null,
     objectType: NotificationObjectType, objectId: ID, text: string,
   ): Promise<void> {
@@ -1214,7 +1218,7 @@ export class CoreStore {
   // ---------- marketplace / reels ----------
   async listings(): Promise<Listing[]> {
     const v = await this.view();
-    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(publicListing);
   }
 
   async listing(viewerId: ID, id: ID): Promise<ListingResponse> {
@@ -1228,7 +1232,7 @@ export class CoreStore {
     const plan = q ? {
       questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt, endsAt: q.endsAt, seatsLeft: v.seatsLeft(q),
     } : null;
-    return { listing: l, seller: v.person(viewerId, l.sellerId)!, plan };
+    return { listing: publicListing(l), seller: v.person(viewerId, l.sellerId)!, plan };
   }
 
   async reels(): Promise<Reel[]> {
@@ -1248,6 +1252,17 @@ export class CoreStore {
 
   // ---------- Out Here: friend locations (logic in locations.ts) ----------
   friendPins(viewerId: ID) { return friendPins(this, viewerId); }
+  // ---------- marketplace pickup (market.ts) ----------
+  mapListings(viewerId: ID) { return mapListings(this, viewerId); }
+  mapListing(viewerId: ID, id: ID) { return mapListing(this, viewerId, id); }
+  createListing(viewerId: ID, body: Parameters<typeof createListing>[2]) { return createListing(this, viewerId, body); }
+  requestHold(viewerId: ID, listingId: ID, body: Parameters<typeof requestHold>[3]) { return requestHold(this, viewerId, listingId, body); }
+  respondHold(viewerId: ID, holdId: ID, accept: boolean) { return respondHold(this, viewerId, holdId, accept); }
+  releaseHold(viewerId: ID, holdId: ID) { return releaseHold(this, viewerId, holdId); }
+  markSold(viewerId: ID, listingId: ID) { return markSold(this, viewerId, listingId); }
+  museWants(viewerId: ID) { return museWants(this, viewerId); }
+  addMuseWant(viewerId: ID, w: Parameters<typeof addMuseWant>[2]) { return addMuseWant(this, viewerId, w); }
+  removeMuseWant(viewerId: ID, id: ID) { return removeMuseWant(this, viewerId, id); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
   walkers(viewerId: ID, questId: ID) { return walkers(this, viewerId, questId); }

@@ -261,20 +261,41 @@ export type NotificationType =
   | 'friend_request' | 'friend_accept'
   | 'comment' | 'reply' | 'reaction'
   | 'group_post' | 'event_invite'
-  | 'quest_invite' | 'quest_join' | 'message' | 'intro';
+  | 'quest_invite' | 'quest_join' | 'message' | 'intro'
+  | 'listing_hold' | 'listing_update';
 export type NotificationObjectType =
-  'post' | 'comment' | 'profile' | 'group' | 'event' | 'quest' | 'invite' | 'thread' | 'intro';
+  'post' | 'comment' | 'profile' | 'group' | 'event' | 'quest' | 'invite' | 'thread' | 'intro' | 'listing';
 export type Notification = {
   id: ID; recipientId: ID; type: NotificationType; actorId: ID | null;
   objectType: NotificationObjectType; objectId: ID; text: string;
   createdAt: string; readAt: string | null;
 };
 
-export type ListingStatus = 'available' | 'pending' | 'sold';
+/** 'reserved' is derived: an accepted hold that has not expired. Stored rows are 'available' or 'sold'. */
+export type ListingStatus = 'available' | 'reserved' | 'sold';
 export type Listing = {
   id: ID; sellerId: ID; title: string; priceUsd: number; condition: string; category: string;
   description: string; imageUrl: string | null; location: LatLng | null;
   status: ListingStatus; createdAt: string;
+  /** "Available for pickup until": the listing is a map pin until then. Null = not on the map. */
+  pickupUntil: string | null;
+  /** The pickup area everyone sees ("Belle Haven"). */
+  pickupLabel: string | null;
+  /** The exact spot; only the seller and a buyer with an accepted hold get it (null for others). */
+  pickupSpot: string | null;
+};
+
+export type ListingHoldStatus = 'requested' | 'accepted' | 'declined' | 'cancelled' | 'completed' | 'expired';
+/** A buyer's "Reserve for pickup". 'expired' is derived: accepted, and expiresAt has passed. */
+export type ListingHold = {
+  id: ID; listingId: ID; buyerId: ID; offerUsd: number; message: string; etaMin: number;
+  status: ListingHoldStatus; createdAt: string; acceptedAt: string | null; expiresAt: string | null;
+};
+
+/** Something a person told Muse they are looking for ("desk chair under $40, 15 min drive"). */
+export type MuseWant = {
+  id: ID; userId: ID; text: string; item: string; keywords: string[];
+  maxPrice: number | null; maxDriveMin: number | null; active: boolean; createdAt: string;
 };
 
 export type Reel = {

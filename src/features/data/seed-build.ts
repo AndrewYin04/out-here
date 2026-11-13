@@ -124,11 +124,25 @@ export const TABLE_ORDER = [
   'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
   'intro_profiles', 'intros',
+  'listing_holds', 'muse_wants',
 ] as const;
 
 const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
   school: 'public', major: 'public', gradYear: 'friends', hometown: 'friends',
   currentCity: 'public', job: 'public', pronouns: 'public',
+};
+
+/** Seeded listings open for pickup on the Out Here map (ids from seed-content.json). */
+const PICKUP_LISTINGS = [
+  { id: 'l04', meters: 2600, bearing: 200, openMin: 150, listedMinAgo: 70, label: 'Downtown Menlo Park', spot: 'Bench outside the library, Alma St' },
+  { id: 'l10', meters: 1700, bearing: 95, openMin: 210, listedMinAgo: 35, label: 'East Palo Alto', spot: 'Front porch, white house on Bay Rd' },
+  { id: 'l05', meters: 1200, bearing: 300, openMin: 90, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
+  { id: 'l26', meters: 3400, bearing: 160, openMin: 240, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
+] as const;
+/** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
+export const ALEX_WANT = {
+  text: 'I need a desk chair under $40, ideally within a 15-minute drive',
+  item: 'desk chair', keywords: ['desk chair', 'office chair', 'chair'], maxPrice: 40, maxDriveMin: 15,
 };
 
 const iso = (d: Date) => d.toISOString();
@@ -537,7 +551,27 @@ export function buildSeed(
       id: seedId('listing', l.id), seller_id: pid(l.sellerHandle), title: l.title, price_usd: l.priceUsd,
       condition: l.condition, category: l.category, description: l.description, image_url: l.image ?? null,
       lat: home.lat, lng: home.lng, status: 'available',
+      pickup_until: null, pickup_label: null, pickup_spot: null,
       created_at: iso(addMin(refDate, -Math.round(l.hoursAgo * 60))),
+    });
+  }
+
+  // Marketplace pickup on the map: a few listings open for pickup now, placed around the demo
+  // centre. None is a chair, so the chair a seller lists live is what Muse surfaces for Alex's want.
+  for (const p of PICKUP_LISTINGS) {
+    const row = t.listings.find((r) => r.id === seedId('listing', p.id));
+    if (!row) { warnings.push(`pickup listing ${p.id}: not in seed content, skipped`); continue; }
+    const at = offsetPoint(DEMO_CENTER, p.meters, p.bearing);
+    Object.assign(row, {
+      lat: at.lat, lng: at.lng, pickup_label: p.label, pickup_spot: p.spot,
+      pickup_until: iso(addMin(demoNow, p.openMin)), created_at: iso(addMin(demoNow, -p.listedMinAgo)),
+    });
+  }
+  if (has('alex')) {
+    t.muse_wants.push({
+      id: seedId('want', 'alex-desk-chair'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
+      keywords: ALEX_WANT.keywords, max_price: ALEX_WANT.maxPrice, max_drive_min: ALEX_WANT.maxDriveMin,
+      active: true, created_at: iso(addMin(demoNow, -26 * 60)),
     });
   }
 

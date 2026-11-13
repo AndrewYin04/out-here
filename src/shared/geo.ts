@@ -70,3 +70,11 @@ export function snapToGrid(exact: LatLng, cellM: number): LatLng {
   const lng = (Math.floor(exact.lng / lngStep) + 0.5) * lngStep;
   return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) };
 }
+
+/** City driving for Marketplace pickups: about 30 km/h over the same route factor as walking. */
+export const DRIVE_METERS_PER_MIN = 500;
+
+/** Driving minutes for a pickup, at least 1. */
+export function drivingMinutes(a: LatLng, b: LatLng): number {
+  return Math.max(1, Math.round((haversineMeters(a, b) * ROUTE_FACTOR) / DRIVE_METERS_PER_MIN));
+}

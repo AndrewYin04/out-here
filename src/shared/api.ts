@@ -84,11 +84,22 @@
 // POST /api/threads                    body: { memberIds, name? }       -> { thread: ThreadView }   (returns the existing 1:1 thread)
 // GET  /api/search?q&type                                               -> SearchResponse
 // GET  /api/listings  /  GET /api/listings/:id                          -> { listings: Listing[] } / ListingResponse
+// ---- Marketplace pickup on the Out Here map ----
+// GET  /api/listings/map                                               -> { listings: MapListing[] }   (pickup window open, not sold)
+// GET  /api/listings/:id/pickup                                        -> { listing: MapListing }      (any status, so a sheet can show "Sold")
+// POST /api/listings                   body: CreateListingBody          -> { listing: MapListing }      (publishes listings:new {listingId})
+// POST /api/listings/:id/holds         body: HoldRequestBody            -> { listing: MapListing }      (409 when reserved or you already asked)
+// POST /api/listing-holds/:id/respond  body: { accept: boolean }        -> { listing: MapListing }      (seller; 409 when already reserved)
+// POST /api/listing-holds/:id/release                                  -> { listing: MapListing }      (buyer or seller cancels)
+// POST /api/listings/:id/sold                                          -> { listing: MapListing }      (seller; leaves the map)
+// GET  /api/muse/wants  /  POST /api/muse/wants  body: { text }        -> { wants: MuseWant[] } / { want: MuseWant }
+// DELETE /api/muse/wants?id=<id>                                       -> { ok: true }
+// GET  /api/muse/finds?lat&lng                                         -> MuseFindsResponse (listings matching your wants, with Muse's line)
 // GET  /api/reels                                                       -> { reels: Reel[] }
 
 import type {
   Audience, Availability, Comment, Crew, DailyEntry, DailyQuest, Event, EventRsvp, FriendList,
-  Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
+  Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, ListingHold, ListingStatus, Memory, MuseWant, Message, MusePlan,
   Notification, PlanSuggestion, Post, Profile, Quest, ReactionCounts, ReactionType, Reel,
   RsvpStatus, Story, Thread,
   TogetherPlan,
@@ -238,6 +249,39 @@ export type ListingsResponse = { listings: Listing[] };
 /** An upcoming Out Here plan the seller linked to a listing (a `listing:<id>` quest tag for now). */
 export type ListingPlan = { questId: ID; title: string; emoji: string; venueName: string; startsAt: string; endsAt: string; seatsLeft: number };
 export type ListingResponse = { listing: Listing; seller: PersonCard; plan: ListingPlan | null };
+
+/** A listing as the Out Here map shows it to one viewer. */
+export type MapListing = {
+  /** location is the fuzzed pickup area unless `exact`; pickupSpot is null unless `exact`. */
+  listing: Listing;
+  status: ListingStatus;
+  seller: PersonCard;
+  /** True for the seller and for a buyer whose hold was accepted (and has not expired). */
+  exact: boolean;
+  /** The viewer's latest hold on this listing (buyer side). */
+  myHold: ListingHold | null;
+  /** When the current reservation ends (anyone sees "Reserved till 4:45 PM"). */
+  reservedUntil: string | null;
+  /** Seller only: open requests and the accepted hold, with the buyer. */
+  requests: (ListingHold & { buyer: PersonCard })[];
+};
+export type MapListingsResponse = { listings: MapListing[] };
+export type MapListingResponse = { listing: MapListing };
+export type CreateListingBody = {
+  title: string; priceUsd: number; category: string; description?: string; imageUrl?: string | null;
+  /** pickupLabel defaults to the neighbourhood of `location`. */
+  location: LatLng; pickupLabel?: string; pickupSpot: string; pickupUntil: string;
+};
+export type HoldRequestBody = { offerUsd: number; etaMin: number; message: string };
+export type HoldRespondBody = { accept: boolean };
+export type MuseWantsResponse = { wants: MuseWant[] };
+/** One listing Muse surfaced for a want: the facts code checked, and Muse's one line. */
+export type MuseFind = {
+  listingId: ID; wantId: ID; title: string; priceUsd: number; imageUrl: string | null;
+  driveMin: number; pickupUntil: string; listedMinAgo: number; sellerFirstName: string;
+  line: string; source: 'muse' | 'mock' | 'fallback';
+};
+export type MuseFindsResponse = { finds: MuseFind[] };
 export type ReelsResponse = { reels: Reel[] };
 export type MessagesResponse = { messages: Message[] };
 export type ThreadsResponse = { threads: ThreadView[] };
