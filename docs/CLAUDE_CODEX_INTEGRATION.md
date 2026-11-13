@@ -59,3 +59,15 @@ Final two-second samples on desktop and 390px phone show zero camera/elevation w
 Unit tests: 571/571 across 74 files. Typecheck and production build pass. Lint has zero errors and six pre-existing warnings. Development browser checks: 12/12, including a new regression through typing, gestures, delayed requests, results and restoration, desktop/phone, and reduced motion. Production browser checks: 18/18 pass, including request ownership, Marketplace/regroup/caption lifecycles, phone/desktop and reduced motion. Production screenshots have one cloud, no overflow and no page/console errors.
 
 Port3113 now serves the tested optimized production build from `.verify/performance-build` with `OUTHERE_STORE=memory MUSE_MOCK=1`; refresh an existing development tab once. Port3114 serves the same build as a verification mirror. Hot reload was available on3113 throughout implementation; the final preview removes development compilation overhead. No hosted deployment, push or main merge. Original worktrees remain intact.
+
+## Sync: Claude's later work merged with the Codex verified branch (06:45 Fri)
+
+`integration/claude-camera-muse` (worktree `out-here-combined`) now contains `integration/claude-codex-verified` (f5a444c, the camera stability and render-cost pass) merged as `e4e510f`, plus three Claude commits that were after the `50b8660` snapshot:
+
+- `50b8660` (already in the snapshot): narration is a sequence of returned facts (intent, free friends, plans checked, the pick, Muse's reason and bridge), one cloud at a time, held for reading time.
+- `303b2d4`: leaving 3D, Jolly flies from his last screen position to a docked, hovering Jolly at the side of the map (`useMuseInWorld`, `setMuseDockFrom`/`takeMuseDockFrom`). In 3D the launcher stays the pill.
+- `189b9e7`: Muse on the 2D map while the chat is open (`src/features/map/MuseMapLayer.tsx`). The narration moved to `muse-companion` (`thought-line.ts`, `commentary.ts`, `useMuseCommentary`) and each thought carries a focus; the map lights rings on free friends and checked plans, tags dropped plans with the planner's own reason, and Jolly hops to each. A real agent encounter shows the friend's Muse over their pin with each sent/received message as an orb; `attachMuseWorld('map')` keeps a finished encounter visible 4.5 s (only `'world'` owners count for `useMuseInWorld`). `useFreeFriendNudge` + `showMuseNudge`: a friend newly sharing "I'm free" (live via `user:<id>`) makes the docked Jolly offer "Ask <name>'s Muse". Plan `meta.friendsFree` now carries `friendId` (guard test updated; suggestions already carried friendIds).
+
+Checks on the merge: typecheck, lint 0 errors (6 old warnings), 572/572 unit tests, production build. Browser checks for the map work ran at 1440 and 390 against a production server in MemoryStore + mock mode with no page or console errors. Not run: Playwright e2e on this merge, live Muse, Supabase.
+
+Next (Claude): the "I'm free" flow becomes a Muse-led view (Muse front and centre, the real pipeline steps and decisions shown as they happen) instead of the chatbot.
