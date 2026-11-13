@@ -221,7 +221,7 @@ export function buildHq(data: HqData, origin: LatLng, assets?:SceneryAssets): Hq
     if(g){const mesh=new THREE.Mesh(keep(g),s.mat);mesh.userData.worldOccluder=true;tall.add(mesh);}
   }
   const roofG = merge(roofs);
-  if(roofG){const mesh=new THREE.Mesh(keep(roofG),keep(new THREE.MeshStandardMaterial({color:'#C9D3DC',roughness:.9,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
+  if(roofG){const mesh=new THREE.Mesh(keep(roofG),keep(new THREE.MeshStandardMaterial({color:'#E4EAEF',roughness:.85,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
   const parG = merge(parapets);
   if(parG){const mesh=new THREE.Mesh(keep(parG),keep(new THREE.MeshStandardMaterial({color:'#FFFFFF',roughness:.7,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
 
