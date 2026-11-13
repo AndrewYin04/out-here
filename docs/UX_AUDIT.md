@@ -105,7 +105,7 @@ Uploads, the crew album and the Muse caption call are unchanged.
 
 ## Integration with Codex's 3D overhaul
 
-Pending. On Thu Nov 12 at about 00:15 PT, `feature/world-visual-overhaul` (`../out-here-world`) had no commits and 61 uncommitted files. It was still being edited at 23:30. It starts from the Muse integration line (0faf935), not from main. Several files overlap this branch: `World3D.tsx`, `memories/MemoryCapture.tsx`, `memories/MemoriesPage.tsx` and `tests/e2e/your-plans.spec.ts`. The merge waits for Codex to commit and confirm it's finished. Steps, once it does:
+Pending. At 23:48 PT on Thu Nov 12, `feature/world-visual-overhaul` (`../out-here-world`) had no commits and 68 uncommitted files. It was still being edited at 23:30. It starts from the Muse integration line (0faf935), not from main. Several files overlap this branch: `World3D.tsx`, `memories/MemoryCapture.tsx`, `memories/MemoriesPage.tsx` and `tests/e2e/your-plans.spec.ts`. The merge waits for Codex to commit and confirm it's finished. Steps, once it does:
 
 1. `git worktree add ../out-here-int -b integration/ui-world feature/world-visual-overhaul`
 2. `git merge --no-ff feature/ui-cleanup` there. Resolve file by file:
