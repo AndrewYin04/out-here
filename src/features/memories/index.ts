@@ -3,6 +3,7 @@
 export { ArrivalSelfie } from './ArrivalSelfie';
 export { MEMORY_SAVED, OPEN_SELFIE, RATE_HANGOUT, requestSelfie, type MemorySavedDetail, type RateHangoutDetail } from './arrival';
 export { MemoriesPage } from './MemoriesPage';
+export { RateHangoutListener } from './RateHangoutListener';
 export { YourPlans } from './YourPlans';
 export { MemoryCapture } from './MemoryCapture';
 export {
