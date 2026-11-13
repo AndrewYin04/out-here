@@ -5,6 +5,8 @@ import raw from './videos.json';
 
 export type SeedVideo = {
   key: string;
+  /** 'reel': a vertical short (9:16, quick cuts). Default: a landscape video. */
+  format?: 'video' | 'reel';
   title: string;
   /** Handle of the fictional creator. */
   creator: string;
@@ -19,6 +21,10 @@ export type SeedVideo = {
 export const SEED_VIDEOS: readonly SeedVideo[] = raw as SeedVideo[];
 export const VIDEO_BY_KEY: ReadonlyMap<string, SeedVideo> = new Map(SEED_VIDEOS.map((v) => [v.key, v]));
 export const videoPoster = (key: string) => `/seed/videos/${key}.webp`;
+/** The cover to show: a reel uses its last shot (the finished look), so cover and reel show the same person. */
+export function coverFor(v: SeedVideo): string {
+  return v.format === 'reel' && v.frames?.length ? `/seed/videos/frames/${v.key}-${v.frames.length}.webp` : videoPoster(v.key);
+}
 /** The short AI clip (scripts/gen-clips.mjs): Muse-generated keyframes with camera moves. */
 export const videoClip = (key: string) => `/seed/videos/${key}.mp4`;
 

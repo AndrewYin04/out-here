@@ -40,11 +40,11 @@ for (const l of data.listings) jobs.push({ path: l.image, kind: "listing", label
 
 // Watch video posters (src/shared/seed/videos.json): fictional creators, no text.
 const VIDEOS = JSON.parse(readFileSync(join(ROOT, "src", "shared", "seed", "videos.json"), "utf8"));
-for (const v of VIDEOS) jobs.push({ path: `/seed/videos/${v.key}.webp`, kind: "video", label: v.key, prompt: `Realistic still frame from a casual phone video posted on social media: ${v.poster}. Natural light, candid, ordinary fictional people if any. ${NO_TEXT}` });
+for (const v of VIDEOS) jobs.push({ path: `/seed/videos/${v.key}.webp`, kind: v.format === "reel" ? "reelposter" : "video", label: v.key, prompt: `Realistic still frame from a casual phone video posted on social media: ${v.poster}. Natural light, candid, ordinary fictional people if any. ${NO_TEXT}` });
 // Keyframes for the AI clips (scripts/gen-clips.mjs turns them into short MP4s): one scene per video.
-for (const v of VIDEOS) (v.frames ?? []).forEach((fr, i) => jobs.push({ path: `/seed/videos/frames/${v.key}-${i + 1}.webp`, kind: "clip", label: `${v.key} ${i + 1}`, prompt: `Realistic still frame from a casual phone video posted on social media, same scene as "${v.title}": ${fr}. Natural light, candid, ordinary fictional people if any. ${NO_TEXT}` }));
+for (const v of VIDEOS) (v.frames ?? []).forEach((fr, i) => jobs.push({ path: `/seed/videos/frames/${v.key}-${i + 1}.webp`, kind: v.format === "reel" ? "reelframe" : "clip", label: `${v.key} ${i + 1}`, prompt: `Realistic still frame from a casual phone video posted on social media, same scene as "${v.title}": ${fr}. Natural light, candid, ordinary fictional people if any. ${NO_TEXT}` }));
 
-const SIZE = { clip: [1280, 720, 80], video: [800, 450, 78], portrait: [256, 256, 80], cover: [1200, 450, 78], post: [800, 600, 78], event: [800, 600, 78], story: [800, 1422, 78], listing: [600, 600, 78] };
+const SIZE = { reelframe: [720, 1280, 80], reelposter: [450, 800, 78], clip: [1280, 720, 80], video: [800, 450, 78], portrait: [256, 256, 80], cover: [1200, 450, 78], post: [800, 600, 78], event: [800, 600, 78], story: [800, 1422, 78], listing: [600, 600, 78] };
 const sha = (s) => createHash("sha256").update(s).digest("hex");
 const abs = (p) => join(PUB, ...p.split("/").filter(Boolean));
 

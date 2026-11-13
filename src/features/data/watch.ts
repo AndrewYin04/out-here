@@ -1,7 +1,7 @@
 // Watch history. Server-only; CoreStore exposes these as store methods. Videos are the fixed,
 // fictional catalogue in src/shared/seed/videos.json; a view is (person, video key, seconds).
 // Realtime: user:<viewerId> {type:"watch", id} so the viewer's other tabs (Marketplace) refetch.
-import { now, SEED_VIDEOS, VIDEO_BY_KEY, videoClip, videoPoster, type ID, type Listing } from '@/shared';
+import { coverFor, now, SEED_VIDEOS, VIDEO_BY_KEY, videoClip, type ID, type Listing } from '@/shared';
 import type { MarketplacePick, PersonCard, WatchHistoryItem, WatchResponse, WatchVideo } from '@/shared/api';
 import { publicListing } from './market';
 import type { CoreStore } from './core';
@@ -16,7 +16,7 @@ export function videoView(v: View, viewerId: ID, key: string): WatchVideo | null
   if (!s) return null;
   const creator = v.profileByHandle.get(s.creator);
   return {
-    key: s.key, title: s.title, minutes: s.minutes, topics: s.topics, posterUrl: videoPoster(s.key), clipUrl: videoClip(s.key),
+    key: s.key, title: s.title, minutes: s.minutes, topics: s.topics, posterUrl: coverFor(s), clipUrl: videoClip(s.key), format: s.format ?? 'video',
     creator: creator ? v.person(viewerId, creator.id) : null,
   };
 }

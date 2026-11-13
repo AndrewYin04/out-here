@@ -1,5 +1,67 @@
 [
   {
+    "key": "reel-flea-market-finds",
+    "format": "reel",
+    "title": "Flea market finds: leather jacket, cardigan, loafers",
+    "creator": "ivy",
+    "minutes": 1,
+    "topics": [
+      "vintage",
+      "vintage clothes",
+      "flea markets"
+    ],
+    "poster": "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a young adult trying on a vintage brown leather jacket at an outdoor flea market stall",
+    "frames": [
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: outdoor flea market stalls with racks of vintage clothes on a sunny morning",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: close-up of a worn brown vintage leather jacket collar and zipper",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a chunky cream knit vintage cardigan folded on a wooden table at a market stall",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: hands holding a pair of vintage leather loafers at a flea market",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the young adult wearing the leather jacket over the cream cardigan, walking through the market"
+    ]
+  },
+  {
+    "key": "reel-thrift-outfit-40",
+    "format": "reel",
+    "title": "Building a full outfit at the thrift store for $40",
+    "creator": "grace",
+    "minutes": 1,
+    "topics": [
+      "vintage",
+      "vintage clothes",
+      "thrifting",
+      "outfits"
+    ],
+    "poster": "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a young adult holding a stack of vintage clothes in a thrift store aisle, smiling",
+    "frames": [
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: long racks of colorful vintage clothes in a small thrift store",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: hands pulling a vintage corduroy blazer off a crowded rack",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a pair of worn brown leather loafers on a thrift store shelf",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a knitted vintage sweater vest held up against the camera",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the finished outfit, corduroy blazer, sweater vest and loafers, mirror selfie in a fitting room"
+    ]
+  },
+  {
+    "key": "reel-denim-5-ways",
+    "format": "reel",
+    "title": "5 ways to style one vintage denim jacket",
+    "creator": "bea",
+    "minutes": 1,
+    "topics": [
+      "vintage",
+      "vintage clothes",
+      "denim",
+      "outfits"
+    ],
+    "poster": "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a young adult in a faded vintage denim jacket posing in front of a brick wall",
+    "frames": [
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: a faded vintage denim jacket hanging on a door hook",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the faded denim jacket worn over a white t-shirt and black jeans, full-length mirror selfie",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the faded denim jacket worn over a floral summer dress, standing on a sunny sidewalk",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the faded denim jacket tied around the waist with a striped shirt and wide trousers",
+      "Vertical phone photo for a social media reel, fictional young adult, natural light, candid: the faded denim jacket layered under a long wool coat, autumn street"
+    ]
+  },
+  {
     "key": "thrift-haul",
     "title": "Thrift haul: a 70s denim jacket for $25",
     "creator": "bea",

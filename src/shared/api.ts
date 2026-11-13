@@ -283,6 +283,8 @@ export type MuseFindsResponse = { finds: MuseFind[] };
 /** A Watch video as the app shows it. */
 export type WatchVideo = {
   key: string; title: string; minutes: number; topics: string[]; posterUrl: string;
+  /** 'reel' is vertical (9:16). */
+  format: 'video' | 'reel';
   /** Short clip made from Muse-generated images (scripts/gen-clips.mjs). */
   clipUrl: string;
   creator: PersonCard | null;

@@ -18,12 +18,43 @@ export function WatchPage() {
   const api = useApi<WatchResponse>('/api/watch');
   const [playing, setPlaying] = useState<WatchVideo | null>(null);
   const watched = new Set(api.data?.history.map((h) => h.videoKey) ?? []);
+  const reels = (api.data?.videos ?? []).filter((v) => v.format === 'reel');
+  const videos = (api.data?.videos ?? []).filter((v) => v.format !== 'reel');
 
   return (
     <div className="pb-6" data-testid="watch-page">
       <PageHeader title="Video" subtitle={<>Short clips from people near you · <span aria-hidden>✨</span> made with Muse Image</>} />
+      {reels.length > 0 && (
+        <section aria-label="Reels" className="mb-4">
+          <h2 className="mb-2 px-4 text-[20px] font-bold text-fb-text md:px-0">Reels</h2>
+          <ul className="flex gap-2 overflow-x-auto px-4 pb-1 md:px-0" data-testid="reels-row">
+            {reels.map((v) => (
+              <li key={v.key} className="shrink-0">
+                <button
+                  type="button"
+                  data-testid={`video-${v.key}`}
+                  onClick={() => setPlaying(v)}
+                  className="group relative block h-[300px] w-[169px] overflow-hidden rounded-card bg-fb-input text-left shadow-card"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={v.posterUrl} alt="" className="size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent px-2.5 pb-2.5 pt-10">
+                    <span className="line-clamp-2 text-[14px] font-semibold leading-[18px] text-white">{v.title}</span>
+                    <span className="mt-0.5 block text-[12px] text-white/80">{v.creator?.name ?? ''}</span>
+                  </span>
+                  {watched.has(v.key) && (
+                    <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-pill bg-black/70 px-2 py-0.5 text-[12px] text-white">
+                      <Check size={12} aria-hidden /> Watched
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <ul className="grid grid-cols-1 gap-3 px-4 sm:grid-cols-2 md:px-0 lg:grid-cols-3">
-        {(api.data?.videos ?? []).map((v) => (
+        {videos.map((v) => (
           <li key={v.key}>
             <button
               type="button"
@@ -112,8 +143,8 @@ function Player({ video, onClose }: { video: WatchVideo; onClose: () => void }) 
 
   return (
     <div role="dialog" aria-modal="true" aria-label={video.title} data-testid="video-player" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-[720px] overflow-hidden rounded-card bg-[#18191A] text-white shadow-popover">
-        <div className="relative aspect-video overflow-hidden bg-black">
+      <div className={cn('w-full overflow-hidden rounded-card bg-[#18191A] text-white shadow-popover', video.format === 'reel' ? 'max-w-[min(400px,calc((100dvh-220px)*9/16))]' : 'max-w-[720px]')}>
+        <div className={cn('relative overflow-hidden bg-black', video.format === 'reel' ? 'aspect-[9/16]' : 'aspect-video')}>
           <video
             ref={ref}
             src={video.clipUrl}

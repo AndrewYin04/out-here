@@ -346,4 +346,42 @@ Model muse-image-1.0, $0.01/image, cache .cache/images/, cap 200/run.
 | /seed/videos/thrift-haul.webp | 21250 | true | generated | 57.8 |
 | /seed/videos/vintage-watch.webp | 13057 | true | generated | 75.6 |
 | /seed/videos/vinyl-dig.webp | 17656 | true | generated | 39.7 |
+
+### Run 2026-11-13T08:40:37.571Z
+
+`referenced=241 processed=18 generated=18 cacheHits=0 fallbacks=0 failures=0 stillMissing=0 spendUsd=0.18 publicSeedMB=17.64 seconds=106`
+
+| Kind | Files | Avg KB |
+|---|---|---|
+| portrait | 62 | 11.8 |
+| cover | 12 | 57.9 |
+| post | 45 | 61.0 |
+| story | 16 | 83.3 |
+| event | 20 | 63.7 |
+| listing | 30 | 29.7 |
+| reelposter | 3 | 44.2 |
+| video | 20 | 43.9 |
+| reelframe | 15 | 81.2 |
+| clip | 18 | 94.0 |
+
+| Path | ms | ok | how | KB |
+|---|---|---|---|---|
+| /seed/videos/frames/reel-denim-5-ways-1.webp | 16992 | true | generated | 75.8 |
+| /seed/videos/frames/reel-denim-5-ways-2.webp | 14254 | true | generated | 69.9 |
+| /seed/videos/frames/reel-denim-5-ways-3.webp | 21818 | true | generated | 123.6 |
+| /seed/videos/frames/reel-denim-5-ways-4.webp | 11650 | true | generated | 91.9 |
+| /seed/videos/frames/reel-denim-5-ways-5.webp | 11185 | true | generated | 72.1 |
+| /seed/videos/frames/reel-flea-market-finds-1.webp | 38349 | true | generated | 100.0 |
+| /seed/videos/frames/reel-flea-market-finds-2.webp | 15386 | true | generated | 95.7 |
+| /seed/videos/frames/reel-flea-market-finds-3.webp | 10595 | true | generated | 65.7 |
+| /seed/videos/frames/reel-flea-market-finds-4.webp | 9964 | true | generated | 66.3 |
+| /seed/videos/frames/reel-flea-market-finds-5.webp | 19352 | true | generated | 83.4 |
+| /seed/videos/frames/reel-thrift-outfit-40-1.webp | 20993 | true | generated | 77.7 |
+| /seed/videos/frames/reel-thrift-outfit-40-2.webp | 25750 | true | generated | 76.1 |
+| /seed/videos/frames/reel-thrift-outfit-40-3.webp | 22962 | true | generated | 54.5 |
+| /seed/videos/frames/reel-thrift-outfit-40-4.webp | 24572 | true | generated | 96.4 |
+| /seed/videos/frames/reel-thrift-outfit-40-5.webp | 18570 | true | generated | 68.0 |
+| /seed/videos/reel-denim-5-ways.webp | 33753 | true | generated | 49.9 |
+| /seed/videos/reel-flea-market-finds.webp | 39664 | true | generated | 40.0 |
+| /seed/videos/reel-thrift-outfit-40.webp | 36485 | true | generated | 42.6 |
 <!-- images:end -->
