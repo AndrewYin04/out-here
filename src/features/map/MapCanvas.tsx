@@ -13,6 +13,7 @@ import { CATEGORY_STYLE, bump, categorySvg, dropIn, markSvg, squash } from '@/fe
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
+import { onAvatar, onAvatarEnd } from './view3d';
 
 export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 /** Downtown San Francisco: Union Square, Chinatown and SoMa demo areas. */
@@ -26,8 +27,26 @@ const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
 const LABEL_GAP = 6;
-/** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
-const PHONE_RESULTS_SHEET = 0.5;
+/** Share of the map the phone plan sheet covers while results show . */
+/**
+ * A friendlier 2D base than plain Positron: bay-blue water, soft green parks and woods, warm land.
+ * Light touches only, so pins and Facebook UI stay the loudest things on screen. The 3D theme
+ * records these as its "before" values, so leaving 3D comes back to this look.
+ */
+function brightenBase(map: MapLibreMap) {
+  const paint: [string, string, string][] = [
+    ['background', 'background-color', '#F6F4EF'],
+    ['water', 'fill-color', '#A9D8F2'],
+    ['waterway', 'line-color', '#A9D8F2'],
+    ['park', 'fill-color', '#D6EDC6'],
+    ['landcover_wood', 'fill-color', '#C9E5B6'],
+  ];
+  for (const [id, prop, value] of paint) {
+    try { if (map.getLayer(id)) map.setPaintProperty(id, prop as Parameters<MapLibreMap['setPaintProperty']>[1], value as Parameters<MapLibreMap['setPaintProperty']>[2]); } catch { /* layer differs in this style */ }
+  }
+}
+
+const PHONE_RESULTS_SHEET = 0.62; // PlanSheet: max-h-[62%] once Muse has picks
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
 const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 14;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
@@ -69,6 +88,11 @@ export type MapCanvasProps = {
   /** The plan being created: a draggable pin with its category's icon. */
   draft?: { at: LatLng; category: string } | null;
   onDraftMove?: (at: LatLng) => void;
+  /**
+   * When false, skip the blue origin puck (FriendsLayer's You pin is the single you-mark).
+   * Default true for callers that do not mount Find My.
+   */
+  showOriginDot?: boolean;
 };
 
 type PinParts = {
@@ -201,7 +225,7 @@ function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
 
 export default function MapCanvas({
   quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
-  onPickLocation, draft, onDraftMove,
+  onPickLocation, draft, onDraftMove, showOriginDot = true,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -344,7 +368,7 @@ export default function MapCanvas({
       symbolLayers.current = map.getStyle().layers.filter((layer) => layer.type === 'symbol').map((layer) => layer.id);
       schedule();
     });
-    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); schedule(); });
+    map.on('load', () => { loaded = true; window.clearTimeout(timer); brightenBase(map); setTiles('ready'); schedule(); });
     // Tile or style errors are shown as the plain-background state, not thrown to the console.
     map.on('error', () => {});
     map.on('move', schedule);
@@ -444,7 +468,7 @@ export default function MapCanvas({
     const h = map.getContainer().clientHeight;
     const padding = isDesktop()
       ? { top: 90, bottom: 70, left: 460, right: 90 }
-      // With results the phone sheet drops to a peek of 50% of the map (PlanSheet); fit the
+      // With results the phone sheet is at most 62% of the map (PlanSheet); fit the
       // picks, their pills and labels in the space above it, 24 px clear of the sheet edge.
       : { top: 72, bottom: Math.max(0, Math.min(Math.round(h * PHONE_RESULTS_SHEET) + 24 + BOX_BOTTOM + LABEL_H, h - 72 - 90)), left: 48, right: 48 };
     map.fitBounds(b, { padding, maxZoom: isDesktop() ? 16 : 15.5, duration: 600 });
@@ -510,19 +534,37 @@ export default function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey, draft?.category, hasDraft]);
 
-  // The viewer's own dot (where walking times are measured from).
+  // The viewer's own dot (where walking times are measured from). Out Here hides this when
+  // FriendsLayer's You pin is the single you-mark; other map hosts can keep it.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !origin) return;
+    if (!map || !origin || !showOriginDot) return;
     const el = document.createElement('div');
-    el.setAttribute('data-map-marker', 'me');
+    // "origin" (not "me"): FriendsLayer's You pin uses data-map-marker="me". When that pin is up,
+    // [data-has-my-pin] hides this blue puck so the flat map has a single you-mark.
+    el.setAttribute('data-map-marker', 'origin');
     el.setAttribute('aria-label', 'You');
     el.setAttribute('role', 'img');
     el.style.cssText = 'width:18px;height:18px;border-radius:9999px;background:#0866FF;border:3px solid #fff;box-shadow:0 0 0 6px rgba(8,102,255,.2),0 1px 3px rgba(0,0,0,.3);';
     const marker = new Marker({ element: el, anchor: 'center' }).setLngLat([origin.lng, origin.lat]).addTo(map);
     me.current = marker;
-    return () => { marker.remove(); if (me.current === marker) me.current = null; };
-  }, [origin]);
+    const unsub = onAvatar(map, (e) => {
+      marker.setLngLat([e.lng, e.lat]);
+      el.style.opacity = String(e.markerOpacity);
+      el.style.pointerEvents = e.markerOpacity < 0.05 ? 'none' : '';
+    });
+    const unsubEnd = onAvatarEnd(map, () => {
+      el.style.opacity = '';
+      el.style.pointerEvents = '';
+      marker.setLngLat([origin.lng, origin.lat]);
+    });
+    return () => {
+      unsub();
+      unsubEnd();
+      marker.remove();
+      if (me.current === marker) me.current = null;
+    };
+  }, [origin, showOriginDot]);
 
   // Keep the selected pin in view beside the panel (desktop) or above the sheet (phones);
   // clear the padding when the panel closes.

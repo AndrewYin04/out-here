@@ -7,7 +7,7 @@ import { addPlanStage, beginMuseActivity, clearPlanRun, finishMuseActivity, fini
 import type { PlanStageEvent } from '@/shared';
 import { MuseDecided, MuseWorking } from './MuseAtWork';
 import { currentPersona, useApi, useViewer } from '@/features/data';
-import { CategoryIcon, categoryOf, cn, IconButton } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn, IconButton, sfx } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 
@@ -120,7 +120,7 @@ export function ImFreeButton({ className, quiet = false }: {
   return (
     <button
       type="button"
-      onClick={() => setPlanOpen(true)}
+      onClick={() => { sfx('free_tap'); setPlanOpen(true); }}
       aria-label={label ? `I'm free · ${label}` : "I'm free"}
       data-status={status.kind}
       data-testid="im-free"
@@ -131,7 +131,7 @@ export function ImFreeButton({ className, quiet = false }: {
       )}
     >
       {label ? (
-        <><StatusDot s={status} className={cn('size-3', !quiet && 'ring-2 ring-white')} />{label}</>
+        <><StatusDot s={status} className={cn('size-3 shrink-0', !quiet && 'ring-2 ring-white')} /><span className="min-w-0 truncate">{label}</span></>
       ) : (
         <><Sparkles size={18} aria-hidden /> I&apos;m free</>
       )}
@@ -261,6 +261,11 @@ export function PlanSheet({ className }: { className?: string }) {
         addPlanStage(mine, e);
       }, ctrl.signal);
       if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      // Muse is about to draft a plan with a free friend: it reads "who is free with you" from
+      // your shared availability, so save that first (otherwise the draft races it and finds no one).
+      const willDraft = r.plan.suggestions.length === 0 && (r.plan.meta?.friendsFree?.length ?? 0) > 0;
+      if (willDraft && picked === null) await shareAvailability(noteFor(moods, text), r.plan);
+      if (mine !== seq.current) return;
       // The last step ("Double-checked every fact") ticks visibly before Muse's decision replaces the rail.
       if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise((ok) => window.setTimeout(ok, 500));
       if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
@@ -268,6 +273,8 @@ export function PlanSheet({ className }: { className?: string }) {
       finishMuseActivity(activity,{outcome:r.plan.suggestions.length?'success':'empty',message:r.plan.suggestions.length?'Your picks are ready.':'No plans fit yet. Try another time or activity.',live:r.museSource==='muse',cached:r.plan.meta?.cache?.rank===true});
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
+      sfx('muse_done');
+      if (r.plan.suggestions.length > 0) window.setTimeout(() => sfx('results_reveal'), 260);
       const top = r.plan.suggestions[0];
       setPlanStatus({
         state: 'done',
@@ -279,7 +286,7 @@ export function PlanSheet({ className }: { className?: string }) {
       });
       // Only the ask whose results are shown becomes the viewer's availability (unless a time
       // was picked, which already set it).
-      if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
+      if (picked === null && !willDraft) void shareAvailability(noteFor(moods, text), r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
       finishMuseActivity(activity,{outcome:'error',message:'The request did not finish. Try again.'});
@@ -427,10 +434,10 @@ export function PlanSheet({ className }: { className?: string }) {
                           <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} />
                         </div>
                       ))}
-                      {picks.length > 1 && !othersOpen && (
+                      {!othersOpen && (picks.length > 1 || drops.length > 0) && (
                         <button type="button" data-testid="other-ideas" onClick={() => setOthersOpen(true)}
-                          className="oh-press h-10 rounded-card bg-fb-surface text-[14px] font-semibold text-fb-text shadow-card hover:bg-fb-hover">
-                          Other ideas · {picks.length - 1}
+                          className="oh-press h-10 text-[14px] font-semibold text-fb-text-2 hover:underline">
+                          {picks.length > 1 ? `${picks.length - 1} other ideas ›` : 'How Muse picked these ›'}
                         </button>
                       )}
                     </div>

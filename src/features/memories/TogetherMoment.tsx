@@ -11,9 +11,10 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useApi, type QuestDetail } from '@/features/data';
-import { Avatar, burst, cn, flash, useDemoTools, useToast } from '@/features/ui';
+import { Avatar, burst, cn, flash, sfx, useDemoTools, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
 import type { PersonCard } from '@/shared/api';
+import { rememberHere } from './arrival';
 import { saveToAlbum } from './together-api';
 
 type Walker = { id: string; name: string; avatarUrl: string; minutesAway: number };
@@ -22,19 +23,21 @@ const first = (n: string) => n.split(' ')[0] ?? n;
 /** "Make the memory" starts to pulse this close to the end. */
 const NUDGE_BEFORE_END_MS = 15 * 60_000;
 
-export function TogetherMoment({ quest, viewer, walkers, onClose }: {
+export function TogetherMoment({ quest, viewer, walkers, onClose, onTakePhoto }: {
   quest: Quest | null;
   viewer: { id: string; name: string; avatarUrl?: string };
   /** People walking to this plan, with minutes left (from the walk-together share). */
   walkers: Walker[];
   onClose: () => void;
+  /** The one photo action: opens the arrival selfie (World3D owns that surface). */
+  onTakePhoto?: () => void;
 }) {
   // Rendered at the map's top level: the 3D layer sits under the map's own buttons (I'm free, the
   // control stack), which would otherwise cover this and catch its taps.
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => { setHost(document.querySelector<HTMLElement>('[data-testid="out-here-map"]') ?? document.body); }, []);
   if (!quest || !host) return null;
-  return createPortal(<Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} />, host);
+  return createPortal(<Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} onTakePhoto={onTakePhoto} />, host);
 }
 
 function useClock(ms = 15_000) {
@@ -43,8 +46,8 @@ function useClock(ms = 15_000) {
   return t;
 }
 
-function Moment({ quest, viewer, walkers, onClose }: {
-  quest: Quest; viewer: { id: string; name: string; avatarUrl?: string }; walkers: Walker[]; onClose: () => void;
+function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
+  quest: Quest; viewer: { id: string; name: string; avatarUrl?: string }; walkers: Walker[]; onClose: () => void; onTakePhoto?: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -75,15 +78,24 @@ function Moment({ quest, viewer, walkers, onClose }: {
   // Everyone on the way: you plus each person sharing their walk here. People who never set off
   // (no walk to follow) don't hold the moment up.
   const onTheWay = people.filter((p) => p.coming && !p.here);
-  const allHere = onTheWay.length === 0;
+  // "All here" needs company: everyone on the way has arrived AND you're not alone (or it's a
+  // plan of one). Until then the sheet says who it's waiting for, set off or not.
+  const notHere = people.filter((p) => !p.here);
+  const allHere = onTheWay.length === 0 && (here.length > 1 || people.length <= 1);
 
   // Confetti when you arrive, and again each time someone else gets there.
   const lastCount = useRef(0);
   useEffect(() => {
-    if (here.length > lastCount.current) burst(folded ? capsuleRef.current : sheetRef.current, [quest.emoji, '🎉', '✨', '🎊'], lastCount.current === 0 ? 24 : 14);
+    if (here.length > lastCount.current) {
+      burst(folded ? capsuleRef.current : sheetRef.current, [quest.emoji, '🎉', '✨', '🎊'], lastCount.current === 0 ? 24 : 14);
+      // Your own arrival is silent (the confetti and ✓ carry it); each friend who gets there after you, a light cheer.
+      if (lastCount.current > 0) sfx('friend_joined');
+    }
     lastCount.current = here.length;
   }, [here.length, quest.emoji, folded]);
   useEffect(() => { if (allHere && togetherSince === null) setTogetherSince(Date.now()); }, [allHere, togetherSince]);
+  const hereKey = here.map((p) => p.id).join(',');
+  useEffect(() => { if (hereKey) rememberHere(quest.id, hereKey.split(',')); }, [hereKey, quest.id]);
 
   const candid = async (file: File | undefined) => {
     if (!file) return;
@@ -140,7 +152,7 @@ function Moment({ quest, viewer, walkers, onClose }: {
       </div>
       <div className="px-4 pb-4">
         <h2 className="text-[22px] font-extrabold text-fb-text">
-          {allHere && here.length > 1 ? 'You’re all here!' : 'You made it!'} <span aria-hidden>🎉</span>
+          {allHere && notHere.length === 0 && here.length > 1 ? 'You’re all here!' : 'You made it!'} <span aria-hidden>🎉</span>
         </h2>
         <ul className="mt-2 flex gap-3 overflow-x-auto pb-1" aria-label="Who's here">
           {people.map((p) => (
@@ -154,10 +166,26 @@ function Moment({ quest, viewer, walkers, onClose }: {
                 ) : null}
               </span>
               <span className="w-full truncate text-center text-[11px] font-semibold text-fb-text">{p.you ? 'You' : first(p.name)}</span>
-              <span className="sr-only">{p.here ? 'is here' : p.minutes != null ? `${p.minutes} min away` : 'not on the way yet'}</span>
+              <span className="sr-only">{p.here ? (p.you ? "You're here" : 'is here') : p.minutes != null ? `${p.minutes} min away` : 'not on the way yet'}</span>
             </li>
           ))}
         </ul>
+        <div className="mt-3 flex items-start gap-2.5">
+          <span aria-hidden className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[14px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
+          <p className="min-w-0 flex-1 rounded-[16px] rounded-tl-md bg-fb-bg px-3 py-2 text-[14px] leading-5 text-fb-text">
+            {allHere
+              ? `You're ${here.length === 2 ? 'both' : 'all'} here. Snap one before you dig in — I'll caption it.`
+              : onTheWay.length > 0
+                ? `Almost together — ${onTheWay.map((p) => first(p.name)).join(' and ')} ${onTheWay.length === 1 ? 'is' : 'are'} on the way. Snap one when you're all here.`
+                : `You're the first one here. I'll let you know when ${notHere.slice(0, 2).map((p) => first(p.name)).join(' and ') || 'the others'} ${notHere.length === 1 ? 'is' : 'are'} close.`}
+          </p>
+        </div>
+        {onTakePhoto && (
+          <button type="button" data-testid="together-take-photo" onClick={onTakePhoto}
+            className="oh-press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-fb-blue text-[16px] font-semibold text-white hover:bg-fb-blue-hover">
+            <Camera size={19} aria-hidden /> Take our photo
+          </button>
+        )}
         {allHere ? (
           <div className="mt-2 flex items-center gap-3 rounded-[16px] bg-[#EFEBFF] p-3" data-testid="together-phones-down">
             <span aria-hidden className="text-[24px]">✨</span>
@@ -168,7 +196,7 @@ function Moment({ quest, viewer, walkers, onClose }: {
         ) : (
           <div className="mt-2 flex items-center gap-3">
             <p data-testid="together-waiting" className="min-w-0 flex-1 text-[13px] font-semibold text-fb-text-2">
-              Waiting for {onTheWay.map((p) => `${first(p.name)}${p.minutes != null ? ` · ${Math.max(1, p.minutes)}m` : ''}`).join(', ')}
+              {onTheWay.length > 0 ? 'Waiting for ' : 'Not here yet: '}{(onTheWay.length > 0 ? onTheWay : notHere).slice(0, 3).map((p) => `${first(p.name)}${p.minutes != null ? ` · ${Math.max(1, p.minutes)}m` : ''}`).join(', ')}{(onTheWay.length > 0 ? onTheWay : notHere).length > 3 ? ` +${(onTheWay.length > 0 ? onTheWay : notHere).length - 3}` : ''}
             </p>
             <button type="button" onClick={() => setFolded(true)} className="shrink-0 text-[13px] font-semibold text-fb-blue hover:underline">Hang out</button>
           </div>

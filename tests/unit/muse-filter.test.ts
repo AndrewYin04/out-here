@@ -43,9 +43,10 @@ describe('muse filter: mock mode', () => {
     expect(out.keep.every((k) => k.kind === 'quest' && k.reason.length > 0)).toBe(true);
   });
 
-  it('alex, explore, "hungry, 15 min": only boba', async () => {
+  it('alex, explore, "hungry, 15 min": nothing fits (boba is in the afternoon), the closest plans stay', async () => {
     const out = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: 'hungry, 15 min' });
-    expect(out.keep.map((k) => k.id)).toEqual([boba]);
+    // Nothing fits 15 minutes now, so code keeps the closest few plans instead.
+    expect(out.closest).toBe(true);
   });
 
   it('alex, friends, no text: keeps Maya', async () => {

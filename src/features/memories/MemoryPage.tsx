@@ -11,7 +11,7 @@ import { Avatar, burst, cn, flash, Skeleton, useToast } from '@/features/ui';
 import type { Crew, Memory } from '@/shared';
 import { beginMuseActivity, finishMuseActivity, releaseMuseActivity, MuseActivityStatus } from '@/features/muse-companion';
 import type { PersonCard, PostView } from '@/shared/api';
-import { MEMORY_SAVED, requestRating } from './arrival';
+import { MEMORY_SAVED, recallHere, requestRating } from './arrival';
 import { SelfieCamera } from './SelfieCamera';
 import { SelfieReview } from './SelfieReview';
 import { crewFor, saveToAlbum } from './together-api';
@@ -66,10 +66,17 @@ export function MemoryPage({ id }: { id: string }) {
 
   const photos = useMemo(() => memories.data?.memories ?? [], [memories.data]);
   const cover = photos.find((m) => m.id === coverId) ?? photos[0] ?? null;
+  // Who was there: the people who actually arrived (remembered by the arrival screen), else the crew.
+  const [hereIds, setHereIds] = useState<string[] | null>(null);
+  useEffect(() => { setHereIds(recallHere(id)); }, [id]);
   const people: PersonCard[] = useMemo(() => {
     const members = detail.data?.members ?? [];
+    if (hereIds) {
+      const there = members.filter((m) => hereIds.includes(m.id));
+      if (there.length > 0) return there;
+    }
     return crew ? members.filter((m) => crew.memberIds.includes(m.id)) : members;
-  }, [detail.data, crew]);
+  }, [detail.data, crew, hereIds]);
 
   // Starting text: the crew's name unless it's the default, and Muse's caption as the story.
   useEffect(() => {
@@ -327,8 +334,8 @@ export function MemoryPage({ id }: { id: string }) {
         </div>
       </article>
 
-      {/* Save */}
-      <div className="fixed inset-x-0 bottom-[60px] z-20 px-4 pb-3 md:bottom-4 md:left-1/2 md:w-[640px] md:-translate-x-1/2 md:px-0">
+      {/* Save (hidden while the selfie camera or its review is open: that has its own Save) */}
+      <div hidden={!!shot || camera} className="fixed inset-x-0 bottom-[60px] z-20 px-4 pb-3 md:bottom-4 md:left-1/2 md:w-[640px] md:-translate-x-1/2 md:px-0">
         {savedAt ? (
           <div className="flex items-center gap-3 rounded-[16px] bg-fb-surface p-3 shadow-popover" data-testid="memory-saved">
             <span className="flex size-10 items-center justify-center rounded-full bg-[#E6F4EA] text-fb-green"><Check size={20} aria-hidden /></span>

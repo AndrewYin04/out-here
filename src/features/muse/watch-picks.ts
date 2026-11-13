@@ -144,33 +144,49 @@ function topicWords(t: TasteTopic): Set<string> {
   return stems([t.name, ...t.evidence.flatMap((e) => e.video.topics)].join(' '));
 }
 
-/** Offline picks: listings whose words overlap a topic's words, strongest topic first. */
+/** How well an item fits a topic: 1 per shared word, but only 0.5 for the topic's own name, which
+ *  every video in it carries. So for "vintage" (denim Reels), a denim bag beats a jacket that only
+ *  says "vintage". */
+function fitScore(t: TasteTopic, words: Set<string>, c: Cand): number {
+  const name = stems(t.name);
+  return [...words].filter((w) => c.words.has(w)).reduce((s, w) => s + (name.has(w) ? 0.5 : 1), 0);
+}
+
+/** Offline picks: listings whose words overlap a topic's words, strongest topic first, best fit
+ *  first within a topic (ties keep the listing order). */
 export function mockPicks(topics: TasteTopic[], cands: Cand[]): RawPicks {
   const picks: RawPicks['picks'] = [];
   for (const t of topics) {
     const w = topicWords(t);
-    for (const c of cands) if (!picks.some((p) => p.candidate === c.id) && overlaps(c.words, w)) picks.push({ candidate: c.id, topic: t.name, reason: '' });
+    const ranked = cands.filter((c) => overlaps(c.words, w))
+      .map((c, i) => ({ c, i, score: fitScore(t, w, c) }))
+      .sort((a, b) => b.score - a.score || a.i - b.i);
+    for (const { c } of ranked) if (!picks.some((p) => p.candidate === c.id)) picks.push({ candidate: c.id, topic: t.name, reason: '' });
   }
   return { picks: picks.slice(0, MAX_PICKS) };
 }
 
-/** The topic's video closest to this item (most shared words), else its most-watched one. */
-function closestVideo(t: TasteTopic, c: Cand): string | undefined {
+/** The topic's video closest to this item (most shared words), else its most-watched one. A tie
+ *  goes to the one watched furthest through (a Reel watched twice beats a video watched once). */
+function closestVideo(t: TasteTopic, c: Cand): TasteTopic['evidence'][number]['video'] | undefined {
   let best = t.evidence[0];
   let score = -1;
+  let through = -1;
   for (const e of t.evidence) {
     const w = stems(`${e.video.title} ${e.video.topics.join(' ')}`);
     const n = [...w].filter((x) => c.words.has(x)).length;
-    if (n > score) { score = n; best = e; }
+    const r = e.seconds / Math.max(60, e.video.minutes * 60);
+    if (n > score || (n === score && r > through)) { score = n; through = r; best = e; }
   }
-  return best?.video.title;
+  return best?.video;
 }
 
 export function codeReason(t: TasteTopic, c: Cand): string {
-  const top = closestVideo(t, c);
+  const v = closestVideo(t, c);
+  const top = v ? (v.format === 'reel' ? `the Reel "${v.title}"` : `"${v.title}"`) : null;
   const watched = t.justNow && top
-    ? `You just watched "${top}".`
-    : `You've watched ${t.minutes} min of ${t.name} videos this week${top ? `, like "${top}"` : ''}.`;
+    ? `You just watched ${top}.`
+    : `You've watched ${t.minutes} min of ${t.name} videos this week${top ? `, like ${top}` : ''}.`;
   const item = c.openHouse
     ? `${c.seller.name.split(' ')[0]} is selling this and holding an open house at ${c.openHouse.venueName} at ${formatDemoTime(c.openHouse.startsAt)}.`
     : `This one is ${money(c.listing.priceUsd)}.`;

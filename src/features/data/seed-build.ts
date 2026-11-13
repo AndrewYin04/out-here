@@ -10,7 +10,7 @@ import {
   DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
 } from '../../shared/seed/story';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
-import { ALEX_WATCH_HISTORY } from '../../shared/seed/videos';
+import { ALEX_WATCH_HISTORY, MAYA_WATCH_HISTORY } from '../../shared/seed/videos';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -139,10 +139,10 @@ export const PICKUP_LISTINGS = [
   { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Nob Hill, San Francisco', spot: 'Lobby of the California St apartments' },
   { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Mission Bay, San Francisco', spot: 'Green door by the courtyard on Third St' },
 ] as const;
-/** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
+/** The watch Alex set with Muse yesterday; the pop-up's $20 track jacket fits it. */
 export const ALEX_WANT = {
-  text: 'I need a desk chair under $40, ideally within a 15-minute drive',
-  item: 'desk chair', keywords: ['desk chair', 'office chair', 'chair'], maxPrice: 40, maxDriveMin: 15,
+  text: 'track jacket under $25',
+  item: 'track jacket', keywords: ['track jacket', 'windbreaker', 'jacket'], maxPrice: 25, maxDriveMin: 15,
 };
 
 const iso = (d: Date) => d.toISOString();
@@ -323,7 +323,8 @@ export function buildSeed(
   for (const a of DEMO_AVAILABILITY) {
     const handle = a.handle ?? alexLocalFriends[a.friendSlot ?? 0];
     if (!handle || !has(handle)) { warnings.push(`availability "${a.text}": no person for slot`); continue; }
-    const near = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const base = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const near = a.offsetM ? offsetPoint(base, a.offsetM, a.bearingDeg ?? 0) : base;
     t.availability.push({
       id: seedId('availability', `${handle}:${a.text}`), user_id: pid(handle), text: a.text,
       starts_at: iso(addMin(demoNow, a.startsInMin)), ends_at: iso(addMin(demoNow, a.endsInMin)),
@@ -605,7 +606,7 @@ export function buildSeed(
   }
   if (has('alex')) {
     t.muse_wants.push({
-      id: seedId('want', 'alex-desk-chair'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
+      id: seedId('want', 'alex-track-jacket'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
       keywords: ALEX_WANT.keywords, max_price: ALEX_WANT.maxPrice, max_drive_min: ALEX_WANT.maxDriveMin,
       active: true, created_at: iso(addMin(demoNow, -26 * 60)),
     });
@@ -616,6 +617,15 @@ export function buildSeed(
     ALEX_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
       t.watch_events.push({
         id: seedId('watch', `alex-${i}-${key}`), user_id: pid('alex'), video_key: key, seconds,
+        created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
+      });
+    });
+  }
+
+  if (has('maya')) {
+    MAYA_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
+      t.watch_events.push({
+        id: seedId('watch', `maya-${i}-${key}`), user_id: pid('maya'), video_key: key, seconds,
         created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
       });
     });

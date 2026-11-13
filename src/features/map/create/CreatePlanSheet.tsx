@@ -82,6 +82,8 @@ export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPo
   const [poster, setPoster] = useState<{ local: string; url: string | null; error: string | null } | null>(null);
   const [bubble, setBubble] = useState('');
   const [posting, setPosting] = useState(false);
+  // A double tap lands before `posting` re-renders; the ref makes the second tap a no-op.
+  const postingRef = useRef(false);
   const [step, setStep] = useState(0);
   const [pipPicks, setPipPicks] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +169,8 @@ export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPo
           : uploading ? 'Poster is uploading…' : null;
 
   const post = async () => {
-    if (missing || posting) return;
+    if (missing || posting || postingRef.current) return;
+    postingRef.current = true;
     setPosting(true);
     setError(null);
     const start = new Date(startsAt);
@@ -184,6 +187,7 @@ export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPo
       onPosted(quest);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not post the plan. Try again.');
+      postingRef.current = false;
       setPosting(false);
     }
   };

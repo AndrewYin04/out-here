@@ -9,13 +9,14 @@
 // the first 10; never the emoji alone.
 // Markers are MapLibre HTML markers whose content React renders through portals.
 import type { Map as MapLibreMap, Marker } from 'maplibre-gl';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Avatar, cn } from '@/features/ui';
 import type { FriendPin, LatLng, Profile } from '@/shared/types';
 import { freeStatus, freeStatusLabel } from '@/shared/status';
 import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type ChipOptions, type ChipSide } from './chips';
 import { FriendCard } from './FriendCard';
+import { onAvatar, onAvatarEnd } from '@/features/map/view3d';
 import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMyShare, PANEL_PX } from './useFindMy';
 
 export type FriendsLayerProps = {
@@ -66,8 +67,14 @@ function useViewTick(map: MapLibreMap | null): number {
 }
 
 /** One HTML marker on the map; children render into it. */
-export function MapMarker({ map, lib, at, offset = [0, 0], z = 1, children, label }: {
+export function MapMarker({ map, lib, at, offset = [0, 0], z = 1, children, label, markerAttr, friendId, markerRef }: {
   map: MapLibreMap; lib: MapLib; at: LatLng; offset?: [number, number]; z?: number; children: ReactNode; label?: string;
+  /** Optional data-map-marker value (e.g. "me" for the You pin). */
+  markerAttr?: string;
+  /** Friend id for 3D avatar pin crossfade. */
+  friendId?: string;
+  /** Imperative handle so the 3D view can move / fade this marker without a React re-render. */
+  markerRef?: { current: Marker | null };
 }) {
   const [el] = useState(() => {
     const d = document.createElement('div');
@@ -78,11 +85,19 @@ export function MapMarker({ map, lib, at, offset = [0, 0], z = 1, children, labe
   useEffect(() => {
     const m = new lib.Marker({ element: el, anchor: 'bottom' }).setLngLat([at.lng, at.lat]).addTo(map);
     setMarker(m);
-    return () => { m.remove(); };
+    if (markerRef) markerRef.current = m;
+    return () => { if (markerRef && markerRef.current === m) markerRef.current = null; m.remove(); };
   }, [lib, map, el]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { marker?.setLngLat([at.lng, at.lat]); }, [marker, at.lat, at.lng]);
   useEffect(() => { marker?.setOffset(offset); }, [marker, offset[0], offset[1]]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { el.style.zIndex = String(z); if (label) el.setAttribute('aria-label', label); }, [el, z, label]);
+  useEffect(() => {
+    el.style.zIndex = String(z);
+    if (label) el.setAttribute('aria-label', label);
+    if (markerAttr) el.setAttribute('data-map-marker', markerAttr);
+    else el.removeAttribute('data-map-marker');
+    if (friendId) el.setAttribute('data-friend-id', friendId);
+    else el.removeAttribute('data-friend-id');
+  }, [el, z, label, markerAttr, friendId]);
   return createPortal(children, el);
 }
 
@@ -108,12 +123,61 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
   const { data } = useFriendPins();
   const { data: mine } = useMyShare();
   const [openId, setOpenId] = useState<string | null>(null);
+  const meMarker = useRef<Marker | null>(null);
+  const homeAt = useRef<LatLng | null>(null);
   const pins = useMemo(() => {
     const all = data?.pins ?? [];
     return keepIds ? all.filter((p) => keepIds.has(p.friend.id)) : all;
   }, [data, keepIds]);
   const openPin = pins.find((p) => p.friend.id === openId) ?? null;
   const me = mine?.share;
+  homeAt.current = me?.location ?? null;
+
+  // Prefer the You photo over MapCanvas's blue origin puck when both would show.
+  useEffect(() => {
+    if (!map || !me || !viewer) return;
+    map.getContainer().dataset.hasMyPin = '1';
+    return () => { delete map.getContainer().dataset.hasMyPin; };
+  }, [map, me, viewer]);
+
+  // 3D view: put You on the walked avatar and crossfade with the body; hide friend pins that have a 3D avatar.
+  useEffect(() => {
+    if (!map) return;
+    const applyPinFade = (ids: string[] | undefined, opacity: number) => {
+      const root = map.getContainer();
+      for (const el of root.querySelectorAll<HTMLElement>('[data-friend-id]')) {
+        const id = el.getAttribute('data-friend-id');
+        if (!id) continue;
+        if (ids?.includes(id)) {
+          el.style.opacity = String(opacity);
+          el.style.pointerEvents = opacity < 0.05 ? 'none' : '';
+        } else {
+          el.style.opacity = '';
+          el.style.pointerEvents = '';
+        }
+      }
+    };
+    const unsub = onAvatar(map, (e) => {
+      const m = meMarker.current;
+      if (m) m.setLngLat([e.lng, e.lat]);
+      const el = m?.getElement();
+      if (el) {
+        el.style.opacity = String(e.markerOpacity);
+        el.style.pointerEvents = e.markerOpacity < 0.05 ? 'none' : '';
+      }
+      applyPinFade(e.avatarFriendIds, e.markerOpacity);
+    });
+    const onEnd = () => {
+      const home = homeAt.current;
+      const m = meMarker.current;
+      if (m && home) m.setLngLat([home.lng, home.lat]);
+      const el = m?.getElement();
+      if (el) { el.style.opacity = ''; el.style.pointerEvents = ''; }
+      applyPinFade(undefined, 1);
+    };
+    const unsubEnd = onAvatarEnd(map, onEnd);
+    return () => { unsub(); unsubEnd(); onEnd(); };
+  }, [map]);
 
   // Phones: once the pins load, frame the local friends and the viewer so their chips separate
   // (the default camera is set for the desktop map and leaves some of them off a 390 px screen).
@@ -204,8 +268,10 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
   if (!map || !lib) return null;
   return (
     <>
+      {/* One you-mark on the flat map: hide MapCanvas's blue origin puck while the You photo is up. */}
+      <style>{'[data-has-my-pin] [data-map-marker="origin"]{display:none!important}'}</style>
       {me && viewer && (
-        <MapMarker map={map} lib={lib} at={me.location} z={2} label="Your location">
+        <MapMarker map={map} lib={lib} at={me.location} z={2} label="Your location" markerAttr="me" markerRef={meMarker}>
           <div className="flex flex-col items-center" data-testid="my-pin">
             <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-blue">
               <Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />
@@ -217,7 +283,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
         </MapMarker>
       )}
       {layout.singles.map(({ pin, offset, chip, side, dx }) => (
-        <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={openId === pin.friend.id ? 5 : 3}>
+        <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={openId === pin.friend.id ? 5 : 3} friendId={pin.friend.id}>
           <FriendPinView pin={pin} chip={chip} side={side} dx={dx} onOpen={() => openFromPin(pin)} />
         </MapMarker>
       ))}

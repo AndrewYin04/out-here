@@ -26,7 +26,7 @@ for (const width of [390, 1440]) {
       test.skip((width === 390) !== (info.project.name === 'phone'), 'one width per project');
     });
 
-    test("Feed I'm free opens the composer on /out-here, focused and empty", async ({ page }) => {
+    test("Feed I'm free opens the composer on /out-here, empty and chips first", async ({ page }) => {
       await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
       await page.goto('/?as=alex');
       const button = page.getByTestId('home-outhere-free-button');
@@ -35,9 +35,10 @@ for (const width of [390, 1440]) {
       await expect(page).toHaveURL(/\/out-here/);
       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
       const composer = page.locator('#imfree-text');
-      await expect(composer).toBeFocused();
+      // No autofocus: on a phone the keyboard would cover the chips, which are the main way in.
+      await expect(composer).not.toBeFocused();
       await expect(composer).toHaveValue('');
-      await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      await expect(composer).toHaveAttribute('placeholder', /^Or tell Muse/);
       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
       await expect(page.getByTestId('plan-summary')).toHaveCount(0);
       // The param is consumed so a reload does not reopen the sheet.
@@ -67,7 +68,7 @@ for (const width of [390, 1440]) {
         await maya.hover();
         await expect(text).toBeVisible();
       }
-      await expect(text).toHaveText('craving dumplings');
+      await expect(text).toHaveText('free after class');
       // Not clipped: the whole thought fits inside its box.
       const clipped = await text.evaluate((el) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
       expect(clipped).toBe(false);

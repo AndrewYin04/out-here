@@ -18,7 +18,7 @@ export const ENTER_ZOOM = 22.1;
 export const MAX_3D_ZOOM = 23.2;
 export const MAX_3D_PITCH = 85;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */
-export const CHARACTER_MIN_ZOOM = 18.2;
+export const CHARACTER_MIN_ZOOM = 18.8;
 /**
  * One zoom, two views. Pinching the 3D view out past this zoom (the camera is flat by then) hands
  * over to the 2D map. The map area's ENTER_3D_ZOOM (map/view3d.ts) is the way back in; the gap

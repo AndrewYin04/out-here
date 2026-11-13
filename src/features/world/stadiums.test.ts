@@ -49,6 +49,10 @@ describe('stadiumLabels', () => {
     ];
     expect(stadiumLabels(qs, DEMO_CENTER).map((l) => l.id)).toEqual(['a', 'b']);
   });
+  it('while walking, only the plan you are heading to keeps a label', () => {
+    const qs = [quest('smash', 40), quest('boba', 80)];
+    expect(stadiumLabels(qs, DEMO_CENTER, { focusId: 'boba' }).map((l) => l.id)).toEqual(['boba']);
+  });
   it('always includes Muse picks and the selected plan, first', () => {
     const qs = [quest('near', 100), quest('pick', 4000), quest('sel', 5000)];
     const out = stadiumLabels(qs, DEMO_CENTER, { picks: ['pick'], selectedId: 'sel', cap: 1 });

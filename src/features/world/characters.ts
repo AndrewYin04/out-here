@@ -9,6 +9,9 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { currentLook, currentPipLook, type AvatarLook, type Pattern, type PipLook } from './avatarLook';
+import { ChibiAvatar } from './chibi';
+import { buildHat } from './hatMesh';
 
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
 // 'stand' and 'walk' keep Jolly on the ground beside you (the hover platform hides, and walking adds a
@@ -39,14 +42,41 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
-export function colorsFor(seed: string): { primary: string; secondary: string; accent: string } {
+/**
+ * Map My look onto the Kenney materials: top → Mat_Primary, pants → Mat_Secondary, skin → Mat_Accent.
+ * Friends without a saved look still get a stable palette from their id.
+ */
+export function colorsFor(
+  seed: string,
+  lookOverride?: AvatarLook | null,
+): { primary: string; secondary: string; accent: string; hair: string; pattern: Pattern } {
+  const look = lookOverride ?? (seed ? currentLook(seed) : null);
+  if (look) {
+    return {
+      primary: look.topColor,
+      secondary: look.bottomColor,
+      accent: look.skin,
+      hair: look.hairColor,
+      pattern: look.pattern,
+    };
+  }
   const h = hashString(seed);
   return {
     primary: PALETTE[h % PALETTE.length],
     secondary: ['#2B2D42', '#3D405B', '#4A4E69', '#22333B'][(h >>> 3) % 4],
     accent: PALETTE[(h >>> 7) % PALETTE.length],
+    hair: '#3D2B1F',
+    pattern: 'plain',
   };
 }
+
+/**
+ * Root scale for Pip beside the map-readable Kenney person (~10 m).
+ * ~0.55 keeps Pip about half the person's height.
+ */
+export const PET_ROOT_SCALE = 0.9; // Ally's Jolly beside a life-size person at her close camera
+/** Person is ~1.72 m in the GLB; ×6 reads on the plaza without the old ×34 giant. */
+export const PERSON_WORLD_SCALE = 1; // life size: Ally's camera (ENTER_ZOOM 22.1) frames the person close
 
 const ONE_SHOT = new Set(['wave', 'celebrate', 'happy']);
 const ONE_SHOT_SECONDS: Record<string, number> = { wave: 1.6, celebrate: 1.9, happy: 1.6 };
@@ -319,6 +349,193 @@ const MOODS = ['think', 'listen', 'sad', 'talk'] as const;
 type Role = 'armL' | 'armR' | 'legL' | 'legR';
 const LIMBS:readonly Role[]=['armL','armR','legL','legR'];
 
+/** Three-step toon ramp shared by every person on the map. */
+let toonGradient: THREE.DataTexture | null = null;
+function toonGradientMap(): THREE.DataTexture {
+  if (toonGradient) return toonGradient;
+  const data = new Uint8Array([80, 80, 80, 255, 160, 160, 160, 255, 255, 255, 255, 255]);
+  toonGradient = new THREE.DataTexture(data, 3, 1);
+  toonGradient.magFilter = THREE.NearestFilter;
+  toonGradient.minFilter = THREE.NearestFilter;
+  toonGradient.generateMipmaps = false;
+  toonGradient.needsUpdate = true;
+  return toonGradient;
+}
+
+type LookColors = { primary: string; secondary: string; accent: string; hair: string; pattern: Pattern };
+
+/** Kenney Person atlas prototypes (skin / shirt / pants / hair) sampled from muse-companion.glb. */
+const ATLAS_SKIN = [
+  { r: 245, g: 147, b: 114 },
+  { r: 228, g: 120, b: 62 },
+  { r: 245, g: 140, b: 106 },
+] as const;
+const ATLAS_TOP = [
+  { r: 240, g: 90, b: 67 },
+  { r: 242, g: 101, b: 76 },
+  { r: 240, g: 84, b: 62 },
+] as const;
+const ATLAS_PANTS = [
+  { r: 23, g: 84, b: 124 },
+  { r: 19, g: 70, b: 106 },
+] as const;
+const ATLAS_HAIR = [
+  { r: 61, g: 43, b: 31 },
+  { r: 45, g: 30, b: 20 },
+  { r: 80, g: 55, b: 35 },
+  { r: 38, g: 28, b: 22 },
+  { r: 90, g: 60, b: 40 },
+] as const;
+
+function dist2(r: number, g: number, b: number, ref: { r: number; g: number; b: number }): number {
+  const dr = r - ref.r, dg = g - ref.g, db = b - ref.b;
+  return dr * dr + dg * dg + db * db;
+}
+
+function nearestDist(r: number, g: number, b: number, refs: readonly { r: number; g: number; b: number }[]): number {
+  let best = Infinity;
+  for (const ref of refs) best = Math.min(best, dist2(r, g, b, ref));
+  return best;
+}
+
+function parseHex(hex: string): { r: number; g: number; b: number } {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/**
+ * Recolor the single "skin" atlas so My look skin/top/pants show on the Kenney person.
+ * Preserves luminance so shading in the texture still reads.
+ */
+function tintPersonAtlas(srcMap: THREE.Texture, colors: LookColors, ownedTex: THREE.Texture[]): THREE.Texture {
+  const img = srcMap.image as CanvasImageSource | undefined;
+  if (!img || typeof document === 'undefined') return srcMap;
+  const w = (img as { width: number }).width;
+  const h = (img as { height: number }).height;
+  if (!w || !h) return srcMap;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return srcMap;
+  ctx.drawImage(img, 0, 0);
+  const image = ctx.getImageData(0, 0, w, h);
+  const d = image.data;
+  const skin = parseHex(colors.accent);
+  const top = parseHex(colors.primary);
+  const pants = parseHex(colors.secondary);
+  const hair = parseHex(colors.hair);
+  // Thresholds from atlas sampling; eyes / white stay untouched.
+  const SKIN_MAX = 48 * 48, TOP_MAX = 55 * 55, PANTS_MAX = 48 * 48, HAIR_MAX = 42 * 42;
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    const x = p % w;
+    const y = (p / w) | 0;
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a < 8) continue;
+    const ds = nearestDist(r, g, b, ATLAS_SKIN);
+    const dt = nearestDist(r, g, b, ATLAS_TOP);
+    const dp = nearestDist(r, g, b, ATLAS_PANTS);
+    const dh = nearestDist(r, g, b, ATLAS_HAIR);
+    let target: { r: number; g: number; b: number } | null = null;
+    let region: 'skin' | 'top' | 'pants' | 'hair' | null = null;
+    if (dh <= HAIR_MAX && dh <= ds && dh <= dt && dh <= dp) { target = hair; region = 'hair'; }
+    else if (ds <= SKIN_MAX && ds <= dt && ds <= dp) { target = skin; region = 'skin'; }
+    else if (dt <= TOP_MAX && dt <= ds && dt <= dp) { target = top; region = 'top'; }
+    else if (dp <= PANTS_MAX && dp <= ds && dp <= dt) { target = pants; region = 'pants'; }
+    if (!target || !region) continue;
+    // Patterns only on the shirt region so hair / skin never pick up stripes.
+    if (region === 'top' && colors.pattern !== 'plain') {
+      const stripe = Math.max(2, Math.round(h / 28));
+      if (colors.pattern === 'stripes' && Math.floor(y / stripe) % 2 === 1) target = { r: 255, g: 255, b: 255 };
+      else if (colors.pattern === 'dots' && (x % 10) < 3 && (y % 10) < 3) target = { r: 255, g: 255, b: 255 };
+      else if (colors.pattern === 'ticket') {
+        const band = Math.floor(y / Math.max(4, Math.round(h / 12))) % 6;
+        if (band === 2 || band === 3) target = { r: 28, g: 30, b: 33 };
+      }
+    }
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    d[i] = Math.min(255, Math.round(target.r * (0.55 + lum * 0.9)));
+    d[i + 1] = Math.min(255, Math.round(target.g * (0.55 + lum * 0.9)));
+    d[i + 2] = Math.min(255, Math.round(target.b * (0.55 + lum * 0.9)));
+  }
+  ctx.putImageData(image, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = srcMap.colorSpace;
+  tex.flipY = srcMap.flipY;
+  tex.wrapS = srcMap.wrapS;
+  tex.wrapT = srcMap.wrapT;
+  tex.magFilter = srcMap.magFilter;
+  tex.minFilter = srcMap.minFilter;
+  tex.needsUpdate = true;
+  ownedTex.push(tex);
+  return tex;
+}
+
+function toonFrom(
+  src: THREE.Material,
+  tint: string | undefined,
+  owned: THREE.Material[],
+  ownedTex: THREE.Texture[],
+  colors: LookColors,
+): THREE.Material {
+  const std = src as THREE.MeshStandardMaterial;
+  // Keep albedo — the Kenney person is one atlas ("skin"); flat color alone washes them white.
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0 });
+  m.name = src.name;
+  if (src.name === 'skin' && std.map) {
+    m.map = tintPersonAtlas(std.map, colors, ownedTex);
+  } else if (std.map) {
+    m.map = std.map;
+  } else if (tint) {
+    m.color.set(tint);
+  } else if (std.color) {
+    m.color.copy(std.color);
+  }
+  // Named Mat_* slots (when present) get a solid tint on top of any map.
+  if (tint && src.name !== 'skin') m.color.set(tint);
+  owned.push(m);
+  return m;
+}
+
+/** Prefer the Head bone in the Person rig (scene graph or skinned skeleton). */
+function findHeadBone(model: THREE.Object3D): THREE.Object3D | null {
+  const named = model.getObjectByName('Head') ?? model.getObjectByName('Head_end');
+  if (named) return named;
+  let found: THREE.Object3D | null = null;
+  model.traverse((o) => {
+    if (found) return;
+    const skinned = o as THREE.SkinnedMesh;
+    if (!skinned.isSkinnedMesh || !skinned.skeleton) return;
+    const bone = skinned.skeleton.bones.find((b) => b.name === 'Head' || b.name === 'mixamorigHead');
+    if (bone) found = bone;
+  });
+  return found;
+}
+
+/** Thin black silhouette; child of the mesh so skinned people keep the outline while they move. */
+function addOutlineHull(mesh: THREE.Mesh, owned: THREE.Material[]): void {
+  try {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1c1e21, side: THREE.BackSide });
+    owned.push(mat);
+    const skinned = mesh as THREE.SkinnedMesh;
+    let outline: THREE.Mesh;
+    if (skinned.isSkinnedMesh && skinned.skeleton) {
+      const skinnedOutline = new THREE.SkinnedMesh(skinned.geometry, mat);
+      skinnedOutline.bind(skinned.skeleton, skinned.bindMatrix);
+      outline = skinnedOutline;
+    } else {
+      outline = new THREE.Mesh(mesh.geometry, mat);
+    }
+    outline.userData.outline = true;
+    outline.frustumCulled = false;
+    outline.scale.setScalar(1.035);
+    outline.renderOrder = -1;
+    mesh.add(outline);
+  } catch {
+    // Outline is optional; a missing silhouette is better than a blank map.
+  }
+}
+
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
@@ -355,7 +572,17 @@ class GltfCharacter implements Character {
   private act: { name: string; t: number; dur: number } | null = null;
   private clock = 0;
 
-  constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
+  private ownedTex: THREE.Texture[] = [];
+  /** Hat rides on hop and tracks the Head bone so a floating bind pose cannot hide it. */
+  private hat: THREE.Object3D | null = null;
+  private headBone: THREE.Object3D | null = null;
+
+  constructor(
+    spec: CharacterSpec,
+    kind: 'avatar' | 'pet',
+    seed: string,
+    opts?: { look?: AvatarLook | null; worldScale?: number },
+  ) {
     this.kind = kind;
     const scene = cloneSkinned(spec.gltf.scene);
     let model: THREE.Object3D = scene;
@@ -374,14 +601,21 @@ class GltfCharacter implements Character {
       keepNames.add(o.name);
       if (hide.has(o.name)) o.visible = false;
     });
-    model.scale.setScalar(spec.scale);
+    // Avatar: street uses PERSON_WORLD_SCALE; the dresser pedestal can pass worldScale: 1.
+    const avatarScale = opts?.worldScale ?? (spec.scale || PERSON_WORLD_SCALE);
+    model.scale.setScalar(kind === 'avatar' ? avatarScale : spec.scale);
 
-    // Persona tint on the materials named for it (Mat_Primary / Mat_Secondary / Mat_Accent).
-    const c = colorsFor(seed);
+    // Persona tint: Mat_Primary / Mat_Secondary / Mat_Accent when present; Kenney atlas "skin" is recolored.
+    // Collect meshes first — adding outline children during traverse nests forever.
+    const look = opts?.look ?? (seed ? currentLook(seed) : null);
+    const c = colorsFor(seed, look);
     const tints: Record<string, string> = { Mat_Primary: c.primary, Mat_Secondary: c.secondary, Mat_Accent: c.accent };
+    const meshes: THREE.Mesh[] = [];
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      if (mesh.isMesh) meshes.push(mesh);
+    });
+    for (const mesh of meshes) {
       mesh.frustumCulled = false;
       if (kind === 'pet' && mesh.name === 'Muse_FurFibers') {
         const sparse = sparseFurGeometry(mesh.geometry);
@@ -389,6 +623,10 @@ class GltfCharacter implements Character {
       }
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const next = mats.map((m) => {
+        if (kind === 'avatar') {
+          // Toon + outline so people read off the street; My look recolors the person's atlas.
+          return toonFrom(m, tints[m.name], this.owned, this.ownedTex, c);
+        }
         // Jolly's fur is a warm cream in the model, but the scene's cool daylight and tone mapping turn
         // it gray. A warm self-light and a slightly richer base bring the cream back.
         if (kind === 'pet' && /Fur|Fiber/.test(m.name) && (m as THREE.MeshStandardMaterial).color) {
@@ -402,15 +640,11 @@ class GltfCharacter implements Character {
           this.owned.push(fur);
           return fur;
         }
-        const tint = kind === 'avatar' ? tints[m.name] : undefined;
-        if (!tint || !(m as THREE.MeshStandardMaterial).color) return m;
-        const copy = (m as THREE.MeshStandardMaterial).clone();
-        copy.color.set(tint);
-        this.owned.push(copy);
-        return copy;
+        // People returned above (toon + atlas tint); Jolly keeps his own materials.
+        return m;
       });
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
-    });
+    }
 
     this.platform = kind === 'pet' ? model.getObjectByName('Muse_Platform') ?? null : null;
     const plat = this.platform as THREE.Mesh | null;
@@ -442,6 +676,26 @@ class GltfCharacter implements Character {
     this.cameraHeight = this.effectBody?.geometry.boundingBox
       ? this.effectBody.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(this.effectBody.matrixWorld).y
       : this.height / 2;
+    if (kind === 'avatar' && look) {
+      const hat = buildHat(look.hat);
+      const head = findHeadBone(model);
+      // Parent to the Head bone so the hat sits on the hair and follows idle/run.
+      if (head && hat) {
+        // Head's bind pose floats above the skinned crown; parenting directly put the hat on
+        // the chest. Keep the hat in hop space at the measured crown and track Head XZ.
+        this.headBone = head;
+        this.hat = hat;
+        hat.name = 'HatSocket';
+        // BBox max.y is near the chest on this bind; 2.1 seats on the hair for the pedestal.
+        hat.scale.setScalar(Math.min(0.52, this.height * 0.34));
+        hat.position.set(0, this.height * 2.1, this.height * 0.05);
+        hat.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh) { m.frustumCulled = false; m.renderOrder = 10; }
+        });
+        this.hop.add(hat);
+      }
+    }
     this.mixer = new THREE.AnimationMixer(model);
     for (const clip of spec.gltf.animations) {
       const adapted = adaptClip(clip, keepNames, spec.node, spec.relativeRoot, hide);
@@ -651,7 +905,18 @@ vec3 jollyLimbs(vec3 p) {
     } else out.set(0, this.height / 2, 0).applyMatrix4(this.root.matrixWorld);
   }
 
-  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); this.ownedGeometry.forEach((g) => g.dispose()); this.glow?.dispose(); }
+  dispose() {
+    this.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.userData.hat) return;
+      mesh.geometry.dispose();
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => m.dispose());
+    });
+    this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot());
+    this.owned.forEach((m) => m.dispose()); this.ownedTex.forEach((t) => t.dispose());
+    this.ownedGeometry.forEach((g) => g.dispose()); this.glow?.dispose();
+  }
 }
 
 // ---- Loading ----
@@ -671,6 +936,11 @@ export type ModelSet = { avatar: CharacterSpec | null; pet: CharacterSpec | null
 
 let modelsPromise: Promise<ModelSet> | null = null;
 
+/** Drop the cached GLB set so the next loadModels() re-reads manifest scale (e.g. after a human-size fix). */
+export function invalidateModels(): void {
+  modelsPromise = null;
+}
+
 /** Loads public/models/manifest.json and its models once. Missing or broken files fall back to placeholders. */
 export function loadModels(): Promise<ModelSet> {
   if (modelsPromise) return modelsPromise;
@@ -678,7 +948,8 @@ export function loadModels(): Promise<ModelSet> {
     const none: ModelSet = { avatar: null, pet: null };
     let m: ModelManifest;
     try {
-      const r = await fetch('/models/manifest.json', { cache: 'no-cache' });
+      // Cache-bust so a stale service worker / browser cache cannot keep avatar scale:34.
+      const r = await fetch(`/models/manifest.json?v=${PERSON_WORLD_SCALE}`, { cache: 'no-cache' });
       if (!r.ok) return none;
       m = (await r.json()) as ModelManifest;
     } catch {
@@ -715,12 +986,76 @@ export function loadModels(): Promise<ModelSet> {
   return modelsPromise;
 }
 
-export function makeAvatar(models: ModelSet | null, seed: string): Character {
-  return models?.avatar ? new GltfCharacter(models.avatar, 'avatar', seed) : new PlaceholderAvatar(seed);
+/**
+ * People are the Kenney Person from muse-companion.glb (person_idle / person_run), toon-shaded
+ * with My look atlas tints. Chibi is only the fallback before the GLB loads or if construction fails.
+ */
+export function makeAvatar(
+  models: ModelSet | null,
+  seed: string,
+  opts?: { look?: AvatarLook | null; worldScale?: number },
+): Character {
+  if (models?.avatar) {
+    try { return new GltfCharacter(models.avatar, 'avatar', seed, opts); }
+    catch (err) { console.error('[world] Kenney person failed; using chibi', err); }
+  }
+  if (!seed) return new PlaceholderAvatar(seed);
+  return new ChibiAvatar(opts?.look ?? currentLook(seed));
 }
 
 export function makePet(models: ModelSet | null, seed: string): Character {
-  return models?.pet ? new GltfCharacter(models.pet, 'pet', seed) : new PlaceholderPet();
+  const pip = seed ? currentPipLook(seed) : null;
+  if (!models?.pet) return new PlaceholderPet();
+  const char = new GltfCharacter(models.pet, 'pet', seed);
+  if (pip) decoratePip(char.root, pip);
+  return char;
+}
+
+/** Coat tint + kind ears on the Muse body so Pip matches the dresser. */
+function decoratePip(root: THREE.Object3D, pip: PipLook): void {
+  const coat = new THREE.Color(pip.coat);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      const std = m as THREE.MeshStandardMaterial;
+      if (!std?.color) continue;
+      const n = (std.name || '').toLowerCase();
+      if (n.includes('fur') || n.includes('body') || n.includes('fiber') || mesh.name === 'Muse_Body') {
+        std.color.copy(coat);
+      }
+    }
+  });
+  const head = root.getObjectByName('Muse_Body') ?? root.getObjectByName('Muse') ?? root;
+  const earMat = new THREE.MeshStandardMaterial({ color: pip.coat, roughness: 0.7 });
+  const bowMat = new THREE.MeshStandardMaterial({ color: '#E8505B', roughness: 0.5 });
+  const addEar = (x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), earMat);
+    ear.position.set(x, y, z);
+    ear.scale.set(sx, sy, sz);
+    ear.userData.pipDecor = true;
+    head.add(ear);
+  };
+  if (pip.kind === 'bun') {
+    addEar(-0.18, 0.55, 0, 0.7, 1.6, 0.5);
+    addEar(0.18, 0.55, 0, 0.7, 1.6, 0.5);
+    const bow = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), bowMat);
+    bow.position.set(0.12, 0.72, 0.05);
+    bow.userData.pipDecor = true;
+    head.add(bow);
+  } else if (pip.kind === 'kit') {
+    addEar(-0.2, 0.5, 0, 0.55, 1.2, 0.35);
+    addEar(0.2, 0.5, 0, 0.55, 1.2, 0.35);
+  } else if (pip.kind === 'bear') {
+    addEar(-0.28, 0.35, 0, 1.1, 1.1, 0.6);
+    addEar(0.28, 0.35, 0, 1.1, 1.1, 0.6);
+  } else if (pip.kind === 'sam') {
+    const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: '#24A148' }));
+    sprout.position.set(0, 0.65, 0);
+    sprout.userData.pipDecor = true;
+    head.add(sprout);
+  }
 }
 
 /** Keep complete authored hairs, never disconnected triangles. Own all output buffers. */

@@ -3,7 +3,7 @@
 import { Camera, Image as ImageIcon, Lock } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { apiFetch, apiPost, currentPersona, PERSONA_EVENT } from '@/features/data';
-import { Button, cn, flash } from '@/features/ui';
+import { Button, cn, flash, sfx } from '@/features/ui';
 import type { CompleteQuestResponse,Memory } from '@/shared';
 
 
@@ -52,14 +52,14 @@ export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
       const form=new FormData();form.set('photo',file,file instanceof File?file.name:'hangout.jpg');form.set('questId',questId);form.set('crewId',id);form.set('caption',caption);
       const {memory}=await apiFetch<{memory:Memory}>('/api/memories',{method:'POST',body:form,signal:ctrl.signal});
       if(!valid())return;
-      setSaved(memory);setPhoto(null);onSaved(id);onMemory?.(memory);
+      setSaved(memory);setPhoto(null);onSaved(id);onMemory?.(memory);sfx('polaroid_develop');window.setTimeout(()=>sfx('pin_board'),420);
       window.dispatchEvent(new CustomEvent('outhere:memory-saved',{detail:{questId,crewId:id,memoryId:memory.id}}));
     }catch(e){if(valid())setError(e instanceof Error?e.message:'Couldn’t save your photo.');}finally{if(valid()){upload.current=null;setPending(false);}}
   }
   if(saved)return <SavedPhotoReview memory={saved} onChange={setSaved}/>;
   // One step at a time: take or choose a photo; then the preview, an optional caption, who can see
   // it, and Save. After saving, Muse can look at the photo and suggest a caption (SavedPhotoReview).
-  const pick=(e:ChangeEvent<HTMLInputElement>)=>{const f=e.currentTarget.files?.[0]??null;if(f)flash();setPhoto(f);setError(null);};
+  const pick=(e:ChangeEvent<HTMLInputElement>)=>{const f=e.currentTarget.files?.[0]??null;if(f){flash();sfx('selfie_shutter');}setPhoto(f);setError(null);};
   const picker='oh-press inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-btn px-4 text-[15px] font-semibold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fb-blue';
   return <form className="mt-3 space-y-3" onSubmit={save}>
     {!photo?(

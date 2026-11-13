@@ -5,7 +5,7 @@
 // chip says so ("Muse tagged who's here"), so nothing on screen claims more than it did.
 import { RotateCcw, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { cn } from '@/features/ui';
+import { cn, sfx } from '@/features/ui';
 import type { Face } from './SelfieCamera';
 
 type Box = { x: number; y: number; w: number; h: number };
@@ -55,7 +55,7 @@ export function SelfieReview({ file, people, viewerId, caption, emoji, saving, o
     const id = window.setInterval(() => {
       i += 2;
       setText(caption.slice(0, i));
-      if (i >= caption.length) window.clearInterval(id);
+      if (i >= caption.length) { window.clearInterval(id); sfx('vision_caption'); }
     }, 28);
     return () => window.clearInterval(id);
   }, [caption, edited]);

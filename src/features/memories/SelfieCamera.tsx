@@ -1,10 +1,10 @@
 'use client';
-// The group selfie camera (memory page): front camera with corner brackets, "N in shot", and
+// The group selfie camera (memory page): front camera with corner brackets, "N together", and
 // everyone who was there around the shutter. No camera (a laptop on stage, or permission denied)
 // falls back to the plan's photo, so the shutter always works.
 import { ImagePlus, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Avatar, cn } from '@/features/ui';
+import { Avatar, cn, sfx } from '@/features/ui';
 import type { Quest } from '@/shared';
 
 export type Face = { id: string; name: string; avatarUrl: string };
@@ -43,6 +43,7 @@ export function SelfieCamera({ here, quest, onTake, onPickFile }: {
   }, [facing]);
 
   const shoot = async () => {
+    sfx('selfie_shutter');
     const v = videoRef.current;
     if (camera === 'on' && v && v.videoWidth > 0) {
       const c = document.createElement('canvas');
@@ -64,7 +65,7 @@ export function SelfieCamera({ here, quest, onTake, onPickFile }: {
     <div className="animate-step-in">
       <div className="flex items-center justify-between">
         <h2 className="text-[20px] font-extrabold text-fb-text">Group selfie <span aria-hidden>📸</span></h2>
-        <span className="rounded-full bg-fb-blue px-2.5 py-0.5 text-[13px] font-semibold text-white">{here.length} in shot</span>
+        <span className="rounded-full bg-fb-blue px-2.5 py-0.5 text-[13px] font-semibold text-white">{here.length} together</span>
       </div>
       <div className="relative mt-2 aspect-[4/3] max-h-[260px] w-full overflow-hidden rounded-[18px] bg-[#1C1E21]">
         <video ref={videoRef} muted playsInline className={cn('size-full object-cover', facing === 'user' && '[transform:scaleX(-1)]', camera !== 'on' && 'hidden')} />

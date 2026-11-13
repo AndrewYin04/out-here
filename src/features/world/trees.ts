@@ -87,6 +87,9 @@ function indexedTest(items: { rings: Ring[]; box: Box }[]): (p: LatLng) => boole
  * Trees for the area within `radiusM` of `center`: inside green `areas`, beside `streets`, and
  * never inside a `blockers` polygon (buildings). The nearest `cap` are returned.
  */
+/** No trees this close to where the view starts. */
+export const CLEARING_M = 40;
+
 export function placeTrees(opts: {
   origin: LatLng; center: LatLng; radiusM: number; cap: number;
   areas: Area[]; streets: Street[]; blockers: Ring[][];
@@ -104,8 +107,10 @@ export function placeTrees(opts: {
   }
   const roadBlocked=(p:LatLng)=>{const o=offsetMeters(origin,p);for(const s of roadCells.get(`${Math.floor(o.east/cell)}:${Math.floor(o.north/cell)}`)??[]){const t=s.len2?Math.max(0,Math.min(1,((o.east-s.ax)*s.dx+(o.north-s.ay)*s.dy)/s.len2)):0;if((o.east-s.ax-t*s.dx)**2+(o.north-s.ay-t*s.dy)**2<s.r*s.r)return true;}return false;};
   const out = new Map<string, TreeSpot & { d: number }>();
+  // A clearing where you stand, so the camera behind you never starts inside a thicket.
+  const clear = (p: LatLng) => haversineMeters(center, p) < CLEARING_M;
   const keep = (p: LatLng, key: string, salt: number) => {
-    if (out.has(key) || !near(p) || blocked(p)) return;
+    if (out.has(key) || !near(p) || blocked(p) || clear(p)) return;
     // Keep trunks and the inner crown clear of building walls, not just the centre point.
     for(const [e,n] of [[1.8,0],[-1.8,0],[0,1.8],[0,-1.8]])if(blocked(fromOffset(p,e,n)))return;
     if(roadBlocked(p))return;

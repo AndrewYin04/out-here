@@ -32,3 +32,4 @@ export { EASE, bump, burst, celebrateJoin, dropIn, flash, flyAvatar, questPin, r
 export { useSheetDrag, type SheetSnap } from './useSheetDrag';
 export { demoToolsOn, useDemoTools } from './tools';
 export { CATEGORY_STYLE, CategoryGlyph, CategoryIcon, categoryOf, categorySvg, markSvg, rememberCategories } from './CategoryIcon';
+export { SFX, sfx, setSfxMuted, useSfxMuted, type SfxName } from './sfx';

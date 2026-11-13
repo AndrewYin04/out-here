@@ -74,10 +74,10 @@ describe('validate', () => {
     expect(out.suggestions[0].bridge ?? '').not.toContain('Priya');
   });
 
-  it('dedupes and caps at 3', () => {
+  it('dedupes and caps at 3 (the afternoon boba quest is not a candidate, so it is dropped)', () => {
     const many = [qid('dumplings'), qid('dumplings'), qid('boba')].map((id) => suggestion({ questId: id, friendIds: [] }));
     const out = validate(many, result.candidates, ctx);
-    expect(out.suggestions.map((s) => s.questId)).toEqual([qid('dumplings'), qid('boba')]);
+    expect(out.suggestions.map((s) => s.questId)).toEqual([qid('dumplings')]);
   });
 });
 

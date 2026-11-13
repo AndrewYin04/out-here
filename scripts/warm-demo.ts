@@ -43,6 +43,9 @@ type Step =
 // taps (notes 'free') and again after the hungry asks (notes 'hungry').
 export const STEPS: Step[] = [
   { kind: 'reset', label: 'presenter reset' },
+  // "45 Minutes to Thrift" beat 1 (docs/DEMO_GUIDE.md): the exact words typed on stage.
+  { kind: 'plan', label: 'Alex: 45 min boba (stage ask)', as: 'alex', typed: "I've got 45 minutes. Can I grab boba with someone nearby?" },
+  { kind: 'reset', label: 'presenter reset (after the stage ask)' },
   // Scene 4: Alex's "I'm free", before anyone else is free.
   { kind: 'plan', label: "Alex: I'm free (typed)", as: 'alex', typed: 'free for an hour, want to try something new, under $20' },
   { kind: 'plan', label: 'Alex: hungry 30 min', as: 'alex', moods: ['hungry'], chip: '30 min' },
