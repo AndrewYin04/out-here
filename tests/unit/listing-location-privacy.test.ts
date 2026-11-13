@@ -34,7 +34,7 @@ afterAll(() => setNow(null));
 const EXACT: LatLng = offsetPoint(DEMO_CENTER, 1500, 70);
 const SPOT = 'Blue door, 12 Ivy Dr';
 const chair = {
-  title: 'Desk chair', priceUsd: 35, category: 'Furniture', location: EXACT,
+  title: 'Track jacket', priceUsd: 20, category: 'Clothing', location: EXACT,
   pickupLabel: 'Belle Haven', pickupSpot: SPOT, pickupUntil: new Date(NOW.getTime() + 3 * 3_600_000).toISOString(),
 };
 

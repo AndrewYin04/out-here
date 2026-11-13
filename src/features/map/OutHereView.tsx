@@ -8,8 +8,14 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, type LatLng, type Quest } from '@/shared';
+import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
+import { ListingSheet } from './market/ListingSheet';
+import { ListingsLayer } from './market/ListingsLayer';
+import { MarketMenu, MuseFindCard } from './market/MuseFind';
+import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
+import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
 import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
@@ -51,11 +57,12 @@ function useNow(intervalMs = 30_000): Date {
  * Switching from one plan to another replaces the entry (Back returns to the map, not plan A).
  */
 const QUEST_ENTRY = 'ohQuest';
-function setQuestParam(id: string | null) {
+function setQuestParam(id: string | null, key: 'quest' | 'listing' = 'quest') {
   const url = new URL(window.location.href);
-  const had = url.searchParams.has('quest');
-  if (id) url.searchParams.set('quest', id);
-  else url.searchParams.delete('quest');
+  const had = url.searchParams.has(key);
+  if (!id && !had) return;
+  if (id) url.searchParams.set(key, id);
+  else url.searchParams.delete(key);
   const state = window.history.state as Record<string, unknown> | null;
   if (!id && state?.[QUEST_ENTRY]) { window.history.back(); return; }
   if (id && !had) window.history.pushState({ ...(state ?? {}), [QUEST_ENTRY]: true }, '', url.toString());
@@ -82,6 +89,13 @@ export function OutHereView() {
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
   const [creating, setCreating] = useState<{ at: LatLng; category: string } | null>(null);
+  // Marketplace pickup: "Sell for pickup" draft spot, the open listing sheet, whether listings
+  // show, and Muse finds the viewer dismissed.
+  const [selling, setSelling] = useState<LatLng | null>(null);
+  const [popUp, setPopUp] = useState(false);
+  const [listingId, setListingId] = useState<string | null>(null);
+  const [showListings, setShowListings] = useState(true);
+  const [dismissedFinds, setDismissedFinds] = useState<ReadonlySet<string>>(() => new Set());
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -91,6 +105,14 @@ export function OutHereView() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('quest');
     if (id) setSelectedId(id);
+    const lid = params.get('listing');
+    if (lid && !id) setListingId(lid);
+    // ?sell=popup: the demo seller's tab opens the Campus Thrift Pop-Up, items filled in.
+    if (params.get('sell') === 'popup') {
+      setPopUp(true);
+      setMode('explore');
+      setSelling(DEMO_CENTER);
+    }
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
     // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
@@ -207,7 +229,40 @@ export function OutHereView() {
     return pts.length > 0 ? pts : null;
   }, [planPicks, mode, friendPins.data]);
 
-  const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id);
+    setQuestParam(id);
+    if (id) { setListingId(null); setQuestParam(null, 'listing'); }
+  }, []);
+  const openListing = useCallback((id: string | null) => {
+    setListingId(id);
+    setQuestParam(id, 'listing');
+    if (id) { setSelectedId(null); setQuestParam(null); }
+  }, []);
+
+  // Marketplace pickup on the map (Explore only), and what Muse found for the viewer's wants.
+  // Listings are fetched in every mode so a Muse find can arrive while you walk on the Friends map.
+  const listingsApi = useMapListings(true);
+  const mapListings: MapListing[] = useMemo(
+    () => (mode === 'explore' && showListings ? listingsApi.data?.listings ?? [] : []), [mode, showListings, listingsApi.data],
+  );
+  const wantsApi = useMuseWants();
+  const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
+  const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
+  // A want find ("track jacket under $25") first, then a pick from what the viewer watches.
+  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings);
+  const allFinds = useMemo(() => [...(findsApi.data?.finds ?? []), ...watchFinds], [findsApi.data, watchFinds]);
+  const find = allFinds.find((f) => !dismissedFinds.has(f.listingId)) ?? null;
+  const viewFind = useCallback((id: string, at: LatLng | null) => {
+    setMode('explore');
+    setShowListings(true);
+    openListing(id);
+    if (map && at && !map.getContainer().hasAttribute('data-view3d')) {
+      map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700 });
+    }
+  }, [map, openListing]);
+  const openedListing = listingId ?listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
+  const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
   // Back and Forward: the plan in the URL is the plan on screen.
   useEffect(() => {
     const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
@@ -246,6 +301,23 @@ export function OutHereView() {
     select(q.id);
     toast.show('Your plan is live on the map.');
   }, [questsApi, select, toast]);
+  // "Sell for pickup" from the Marketplace menu: a draft pin at the map centre and the sell sheet.
+  const startSell = useCallback(() => {
+    const c = map?.getCenter();
+    setPlanOpen(false);
+    select(null);
+    openListing(null);
+    setCreating(null);
+    setSelling(c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
+  }, [map, select, openListing]);
+  const onListed = useCallback((l: MapListing) => {
+    setSelling(null);
+    setMode('explore');
+    setShowListings(true);
+    void listingsApi.refetch();
+    openListing(l.listing.id);
+    toast.show('Your listing is on the map.');
+  }, [listingsApi, openListing, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
   const noSelect = useCallback(() => {}, []);
@@ -355,12 +427,12 @@ export function OutHereView() {
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
-          onSelect={creating ? noSelect : select}
+          onSelect={creating || selling ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
           onPickLocation={startCreate}
-          draft={creating}
-          onDraftMove={moveDraft}
+          draft={creating ?? (selling ? { at: selling, category: 'other' } : null)}
+          onDraftMove={selling ? setSelling : moveDraft}
         />
       )}
 
@@ -549,8 +621,24 @@ export function OutHereView() {
 
       {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
-      {!unsupported && !creating && !sheetOpen && (
-        <div className={cn(selectedId && 'max-md:hidden')}>
+      {mode === 'explore' && (
+        <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
+      )}
+
+      {/* Muse found something the viewer is looking for: a card above the dashboard. */}
+      {find && !creating && !selling && !sheetOpen && !listingId && !selectedId && (
+        <div className="pointer-events-none absolute inset-x-3 top-[84px] z-30 flex justify-center">
+          <MuseFindCard
+            key={find.listingId}
+            find={find}
+            onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
+            onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
+          />
+        </div>
+      )}
+
+      {!unsupported && !creating && !selling && !sheetOpen && (
+        <div className={cn((selectedId || listingId) && 'max-md:hidden')}>
           <OutHereDock
             mode={mode}
             onMode={setMode}
@@ -563,6 +651,15 @@ export function OutHereView() {
             now={now}
             onSelect={select}
             showActions={!walkingNow}
+            extraActions={mode === 'explore' ? (
+              <MarketMenu
+                wants={wants}
+                onWantsChanged={() => { void wantsApi.refetch(); }}
+                onSell={startSell}
+                showListings={showListings}
+                onShowListings={setShowListings}
+              />
+            ) : null}
           />
         </div>
       )}
@@ -587,8 +684,25 @@ export function OutHereView() {
         />
       )}
 
+      {selling && (
+        <SellSheet at={selling} now={now} popUp={popUp ? CAMPUS_THRIFT_POPUP : null}
+          onClose={() => { setSelling(null); setPopUp(false); }} onPosted={(l) => { setPopUp(false); onListed(l); }} />
+      )}
+
       {!unsupported && (
-        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', selectedId && 'max-md:hidden')} />
+        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', (selectedId || listingId) && 'max-md:hidden')} />
+      )}
+
+      {listingId && !creating && !selling && (
+        <ListingSheet
+          key={listingId}
+          listingId={listingId}
+          viewerId={persona.id}
+          driveMin={driveMin}
+          museLine={allFinds.find((f) => f.listingId === listingId)?.line ?? null}
+          onClose={() => openListing(null)}
+          onChanged={() => { void listingsApi.refetch(); }}
+        />
       )}
 
       {selectedId && !creating && (
