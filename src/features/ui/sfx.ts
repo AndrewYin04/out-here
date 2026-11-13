@@ -21,13 +21,8 @@ export const SFX = {
   accept_stamp: { v: 0.7, tier: 'essential' },
   friend_joined: { v: 0.6, tier: 'essential' },
   countdown_tick: { v: 0.5, tier: 'essential' },
-  lets_go: { v: 0.7, tier: 'essential' },
+  lets_go: { v: 0.55, tier: 'essential' }, // the pack's alternate (a short rise); the first one was too loud
   zoom_whoosh: { v: 0.45, tier: 'flair' },
-  walk_step: { v: 0.18, tier: 'flair' },
-  walk_step_2: { v: 0.18, tier: 'flair' },
-  walk_step_3: { v: 0.18, tier: 'flair' },
-  progress_tick: { v: 0.3, tier: 'flair' },
-  arrival_made_it: { v: 0.75, tier: 'essential' },
   selfie_shutter: { v: 0.7, tier: 'essential' },
   polaroid_develop: { v: 0.45, tier: 'flair' },
   pin_board: { v: 0.5, tier: 'flair' },
@@ -55,8 +50,7 @@ export type SfxName = keyof typeof SFX;
 
 /** Minimum gap between two plays of the same cue. */
 const THROTTLE_MS: Partial<Record<SfxName, number>> = {
-  pop_stamp: 120, muse_step: 400, pip_hop: 3000, walk_step: 300, walk_step_2: 300, walk_step_3: 300,
-  progress_tick: 600, tap: 80, sheet_open: 300, sheet_close: 300, map_open: 60_000,
+  pop_stamp: 120, muse_step: 400, pip_hop: 3000, tap: 80, sheet_open: 300, sheet_close: 300, map_open: 60_000,
 };
 const MASTER = 0.8;
 const STORE_KEY = 'oh.sfx.muted';
@@ -68,7 +62,6 @@ const buffers = new Map<SfxName, Promise<AudioBuffer | null>>();
 const lastPlayed = new Map<SfxName, number>();
 const listeners = new Set<() => void>();
 let muted = false;
-let stepIdx = 0;
 
 function readMuted(): boolean {
   try { return window.localStorage.getItem(STORE_KEY) === '1'; } catch { return false; }
@@ -103,7 +96,7 @@ function unlock() {
     master.connect(ctx.destination);
     void ctx.resume();
     unlocked = true;
-    for (const n of ['free_tap', 'invite_send', 'invite_received', 'accept_stamp', 'friend_joined', 'lets_go', 'arrival_made_it', 'selfie_shutter', 'muse_done', 'results_reveal', 'zoom_whoosh'] as SfxName[]) void load(n);
+    for (const n of ['free_tap', 'invite_send', 'invite_received', 'accept_stamp', 'friend_joined', 'lets_go', 'selfie_shutter', 'muse_done', 'results_reveal', 'zoom_whoosh'] as SfxName[]) void load(n);
   } catch { /* no audio: the app works silently */ }
 }
 
@@ -141,12 +134,6 @@ export function sfx(name: SfxName, opts: { rate?: number; volume?: number } = {}
       src.start();
     } catch { /* ignore */ }
   });
-}
-
-/** A soft footstep, rotating three variants. Call at most every ~25 m of walking, never per frame. */
-export function footstep(): void {
-  const names: SfxName[] = ['walk_step', 'walk_step_2', 'walk_step_3'];
-  sfx(names[stepIdx++ % 3]!, { rate: 0.95 + (stepIdx % 3) * 0.04 });
 }
 
 export function setSfxMuted(m: boolean): void {

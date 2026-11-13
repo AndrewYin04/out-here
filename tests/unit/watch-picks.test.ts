@@ -98,6 +98,21 @@ describe('Marketplace picks', () => {
     expect(cam!.reason).toMatch(/^You just watched "35mm film for beginners/);
   });
 
+  it('the pop-up: Maya (denim Reels) gets the denim bag first, citing the Reel, not the track jacket', async () => {
+    const at = { location: offsetPoint(DEMO_CENTER, 50, 0), pickupLabel: 'Campus Thrift Pop-Up', pickupSpot: 'Bike racks',
+      pickupUntil: new Date(NOW.getTime() + 2 * 3600_000).toISOString() };
+    const leo = profileId('leo');
+    await store.createListing(leo, { title: 'Vintage track jacket', priceUsd: 20, category: 'Clothing',
+      description: 'Zip-up track jacket, size M, barely worn. At the Campus Thrift Pop-Up today only.', ...at });
+    await store.createListing(leo, { title: 'Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing',
+      description: 'Early-2000s denim purse with a short shoulder strap. At the Campus Thrift Pop-Up today only.', ...at });
+    const ctx = await store.marketplaceContext(maya);
+    const r = await marketplacePicks({ ...ctx, origin: DEMO_CENTER, at: new Date(), exclude: [], userId: maya });
+    const order = titles(r).filter((t) => /track jacket|denim shoulder bag/i.test(t));
+    expect(order[0]).toBe('Y2K denim shoulder bag');
+    expect(r.picks.find((p) => p.listing.title === 'Y2K denim shoulder bag')!.reason).toMatch(/the Reel "5 ways to style one vintage denim jacket"/);
+  });
+
   it('switching a topic off removes its items', async () => {
     const before = await picks();
     const music = before.topics.find((t) => /band|music|bass/.test(t.name))!.name;

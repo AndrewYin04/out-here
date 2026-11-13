@@ -90,7 +90,8 @@ export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | un
     const t = Date.now();
     return (api.data?.picks ?? []).flatMap((p): MuseFind[] => {
       const l = onMap.get(p.listing.id);
-      if (!l || l.listing.status !== 'available' || !l.listing.pickupUntil) return [];
+      // l.status, not l.listing.status: a held listing keeps its row status but is reserved.
+      if (!l || l.status !== 'available' || !l.listing.pickupUntil) return [];
       const ageMin = Math.max(0, Math.round((t - new Date(l.listing.createdAt).getTime()) / 60_000));
       if (ageMin > WATCH_FIND_MAX_AGE_MIN) return [];
       return [{

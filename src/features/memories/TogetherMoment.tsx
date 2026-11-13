@@ -88,8 +88,8 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
   useEffect(() => {
     if (here.length > lastCount.current) {
       burst(folded ? capsuleRef.current : sheetRef.current, [quest.emoji, '🎉', '✨', '🎊'], lastCount.current === 0 ? 24 : 14);
-      // You made it: the stamp + sting once; each friend who gets there after you, a lighter cheer.
-      sfx(lastCount.current === 0 ? 'arrival_made_it' : 'friend_joined');
+      // Your own arrival is silent (the confetti and ✓ carry it); each friend who gets there after you, a light cheer.
+      if (lastCount.current > 0) sfx('friend_joined');
     }
     lastCount.current = here.length;
   }, [here.length, quest.emoji, folded]);

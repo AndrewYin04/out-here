@@ -10,7 +10,18 @@ import type { MuseFind, MuseWantsResponse } from '@/shared/api';
 import type { MuseWant } from '@/shared';
 import { listingEmoji, money } from './useMarket';
 
-export function MuseFindCard({ find, onView, onDismiss }: { find: MuseFind; onView: () => void; onDismiss: () => void }) {
+/** "track jacket under $25": the watch a want find matched, as the card and the sheet name it. */
+export function watchLabel(w: Pick<MuseWant, 'item' | 'maxPrice'>): string {
+  return w.maxPrice !== null ? `${w.item} under ${money(w.maxPrice)}` : w.item;
+}
+
+export function MuseFindCard({ find, watch = null, onView, onDismiss }: {
+  find: MuseFind;
+  /** The watch this find matched ("track jacket under $25"); null for a find from what you watch. */
+  watch?: string | null;
+  onView: () => void;
+  onDismiss: () => void;
+}) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const id = window.requestAnimationFrame(() => setShown(true)); return () => window.cancelAnimationFrame(id); }, []);
   return (
@@ -34,9 +45,10 @@ export function MuseFindCard({ find, onView, onDismiss }: { find: MuseFind; onVi
         )}
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-2">
-            {find.source === 'muse' ? <MuseLabel className="py-0" /> : <span className="text-[12px] font-semibold text-fb-blue">✨ Found for you</span>}
-            <span className="truncate text-[13px] text-fb-text-2">{find.title} · {money(find.priceUsd)}</span>
+            {find.source === 'muse' ? <MuseLabel className="shrink-0 py-0" /> : <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-fb-blue">✨ Found for you</span>}
+            <span className="min-w-0 truncate text-[13px] text-fb-text-2">{find.title} · {money(find.priceUsd)}</span>
           </div>
+          {watch && <p data-testid="muse-find-watch" className="mb-0.5 text-[13px] font-semibold leading-4 text-fb-text">Fits the watch you set: {watch}</p>}
           <p data-testid="muse-find-line" className="text-[15px] leading-5 text-fb-text">{find.line}</p>
         </div>
         <button type="button" aria-label="Dismiss" onClick={onDismiss} className="-mr-1 -mt-1 rounded-full p-1 text-fb-text-2 hover:bg-fb-hover">

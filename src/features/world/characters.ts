@@ -9,6 +9,8 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { currentLook } from './avatarLook';
+import { ChibiAvatar } from './chibi';
 
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
 export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy';
@@ -484,8 +486,15 @@ export function loadModels(): Promise<ModelSet> {
   return modelsPromise;
 }
 
+/**
+ * People are the procedural little characters (chibi.ts): each person's own look, customizable for
+ * the viewer. The shared glTF person stays available behind USE_GLTF_PEOPLE.
+ */
+const USE_GLTF_PEOPLE = false;
 export function makeAvatar(models: ModelSet | null, seed: string): Character {
-  return models?.avatar ? new GltfCharacter(models.avatar, 'avatar', seed) : new PlaceholderAvatar(seed);
+  if (USE_GLTF_PEOPLE && models?.avatar) return new GltfCharacter(models.avatar, 'avatar', seed);
+  if (!seed) return new PlaceholderAvatar(seed);
+  return new ChibiAvatar(currentLook(seed));
 }
 
 export function makePet(models: ModelSet | null, seed: string): Character {

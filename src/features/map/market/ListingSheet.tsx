@@ -3,8 +3,8 @@
 // desktop (same shell as QuestPanel). Buyers reserve it for pickup with an offer and an ETA; once
 // the seller accepts, they get a countdown, the exact spot and directions. The seller answers
 // requests in one tap, then marks it sold (the pin leaves every map) or releases the hold.
-import { Car, Check, Clock, MapPin, Navigation, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Car, Check, Clock, Footprints, MapPin, Navigation, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type LatLng } from '@/shared';
@@ -17,13 +17,19 @@ export type ListingSheetProps = {
   viewerId: string;
   /** Driving minutes from the viewer, when known. */
   driveMin: number | null;
+  /** Walking minutes from the viewer, when known. Within WALKABLE_MIN the sheet shows the walk. */
+  walkMin?: number | null;
   /** Muse's line when this listing is the viewer's find. */
   museLine: string | null;
+  /** The watch the find matched ("track jacket under $25"), shown above Muse's line. */
+  museWatch?: string | null;
   onClose: () => void;
   onChanged: () => void;
 };
 
 const ETAS = [15, 30, 45, 60] as const;
+/** Same cut-off as Muse's find line: up to this many minutes on foot reads as a walk, not a drive. */
+const WALKABLE_MIN = 15;
 
 function useTick(ms: number): Date {
   const [t, setT] = useState(() => new Date());
@@ -41,7 +47,7 @@ const ago = (iso: string, at: Date) => {
 
 const directionsUrl = (p: LatLng) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
 
-export function ListingSheet({ listingId, viewerId, driveMin, museLine, onClose, onChanged }: ListingSheetProps) {
+export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, museLine, museWatch = null, onClose, onChanged }: ListingSheetProps) {
   const api = useMapListing(listingId);
   const m = api.data?.listing ?? null;
   const toast = useToast();
@@ -111,7 +117,9 @@ export function ListingSheet({ listingId, viewerId, driveMin, museLine, onClose,
         <div className="flex flex-col gap-3 overflow-y-auto px-4 pb-4">
           {museLine && !isSeller && m.status === 'available' && (
             <p data-testid="listing-muse-line" className="rounded-card bg-fb-blue-tint px-3 py-2 text-[14px] leading-[19px] text-fb-text">
-              <span className="mr-1 font-semibold text-fb-blue">✨ Muse</span>{museLine}
+              <span className="mr-1 font-semibold text-fb-blue">✨ Muse</span>
+              {museWatch && <span className="font-semibold">Fits the watch you set: {museWatch}. </span>}
+              {museLine}
             </p>
           )}
 
@@ -122,7 +130,9 @@ export function ListingSheet({ listingId, viewerId, driveMin, museLine, onClose,
                 {m.exact && l.pickupSpot ? <><strong className="font-semibold">{l.pickupSpot}</strong> · {l.pickupLabel}</> : <>Pickup around {l.pickupLabel ?? 'nearby'}</>}
               </span>
             </li>
-            {driveMin !== null && !isSeller && (
+            {!isSeller && walkMin !== null && walkMin <= WALKABLE_MIN ? (
+              <li className="flex items-center gap-2"><Footprints size={18} className="shrink-0 text-fb-text-2" aria-hidden />{Math.max(1, walkMin)} min walk</li>
+            ) : driveMin !== null && !isSeller && (
               <li className="flex items-center gap-2"><Car size={18} className="shrink-0 text-fb-text-2" aria-hidden />{driveMin} min drive</li>
             )}
             {l.pickupUntil && m.status !== 'sold' && (
@@ -244,11 +254,15 @@ function ReserveForm({ m, at, busy, run, onCancel }: { m: MapListing; at: Date; 
   const [offer, setOffer] = useState(String(l.priceUsd));
   const auto = useMemo(() => `${money(Number(offer) || 0)}, I can be there in ${eta} minutes.`, [offer, eta]);
   const [message, setMessage] = useState<string | null>(null);
+  // On a phone the sheet is short: bring the form (and Send request) into view when it opens.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => { formRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, []);
   const body: HoldRequestBody = { offerUsd: Math.max(0, Number(offer) || 0), etaMin: eta, message: message ?? auto };
 
   if (etas.length === 0) return <p className="text-[15px] text-fb-text-2">The pickup window is about to close.</p>;
   return (
     <form
+      ref={formRef}
       data-testid="reserve-form"
       className="flex flex-col gap-2.5 rounded-card border border-fb-divider p-3"
       onSubmit={(e) => {

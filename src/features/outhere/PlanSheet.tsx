@@ -130,7 +130,7 @@ export function ImFreeButton({ className, quiet = false }: {
       )}
     >
       {label ? (
-        <><StatusDot s={status} className={cn('size-3', !quiet && 'ring-2 ring-white')} />{label}</>
+        <><StatusDot s={status} className={cn('size-3 shrink-0', !quiet && 'ring-2 ring-white')} /><span className="min-w-0 truncate">{label}</span></>
       ) : (
         <><Sparkles size={18} aria-hidden /> I&apos;m free</>
       )}

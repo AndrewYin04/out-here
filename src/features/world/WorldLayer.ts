@@ -8,6 +8,7 @@ import { MercatorCoordinate, type CustomLayerInterface, type CustomRenderMethodI
 import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
+import { AVATAR_SCALE } from './chibi';
 import { characterScale, offsetMeters } from './math';
 import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
 import { stadiumSeats } from './stadiums';
@@ -189,6 +190,18 @@ export class WorldLayer implements CustomLayerInterface {
       next.root.traverse(o=>{o.frustumCulled=!(o as THREE.SkinnedMesh).isSkinnedMesh;});
       next.setState(a.state);
       this.charScene.remove(previous.root);previous.dispose();a.char=next;this.charScene.add(next.root);
+    }
+  }
+
+  /** Rebuild people's characters (a look was customized, or a pronoun hint arrived). */
+  refreshAvatars() {
+    for (const a of this.actors.values()) {
+      if (a.kind === 'pet') continue;
+      const previous = a.char;
+      const next = makeAvatar(this.models, a.seed);
+      next.root.position.copy(previous.root.position); next.root.quaternion.copy(previous.root.quaternion); next.root.scale.copy(previous.root.scale);
+      next.setState(a.state);
+      this.charScene.remove(previous.root); previous.dispose(); a.char = next; this.charScene.add(next.root);
     }
   }
 
@@ -451,7 +464,7 @@ export class WorldLayer implements CustomLayerInterface {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
         a.shadow.visible = showChars;
         a.shadow.position.set(o.east, 0.04, -o.north);
-        a.shadow.scale.set(s * 1.05, s * 1.05, 1);
+        a.shadow.scale.set(s * 1.05 * AVATAR_SCALE, s * 1.05 * AVATAR_SCALE, 1);
       }
       if (a.trail) {
         if (showChars) {
