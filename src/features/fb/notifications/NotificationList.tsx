@@ -1,6 +1,6 @@
 'use client';
 
-import { AtSign, Bell, CalendarDays, Heart, MapPin, MessageCircle, MessageSquare, Star, UserPlus, Users } from 'lucide-react';
+import { AtSign, Bell, CalendarDays, Heart, MapPin, MessageCircle, MessageSquare, Star, Store, UserPlus, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Avatar, EmptyState, Skeleton, SkeletonGroup, cn } from '@/features/ui';
@@ -21,6 +21,8 @@ const TYPE_BADGE: Record<NotificationType, { icon: ReactNode; bg: string }> = {
   quest_join: { icon: <MapPin size={14} />, bg: 'bg-[#7A3CFF]' },
   message: { icon: <MessageCircle size={14} />, bg: 'bg-fb-blue' },
   hangout_rate: { icon: <Star size={14} fill="currentColor" />, bg: 'bg-[#F7B928]' },
+  listing_hold: { icon: <Store size={14} />, bg: 'bg-[#E4A11B]' },
+  listing_update: { icon: <Store size={14} />, bg: 'bg-[#E4A11B]' },
 };
 
 /** Bolds the actor's name where it opens the text. */
