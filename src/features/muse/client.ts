@@ -174,6 +174,8 @@ function background(p: Promise<unknown>): void {
 
 /** muse_runs is written for the real transport, or for any transport once a test set a store. */
 function runsLogged(): boolean {
+  // MUSE_RUNS_LOG=1 also logs mock/test transports (local previews of the "what Muse did" list).
+  if (process.env.MUSE_RUNS_LOG === '1') return true;
   return process.env.MUSE_RUNS_LOG !== '0' && (transport === openAITransport || runStoreIsExplicit());
 }
 

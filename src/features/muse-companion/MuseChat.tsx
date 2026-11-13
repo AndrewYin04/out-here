@@ -11,9 +11,11 @@ import { MuseLabel, OfflineLabel, SuggestionCard, setPlanOpen, usePlanOpen } fro
 import { cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import {
-  closeChat, museDispatch, openChat, retryLast, selectPlan, sendMessage,
+  closeChat, museDispatch, retryLast, selectPlan, sendMessage,
   reportAgentRecipientError, sendAgentMessage, useAgentEncounter, useChatError, useChatMessages, useMuseSnapshot, type ChatMessage,
+  useMuseDockSlotted,
 } from './controller';
+import { MuseDockButton } from './MuseDock';
 import { simulationTransport } from './encounter';
 import { backendTransport, isCoordinationAsk } from '@/features/muse-encounters';
 import { MuseOrb, MuseStyles } from './MuseOrb';
@@ -21,7 +23,8 @@ import { MuseOrb, MuseStyles } from './MuseOrb';
 const firstName = (n: string) => n.split(' ')[0] ?? n;
 
 /** Out Here and Memories are where the companion lives. */
-const SHOWN_ON = /^\/(out-here|memories)(\/|$)/;
+/** Every page of the app: Muse introduces each one and can be asked anywhere. */
+const SHOWN_ON = /^\//;
 
 const STATE_LABEL: Record<string, string> = {
   approaching: 'Muse is coming over', listening: 'Muse is listening', thinking: 'Muse is thinking',
@@ -98,7 +101,6 @@ export function MuseChat() {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const launcherRef = useRef<HTMLButtonElement>(null);
   const kb = useKeyboardInset(snap.open);
   const encounter = useAgentEncounter();
   const demo = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('encounterDemo') === '1';
@@ -133,9 +135,8 @@ export function MuseChat() {
     if (last && messages.at(-1)?.role === 'muse' && !thinking) el.scrollTop = Math.max(0, last.offsetTop - 8);
     else el.scrollTop = el.scrollHeight;
   }, [messages, thinking, snap.open]);
-  // Hand focus back to the launcher after closing, so keyboard users are not dropped.
-  const wasOpen = useRef(false);
-  useEffect(() => { if (wasOpen.current && !snap.open) launcherRef.current?.focus({ preventScroll: true }); wasOpen.current = snap.open; }, [snap.open]);
+  // The Muse button itself (Jolly, the fly-out from 3D, nudges) is MuseDockButton.
+  const slotted = useMuseDockSlotted();
 
   const submit = useCallback((text: string) => {
     const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []);
@@ -153,7 +154,7 @@ export function MuseChat() {
     closeChat();
   }, [pathname, router]);
 
-  if (!here) return null;
+  if (!here) return <MuseStyles />;
 
   const hasMessages = messages.length > 0;
   const chips = [
@@ -166,20 +167,7 @@ export function MuseChat() {
   return (
     <>
       <MuseStyles />
-      {!snap.open && !planOpen && (
-        <button
-          ref={launcherRef}
-          type="button"
-          data-testid="muse-launcher"
-          aria-label="Ask Muse"
-          onClick={openChat}
-          className="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0"
-        >
-          <MuseOrb state="idle" size={32} />
-          {/* Phones: just the orb, up by the map chips, so it never covers a sheet's buttons. */}
-          <span className="max-md:sr-only">Ask Muse</span>
-        </button>
-      )}
+      {!slotted && <MuseDockButton variant="floating" />}
 
       {snap.open && (
         <section
@@ -193,11 +181,14 @@ export function MuseChat() {
             // desktop: a compact card anchored bottom right, the map stays the focus
             'md:bottom-4 md:right-4 md:w-[380px] md:max-h-[min(580px,calc(100dvh-96px))] md:rounded-card',
             // mobile: a bottom sheet that stops short of the top bar
-            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[min(52dvh,calc(100dvh-176px))] max-md:rounded-t-[16px]',
+            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[min(42dvh,calc(100dvh-176px))] max-md:rounded-t-[16px]',
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">
-            <MuseOrb state="idle" size={36} />
+            <button type="button" aria-label="Make Jolly do a move" title="Tap for a move" disabled={busy || snap.state === 'approaching' || snap.state === 'returning'} onClick={() => window.dispatchEvent(new Event('muse:trick'))}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue">
+              <MuseOrb state={snap.state} size={36} />
+            </button>
             <div className="min-w-0 flex-1">
               <h2 className="text-[16px] font-bold leading-5 text-fb-text">Muse <span aria-hidden>✨</span></h2>
               <p className="truncate text-[12px] leading-4 text-fb-text-2" data-testid="muse-state-label">{demo ? 'Simulation only · illustrative positions · no messages sent' : encounter?.source === 'simulation' ? 'Simulated coordination · offline' : STATE_LABEL[snap.state] ?? 'Ready when you are'}</p>

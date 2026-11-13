@@ -7,9 +7,13 @@
   "scale": { "avatar": 1, "pet": 1.3 },
   "clips": {
     "avatar": { "idle": "person_idle", "walk": "person_run", "talk": "person_idle" },
-    "pet": { "hover": "follow_back", "fly": "follow_back", "think": "thinking", "talk": "talk_front", "happy": "follow_back" }
+    "pet": { "hover": "follow_back", "fly": "follow_back", "think": "thinking", "talk": "talk_front", "happy": "follow_back", "stand": "follow_back", "walk": "follow_back", "listen": "follow_back", "sad": "follow_back" }
   },
-  "timeScale": { "avatar": { "walk": 0.6 } },
+  "timeScale": {
+    "avatar": {
+      "walk": 0.6
+    }
+  },
   "petRelativeMotion": true,
-  "hide": ["Muse_SpeechBubble"]
+  "hide": ["Muse_SpeechBubble", "Muse_ThinkingDots"]
 }

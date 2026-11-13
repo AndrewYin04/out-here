@@ -33,8 +33,9 @@ let seq = 0;
 const nextId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 const reduced = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-export const APPROACH_MS = 700;
-const RETURN_MS = 900;
+// Slow enough to watch: Jolly flies up toward the screen while the camera zooms in (about 2 s).
+export const APPROACH_MS = 2200;
+const RETURN_MS = 1800;
 const SETTLE_MS = 3500;
 
 // ---- the conversation survives a reload of the tab (per persona, per tab) ----
@@ -54,6 +55,7 @@ function ensureOwner() {
   const owner = currentPersona();
   if (owner === store.owner) return;
   cancelInFlight();
+  clearActivity();
   clearTimer();setPlanStatus(null);setPlanSuggestions(null);photoTarget=null;
   store = { encounter: null, snap: { ...INITIAL, selectionSeq: store.snap.selectionSeq }, messages: load(owner), error: null, owner };
 }
@@ -93,6 +95,7 @@ function cancelInFlight() {
 }
 
 export function openChat(): void {
+  clearActivity();
   const photoCancelled=!!photoAction;
   if (photoAction) { photoAction.controller.abort(); photoAction=null; photoTarget=null; store={...store,snap:{...store.snap,state:'idle',energy:'fade'}}; }
   // One surface at a time: the "I'm free" composer and the chat never stack.
@@ -101,6 +104,7 @@ export function openChat(): void {
 }
 
 export function closeChat(): void {
+  clearActivity();
   const hadPhoto=!!photoAction;
   cancelInFlight();
   photoTarget=null;
@@ -137,7 +141,7 @@ export function sendMessage(raw: string): boolean {
       save();
       setPlanSuggestions(plan.suggestions);
       setPlanStatus(null);
-      museDispatch({ type: 'MUSE_RESPONSE_RECEIVED', live: museSource === 'muse' });
+      museDispatch({ type: 'MUSE_RESPONSE_RECEIVED', live: museSource === 'muse' && plan.suggestions.length > 0 && plan.meta?.cache?.rank !== true });
       emit();
     },
     (err: unknown) => {
@@ -196,9 +200,9 @@ export function useChatError(): string | null {
 
 /** For tests. */
 export function resetCompanionForTests(): void {
-  clearTimer(); cancelInFlight();
+  clearTimer(); cancelInFlight(); clearActivity();
   store = { encounter: null, snap: INITIAL, messages: [], error: null, owner: '' };
-  worldOwners=0;viewport=EMPTY_VIEWPORT;photoTarget=null;
+  worldOwners=0;worldViews=0;viewport=EMPTY_VIEWPORT;photoTarget=null;
 }
 
 export const getCompanionForTests = () => store;
@@ -228,7 +232,8 @@ export function sendAgentMessage(raw: string, recipient: AgentRecipient, transpo
       if (!store.encounter || store.encounter.id !== id) return;
       store = { ...store, encounter: { ...store.encounter,
         sent: store.encounter.sent + (event.type === 'sent' ? 1 : 0),
-        received: store.encounter.received + (event.type === 'received' ? 1 : 0), messages: [...store.encounter.messages, event.type] } };
+        received: store.encounter.received + (event.type === 'received' ? 1 : 0), messages: [...store.encounter.messages, event.type],
+        notes: event.note ? [...(store.encounter.notes ?? []), { dir: event.type as 'sent' | 'received', text: event.note }] : store.encounter.notes } };
     }
     seen.add(event.id); emit();
   };
@@ -280,6 +285,8 @@ export function reportAgentRecipientError(): void { store={...store,error:"Name 
 /** Photo request lease in the existing controller; no second character state machine. */
 export function beginPhotoAnalysis(controller:AbortController):number|null {
   ensureOwner();
+  if(activity?.priority==='background')clearActivity();
+  if(activity)return null;
   if(photoAction?.controller.signal.aborted)endPhotoAnalysis(photoAction.id,'cancelled');
   if(controller.signal.aborted)return null;
   if (inFlight || photoAction || store.encounter || ['sending','receiving','thinking','evaluating'].includes(store.snap.state)) return null;
@@ -298,10 +305,21 @@ export function endPhotoAnalysis(id:number, outcome:'live'|'mock'|'error'|'cance
 }
 
 /** Presentation ownership never owns or cancels an API request. */
-export function attachMuseWorld():()=>void {
-  worldOwners++;let attached=true;
-  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(!worldOwners&&store.encounter){store={...store,encounter:null};emit();}};
+/** A view that shows encounters (the 3D world, or the 2D map's hand-off) keeps a finished one on screen until it calls finishAgentEncounter. */
+export function attachMuseWorld(kind:'world'|'map'='world'):()=>void {
+  worldOwners++;if(kind==='world')worldViews++;let attached=true;emit();
+  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(kind==='world')worldViews=Math.max(0,worldViews-1);if(!worldOwners&&store.encounter)store={...store,encounter:null};emit();};
 }
+let worldViews=0;
+/** True while the 3D world is showing Jolly (the map's docked Jolly steps aside). */
+export function useMuseInWorld():boolean {return useSyncExternalStore(subscribe,()=>worldViews>0,()=>false);}
+
+// Where Jolly was on screen when the 3D world closed, so the map's docked Jolly can fly out from there.
+let dockFrom:{x:number;y:number;at:number}|null=null;
+/** The 3D world records Jolly's last screen position (viewport px) as it closes. */
+export function setMuseDockFrom(p:{x:number;y:number}):void {dockFrom=Number.isFinite(p.x)&&Number.isFinite(p.y)?{x:p.x,y:p.y,at:Date.now()}:null;}
+/** Takes the recorded position once, if the world closed in the last moment; otherwise null. */
+export function takeMuseDockFrom():{x:number;y:number}|null {const d=dockFrom;dockFrom=null;return d&&Date.now()-d.at<1500?{x:d.x,y:d.y}:null;}
 /** Dashboard collapse hides the conversation while preserving pending backend work. */
 export function minimizeChat():void {store={...store,snap:{...store.snap,open:false}};emit();}
 export function setMuseViewport(next:MuseViewport):void {if(JSON.stringify(viewport)===JSON.stringify(next))return;viewport=next;emit();}
@@ -311,3 +329,78 @@ export function setPhotoAnalysisTarget(id:number,rect:{left:number;top:number;wi
   photoTarget=rect?{requestId:id,rect:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}}:null;
 }
 export function photoTargetForRender(){return photoTarget;}
+
+
+export type MuseActivityOutcome = 'success' | 'empty' | 'error' | 'cancelled';
+export type MuseActivity = {
+  requestId: number; owner: string; source: string; target?: string;
+  pending: string; priority: 'foreground' | 'background';
+  message?: string; outcome: MuseActivityOutcome | null; cached?: boolean; live?: boolean;
+};
+let activity: MuseActivity | null = null;
+let activityTimer: ReturnType<typeof setTimeout> | null = null;
+let detachActivitySignal: (() => void) | null = null;
+/** Release presentation only. The surface still owns its fetch and result. */
+function clearActivity(): void {
+  if(activityTimer)clearTimeout(activityTimer);
+  activityTimer=null;
+  detachActivitySignal?.();detachActivitySignal=null;
+  if(!activity)return;
+  activity=null;
+  if(!inFlight&&!photoAction)store={...store,snap:{...store.snap,state:'idle',energy:'fade'}};
+}
+export function beginMuseActivity(options: {
+  owner:string; source:string; target?:string; pending:string;
+  priority?:'foreground'|'background'; signal?:AbortSignal;
+}):number|null {
+  ensureOwner();
+  if(options.signal?.aborted)return null;
+  const priority=options.priority??'foreground';
+  // An explicit conversation or encounter always owns its character. Quiet reads never steal it.
+  if(inFlight||photoAction||(store.encounter&&!store.encounter.outcome)||store.snap.open)return null;
+  if(activity&&!activity.outcome&&(priority==='background'||activity.priority==='foreground'))return null;
+  clearActivity();clearTimer();
+  const id=++runId;
+  activity={requestId:id,owner:options.owner,source:options.source,target:options.target,pending:options.pending,priority,outcome:null};
+  store={...store,snap:{...store.snap,state:'evaluating',energy:'pending'}};
+  if(options.signal){
+    const onAbort=()=>releaseMuseActivity(id);
+    options.signal.addEventListener('abort',onAbort,{once:true});
+    detachActivitySignal=()=>options.signal?.removeEventListener('abort',onAbort);
+  }
+  emit();return id;
+}
+export function finishMuseActivity(id:number|null,result:{outcome:MuseActivityOutcome;message?:string;cached?:boolean;live?:boolean}):void {
+  ensureOwner();
+  if(id===null||activity?.requestId!==id)return;
+  if(result.outcome==='cancelled'){releaseMuseActivity(id);return;}
+  activity={...activity,...result};
+  const success=result.outcome==='success';
+  store={...store,snap:{...store.snap,state:success?'delivering':result.outcome==='error'?'error':'idle',energy:success&&!result.cached&&result.live!==false?'success':'fade'}};
+  emit();
+  activityTimer=setTimeout(()=>{if(activity?.requestId!==id)return;clearActivity();emit();},result.cached?1400:3000);
+}
+export function releaseMuseActivity(id:number|null):void {
+  if(id===null||activity?.requestId!==id)return;
+  clearActivity();emit();
+}
+export function useMuseActivity():MuseActivity|null {
+  return useSyncExternalStore(subscribe,()=>{ensureOwner();return activity;},()=>null);
+}
+export const getMuseActivityForTests=()=>activity;
+
+/**
+ * Muse speaking up on its own, from a real event (a friend just shared that they're free). Shown by
+ * the docked Jolly; its action asks the friend's Muse, the same as typing it in the chat.
+ */
+export type MuseNudge = { id: string; title: string; detail: string; quote: string | null; friend: AgentRecipient; ask: string; action: string };
+let nudge: MuseNudge | null = null;
+export function showMuseNudge(n: MuseNudge): void { nudge = n; emit(); }
+export function dismissMuseNudge(id?: string): void { if (!nudge || (id && nudge.id !== id)) return; nudge = null; emit(); }
+export function useMuseNudge(): MuseNudge | null { return useSyncExternalStore(subscribe, () => nudge, () => null); }
+
+// The Out Here control row hosts Jolly (MuseDockButton variant="row"); while it is mounted the
+// floating Jolly is not shown, so there is only ever one Muse button.
+let dockSlots = 0;
+export function registerMuseDockSlot(): () => void { dockSlots++; emit(); return () => { dockSlots = Math.max(0, dockSlots - 1); emit(); }; }
+export function useMuseDockSlotted(): boolean { return useSyncExternalStore(subscribe, () => dockSlots > 0, () => false); }

@@ -55,8 +55,10 @@ describe('muse filter: mock mode', () => {
     expect(out.keep[0]!.kind).toBe('friend');
   });
 
-  it('maya, explore, no text: a short list is kept whole, never emptied', async () => {
+  it('a short explore candidate list is kept whole, never emptied', async () => {
     const ctx = await ctxFor(maya);
+    const shortIds = new Set(questCandidates(ctx).slice(0, 3).map(q => q.id));
+    ctx.quests = ctx.quests.filter(q => shortIds.has(q.id));
     const total = questCandidates(ctx).length;
     const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
     expect(total).toBeGreaterThan(0);

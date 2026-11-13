@@ -4,8 +4,8 @@
 // 1 verdict, 2 "Which was better?" placement, 3 highlights + private note + photos,
 // 4 "Hang out with them again?" per attendee, then a done screen with the score and rank.
 import { Check, Lock, X } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { apiFetch, apiPost, currentPersona } from '@/features/data';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { apiFetch, apiPost, currentPersona, useViewer } from '@/features/data';
 import { Avatar, Button, Chip, Modal, Skeleton, cn } from '@/features/ui';
 import {
   HANGOUT_HIGHLIGHTS, type HangoutRating, type HangoutRatingState, type HangoutVerdict, type ID, type Memory, type Quest,
@@ -13,6 +13,7 @@ import {
 import { AddPhotoTile } from './MemoryCapture';
 import { MemoryThumb } from './MemoryThumb';
 import { fallbackTakeaway } from './takeaway';
+import { beginMuseActivity, finishMuseActivity, releaseMuseActivity, MuseActivityStatus } from '@/features/muse-companion';
 import {
   answerComparison, bucketMidpoint, nextComparison, placementIndex, rankOf, scoreAt, startPlacement, type Placement,
 } from './placement';
@@ -40,9 +41,10 @@ const FRESH = { headers: { 'x-outhere-fresh': '1' } };
 export function RateHangoutDialog({ questId, crewId = null, initialPhotoIds, onClose, onSaved }: {
   questId: ID | null; crewId?: ID | null; initialPhotoIds?: ID[]; onClose: () => void; onSaved?: (rating: HangoutRating) => void;
 }) {
+  const { handle } = useViewer();
   return (
     <Modal open={!!questId} onClose={onClose} title="Rate your hangout" size="md">
-      {questId && <RateHangout key={questId} questId={questId} crewId={crewId} initialPhotoIds={initialPhotoIds} onClose={onClose} onSaved={onSaved} />}
+      {questId && <RateHangout key={`${handle}:${questId}`} questId={questId} crewId={crewId} initialPhotoIds={initialPhotoIds} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
 }
@@ -65,7 +67,18 @@ export function RateHangout({ questId, crewId, initialPhotoIds, onClose, onSaved
   const [saveError, setSaveError] = useState<string | null>(null);
   const [result, setResult] = useState<{ score: number; rank: number; total: number } | null>(null);
   // null while Muse writes it; byMuse false means the code template is shown, without the label.
-  const [takeaway, setTakeaway] = useState<{ text: string; byMuse: boolean } | null>(null);
+  const [takeaway, setTakeaway] = useState<{ text: string; byMuse: boolean; offline?: boolean } | null>(null);
+  const takeawayRequest = useRef<{ controller: AbortController; activity: number | null } | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      takeawayRequest.current?.controller.abort();
+      if (takeawayRequest.current?.activity != null) releaseMuseActivity(takeawayRequest.current.activity);
+      takeawayRequest.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -169,6 +182,7 @@ export function RateHangout({ questId, crewId, initialPhotoIds, onClose, onSaved
         again: Object.entries(again).map(([subjectId, a]) => ({ subjectId, again: a })),
       }, 'PUT');
       const { ratings } = await apiFetch<MyRatings>('/api/me/ratings', FRESH).catch(() => ({ ratings: [rating] as MyRatings['ratings'] }));
+      if (!alive.current) return;
       setResult({ score: rating.score, rank: rankOf(rating.score, ratings.map((r) => r.score)), total: ratings.length });
       setTakeaway(null);
       setStep('done');
@@ -177,13 +191,28 @@ export function RateHangout({ questId, crewId, initialPhotoIds, onClose, onSaved
       // stands in, unlabeled, when the call fails.
       const yes = attendees.filter((p) => again[p.id] === true).map((p) => p.name.split(' ')[0]);
       const fallback = { text: fallbackTakeaway(verdict, highlights, yes), byMuse: false };
-      apiPost<{ takeaway: string; byMuse: boolean }>('/api/muse/rating-takeaway', { questId })
-        .then((t) => setTakeaway({ text: t.takeaway, byMuse: t.byMuse }))
-        .catch(() => setTakeaway(fallback));
+      const controller = new AbortController();
+      const activity = beginMuseActivity({ owner: `rating:${questId}`, source: 'rating-takeaway', target: 'rating-takeaway', pending: 'is writing a note from your saved rating…', priority: 'foreground', signal: controller.signal });
+      takeawayRequest.current = { controller, activity };
+      fetch('/api/muse/rating-takeaway', { method: 'POST', headers: { 'content-type': 'application/json', 'x-persona': currentPersona() }, body: JSON.stringify({ questId }), signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Takeaway unavailable');
+          const t = await res.json() as { takeaway: string; byMuse: boolean; cached?: boolean };
+          if (controller.signal.aborted || !alive.current) return;
+          const offline = res.headers.get('x-muse-mode') === 'mock';
+          setTakeaway({ text: t.takeaway, byMuse: t.byMuse && !offline, offline });
+          finishMuseActivity(activity, { outcome: 'success', live: t.byMuse && !offline, cached: t.cached, message: offline ? 'has an offline note ready.' : t.byMuse ? 'has a note for your next plan.' : 'saved your rating. A simple summary is ready.' });
+        })
+        .catch(() => {
+          if (controller.signal.aborted || !alive.current) return;
+          setTakeaway(fallback);
+          finishMuseActivity(activity, { outcome: 'error', message: 'couldn’t write a note. Your rating is saved.' });
+        });
     } catch (e) {
+      if (!alive.current) return;
       setSaveError(e instanceof Error ? e.message : 'Couldn’t save your rating.');
     } finally {
-      setSaving(false);
+      if (alive.current) setSaving(false);
     }
   }
 
@@ -346,14 +375,16 @@ export function RateHangout({ questId, crewId, initialPhotoIds, onClose, onSaved
             {result.score.toFixed(1)}, your #{result.rank} hangout{result.total > 1 ? ` of ${result.total}` : ''}
           </p>
           <p className="mt-1 text-[13px] text-fb-text-2">{quest.emoji} {quest.title}</p>
+          <MuseActivityStatus owner={`rating:${questId}`} />
           <div className="mt-4 w-full rounded-card bg-fb-bg p-3 text-left" data-testid="rating-takeaway" aria-busy={!takeaway}>
             {!takeaway ? (
               <>
                 <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>
-                <p className="mt-1 text-[15px] text-fb-text-2">Muse is noting what to look for next time…</p>
+                <p className="mt-1 text-[15px] text-fb-text-2">Muse is writing a note from your saved rating…</p>
               </>
             ) : (
               <>
+                {takeaway.offline && <p className="text-[12px] font-semibold text-fb-text-2">Offline summary</p>}
                 {takeaway.byMuse && <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>}
                 <p className={cn('text-[15px] text-fb-text', takeaway.byMuse && 'mt-1')}>{takeaway.text}</p>
               </>

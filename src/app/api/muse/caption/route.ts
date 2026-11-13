@@ -33,5 +33,5 @@ export const POST = route(async ({ store, viewer, req }) => {
     route: 'muse/caption', userId: viewer.id,
     signal:req.signal,
   });
-  return {...result.data,mode:result.mock?'mock':'live',source:'context'};
+  return {...result.data,mode:result.mock?'mock':'live',source:'context',cached:result.cached===true};
 });

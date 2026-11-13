@@ -21,6 +21,9 @@ export type CacheEntry = {
   createdAt: string;
 };
 
+/** A run as the viewer's own "what Muse did" list sees it. */
+export type MuseOpRow = { route: string; model: string; latencyMs: number; ok: boolean; cached: boolean; mock: boolean; at: string };
+
 export type RunCounts = { live: number; cached: number; failed: number; mock: number };
 
 export interface MuseRunStore {
@@ -33,6 +36,8 @@ export interface MuseRunStore {
   setPrebakedFlag(on: boolean): Promise<void>;
   /** For the warm-up and docs: what the log says since a moment, and how many entries exist. */
   stats(sinceIso: string): Promise<{ entries: number; runs: RunCounts }>;
+  /** One person's most recent runs, newest first: metadata only (no input, output or error text). */
+  recent(userId: string, limit: number): Promise<MuseOpRow[]>;
   /** Removes every cached answer (not the run log). */
   clearCache(): Promise<number>;
 }
@@ -100,6 +105,14 @@ export function createMemoryRunStore(opts: { persistDir?: string | null } = {}):
       const c: RunCounts = { live: 0, cached: 0, failed: 0, mock: 0 };
       for (const r of runs) if (r.createdAt >= since) countRun(c, r);
       return { entries: cache.size, runs: c };
+    },
+    async recent(userId, limit) {
+      const out: MuseOpRow[] = [];
+      for (let i = runs.length - 1; i >= 0 && out.length < limit; i--) {
+        const r = runs[i];
+        if (r.userId === userId) out.push({ route: r.route, model: r.model, latencyMs: r.latencyMs, ok: r.ok, cached: r.cached, mock: r.mock, at: r.createdAt });
+      }
+      return out;
     },
     async clearCache() {
       const n = cache.size;
@@ -197,6 +210,17 @@ export function createSupabaseRunStore(client: SupabaseClient): MuseRunStore {
         countRun(c, { ok: r.ok, cached: r.cached ?? false, mock: r.mock ?? false });
       }
       return { entries: entries.count ?? 0, runs: c };
+    },
+    async recent(userId, limit) {
+      try {
+        const { data } = await client.from('muse_runs')
+          .select(runColumnsMissing ? 'route, model, latency_ms, ok, created_at' : 'route, model, latency_ms, ok, cached, mock, created_at')
+          .eq('user_id', userId).order('created_at', { ascending: false }).limit(limit).abortSignal(signal());
+        return ((data ?? []) as unknown as { route: string; model: string; latency_ms: number; ok: boolean; cached?: boolean; mock?: boolean; created_at: string }[])
+          .map((r) => ({ route: r.route, model: r.model, latencyMs: r.latency_ms, ok: r.ok, cached: r.cached ?? false, mock: r.mock ?? false, at: r.created_at }));
+      } catch {
+        return [];
+      }
     },
     async clearCache() {
       const { error, count } = await client.from('muse_cache').delete({ count: 'exact' }).neq('input_hash', '');

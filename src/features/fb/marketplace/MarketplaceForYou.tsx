@@ -6,21 +6,16 @@
 // watched just now shows up here as "New".
 import { ChevronDown, ChevronUp, MapPin, Plus, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useApi, useViewer } from '@/features/data';
-import { MuseLabel, MuseStepsDone, MuseStepsLoading, type MuseStep } from '@/features/outhere';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiFetch, useChannel, useViewer } from '@/features/data';
+import { MuseLabel, MuseStepsDone, type MuseStep } from '@/features/outhere';
 import { Avatar, cn } from '@/features/ui';
 import { DEMO_CENTER, formatDemoTime } from '@/shared';
 import type { Listing } from '@/shared';
 import type { MarketplacePick, MarketplacePicksResponse, PersonCard } from '@/shared/api';
 import { PageHeader } from '../shell';
+import { beginMuseActivity, finishMuseActivity, releaseMuseActivity, MuseActivityStatus } from '@/features/muse-companion';
 
-const LOADING = [
-  'Reading what you watched this week…',
-  'Finding what you’re into…',
-  'Checking listings near you…',
-  'Keeping only what fits…',
-] as const;
 const EXCLUDE_KEY = 'outhere:marketplace-exclude';
 
 const money = (n: number) => (n === 0 ? 'Free' : `$${Number.isInteger(n) ? n : n.toFixed(2)}`);
@@ -55,13 +50,36 @@ function steps(r: MarketplacePicksResponse, excluded: string[]): MuseStep[] {
 }
 
 export function MarketplaceForYou() {
-  const { viewer } = useViewer();
+  const { viewer, handle } = useViewer();
   const [exclude, setExclude] = useExclude();
   const [showAll, setShowAll] = useState(false);
   const path = `/api/muse/marketplace-picks?lat=${DEMO_CENTER.lat}&lng=${DEMO_CENTER.lng}${exclude.length ? `&exclude=${encodeURIComponent(exclude.join(','))}` : ''}`;
-  const api = useApi<MarketplacePicksResponse>(path, [`user:${viewer.id}`]);
-  const r = api.data;
-  const { refetch } = api;
+  const [responseState, setResponse] = useState<{ handle: string; data: MarketplacePicksResponse } | null>(null);
+  const r = responseState?.handle === handle ? responseState.data : null;
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refresh, setRefresh] = useState(0);
+  const refetch = useCallback(async () => { setRefresh((value) => value + 1); }, []);
+  useChannel([`user:${viewer.id}`], (_channel, payload) => { if (payload.type === 'watch' || payload.resync) void refetch(); });
+  useEffect(() => {
+    const controller = new AbortController();
+    const activity = beginMuseActivity({ owner: 'marketplace-picks', source: 'marketplace-picks', target: 'marketplace-picks', pending: 'is loading picks from what you watch…', priority: 'background', signal: controller.signal });
+    setLoading(true);
+    setError(null);
+    apiFetch<MarketplacePicksResponse>(path, { signal: controller.signal, headers: { 'x-outhere-fresh': '1' } })
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        setResponse({ handle, data: response });
+        finishMuseActivity(activity, { outcome: response.picks.length ? 'success' : 'empty', live: response.source === 'muse', cached: response.cached, message: response.picks.length ? response.source === 'mock' ? 'has offline picks ready.' : response.source === 'fallback' ? 'couldn’t answer. Simple matches are ready.' : 'has picks ready to explore.' : 'found no nearby picks for this watch history.' });
+      })
+      .catch((e: unknown) => {
+        if (controller.signal.aborted) return;
+        setError(e instanceof Error ? e.message : 'Could not load picks');
+        finishMuseActivity(activity, { outcome: 'error', message: 'couldn’t load your picks. Try again.' });
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => { controller.abort(); releaseMuseActivity(activity); };
+  }, [path, handle, refresh]);
   // Back from the Watch page (or another tab): pick again.
   useEffect(() => {
     const on = () => { if (document.visibilityState === 'visible') void refetch(); };
@@ -73,15 +91,15 @@ export function MarketplaceForYou() {
   const live = r?.source === 'muse';
 
   return (
-    <div className="pb-6" data-testid="marketplace-for-you">
+    <div id="marketplace-picks" className="pb-6" data-testid="marketplace-for-you">
       <PageHeader
         title="Marketplace"
         subtitle={<span className="inline-flex flex-wrap items-center gap-1.5"><span aria-hidden>✨</span> Picked by Muse from what you watch</span>}
         action={<Link href="/watch" className="text-[15px] font-semibold text-fb-blue hover:underline">Watch</Link>}
       />
       <div className="flex flex-col gap-3 px-4 md:px-0">
-        {!r && <MuseStepsLoading steps={LOADING} className="max-w-[560px]" />}
-        {api.error && !r && <p className="text-[15px] text-fb-text-2">Muse couldn’t load your picks. Try again in a moment.</p>}
+        <MuseActivityStatus owner="marketplace-picks" fallback={loading ? 'Loading picks from what you watch…' : undefined} />
+        {error && <div role="alert" className="flex items-center gap-3 text-[15px] text-fb-text-2"><p>Couldn’t load your picks.</p><button type="button" onClick={() => void refetch()} className="min-h-10 font-semibold text-fb-blue hover:underline">Try again</button></div>}
 
         {r && (
           <>
@@ -92,7 +110,7 @@ export function MarketplaceForYou() {
               <div className="rounded-card bg-fb-surface p-4 text-[15px] text-fb-text shadow-card" data-testid="picks-empty">
                 {r.videosRead === 0
                   ? <>Watch a few videos and Muse will pick from Marketplace for you. <Link href="/watch" className="font-semibold text-fb-blue hover:underline">Go to Watch</Link></>
-                  : 'Nothing nearby fits what you watch right now. Muse will keep looking.'}
+                  : 'Nothing nearby fits what you watch right now. Try changing your topics or browse all items.'}
               </div>
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="picks">

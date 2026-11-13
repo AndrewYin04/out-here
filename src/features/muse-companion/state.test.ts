@@ -68,5 +68,8 @@ describe('muse companion state', () => {
     expect(petPose(INITIAL)).toEqual({ front: false, clip: 'hover' });
     expect(petPose({ ...INITIAL, open: true, state: 'thinking' })).toEqual({ front: true, clip: 'think' });
     expect(petPose({ ...INITIAL, open: true, state: 'responding' })).toEqual({ front: true, clip: 'talk' });
+    expect(petPose({ ...INITIAL, open: true, state: 'listening' })).toMatchObject({ clip: 'listen' });
+    expect(petPose({ ...INITIAL, open: true, state: 'error' })).toMatchObject({ clip: 'sad' });
+    expect(petPose({ ...INITIAL, open: true, state: 'celebrating' })).toMatchObject({ clip: 'happy' });
   });
 });

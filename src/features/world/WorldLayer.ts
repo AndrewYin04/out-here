@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
-import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
+import { MuseTrail, SparkleWake, type MuseTrailModeSetting } from './muse-trail';
 import { stadiumSeats } from './stadiums';
 import type { TreeSpot } from './trees';
 import {buildTreeBatch,type TreeBatch} from './vegetation';
@@ -35,6 +35,15 @@ type Actor = {
   trail: MuseTrail | null;
   /** A soft ground shadow (avatars). Depth-tested in the main scene, so buildings still cover it. */
   shadow: THREE.Mesh | null;
+  /** Size multiplier (Jolly grows toward the screen while the Muse chat is open). */
+  boost: number;
+  /** Hidden (the avatar steps out of frame while Jolly fills the chat view). */
+  hidden: boolean;
+  /** Jolly's sparkle trail on the ground, and whether his thinking effect is on. */
+  sparkles: SparkleWake | null;
+  processing: 'off' | 'pending' | 'success' | 'fade';
+  /** A Muse-blue glow behind Jolly, so he stands out from the street. */
+  halo: THREE.Sprite | null;
 };
 export type BeaconSpec = {
   id: string; pos: LatLng; color: string; height: number; strong: boolean;
@@ -58,6 +67,28 @@ const GOLD = '#F5B800';
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
+/** Off: no glow around Jolly (asked for). The cool back light still separates him from the street. */
+const SHOW_HALO = false;
+
+/** Jolly's halo: Muse blue, bright cyan in the middle, fading out (drawn additively behind him). */
+function haloTexture(): THREE.Texture {
+  if (typeof document === 'undefined') return new THREE.Texture();
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (g) {
+    const grad = g.createRadialGradient(32, 32, 4, 32, 32, 31);
+    grad.addColorStop(0, 'rgba(140, 220, 255, 0.8)');
+    grad.addColorStop(0.45, 'rgba(35, 160, 255, 0.42)');
+    grad.addColorStop(1, 'rgba(8, 102, 255, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** A soft round shadow: dark in the middle, fading to nothing at the edge. */
 function shadowTexture(): THREE.Texture {
   if (typeof document === 'undefined') return new THREE.Texture();
@@ -66,9 +97,9 @@ function shadowTexture(): THREE.Texture {
   const g = c.getContext('2d');
   if (g) {
     const grad = g.createRadialGradient(32, 32, 2, 32, 32, 31);
-    grad.addColorStop(0, 'rgba(10, 20, 35, 0.42)');
-    grad.addColorStop(0.55, 'rgba(10, 20, 35, 0.22)');
-    grad.addColorStop(1, 'rgba(10, 20, 35, 0)');
+    grad.addColorStop(0, 'rgba(15, 22, 38, 0.6)');
+    grad.addColorStop(0.5, 'rgba(15, 22, 38, 0.34)');
+    grad.addColorStop(1, 'rgba(15, 22, 38, 0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
   }
@@ -84,6 +115,8 @@ export class WorldLayer implements CustomLayerInterface {
 
   private map: MapLibreMap | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
+  private feet = new THREE.Vector3();
+  private bufSize = new THREE.Vector2();
   /** Trees and beacons: depth-tested against the 3D buildings. */
   private scene = new THREE.Scene();
   /** Characters: drawn after a depth clear, so a building never hides you (as in Pokémon GO). */
@@ -118,6 +151,8 @@ export class WorldLayer implements CustomLayerInterface {
   private trailPos = new THREE.Vector3();
   private trailAnchor = new THREE.Vector3();
   private shadowGeo = new THREE.PlaneGeometry(1, 1);
+  private haloCenter = new THREE.Vector3();
+  private haloMat = new THREE.SpriteMaterial({ map: haloTexture(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .85 });
   private shadowMat = new THREE.MeshBasicMaterial({
     map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
@@ -137,13 +172,18 @@ export class WorldLayer implements CustomLayerInterface {
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
     const m=this.originMerc.meterInMercatorCoordinateUnits();
     this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
-    this.scene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    this.charScene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    const sun2 = new THREE.DirectionalLight('#FFF2D9', 2.4);
-    sun2.position.set(-5,8,7);
+    // Clear daylight: a bright sky fill and a sun from the south-west (shadows fall north-east).
+    this.scene.add(new THREE.HemisphereLight('#EAF4FF', '#D3D8C6', 1.2));
+    this.charScene.add(new THREE.HemisphereLight('#EAF4FF', '#D3D8C6', .95));
+    const sun2 = new THREE.DirectionalLight('#FFF7EC', 2.7);
+    sun2.position.set(-6,5,6);
     this.charScene.add(sun2);
-    const sun = new THREE.DirectionalLight('#FFF2D9', 2.4);
-    sun.position.set(-5,8,7);
+    // A soft cool back light outlines the characters against the warm street.
+    const rim = new THREE.DirectionalLight('#BFD8FF', 1.4);
+    rim.position.set(5,4,-7);
+    this.charScene.add(rim);
+    const sun = new THREE.DirectionalLight('#FFF7EC', 2.6);
+    sun.position.set(-6,5,6);
     this.scene.add(sun);
   }
 
@@ -160,6 +200,19 @@ export class WorldLayer implements CustomLayerInterface {
     }
   }
 
+  /** Rebuild people's characters after a My look change (Jolly keeps his own model). */
+  refreshAvatars() {
+    for (const a of this.actors.values()) {
+      if (a.kind === 'pet') continue;
+      const previous = a.char;
+      const next = makeAvatar(this.models, a.seed);
+      next.root.position.copy(previous.root.position); next.root.quaternion.copy(previous.root.quaternion); next.root.scale.copy(previous.root.scale);
+      next.root.traverse((o) => { o.frustumCulled = !(o as THREE.SkinnedMesh).isSkinnedMesh; });
+      next.setState(a.state);
+      this.charScene.remove(previous.root); previous.dispose(); a.char = next; this.charScene.add(next.root);
+    }
+  }
+
   upsertActor(id: string, kind: ActorKind, seed: string) {
     if (this.actors.has(id)) return;
     const char = kind === 'pet' ? makePet(this.models, seed) : makeAvatar(this.models, seed);
@@ -168,23 +221,34 @@ export class WorldLayer implements CustomLayerInterface {
     // The walking view gets the calm wake; the showpiece style is for flights and later animations.
     const trail = kind === 'pet' ? new MuseTrail({ style: 'walk' }) : null;
     if (trail) this.charScene.add(trail.object);
+    const sparkles = kind === 'pet' ? new SparkleWake() : null;
+    if (sparkles) this.charScene.add(sparkles.object);
     let shadow: THREE.Mesh | null = null;
-    if (kind === 'avatar') {
+    {
       shadow = new THREE.Mesh(this.shadowGeo, this.shadowMat);
       shadow.rotation.x = -Math.PI / 2;
       shadow.renderOrder = 1;
       shadow.frustumCulled = false;
       this.scene.add(shadow);
     }
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow });
+    let halo: THREE.Sprite | null = null;
+    if (kind === 'pet' && SHOW_HALO) {
+      halo = new THREE.Sprite(this.haloMat);
+      halo.renderOrder = -1;
+      halo.frustumCulled = false;
+      this.charScene.add(halo);
+    }
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow, boost: 1, hidden: false, sparkles, processing: 'off', halo });
   }
 
   removeActor(id: string) {
     const a = this.actors.get(id);
     if (!a) return;
     this.charScene.remove(a.char.root);
-    a.trail?.dispose();
+    if(a.trail){this.charScene.remove(a.trail.object);a.trail.dispose();}
+    if (a.sparkles) { this.charScene.remove(a.sparkles.object); a.sparkles.dispose(); }
     if (a.shadow) this.scene.remove(a.shadow);
+    if (a.halo) this.charScene.remove(a.halo);
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
     this.actors.delete(id);
@@ -192,13 +256,24 @@ export class WorldLayer implements CustomLayerInterface {
 
   actorIds(): string[] { return [...this.actors.keys()]; }
 
+  setHidden(id: string, hidden: boolean) { const a = this.actors.get(id); if (a) a.hidden = hidden; }
+
+  setBoost(id: string, boost: number) { const a = this.actors.get(id); if (a) a.boost = boost; }
+
   setPose(id: string, pos: LatLng, heading: number, altitude = 0) {
     const a = this.actors.get(id);
     if (!a) return;
     a.pos = pos; a.heading = heading; a.altitude = altitude;
   }
 
-  setState(id: string, state: string) { const a=this.actors.get(id);if(!a||(a.state===state&&!['wave','happy','celebrate'].includes(state)))return;a.state=state;a.char.setState(state); }
+  setState(id: string, state: string) {
+    const a = this.actors.get(id);
+    if (!a) return;
+    // One-shot moves play over his current state (and do not change it).
+    if (a.kind === 'pet' && ['jump', 'cheer', 'spin', 'dance', 'nod', 'wave', 'happy', 'celebrate'].includes(state)) { a.char.setState(state); return; }
+    if (a.state === state && !['wave', 'happy', 'celebrate'].includes(state)) return;
+    a.state = state; a.char.setState(state);
+  }
 
   /** Muse's wake follows its speed by default ('auto'); force a look for scripted moves. */
   setTrailMode(id: string, mode: MuseTrailModeSetting) { this.actors.get(id)?.trail?.setMode(mode); }
@@ -211,7 +286,15 @@ export class WorldLayer implements CustomLayerInterface {
   }
   setMuseTrailStyle(id: string, style: 'walk' | 'full') { this.actors.get(id)?.trail?.setConfig({style, seed:id, ...(id.startsWith('muse:') ? {brightBlue:'#23D9F5',cyanAccent:'#B8F7FF'} : {})}); }
 
-  setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { this.actors.get(id)?.trail?.setProcessing(phase); }
+  setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { const a = this.actors.get(id); if (a) a.processing = phase; a?.trail?.setProcessing(phase); }
+
+  /** Stable rest-pose elevation, independent of thinking, gestures and breathing. */
+  actorCameraElevation(id: string, boost: number): number {
+    const a = this.actors.get(id);
+    if (!a) return 0;
+    const scale = characterScale(this.map?.getZoom() ?? 22);
+    return a.altitude * scale + (a.char.cameraHeight ?? a.char.height / 2) * .9 * scale * boost;
+  }
 
   /** Actual animated body centre, in map-canvas pixels, for the existing camera rig. */
   actorScreenPoint(id: string, out: { x: number; y: number; elevation: number }): boolean {
@@ -368,6 +451,7 @@ export class WorldLayer implements CustomLayerInterface {
     this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
+    this.haloMat.map?.dispose(); this.haloMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
     this.standGeo.dispose(); this.floorGeo.dispose(); this.seatGeo.dispose(); this.standMat.dispose(); this.seatMat.dispose();
@@ -402,20 +486,34 @@ export class WorldLayer implements CustomLayerInterface {
 
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
-      const s = a.kind === 'pet' ? scale * 0.9 : scale;
-      a.char.root.visible = showChars;
+      const s = (a.kind === 'pet' ? scale * 0.9 : scale) * a.boost;
+      a.char.root.visible = showChars && !a.hidden;
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
       const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
       const delta=Math.atan2(Math.sin(target-current),Math.cos(target-current));
       const reduced=this.motionQuery?.matches;
       a.char.root.rotation.set(0,a.posed&&!reduced?current+delta*(1-Math.exp(-dt*10)):target,0);a.posed=true;
       a.char.root.scale.setScalar(s);
-      if(showChars)a.char.update(dt, this.elapsed);
+      if(showChars)a.char.update(reduced?0:dt, reduced?0:this.elapsed);
       if (a.shadow) {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
-        a.shadow.visible = showChars;
+        a.shadow.visible = showChars && !a.hidden;
         a.shadow.position.set(o.east, 0.04, -o.north);
-        a.shadow.scale.set(s * 1.05, s * 1.05, 1);
+        // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
+        const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;
+        // Cast by the sun (south-west): stretched and pushed toward the north-east.
+        const k = s * foot * (a.boost || 1);
+        a.shadow.scale.set(k * 1.15, k * 1.5, 1);
+        a.shadow.rotation.z = Math.PI / 4;
+        // Just above the street surface (the city kit's road and kerb tiles stand ~0.2 m proud).
+        a.shadow.position.set(o.east + .32 * k, 0.26, -o.north - .32 * k);
+      }
+      if (a.halo) {
+        // Behind Jolly, centred on his body, scaled with him; it makes him read against grey streets.
+        a.halo.visible = showChars && !a.hidden;
+        if (a.char.getEffectCenter) { a.char.getEffectCenter(this.haloCenter); a.halo.position.copy(this.haloCenter); }
+        const hs = s * 1.75 * (a.boost || 1);
+        a.halo.scale.set(hs, hs, 1);
       }
       if (a.trail) {
         if (showChars) {
@@ -434,7 +532,20 @@ export class WorldLayer implements CustomLayerInterface {
             y: 1 - ((Math.max(canvasRect.top, rect.top) + Math.min(rect.height / 2, 70) - canvasRect.top) / h) * 2,
           } : undefined;
           a.trail.update(this.trailPos, dt, { result, camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
-        } else a.trail.object.visible = false;
+          // On the ground Jolly leaves sparkles from his feet instead of the energy ray; the ray is for
+          // flying and for Muse's thinking.
+          // On the ground (any pose, not only walk/stand): sparkles, and the ray only while he works.
+          const onGround = a.state !== 'fly' && a.altitude < .15;
+          const working=a.trail.isProcessing();
+          const ray = !onGround || working;
+          if (!ray) a.trail.object.visible = false;
+          if (a.sparkles) {
+            this.feet.set(o.east, a.altitude * scale, -o.north);
+            const still = !!this.motionQuery?.matches;
+            a.sparkles.update(dt, this.feet, onGround && a.state === 'walk' && !still && !working, s, this.renderer?.getDrawingBufferSize(this.bufSize).y ?? 800);
+            a.sparkles.object.visible = !still && a.sparkles.activeCount > 0;
+          }
+        } else { a.trail.object.visible = false; if (a.sparkles) a.sparkles.object.visible = false; }
       }
       if (a.label) {
         // Project the point just above the head into screen pixels.

@@ -122,12 +122,12 @@ export const POST = route(async ({ store, viewer, req }) => {
     const res = await museJSON({
       schemaName: 'regroup', schema: RegroupZ, jsonSchema: REGROUP_JSON_SCHEMA,
       messages: regroupMessages(ctx), model: 'fast', effort: 'minimal',
-      mock: () => mockRegroup(ctx), route: '/api/muse/regroup', userId: viewer.id, deadline: Date.now() + 8_000,
+      mock: () => mockRegroup(ctx), route: '/api/muse/regroup', userId: viewer.id, signal: req.signal, deadline: Date.now() + 8_000,
       // "Why did Muse suggest this": past ratings used, as counts and chips, never whose answer.
       logSignals: { pastHangoutsRated: rated.length, likedBefore, membersLeftOut: crew.memberIds.length - invited.length },
     });
     const out = validateRegroup(res.data, ctx);
-    return NextResponse.json(out, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
+    return NextResponse.json({ ...out, cached: res.cached === true }, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
   } catch (err) {
     // Muse slow or down: the code version picks from the same real plans, so the crew card
     // still gets a suggestion (labelled offline) instead of "Muse is busy".

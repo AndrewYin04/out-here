@@ -8,5 +8,17 @@ export { petPose, type MuseEvent, type MuseSnapshot, type MuseState, type Extern
 export { sendAgentMessage, finishAgentEncounter, useAgentEncounter } from './controller';
 export type { AgentEncounter, AgentTransport, AgentRecipient, AgentEvent } from './encounter';
 export {beginPhotoAnalysis,endPhotoAnalysis} from './controller';
-export {attachMuseWorld,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
+export {attachMuseWorld,useMuseInWorld,setMuseDockFrom,takeMuseDockFrom,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
 export type {MuseViewport} from './controller';
+
+export {beginMuseActivity,finishMuseActivity,releaseMuseActivity,useMuseActivity} from './controller';
+export {MuseActivityStatus} from './MuseActivityStatus';
+export type {MuseActivity, MuseActivityOutcome} from './controller';
+
+export type { ChatMessage } from './controller';
+export { useMuseCommentary, type MuseCommentary } from './commentary';
+export { showMuseNudge, dismissMuseNudge, useMuseNudge, type MuseNudge } from './controller';
+export type { Thought, ThoughtFocus } from './thought-line';
+export { startPlanRun, addPlanStage, finishPlanRun, clearPlanRun, usePlanRun, type PlanRun } from './plan-run';
+export { MuseDockButton } from './MuseDock';
+export { registerMuseDockSlot, useMuseDockSlotted } from './controller';

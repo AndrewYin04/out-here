@@ -15,9 +15,9 @@ import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
 
 export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
-/** Menlo Park framing: Meta campus, Bayfront Park (north), Belle Haven (east), Willow Rd toward downtown. */
-const FRAME_SW: [number, number] = [-122.168, 37.468];
-const FRAME_NE: [number, number] = [-122.134, 37.497];
+/** Downtown San Francisco: Union Square, Chinatown and SoMa demo areas. */
+const FRAME_SW: [number, number] = [-122.423, 37.777];
+const FRAME_NE: [number, number] = [-122.392, 37.805];
 const TILE_TIMEOUT_MS = 8000;
 const PIN = 40;
 /** Collision box of a pin around its point: circle plus seat badge, and the label when shown. */

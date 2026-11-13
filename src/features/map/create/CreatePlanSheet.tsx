@@ -5,6 +5,7 @@
 import { ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ImagePlus, Mic, Minus, Plus, Sparkles, Sticker, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, currentPersona, uploadImage, useApi } from '@/features/data';
+import { beginMuseActivity, finishMuseActivity } from '@/features/muse-companion';
 import { MuseLabel } from '@/features/outhere';
 import { Avatar, Button, CategoryIcon, Chip, IconButton, cn } from '@/features/ui';
 import { DEMO_TZ, type LatLng, type Quest, type QuestCategory, type QuestVisibility } from '@/shared';
@@ -117,11 +118,13 @@ export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPo
     if (t.length < 2 || muse.status === 'loading') return;
     inFlight.current?.abort();
     const ctrl = new AbortController();
+    const owner=currentPersona();
     inFlight.current = ctrl;
     setMuse({ status: 'loading' });
+    const activity=beginMuseActivity({owner:'create-plan',source:'create-quest',target:'create-plan-sheet',pending:'Drafting your plan…',signal:ctrl.signal});
     try {
       const r = await requestDraft(t, at, ctrl.signal);
-      if (ctrl.signal.aborted) return;
+      if (ctrl.signal.aborted || owner!==currentPersona()) return;
       const d = r.draft;
       setTitle(d.title); setEmoji(d.emoji); setCategory(d.category); setDescription(d.description);
       setStartsAt(d.startsAt);
@@ -130,8 +133,10 @@ export function CreatePlanSheet({ at, friends, onMove, onCategory, onClose, onPo
       if (d.bubbleText) setBubble(d.bubbleText.slice(0, BUBBLE_MAX));
       if (d.placeId) { setPlace({ id: d.placeId, at: d.location }); onMove(d.location); }
       setMuse({ status: 'done', pitch: r.pitch, mode: r.mode });
+      finishMuseActivity(activity,{outcome:'success',message:'Your draft is ready to review.',live:r.mode==='live'});
     } catch (e) {
-      if (ctrl.signal.aborted) return;
+      if (ctrl.signal.aborted || owner!==currentPersona()) return;
+      finishMuseActivity(activity,{outcome:'error',message:'The draft did not finish. You can fill it in below.'});
       setMuse({ status: 'error', message: e instanceof Error ? e.message : 'Muse could not draft this. Fill it in below.' });
     }
   };

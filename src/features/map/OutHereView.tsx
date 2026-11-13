@@ -6,6 +6,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
+import { MuseMapLayer } from './MuseMapLayer';
+import { useFreeFriendNudge } from './useFreeFriendNudge';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
@@ -13,7 +15,7 @@ import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
-import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
+import { MarketPanel, MuseFindCard, watchLabel } from './market/MuseFind';
 import { SellerRequests } from './market/SellerRequests';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
@@ -154,6 +156,8 @@ export function OutHereView() {
   }, [mode, visible, filter.keep, persona.id, selectedId]);
   const friendKeep = mode === 'friends' ? filter.keep : null;
   const allFriendPins = useMemo(() => friendPins.data?.pins ?? [], [friendPins.data]);
+  // Muse speaks up when a friend newly shares that they're free.
+  useFreeFriendNudge(friendPins.data?.pins ?? null);
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
@@ -487,6 +491,11 @@ export function OutHereView() {
         />
       )}
 
+      {/* Muse at work on the 2D map while its chat is open: Jolly hops to what he is talking about. */}
+      {!show3d && map && (
+        <MuseMapLayer map={map} me={ctx?.origin ?? DEMO_CENTER} quests={questsApi.data?.quests ?? []} friendPins={allFriendPins} />
+      )}
+
       {viewNote && (
         <p role="status" className="absolute inset-x-4 top-[60px] z-[16] mx-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
           {viewNote}
@@ -625,11 +634,10 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {upNextShown && upNext && (
-        // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
-        // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
-        // at this height and covered Let's go.
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center max-md:right-[68px]',
+      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
+        // Below the Muse filter status and the Friends chip, so neither is ever covered. (Jolly, the
+        // Muse button, sits in the control row at the bottom, so the card can use the full width.)
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
           filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}
@@ -655,14 +663,6 @@ export function OutHereView() {
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
       {mode === 'explore' && !unsupported && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
-      )}
-
-      {/* A seller's pickup requests, with Accept, under the top bar (the pop-up seller's screen). */}
-      {!creating && !selling && !sheetOpen && !listingId && !selectedId && (
-        <div className="pointer-events-none absolute inset-x-3 top-[84px] z-30 flex justify-center empty:hidden">
-          <SellerRequests className="pointer-events-auto" viewerId={persona.id} listings={listingsApi.data?.listings ?? []} now={now}
-            onChanged={() => { void listingsApi.refetch(); }} />
-        </div>
       )}
 
       {/* Muse found something the viewer is looking for: a card above the dashboard. */}
@@ -698,15 +698,15 @@ export function OutHereView() {
             now={now}
             onSelect={select}
             showActions={!walkingNow}
-            extraActions={mode === 'explore' ? (
-              <MarketMenu
+            marketPanel={(
+              <MarketPanel
                 wants={wants}
                 onWantsChanged={() => { void wantsApi.refetch(); }}
                 onSell={startSell}
                 showListings={showListings}
                 onShowListings={setShowListings}
               />
-            ) : null}
+            )}
           />
         </div>
       )}
@@ -721,7 +721,7 @@ export function OutHereView() {
       <PlanSheet />
       <TogetherSheet />
       {creating && (
-        <CreatePlanSheet
+        <CreatePlanSheet key={persona.id}
           at={creating.at}
           friends={ctx?.friends ?? []}
           onMove={moveDraft}

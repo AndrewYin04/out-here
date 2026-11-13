@@ -9,7 +9,6 @@ import { Avatar, Button, CategoryIcon, IconButton, Skeleton, categoryOf, cn } fr
 import { formatDemoTime, minutesUntil, type TogetherResponse, type TogetherView } from '@/shared';
 import { useLetsGo } from './lets-go';
 import { MuseLabel } from './SuggestionCard';
-import { MuseThinking, TOGETHER_STEPS } from './MuseThinking';
 import { openPlanWith, openTogether, useTogetherId } from './plan-state';
 
 const first = (name: string) => name.split(' ')[0] ?? name;
@@ -90,7 +89,7 @@ function Sheet({ id }: { id: string }) {
       <div className="min-h-0 flex-1 overflow-y-auto bg-fb-bg px-3 pb-4 pt-3 md:rounded-b-card">
         {!plan && (
           <div aria-busy="true">
-            <MuseThinking steps={TOGETHER_STEPS} />
+            <p role="status" className="mb-3 px-1 text-[15px] text-fb-text-2">Loading your shared plan…</p>
             {[0, 1].map((i) => (
               <div key={i} className="animate-rise" style={{ animationDelay: `${i * 90}ms` }}><Skeleton className="mb-2 h-28 w-full rounded-card" /></div>
             ))}

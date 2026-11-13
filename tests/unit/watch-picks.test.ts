@@ -162,3 +162,22 @@ describe('checkReason', () => {
     expect(checkReason('You watched 3 hours... 45 min of comics.', t, c)).toMatch(/45 min/);
   });
 });
+
+describe('pick request lifecycle metadata', () => {
+  it('identifies a memoized pick response without inferring cache from its latency', async () => {
+    const ctx = await store.marketplaceContext(alex);
+    const input: PicksInput = { ...ctx, origin: DEMO_CENTER, at: new Date('2026-12-11T17:00:00Z'), exclude: ['fixture-cache-check'], userId: alex };
+    const first = await marketplacePicks(input);
+    const second = await marketplacePicks(input);
+    expect(second.cached).toBe(true);
+    expect(second.picks).toEqual(first.picks);
+    expect(second.source).toBe(first.source);
+  });
+
+  it('rejects an already cancelled request even when its inputs could have a cached result', async () => {
+    const ctx = await store.marketplaceContext(alex);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(marketplacePicks({ ...ctx, origin: DEMO_CENTER, at: NOW, exclude: [], userId: alex, signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});

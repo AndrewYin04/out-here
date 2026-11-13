@@ -12,27 +12,27 @@ type PaintProp = Parameters<MapLibreMap['setPaintProperty']>[1];
 type PaintValue = Parameters<MapLibreMap['setPaintProperty']>[2];
 /** Paint overrides on Positron's own layers: [layer id, property, value]. Missing layers are skipped. */
 const PAINT: [string, PaintProp, PaintValue][] = [
-  ['background', 'background-color', '#E5E5D8'],
-  ['park', 'fill-color', '#C4D4AD'],
-  ['landcover_wood', 'fill-color', '#A9C397'],
-  ['landuse_residential', 'fill-color', '#DDDCCD'],
-  ['water', 'fill-color', '#91BEC8'],
-  ['waterway', 'line-color', '#91BEC8'],
+  ['background', 'background-color', '#F4EAD8'],
+  ['park', 'fill-color', '#8ACB65'],
+  ['landcover_wood', 'fill-color', '#65AD65'],
+  ['landuse_residential', 'fill-color', '#F0DFCE'],
+  ['water', 'fill-color', '#65C9DF'],
+  ['waterway', 'line-color', '#65C9DF'],
   ['highway_path', 'line-color', '#F8F3E6'],
-  ['highway_minor', 'line-color', '#75828A'],
-  ['highway_major_casing', 'line-color', '#EEE9DD'],
-  ['highway_major_inner', 'line-color', '#75828A'],
+  ['highway_minor', 'line-color', '#526575'],
+  ['highway_major_casing', 'line-color', '#F8E9D0'],
+  ['highway_major_inner', 'line-color', '#526575'],
   ['highway_motorway_casing', 'line-color', '#D8D1BC'],
   ['highway_motorway_inner', 'line-color', '#879095'],
   // The flat footprints sit under the 3D walls; drop them where the walls are drawn.
   ['building', 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.5, 1, 16.5, 0]],
 ];
 
-const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF1D8', intensity: 0.48, position: [1.4, 215, 38] };
+const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF6EA', intensity: 0.5, position: [1.4, 215, 45] };
 const SKY: SkySpecification = {
-  'sky-color': '#BAD2DD',
-  'horizon-color': '#E5E8DD',
-  'fog-color': '#E5E8DD',
+  'sky-color': '#7FC8EE',
+  'horizon-color': '#D7EAF0',
+  'fog-color': '#DCEBF2',
   'sky-horizon-blend': 0.55,
   'horizon-fog-blend': 0.5,
   'fog-ground-blend': 0.55,
@@ -67,11 +67,11 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     const path=/path|track|pedestrian/.test(layer.id), casing=/casing/.test(layer.id), bridge=/bridge/.test(layer.id);
     const width=path?1.7:/motorway/.test(layer.id)?12:/major/.test(layer.id)?8:5.5;
     const beforeColor=map.getPaintProperty(layer.id,'line-color'),beforeWidth=map.getPaintProperty(layer.id,'line-width');
-    map.setPaintProperty(layer.id,'line-color',path?'#E8DFCB':casing?'#EEE9DD':bridge?'#8E969A':'#75828A');
+    map.setPaintProperty(layer.id,'line-color',path?'#F4E0BD':casing?'#F8E9D0':bridge?'#8E969A':'#526575');
     map.setPaintProperty(layer.id,'line-width',['interpolate',['exponential',2],['zoom'],12,(width+(casing?2.2:0))*.0658,22,(width+(casing?2.2:0))*67.4]);
     undo.push(()=>{if(map.getLayer(layer.id)){map.setPaintProperty(layer.id,'line-color',beforeColor);map.setPaintProperty(layer.id,'line-width',beforeWidth);}});
     const hasCasing=style.layers.some(other=>other.id!==layer.id&&(other.id===`${layer.id}_casing`||other.id===layer.id.replace(/_inner$/,'_casing')));
-    if(!path&&!casing&&!hasCasing){const id=`oh-curb-${layer.id}`;map.addLayer({...layer,id,paint:{...layer.paint,'line-color':'#EEE9DD','line-opacity':1,'line-width':['interpolate',['exponential',2],['zoom'],12,(width+2.2)*.0658,22,(width+2.2)*67.4]}},layer.id);undo.push(()=>{if(map.getLayer(id))map.removeLayer(id);});}
+    if(!path&&!casing&&!hasCasing){const id=`oh-curb-${layer.id}`;map.addLayer({...layer,id,paint:{...layer.paint,'line-color':'#F8E9D0','line-opacity':1,'line-width':['interpolate',['exponential',2],['zoom'],12,(width+2.2)*.0658,22,(width+2.2)*67.4]}},layer.id);undo.push(()=>{if(map.getLayer(id))map.removeLayer(id);});}
 
   }
 
@@ -82,12 +82,12 @@ export function applyCityTheme(map: MapLibreMap): () => void {
   };
 
   if (source) {
-    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#DEDCCD','#D8D9CE'],'fill-opacity':.7}},firstRoad);
+    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#F1DDC9','#F1E6D4'],'fill-opacity':.7}},firstRoad);
     // Grass and sports fields: in the tiles, not drawn by Positron.
     add({
       id: GRASS_ID, type: 'fill', source, 'source-layer': 'landcover',
       filter: ['match', ['get', 'class'], ['grass', 'wetland', 'farmland'], true, false],
-      paint: { 'fill-color': ['match',['get','class'],'wetland','#B7CEC1','farmland','#D0D5AB','#CBD8B4'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': ['match',['get','class'],'wetland','#B7CEC1','farmland','#D0D5AB','#8EC86B'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',
@@ -98,10 +98,7 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     add({
       id: BUILDINGS_ID, type: 'fill-extrusion', source, 'source-layer': 'building', minzoom: 14.5,
       paint: {
-        'fill-extrusion-color': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8],
-          0, '#E7DFC9', 10, '#DED7C7', 25, '#D4D5CC', 60, '#C9D4D1',
-        ],
+        'fill-extrusion-color': ['match',['%',['to-number',['id'],0],9],0,'#E86A3A',1,'#3D7DCA',2,'#F2C14E',3,'#2A9D8F',4,'#F07C6C',5,'#6EC6F0',6,'#C8553D',7,'#F6A04D','#8FD3B6'],
         'fill-extrusion-height': ['max', 3.5, ['coalesce', ['get', 'render_height'], 8]],
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
         'fill-extrusion-vertical-gradient': true,

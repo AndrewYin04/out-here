@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Images, Search, Sparkles, Star } from 'lucide-react';
 import type { Crew, HangoutRating, Memory, PersonCard, Quest } from '@/shared';
 
@@ -12,6 +12,7 @@ import { memoryImgSrc } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
 import { MEMORY_SAVED } from './arrival';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
+import { beginMuseActivity, finishMuseActivity, releaseMuseActivity, MuseActivityStatus } from '@/features/muse-companion';
 
 type CrewMeta = {
   crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null;
@@ -159,7 +160,7 @@ function CrewCard({ crew, handle, rating, onRate }: {
 }) {
   const members = useMemo(() => crew.meta?.members ?? [], [crew.meta]);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<(RegroupResult & { mock: boolean }) | null>(null);
+  const [result, setResult] = useState<(RegroupResult & { mock: boolean; cached?: boolean }) | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [send, setSend] = useState<SendState>({ kind: 'idle' });
   const notAgain = useMemo(() => new Set(crew.meta?.notAgainIds ?? []), [crew.meta]);
@@ -167,19 +168,35 @@ function CrewCard({ crew, handle, rating, onRate }: {
   // After "Not for me", or a no to everyone else, the card offers a different plan instead of a regroup.
   const regroupDemoted = rating?.verdict === 'meh' || (others.length > 0 && others.every((m) => notAgain.has(m.id)));
   const [showRegroup, setShowRegroup] = useState(false);
+  const regroupRequest = useRef<{ controller: AbortController; activity: number | null } | null>(null);
+  useEffect(() => () => {
+    regroupRequest.current?.controller.abort();
+    if (regroupRequest.current?.activity != null) releaseMuseActivity(regroupRequest.current.activity);
+    regroupRequest.current = null;
+  }, [crew.id]);
 
   const regroup = useCallback(async () => {
+    regroupRequest.current?.controller.abort();
+    const controller = new AbortController();
+    const activity = beginMuseActivity({ owner: `regroup:${crew.id}`, source: 'regroup', target: `crew-${crew.id}`, pending: 'is looking for a plan for this crew…', priority: 'foreground', signal: controller.signal });
+    regroupRequest.current = { controller, activity };
     setBusy(true);
     setFailed(null);
     setResult(null);
     setSend({ kind: 'idle' });
     try {
-      const res = await fetchRegroup(crew.id);
+      const res = await fetchRegroup(crew.id, controller.signal);
+      if (controller.signal.aborted) return;
       setResult(res);
+      if (activity !== null) finishMuseActivity(activity, { outcome: 'success', live: !res.mock, cached: res.cached, message: res.mock ? 'has an offline suggestion ready.' : 'has a suggestion. Your crew still needs to agree.' });
     } catch (e) {
+      if (controller.signal.aborted) return;
+      if (activity !== null) finishMuseActivity(activity, { outcome: 'error', message: 'couldn’t find a plan. Try again.' });
       setFailed(e instanceof ApiFetchError && e.status === 404 ? 'This crew is no longer available.' : 'Muse is busy, try again.');
     } finally {
-      setBusy(false);
+      if (regroupRequest.current?.controller === controller) {
+        if (!controller.signal.aborted) setBusy(false);
+      }
     }
   }, [crew.id]);
 
@@ -269,10 +286,11 @@ function CrewCard({ crew, handle, rating, onRate }: {
           </div>
         ) : (
           <Button variant="tint" block onClick={regroup} disabled={busy} icon={<Sparkles size={16} />}>
-            {busy ? 'Muse is checking who’s free…' : result || failed ? 'Ask Muse again' : 'Get this group together again'}
+            {busy ? 'Muse is finding a crew plan…' : result || failed ? 'Ask Muse again' : 'Get this group together again'}
           </Button>
         )}
 
+        <MuseActivityStatus owner={`regroup:${crew.id}`} />
         {failed && <p className="mt-3 text-[15px] text-fb-text-2" role="status">{failed}</p>}
 
         {result && (
@@ -307,12 +325,12 @@ function CrewCard({ crew, handle, rating, onRate }: {
   );
 }
 
-async function fetchRegroup(crewId: string): Promise<RegroupResult & { mock: boolean }> {
+async function fetchRegroup(crewId: string, signal?: AbortSignal): Promise<RegroupResult & { mock: boolean; cached?: boolean }> {
   // apiFetch drops headers, so read x-muse-mode from a raw call with the same persona header.
   const res = await fetch('/api/muse/regroup', {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-persona': currentPersona() }, body: JSON.stringify({ crewId }),
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-persona': currentPersona() }, body: JSON.stringify({ crewId }), signal,
   });
-  const data = await res.json().catch(() => null) as (RegroupResult & { error?: string }) | null;
+  const data = await res.json().catch(() => null) as (RegroupResult & { error?: string; cached?: boolean }) | null;
   if (!res.ok || !data || !data.suggestion) throw new ApiFetchError(res.status, data?.error ?? `HTTP ${res.status}`);
   const mode = res.headers.get('x-muse-mode');
   return { ...data, mock: mode === 'mock' || mode === 'fallback' };

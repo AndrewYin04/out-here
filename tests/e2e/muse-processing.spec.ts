@@ -1,4 +1,10 @@
 import { expect, test } from '@playwright/test';
+// Controlled map background keeps camera tests independent of the external tile-style DNS.
+// The real character, MapLibre camera, renderer, API flows and one shared WebGL canvas still run.
+test.beforeEach(async({page})=>{
+ await page.route('https://tiles.openfreemap.org/styles/positron',r=>r.fulfill({json:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#F2F4F7'}}]}}));
+});
+
 import { seedId } from '../../src/shared/seed/ids';
 
 // Controlled network responses exercise the real chat/controller/render integration without
@@ -52,7 +58,7 @@ test('opening chat frames Muse closely and closing restores the walking zoom', a
   await page.goto('/out-here?as=alex&view=3d');
   const world=page.getByTestId('world-3d');
   await expect(world).toBeVisible();
-  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeGreaterThan(21.2);
+  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeCloseTo(22.1, 1);
   const walkingZoom=Number(await world.getAttribute('data-zoom'));
   await page.getByTestId('muse-launcher').click();
   const phone=(page.viewportSize()?.width ?? 1440)<768;

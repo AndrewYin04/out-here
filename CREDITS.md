@@ -37,3 +37,6 @@ The Muse companion "Jolly" is by Ally Chen (`assets/muse-companion/`). The perso
 ## 3D street scenery
 
 Kenney, City Kit Roads 2.2 (`light-curved`) and City Kit Suburban 2.0 (`tree-large`), CC0. Source: https://kenney.nl/assets/city-kit-roads and https://kenney.nl/assets/city-kit-suburban. Only selected normalized, vertex-colour GLBs are included in `public/models/world/`, with the supplied licenses and source hashes. Rounded deciduous tree prototypes and placement code are project-generated; their real geographic context is OpenStreetMap / OpenFreeMap, credited by the existing map attribution. Stylized streetlight placement is visual scenery, not surveyed infrastructure.
+
+## Sound effects (public/sfx)
+All CC0 1.0. Kenney (kenney.nl): Interface Sounds, UI Audio, Casino Audio, Digital Audio, Impact Sounds, Music Jingles, RPG Audio. OpenGameArt CC0 contributors: luckius (paper), artisticdude (swishes), pyranostudios (air whoosh), wubitog (pops), antumdeluge (pencil), railkill (kalimba), themightyglider (camera), rubberduck (100 CC0 SFX), voltiment555 (book flips). Processed to -16 LUFS mono; see the pack's SOUNDS.md for the per-file source list.

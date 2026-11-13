@@ -27,6 +27,9 @@ export const MAX_SHOWN_WALK_MIN = 120;
 
 // Labels for approximate shares: the nearest of these within 30 km, else the region name.
 const AREAS: { label: string; at: LatLng }[] = [
+  { label: 'Union Square, San Francisco', at: { lat: 37.7895, lng: -122.4078 } },
+  { label: 'Chinatown, San Francisco', at: { lat: 37.7931, lng: -122.4069 } },
+  { label: 'SoMa, San Francisco', at: { lat: 37.7857, lng: -122.4025 } },
   { label: 'Menlo Park', at: { lat: 37.4530, lng: -122.1817 } },
   { label: 'Belle Haven, Menlo Park', at: { lat: 37.4790, lng: -122.1560 } },
   { label: 'East Palo Alto', at: { lat: 37.4688, lng: -122.1411 } },

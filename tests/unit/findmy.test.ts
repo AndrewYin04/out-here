@@ -32,9 +32,9 @@ describe('Find My: friend pins', () => {
     for (let i = 1; i < pins.length; i++) expect(pins[i].distanceKm).toBeGreaterThanOrEqual(pins[i - 1].distanceKm);
   });
 
-  it('gives Maya the boba bubble and no home location for other people', async () => {
+  it('gives Maya the dumpling bubble (SF demo city) and no home location for other people', async () => {
     const maya = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
-    expect(maya.bubble).toEqual({ emoji: '🧋', thought: 'Free after class · Down for boba', doing: 'out of class, free for an hour', wantsTo: 'grab boba' });
+    expect(maya.bubble).toEqual({ emoji: '🥟', thought: 'craving dumplings', doing: 'lunch break for ~45 min', wantsTo: 'try Dumpling Den' });
     expect(maya.walkingMinutes).not.toBeNull();
     expect(maya.friend.home).toBeNull();
   });
@@ -53,7 +53,7 @@ describe('Find My: friend pins', () => {
     expect(pin.precision).toBe('approximate');
     expect(pin.location).toEqual(snapToGrid(raw.location, 800));
     expect(pin.location).not.toEqual(raw.location);
-    expect(pin.placeLabel).toBe('Redwood City');
+    expect(pin.placeLabel).toContain('San Francisco');
     expect((pin.distanceKm * 2) % 1).toBe(0);
     expect(pin.walkingMinutes === null || pin.walkingMinutes % 5 === 0).toBe(true);
   });
@@ -76,7 +76,7 @@ describe('Find My: editing my share', () => {
     expect(got.some((m) => m.channel === `location:${id('nina')}`)).toBe(false);
     const pin = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
     expect(pin.bubble.thought).toBe('ramen instead?');
-    expect(pin.bubble.emoji).toBe('🧋');
+    expect(pin.bubble.emoji).toBe('🥟');
   });
 
   it("a friend's move does not refetch the watcher's own share; the mover's own tabs do (E2)", async () => {

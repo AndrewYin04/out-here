@@ -14,11 +14,11 @@ export const maxDuration = 30;
 
 const QueryZ = z.object({ lat: z.coerce.number().min(-90).max(90), lng: z.coerce.number().min(-180).max(180) });
 
-export const GET = route(async ({ store, viewer, url }) => {
+export const GET = route(async ({ store, viewer, url, req }) => {
   const q = QueryZ.safeParse(Object.fromEntries(url.searchParams));
   const exclude = (url.searchParams.get('exclude') ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean).slice(0, 10);
   const ctx = await store.marketplaceContext(viewer.id);
   return marketplacePicks({
-    ...ctx, origin: q.success ? q.data : viewer.home, at: now(), exclude, userId: viewer.id,
+    ...ctx, origin: q.success ? q.data : viewer.home, at: now(), exclude, userId: viewer.id, signal: req.signal,
   });
 });

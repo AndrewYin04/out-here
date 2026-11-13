@@ -1,10 +1,12 @@
 /** Transport facts only. Rendering cannot manufacture a message or a recipient reply. */
 export type AgentRecipient = { id: string; name: string };
-export type AgentEvent = { id: string; type: 'accepted' | 'sent' | 'received'; recipientId: string; mode?: 'live' | 'mock' };
+export type AgentEvent = { id: string; type: 'accepted' | 'sent' | 'received'; recipientId: string; mode?: 'live' | 'mock'; note?: string };
 export type AgentOutcome = 'success' | 'unavailable' | 'no_response' | 'error' | 'cancelled';
 export type AgentEncounter = {
   id: number; recipient: AgentRecipient; source: 'backend' | 'simulation';
   sent: number; received: number; messages: ('sent' | 'received')[]; outcome: AgentOutcome | null;
+  /** What each envelope said, in order (code-written lines from the server; empty in simulation). */
+  notes?: { dir: 'sent' | 'received'; text: string }[];
 };
 export type AgentTransport = {
   source: 'backend' | 'simulation';

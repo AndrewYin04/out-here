@@ -158,8 +158,9 @@ export function MuseTrailLab() {
         const dx = p2[0] - pos.x, dz = p2[1] - pos.z;
         if (Math.hypot(dx, dz) > 1e-4 && dt > 0) heading = Math.atan2(dx, dz);
         pos.x = p2[0]; pos.z = p2[1];
-      } else if (pos.lengthSq() === 0 && pid !== 'stopgo') {
-        const p0 = shape.at(0); pos.x = p0[0]; pos.z = p0[1];
+      } else if (pid === 'idle') {
+        // Idle must remain in frame at phone widths so ambient/pending can be compared.
+        pos.x = 0; pos.z = 0;
       }
       pos.y = 0.8 * SCALE + (pid === 'idle' ? 0 : Math.sin(t * 1.6) * 0.05 * SCALE);
 

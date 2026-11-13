@@ -60,6 +60,7 @@ test.describe("Out Here plan sheet", () => {
       await page.getByRole("button", { name: "Cancel" }).click();
     }
 
+    await page.getByTestId("other-ideas").click();
     await page.getByRole("button", { name: "Why not others?" }).click();
     const why = page.getByTestId("why-not");
     await expect(why).toContainText(/\d+ min walk, too far/);
@@ -188,10 +189,11 @@ test.describe("Out Here plan sheet", () => {
     expect(incoming.length).toBe(1);
 
     const card = maya.getByTestId("invite-card");
-    await expect(card).toContainText(`Alex invited you: ${DUMPLINGS}`, { timeout: 5_000 });
+    await expect(card).toContainText("wants to get", { timeout: 5_000 });
+    await expect(card).toContainText(DUMPLINGS, { timeout: 5_000 });
     // Alex took a seat when he sent it ("Go with" = join + invite), so one is left for Maya
     await expect(card.getByTestId("seats-left")).toHaveText("1 left");
-    await card.getByRole("button", { name: "Accept" }).click();
+    await card.getByRole("button", { name: "I'm in" }).click();
     await expect(card.getByTestId("invite-result")).toContainText("You're in with Alex");
     await expect(card.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
     await expect(top.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });

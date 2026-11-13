@@ -45,14 +45,14 @@ export const POST = route(async ({ store, viewer, req }) => {
       messages: takeawayMessages(ctx),
       model: 'fast', effort: 'minimal', timeoutMs: 5000, deadline: Date.now() + 6000,
       mock: () => ({ takeaway: template }),
-      route: 'muse/rating-takeaway', userId: viewer.id,
+      route: 'muse/rating-takeaway', userId: viewer.id, signal: req.signal,
       logSignals: {
         verdict: ctx.verdict, chips: ctx.highlights.length, yesCount: ctx.yesFirstNames.length,
         lovedInCategory: ctx.lovedInCategory, lovedWith: ctx.lovedWith.length,
       },
     });
     const line = validateTakeaway(res.data.takeaway, ctx);
-    if (line) return NextResponse.json({ takeaway: line, byMuse: true }, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
+    if (line) return NextResponse.json({ takeaway: line, byMuse: true, cached: res.cached === true }, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
     reportFallback({ route: 'muse/rating-takeaway', step: 'validate', error: 'line named someone or invented a count', userId: viewer.id });
   } catch (err) {
     reportFallback({ route: 'muse/rating-takeaway', step: 'muse', error: String((err as Error)?.message ?? err).slice(0, 200), userId: viewer.id });

@@ -99,6 +99,26 @@
 [data-mode="friends"] .oh-quest-pin:hover [data-role="pin-label"],
 [data-mode="friends"] .oh-quest-pin:focus-visible [data-role="pin-label"] { visibility: visible; }
 
+/* Muse's thought orbs and bubbles (MuseThoughts): blue, glowing, sheer. */
+/* A cloud: a soft rounded body with two bumps on top, joined to Jolly by a trail of dots. */
+.muse-thought { position: absolute; transform: translate(-50%, -50%); width: max-content; min-width: 96px; max-width: min(190px, 38vw); padding: 9px 16px; border-radius: 30px / 26px; font: 600 13px/17px var(--font-sans); text-wrap: balance; color: #0A57D6; text-align: center; background: rgba(228, 242, 255, .9); border: 1px solid rgba(76, 168, 255, .5); box-shadow: 0 0 18px rgba(35, 217, 245, .4); animation: muse-thought-in .5s cubic-bezier(.22, 1, .36, 1) both, muse-thought-float 3.4s ease-in-out .9s infinite; }
+.muse-thought::before, .muse-thought::after { content: ''; position: absolute; top: -9px; width: 28px; height: 22px; border-radius: 9999px; background: rgba(228, 242, 255, .9); border: 1px solid rgba(76, 168, 255, .5); border-bottom-color: transparent; z-index: -1; }
+.muse-thought::before { left: 18%; } .muse-thought::after { right: 16%; top: -7px; width: 22px; height: 18px; }
+.muse-thought-dot { position: absolute; transform: translate(-50%, -50%); border-radius: 9999px; background: rgba(228, 242, 255, .92); border: 1px solid rgba(76, 168, 255, .55); box-shadow: 0 0 10px rgba(35, 217, 245, .45); animation: muse-thought-in .4s cubic-bezier(.22, 1, .36, 1) both; }
+.muse-thought-orbit { position: absolute; left: 0; top: 0; width: 0; height: 0; animation: muse-thought-spin linear infinite; }
+.muse-thought-orb { position: absolute; left: calc(var(--r) * .95); top: 0; border-radius: 9999px; transform: translate(-50%, -50%); background: radial-gradient(circle at 35% 30%, #B8F7FF 0%, #23D9F5 40%, rgba(8, 102, 255, .85) 100%); box-shadow: 0 0 12px 3px rgba(35, 217, 245, .5); opacity: .85; }
+@keyframes muse-thought-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.7); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+@keyframes muse-thought-float { 50% { translate: 0 -4px; } }
+@keyframes muse-thought-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .muse-thought, .muse-thought-dot { animation: none; } .muse-thought-orbit { animation: none; } }
+
+/* World labels (friends' photos, plan labels) fade out while the Muse chat is open, so Jolly is in front. */
+[data-world-label] { transition: opacity .25s ease; }
+[data-muse-chat="true"] [data-world-label] { opacity: 0; pointer-events: none; }
+/* The 2D map's markers (friends' photos, plan pins) also step aside for the chat. */
+body:has([data-muse-chat="true"]) .maplibregl-marker { opacity: 0 !important; pointer-events: none; transition: opacity .25s ease; }
+@media (prefers-reduced-motion: reduce) { [data-world-label], body:has([data-muse-chat="true"]) .maplibregl-marker { transition: none !important; } }
+
 /* The 3D loading screen: Jolly bobs while thinking, and the bubble's dots pulse. */
 @keyframes oh-jolly-bob {
   0%, 100% { transform: translateY(0); }
@@ -195,3 +215,90 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Jolly docked at the side of the map (MuseChat): a little agent that hovers, glows and casts a soft
+   shadow; he flies in from the 3D world when you zoom out (muse-dock-flying). */
+.muse-dock-float { position: relative; display: block; animation: muse-dock-hover 3.6s ease-in-out infinite; }
+.muse-dock-glow { position: absolute; inset: -9px; border-radius: 9999px; background: radial-gradient(circle, rgba(35, 217, 245, .38) 0%, rgba(8, 102, 255, .14) 55%, transparent 72%); animation: muse-dock-glow 3.6s ease-in-out infinite; }
+.muse-dock-shadow { position: absolute; left: 50%; bottom: -8px; width: 34px; height: 8px; margin-left: -17px; border-radius: 9999px; background: rgba(5, 30, 70, .28); filter: blur(2px); animation: muse-dock-shadow 3.6s ease-in-out infinite; }
+.muse-dock-spark { position: absolute; right: -2px; top: 2px; width: 8px; height: 8px; border-radius: 9999px; background: #B8F7FF; box-shadow: 0 0 8px 2px rgba(35, 217, 245, .7); animation: muse-dock-spark 2.4s ease-in-out infinite; }
+.muse-dock:hover .muse-dock-float { animation-duration: 1.8s; }
+.muse-dock-flying .muse-dock-shadow, .muse-dock-flying .muse-dock-tag { opacity: 0; }
+.muse-dock-flying .muse-dock-glow { inset: -16px; }
+@keyframes muse-dock-hover { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(2deg); } }
+@keyframes muse-dock-glow { 0%, 100% { opacity: .75; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
+@keyframes muse-dock-shadow { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.72); opacity: .55; } }
+@keyframes muse-dock-spark { 0%, 100% { opacity: 0; transform: scale(.4); } 45% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .muse-dock-float, .muse-dock-glow, .muse-dock-shadow, .muse-dock-spark { animation: none; } }
+
+/* Muse at work on the 2D map (MuseMapLayer): Jolly hops to what he is thinking about, rings light
+   the friends and plans he means, dropped plans get a grey tag, and messages to a friend's Muse fly
+   between the two as orbs. */
+.muse-map-jolly { position: absolute; left: 0; top: 0; transition: transform .8s cubic-bezier(.34, 1.25, .5, 1); will-change: transform; }
+.muse-map-hop { display: block; width: 44px; height: 44px; margin: -22px 0 0 -22px; filter: drop-shadow(0 0 10px rgba(35, 217, 245, .55)); animation: muse-map-hop .7s cubic-bezier(.3, .7, .4, 1) both, muse-dock-hover 3.6s ease-in-out .7s infinite; }
+.muse-map-other { filter: hue-rotate(150deg) saturate(1.15) drop-shadow(0 0 10px rgba(49, 162, 76, .5)); }
+.muse-map-name { position: absolute; left: 0; top: 26px; transform: translateX(-50%); white-space: nowrap; border-radius: 9999px; background: #fff; padding: 2px 8px; font: 700 12px/16px var(--font-sans); color: #080809; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); }
+.muse-map-name em { font-style: normal; font-weight: 600; color: #65676B; }
+.muse-map-cloud { position: absolute; left: 0; top: -42px; transform: translate(-50%, -100%); }
+.muse-map-thought { position: relative; display: block; left: auto; top: auto; transform: none; transform-origin: 50% 100%; animation: muse-map-pop .45s cubic-bezier(.22, 1, .36, 1) .2s both; }
+.muse-map-ring { position: absolute; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 9999px; border: 3px solid #23D9F5; box-shadow: 0 0 16px 4px rgba(35, 217, 245, .55), inset 0 0 10px rgba(35, 217, 245, .4); animation: muse-map-ring-in .5s cubic-bezier(.22, 1, .36, 1) both, muse-map-ring 1.6s ease-in-out .5s infinite; }
+.muse-map-ring-friend { border-color: #31A24C; box-shadow: 0 0 16px 4px rgba(49, 162, 76, .45); width: 62px; height: 62px; margin: -46px 0 0 -31px; }
+.muse-map-drop { position: absolute; transform: translate(-50%, 24px); white-space: nowrap; border-radius: 9999px; background: rgba(28, 30, 33, .82); color: #fff; padding: 1px 7px; font: 700 11px/15px var(--font-sans); animation: muse-fade .4s ease-out both; }
+.muse-map-link { fill: none; stroke: #23D9F5; stroke-width: 2.5; stroke-dasharray: 2 8; stroke-linecap: round; opacity: .8; animation: muse-map-dash 1s linear infinite; }
+.muse-map-orb { position: absolute; width: 16px; height: 16px; border-radius: 9999px; background: radial-gradient(circle at 35% 30%, #fff 0%, #B8F7FF 30%, #23D9F5 60%, #0866FF 100%); box-shadow: 0 0 14px 5px rgba(35, 217, 245, .65); animation: muse-map-fly 1.2s cubic-bezier(.45, .05, .35, 1) both; }
+@keyframes muse-map-hop { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-22px) scale(1.12); } 100% { transform: translateY(0) scale(1); } }
+@keyframes muse-map-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes muse-map-ring-in { from { opacity: 0; transform: scale(1.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes muse-map-ring { 50% { transform: scale(1.12); opacity: .75; } }
+@keyframes muse-map-dash { to { stroke-dashoffset: -10; } }
+@keyframes muse-map-fly {
+  0% { transform: translate(-50%, -50%) scale(.4); opacity: 0; }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(calc(-50% + var(--dx) * .5), calc(-50% + var(--dy) * .5 - 60px)) scale(1.25); }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(.6); opacity: .2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .muse-map-jolly { transition: none; }
+  .muse-map-hop, .muse-map-thought, .muse-map-ring, .muse-map-link, .muse-map-drop { animation: none; }
+  .muse-map-orb { animation-duration: .01s; }
+}
+
+/* Muse speaking up from its dock (a friend just got free): the card pops out of Jolly, and he waves. */
+.muse-nudge { transform-origin: 100% 30%; animation: muse-nudge-in .5s cubic-bezier(.22, 1, .36, 1) both; }
+.muse-dock[data-nudge] .muse-dock-float { animation: muse-dock-wave .5s ease-in-out 4, muse-dock-hover 3.6s ease-in-out 2s infinite; }
+.muse-dock[data-nudge] .muse-dock-tag { display: none; }
+@keyframes muse-nudge-in { from { opacity: 0; transform: translateX(16px) scale(.85); } to { opacity: 1; transform: none; } }
+@keyframes muse-dock-wave { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-8px) rotate(-10deg); } 75% { transform: translateY(-8px) rotate(10deg); } }
+@media (prefers-reduced-motion: reduce) { .muse-nudge, .muse-dock[data-nudge] .muse-dock-float { animation: none; } }
+.muse-map-ring-emoji { position: absolute; left: -8px; top: -8px; display: flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 9999px; background: #fff; font: 400 13px/1 var(--font-sans); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+
+/* "I'm free", Muse-led (MuseAtWork): Jolly glows while he works, and each pipeline row slides in as
+   the server reports it. */
+.muse-hero { filter: drop-shadow(0 0 14px rgba(35, 217, 245, .45)); }
+.muse-rail-row[data-state="done"] .muse-rail-detail { animation: muse-rail-in .35s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes muse-rail-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .muse-rail-row[data-state="done"] .muse-rail-detail { animation: none; } }
+/* Jolly in the map's control row: the same round button as Back to you and Map/3D, glowing softly. */
+.muse-dock-row .muse-dock-float { animation-duration: 4.2s; }
+.muse-dock-row .muse-dock-glow { inset: -5px; }
+.muse-dock-row .muse-dock-spark { right: -1px; top: -1px; width: 7px; height: 7px; }
+.muse-nudge-up { transform-origin: 90% 100%; animation-name: muse-nudge-rise; }
+@keyframes muse-nudge-rise { from { opacity: 0; transform: translateY(10px) scale(.88); } to { opacity: 1; transform: none; } }
+
+/* Muse to Muse in 3D (World3D scene overlay): speech bubbles with what each envelope says, and the envelope. */
+.oh-enc-bubble { position: absolute; left: 0; top: 0; max-width: 220px; width: max-content; padding: 8px 12px; border-radius: 18px; background: #fff; color: #080809; font: 600 14px/18px var(--font-sans); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); text-wrap: balance; }
+.oh-enc-bubble::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 12px; height: 12px; margin-left: -6px; transform: rotate(45deg); background: inherit; }
+.oh-enc-bubble-peer { background: #E9F8EE; color: #0B5A2A; }
+.oh-enc-pop { animation: oh-enc-pop .35s cubic-bezier(.22, 1, .36, 1); }
+@keyframes oh-enc-pop { from { opacity: 0; scale: .8; } to { opacity: 1; scale: 1; } }
+.oh-enc-envelope { position: absolute; left: 0; top: 0; display: flex; width: 38px; height: 30px; align-items: center; justify-content: center; border-radius: 6px; background: #fff; font-size: 20px; line-height: 1; box-shadow: 0 0 0 2px #FFD54F, 0 0 16px 4px rgba(255, 213, 79, .7); }
+@media (prefers-reduced-motion: reduce) { .oh-enc-pop { animation: none; } }
+.oh-enc-bubble[data-bubble="own"]::after { left: 88%; }
+.oh-enc-bubble[data-bubble="peer"]::after { left: 12%; }
+
+/* Jolly's bubbles from the Muse button (MuseDockButton), every view but 3D. */
+.muse-dock-cloud { display: block; width: max-content; max-width: 230px; padding: 9px 14px; border-radius: 26px / 22px; font: 600 13px/17px var(--font-sans); text-wrap: balance; color: #0A57D6; background: rgba(232, 244, 255, .97); border: 1px solid rgba(76, 168, 255, .55); box-shadow: 0 4px 16px rgba(8, 102, 255, .18); animation: muse-nudge-rise .4s cubic-bezier(.22, 1, .36, 1) both; transform-origin: 90% 100%; }
+.muse-dock-cloud-dot { position: absolute; border-radius: 9999px; background: rgba(232, 244, 255, .97); border: 1px solid rgba(76, 168, 255, .55); }
+.muse-dock-speech { display: block; width: max-content; max-width: 240px; padding: 9px 13px; border-radius: 18px; background: #fff; color: #080809; font: 500 14px/19px var(--font-sans); box-shadow: 0 6px 20px rgba(0, 0, 0, .18); animation: muse-nudge-rise .4s cubic-bezier(.22, 1, .36, 1) both; transform-origin: 90% 100%; }
+.muse-dock-speech::after { content: ''; position: absolute; right: 16px; bottom: -6px; width: 12px; height: 12px; transform: rotate(45deg); background: #fff; }
+@media (prefers-reduced-motion: reduce) { .muse-dock-cloud, .muse-dock-speech { animation: none; } }

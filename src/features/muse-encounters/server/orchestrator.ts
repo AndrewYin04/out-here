@@ -41,9 +41,9 @@ export async function runEncounter(initial: EncounterSession, text: string, stor
     const current = await repo.get(session.id, session.initiatorId);
     if (current?.status !== 'pending' || current.version !== session.version) throw new DOMException('Cancelled', 'AbortError');
   };
-  const publish = async (type: EncounterEvent['type'], message?: EncounterSession['messages'][number]) => {
+  const publish = async (type: EncounterEvent['type'], message?: EncounterSession['messages'][number], note?: string) => {
     await active();
-    const event: EncounterEvent = { id: `${session.id}:${type}`, type, recipientId: session.recipientId, mode: session.mode };
+    const event: EncounterEvent = { id: `${session.id}:${type}`, type, recipientId: session.recipientId, mode: session.mode, ...(note ? { note: note.slice(0, 240) } : {}) };
     session = await repo.save({ ...session, events: [...session.events, event], messages: message ? [...session.messages, MessageZ.parse(message)] : session.messages });
     emit(event);
   };
@@ -74,7 +74,9 @@ export async function runEncounter(initial: EncounterSession, text: string, stor
       summary: `Checking shared availability for ${request.activity}.`, timestamp: new Date().toISOString() });
     // Rebuild recipient context after the first call; never forward the raw user request.
     const recipientContext = await encounterContext(store, session.initiatorId, session.recipientId);
-    await publish('sent', outgoing);
+    const ask = request.activity === 'other' ? 'something' : request.activity;
+    const when = request.time === 'now' ? ' now' : ` ${request.time}`;
+    await publish('sent', outgoing, `Is ${context.recipient.name.split(' ')[0]} free for ${ask}${when}${request.budgetMax !== null ? `, under $${request.budgetMax}` : ''}?`);
     const candidates = recipientContext.candidates(request, new Date(session.createdAt));
     const b = await museJSON({ ...common, userId: session.recipientId, schemaName: 'encounter_reply', schema: ReplyPayloadZ,
       jsonSchema: z.toJSONSchema(ReplyPayloadZ), messages: [
@@ -102,7 +104,7 @@ export async function runEncounter(initial: EncounterSession, text: string, stor
     const reply = { availability: slot ? 'shared_window' as const : 'unknown' as const, slotId: slot?.id ?? null, questId: quest?.id ?? null, approvalRequired: true as const };
     const incoming = MessageZ.parse({ id: randomUUID(), sessionId: session.id, senderAgentId: `muse:${session.recipientId}`,
       recipientAgentId: `muse:${session.initiatorId}`, intent: 'request_approval', payload: reply, summary, timestamp: new Date().toISOString() });
-    await publish('received', incoming);
+    await publish('received', incoming, `${evidence}${quest ? ` ${quest.venueName} fits.` : ''}`);
     const suggestion: PlanSuggestion = {
       kind: quest ? 'join_quest' : 'friend_hang', questId: quest?.id ?? null, friendIds: [session.recipientId],
       title: quest?.title ?? `Invite ${name} for ${request.activity}`, emoji: quest?.emoji ?? '💬', reason: evidence,

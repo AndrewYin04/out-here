@@ -3,19 +3,20 @@
 import { ChevronDown, ChevronUp, Coffee, Timer, CupSoda, Dumbbell, Footprints, Gamepad2, Hand, Music, Palette, SendHorizontal, Sparkles, Utensils, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
-import { useApi, useViewer } from '@/features/data';
-import { CategoryIcon, categoryOf, cn, IconButton, Skeleton } from '@/features/ui';
+import { addPlanStage, beginMuseActivity, clearPlanRun, finishMuseActivity, finishPlanRun, startPlanRun } from '@/features/muse-companion';
+import type { PlanStageEvent } from '@/shared';
+import { MuseDecided, MuseWorking } from './MuseAtWork';
+import { currentPersona, useApi, useViewer } from '@/features/data';
+import { CategoryIcon, categoryOf, cn, IconButton } from '@/features/ui';
 import type { ForYouResponse, PersonCard } from '@/shared';
 import { FOR_YOU_ICONS, ForYouWhy } from './ForYou';
 import { shownDrops } from './dropped';
-import { museSteps } from './muse-steps';
-import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
-import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
+import { errorText, requestPlanStream, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
 import { StatusDot, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
-import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
+import { SuggestionCard } from './SuggestionCard';
 import { DraftHangCard } from './DraftHangCard';
 
 export const COMPOSER_PLACEHOLDER = 'Or tell Muse… e.g. with someone who likes comics';
@@ -182,6 +183,8 @@ export function PlanSheet({ className }: { className?: string }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<PlanResult | null>(null);
+  /** The pipeline stages the server has reported for the ask on screen (Muse's work, live). */
+  const [stages, setStages] = useState<PlanStageEvent[]>([]);
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [whyOpen, setWhyOpen] = useState(false);
@@ -234,10 +237,11 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
+    setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null); setStages([]); clearPlanRun();
     setStatus('idle');
   }, [viewer.id]);
-  useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
+  useEffect(() => () => { inFlight.current?.abort(); ++seq.current; setPlanSuggestions(null); }, []);
+  useEffect(() => { if(!open){inFlight.current?.abort();++seq.current;setStatus(s=>s==='loading'?'idle':s);setPlanStatus(null);} },[open]);
 
   const ask = composeAsk(moods, text, duration, budget, moodList);
   const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -259,22 +263,35 @@ export function PlanSheet({ className }: { className?: string }) {
     // A new ask replaces one still in flight: abort it, and seq drops any late answer.
     inFlight.current?.abort();
     const ctrl = new AbortController();
+    const owner=currentPersona();
     inFlight.current = ctrl;
     const mine = ++seq.current;
+    const activity=beginMuseActivity({owner:'plan-sheet',source:'plan',target:'plan-results',pending:'Finding plans that fit…',signal:ctrl.signal});
     setStatus('loading');
+    setStages([]);
+    startPlanRun(mine);
     setError(null);
     setWhyOpen(false);
     setAsked(t);
     setPlanAsk(t);
     setPlanStatus({ state: 'loading', summary: null, topTitle: null, topReason: null, error: null, live: false });
     try {
-      const r = await requestPlan(t, ctrl.signal);
-      if (mine !== seq.current) return;
+      const r = await requestPlanStream(t, (e) => {
+        if (mine !== seq.current || ctrl.signal.aborted) return;
+        setStages((cur) => [...cur, e]);
+        addPlanStage(mine, e);
+      }, ctrl.signal);
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
       // Muse is about to draft a plan with a free friend: it reads "who is free with you" from
       // your shared availability, so save that first (otherwise the draft races it and finds no one).
       const willDraft = r.plan.suggestions.length === 0 && (r.plan.meta?.friendsFree?.length ?? 0) > 0;
       if (willDraft && picked === null) await shareAvailability(noteFor(moods, text, moodList), r.plan);
       if (mine !== seq.current) return;
+      // The last step ("Double-checked every fact") ticks visibly before Muse's decision replaces the rail.
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise((ok) => window.setTimeout(ok, 500));
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      finishPlanRun(mine, { plan: r.plan, source: r.museSource });
+      finishMuseActivity(activity,{outcome:r.plan.suggestions.length?'success':'empty',message:r.plan.suggestions.length?'Your picks are ready.':'No plans fit yet. Try another time or activity.',live:r.museSource==='muse',cached:r.plan.meta?.cache?.rank===true});
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
       const top = r.plan.suggestions[0];
@@ -290,7 +307,9 @@ export function PlanSheet({ className }: { className?: string }) {
       // was picked, which already set it).
       if (picked === null && !willDraft) void shareAvailability(noteFor(moods, text, moodList), r.plan);
     } catch (err) {
-      if (mine !== seq.current || ctrl.signal.aborted) return;
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      finishMuseActivity(activity,{outcome:'error',message:'The request did not finish. Try again.'});
+      finishPlanRun(mine, null, true);
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error'); setPlanSuggestions(null);
       setPlanStatus({ state: 'error', summary: null, topTitle: null, topReason: null, error: errorText(err, 'Muse could not make a plan right now.'), live: false });
@@ -321,8 +340,6 @@ export function PlanSheet({ className }: { className?: string }) {
 
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
   const showMuse = result?.museSource === 'muse';
-  const offline = result?.museSource === 'mock';
-  const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   // Nothing posted fits but a friend is free: Muse drafts a plan for you two (DraftHangCard).
   // Friends free in this window (their availability is shared with you): invite chips on each pick.
   // The plan carries each free friend's name and photo, so the chips never wait on /api/friends.
@@ -334,7 +351,6 @@ export function PlanSheet({ className }: { className?: string }) {
   }), [result, friendMap]);
   const drafting = !!result && result.plan.suggestions.length === 0 && (result.plan.meta?.friendsFree?.length ?? 0) > 0 && !draftNone;
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
-  const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
 
   const picks = result?.plan.suggestions ?? [];
   return (
@@ -421,14 +437,7 @@ export function PlanSheet({ className }: { className?: string }) {
             <div className="min-h-0 flex-1 overflow-y-auto bg-fb-bg px-3 pb-4 pt-3 md:rounded-b-[24px]">
               {status === 'loading' && (
                 <div data-testid="plan-loading" aria-live="polite">
-                  <MuseStepsLoading />
-                  <div className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card" style={{ animationDelay: '90ms' }}>
-                    <div className="flex gap-3">
-                      <Skeleton shape="circle" width={40} height={40} />
-                      <div className="flex-1"><Skeleton width="60%" className="h-4" /><Skeleton width="40%" className="mt-2 h-3" /></div>
-                    </div>
-                    <Skeleton className="mt-3 h-9 w-full rounded-[8px]" />
-                  </div>
+                  <MuseWorking stages={stages} />
                 </div>
               )}
 
@@ -436,13 +445,7 @@ export function PlanSheet({ className }: { className?: string }) {
 
               {status === 'done' && result && (
                 <div aria-live="polite">
-                  {summary && (
-                    <div data-testid="plan-summary" className="mb-2 animate-step-in px-1">
-                      {showMuse && <MuseLabel className="mb-1" />}
-                      {offline && <OfflineLabel className="mb-1" />}
-                      <p className="line-clamp-2 text-[14px] leading-5 text-fb-text-2">{summary}</p>
-                    </div>
-                  )}
+                  <MuseDecided stages={stages} result={result}>
                   {!drafting && <PrecheckLine plan={result.plan} friends={friendMap} />}
                   {drafting ? (
                     <DraftHangCard ask={asked} budgetMax={result.plan.intent.budgetMax ?? null} onNone={onDraftNone} />
@@ -467,7 +470,7 @@ export function PlanSheet({ className }: { className?: string }) {
                       )}
                     </div>
                   )}
-                  {steps.length > 0 && <div className="mt-3"><MuseStepsDone steps={steps} showMuse={showMuse} /></div>}
+                  </MuseDecided>
                   {drops.length > 0 && (
                     <div className="mt-2 rounded-card bg-fb-surface shadow-card">
                       <button

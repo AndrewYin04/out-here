@@ -4,10 +4,11 @@
 
 import { Check, Clock, Footprints, MapPin, RefreshCw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiPost, useQuest } from '@/features/data';
+import { apiFetch, apiPost, useQuest } from '@/features/data';
 import { Avatar, burst, cn } from '@/features/ui';
 import { formatDemoTime, type PersonCard, type Quest } from '@/shared';
 import type { HangDraft, HangWork } from '@/features/muse';
+import { beginMuseActivity, finishMuseActivity } from '@/features/muse-companion';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
@@ -22,15 +23,6 @@ type State =
 
 const first = (name: string) => name.split(' ')[0] ?? name;
 
-const DRAFT_TIMEOUT_MS = 12_000;
-class DraftTimeout extends Error {}
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = window.setTimeout(() => reject(new DraftTimeout('draft timed out')), ms);
-    p.then((v) => { window.clearTimeout(t); resolve(v); }, (e) => { window.clearTimeout(t); reject(e); });
-  });
-}
-
 /**
  * Renders nothing when no friend is free or no place fits (the caller's empty state stays).
  * `onNone` lets the caller show its own empty card in that case.
@@ -41,22 +33,22 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
   const [work, setWork] = useState<HangWork | null>(null);
   const [error, setError] = useState<string | null>(null);
   const tried = useRef<string[]>([]);
+  const request=useRef<AbortController|null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const letsGo = useLetsGo();
 
   /** `another`: a different place with the same friend. `friendId`: redraft with that friend. */
   const load = useCallback(async (another: boolean, friendId?: string) => {
+    request.current?.abort();
+    const ctrl=new AbortController();request.current=ctrl;
+    const activity=beginMuseActivity({owner:'draft-hang',source:'draft-hang',target:'draft-hang',pending:'Finding another idea…',signal:ctrl.signal});
     setError(null);
     if (friendId) tried.current = [];
     if (another) setBusy(true); else setState({ kind: 'loading' });
     try {
-      // A dropped request on a flaky network would leave the card spinning: ask again after 12 s, once.
-      const body = { text: ask, budgetMax, excludePlaceIds: tried.current, friendId };
-      const res = await withTimeout(apiPost<DraftResponse>('/api/muse/draft-hang', body), DRAFT_TIMEOUT_MS)
-        .catch((e: unknown) => {
-          if (e instanceof DraftTimeout) return apiPost<DraftResponse>('/api/muse/draft-hang', body);
-          throw e;
-        });
+      const res = await apiFetch<DraftResponse>('/api/muse/draft-hang', {method:'POST',body:JSON.stringify({ text: ask, budgetMax, excludePlaceIds: tried.current, friendId }),signal:ctrl.signal});
+      if(ctrl.signal.aborted)return;
+      finishMuseActivity(activity,{outcome:res.draft&&res.friend?'success':'empty',message:res.draft?'Your draft is ready to review.':'No other spots fit right now.',live:res.mode==='live'});
       const live = res.mode === 'live';
       if (res.draft && res.friend) {
         tried.current = [...tried.current, res.draft.placeId];
@@ -68,14 +60,16 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
         setState({ kind: 'none' }); onNone();
       }
     } catch {
+      if(ctrl.signal.aborted)return;
+      finishMuseActivity(activity,{outcome:'error',message:'The request did not finish. Try again.'});
       if (another) setError('Muse couldn’t find another one. Try again in a moment.');
       else { setState({ kind: 'none' }); onNone(); }
     } finally {
-      setBusy(false);
+      if(!ctrl.signal.aborted)setBusy(false);
     }
   }, [ask, budgetMax, onNone]);
 
-  useEffect(() => { tried.current = []; void load(false); }, [load]);
+  useEffect(() => { tried.current = []; void load(false);return()=>request.current?.abort(); }, [load]);
 
   const make = async () => {
     if (state.kind !== 'draft') return;
@@ -182,7 +176,7 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
           </>
         ) : (
           <>
-            <MadeStatus questId={state.questId} friendId={state.friend.id} fname={fname} />
+            <p className="flex flex-1 items-center gap-1.5 text-[14px] font-semibold text-[#31A24C]"><Check size={18} aria-hidden />You’re in · waiting on {fname}</p>
             <button type="button" data-testid="draft-hang-go" onClick={() => { setPlanOpen(false); letsGo(state.questId); }}
               className="oh-press inline-flex h-10 items-center gap-1.5 rounded-btn bg-fb-blue px-4 text-[15px] font-semibold text-white hover:bg-fb-blue-hover">
               <Footprints size={18} aria-hidden />Let’s go
