@@ -30,6 +30,7 @@ import {
   promptEndedHangouts, promptRatings, rateHangout, ratingState,
 } from './ratings';
 import { postWalkStep, walkers } from './walkers';
+import { TABLES, type TableSet } from './tables';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -79,13 +80,14 @@ export class CoreStore {
 
   get kind() { return this.backend.kind; }
 
-  async view(): Promise<View> {
-    return new View(await this.backend.snapshot(), this.backend.kind === 'memory' ? onlineUserIds() : []);
+  /** A View over every table, or only the tables in `set` (tables.ts); hot read paths pass a set. */
+  async view(set?: TableSet): Promise<View> {
+    return new View(await this.backend.snapshot(set), this.backend.kind === 'memory' ? onlineUserIds() : []);
   }
 
   // ---------- identity ----------
   async profileByHandle(handle: string): Promise<Profile | null> {
-    return (await this.view()).profileByHandle.get(handle) ?? null;
+    return (await this.view(TABLES.persona)).profileByHandle.get(handle) ?? null;
   }
 
   /** Accepts a handle or an id; 404 when unknown. */
@@ -96,7 +98,7 @@ export class CoreStore {
   }
 
   async users(viewerId: ID): Promise<Profile[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.people);
     return PERSONA_HANDLES.map((h) => v.profileByHandle.get(h)).filter((p): p is Profile => !!p)
       .map((p) => v.profileFor(viewerId, p));
   }
@@ -314,7 +316,7 @@ export class CoreStore {
 
   // ---------- friends ----------
   async friends(viewerId: ID): Promise<PersonCard[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.people);
     return v.people(viewerId, v.friendIds(viewerId)).sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -325,7 +327,7 @@ export class CoreStore {
   }
 
   async friendRequests(viewerId: ID): Promise<{ incoming: FriendRequestView[]; outgoing: FriendRequestView[] }> {
-    const v = await this.view();
+    const v = await this.view(TABLES.people);
     const incoming: FriendRequestView[] = [];
     const outgoing: FriendRequestView[] = [];
     for (const f of v.db.friendships) {
@@ -545,10 +547,10 @@ export class CoreStore {
 
   // ---------- notifications ----------
   async notifications(viewerId: ID, limit = 50): Promise<{ notifications: NotificationView[]; unread: number }> {
-    let v = await this.view();
+    let v = await this.view(TABLES.notifications);
     // Hangouts whose end time passed without a "We're done" still ask their members for a rating.
     // A failed prompt write (for example before migration 0004) never breaks the list.
-    if (await promptEndedHangouts(this, v, viewerId).catch(() => false)) v = await this.view();
+    if (await promptEndedHangouts(this, v, viewerId).catch(() => false)) v = await this.view(TABLES.notifications);
     const mine = v.db.notifications.filter((n) => n.recipientId === viewerId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return { notifications: mine.slice(0, limit).map((n) => v.notificationView(viewerId, n)), unread: mine.filter((n) => !n.readAt).length };
   }
@@ -627,14 +629,14 @@ export class CoreStore {
 
   // ---------- Out Here: quests ----------
   async questsNear(viewerId: ID, center: LatLng, radiusM = 3000): Promise<Quest[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.quests);
     return v.db.quests.filter((q) => v.isActiveQuest(q) && v.canSeeQuest(viewerId, q)
       && haversineMeters(center, q.approxLocation) <= radiusM + 250)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((q) => v.questFor(viewerId, q));
   }
 
   async yourPlans(viewerId: ID): Promise<YourPlan[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.yourPlans);
     const viewer = this.resolvePerson(v, viewerId);
     const joined = new Set(v.db.questMembers.filter((m) => m.userId === viewerId).map((m) => m.questId));
     const crews = new Map(v.db.crews.filter((c) => v.crewMemberIds(c.id).includes(viewerId))
@@ -648,7 +650,7 @@ export class CoreStore {
   }
 
   async quest(viewerId: ID, questId: ID): Promise<QuestDetail> {
-    const v = await this.view();
+    const v = await this.view(TABLES.questDetail);
     const q = v.questById.get(questId);
     if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
     const memberIds = v.questMemberIds(q.id);
@@ -866,7 +868,7 @@ export class CoreStore {
 
   /** Friends free when the viewer is, ranked, with a suggested group. Empty when the viewer is busy. */
   async freeWithMe(viewerId: ID): Promise<FreeWithMeResponse> {
-    const v = await this.view();
+    const v = await this.view(TABLES.friendAvailability);
     const at = now();
     const t = at.toISOString();
     const mine = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t);
@@ -897,7 +899,7 @@ export class CoreStore {
   }
 
   async myAvailability(viewerId: ID): Promise<Availability[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.availability);
     const t = iso();
     return v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t)
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map(({ audience: _a, ...a }) => { void _a; return a; });
@@ -905,7 +907,7 @@ export class CoreStore {
 
   /** Friends-only: the viewer's friends' current and upcoming availability. */
   async friendAvailability(viewerId: ID): Promise<AvailabilityItem[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.friendAvailability);
     const t = iso();
     const friends = v.friendIds(viewerId);
     return v.db.availability.filter((a) => friends.has(a.userId) && a.endsAt > t && v.canSee(viewerId, a.userId, a.audience))
@@ -997,7 +999,7 @@ export class CoreStore {
 
   /** The viewer's open plans and ones confirmed in the last 2 hours, newest first. */
   async togetherPlans(viewerId: ID): Promise<TogetherView[]> {
-    const v = await this.view();
+    const v = await this.view(TABLES.together);
     const t = now().getTime();
     return v.db.togetherPlans
       .filter((p) => p.memberIds.includes(viewerId) && (
@@ -1008,7 +1010,7 @@ export class CoreStore {
   }
 
   async together(viewerId: ID, id: ID): Promise<TogetherView> {
-    const v = await this.view();
+    const v = await this.view(TABLES.together);
     return this.togetherView(v, viewerId, this.togetherRow(v, viewerId, id));
   }
 
@@ -1052,7 +1054,7 @@ export class CoreStore {
   }
 
   async invites(viewerId: ID): Promise<{ incoming: InviteView[]; outgoing: InviteView[] }> {
-    const v = await this.view();
+    const v = await this.view(TABLES.quests);
     const newest = (a: InviteRow, b: InviteRow) => b.createdAt.localeCompare(a.createdAt);
     return {
       incoming: v.db.invites.filter((i) => i.toId === viewerId).sort(newest).map((i) => this.inviteView(v, viewerId, i)),
@@ -1061,7 +1063,7 @@ export class CoreStore {
   }
 
   async invite(viewerId: ID, inviteId: ID): Promise<InviteView> {
-    const v = await this.view();
+    const v = await this.view(TABLES.quests);
     const i = v.db.invites.find((x) => x.id === inviteId);
     if (!i || (i.fromId !== viewerId && i.toId !== viewerId)) throw notFound('invite_not_found');
     return this.inviteView(v, viewerId, i);

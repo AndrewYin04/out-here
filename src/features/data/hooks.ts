@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Crew, Quest } from '@/shared';
 import type { FriendAvailabilityResponse, NotificationView, PostView } from '@/shared/api';
 import { apiFetch, currentPersona, initPersonaFromUrl, PERSONA_EVENT, setPersona as setPersonaRaw, tabPersona } from './client';
+import { coalescedFetch } from './coalesce';
 import { FRESH_HEADER } from './fresh';
 import { subscribeChannels, subscribePresence, type ChannelHandler } from './realtime-client';
 import { PERSONAS, personaByHandle, type Persona } from './personas';
@@ -43,7 +44,7 @@ export function useChannel(channels: readonly string[], handler: ChannelHandler)
   const key = [...new Set(channels.filter(Boolean))].sort().join(',');
   useEffect(() => {
     if (!key) return;
-    return subscribeChannels(key.split(','), (c, p) => ref.current(c, p));
+    return subscribeChannels(key.split(','), (c, p, at) => ref.current(c, p, at));
   }, [key]);
 }
 
@@ -60,6 +61,10 @@ export type ApiState<T> = { data: T | null; error: string | null; loading: boole
 /**
  * GET `path` as the current persona; refetches when the persona changes and when any of
  * `channels` (or the ones `channelsOf(data)` returns) receives a message. `path` null = idle.
+ *
+ * Refetches go through the tab-wide coalescer (coalesce.ts): one message makes one GET per path
+ * however many hooks in the tab read that path, and a burst makes one GET plus at most one
+ * trailing GET.
  */
 export function useApi<T>(
   pathArg: string | null,
@@ -67,6 +72,8 @@ export function useApi<T>(
   channelsOf?: (data: T) => string[],
   /** Optional: apply a realtime payload (ids/counts only) to the current data at once, before the refetch confirms it. */
   patch?: (data: T, channel: string, payload: unknown) => T,
+  /** Optional: true when the current data already reflects this message, so no refetch is needed. */
+  skip?: (data: T, channel: string, payload: Record<string, unknown>) => boolean,
 ): ApiState<T> {
   const { handle, ready } = useViewer();
   // Idle until the persona has resolved, so a path built from the default persona's id is never fetched.
@@ -79,13 +86,18 @@ export function useApi<T>(
   // response is shown if it is newer than the last one shown, not only if it is the very last
   // fetch, so a stream of messages cannot hold back data that has already arrived.
   const applied = useRef(0);
+  const dataRef = useRef<T | null>(null);
+  dataRef.current = data;
   /** fresh: read past the server's snapshot cache (used when a realtime message triggered it). */
-  const load = useCallback(async (fresh: boolean) => {
+  /** since: the message's markArrival(), so hooks woken by the same message share one GET. */
+  const load = useCallback(async (fresh: boolean, since?: number) => {
     if (!path) return;
     const n = ++seq.current;
     setLoading(true);
     try {
-      const d = await apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {});
+      const key = `${currentPersona()}|${fresh ? 'fresh' : 'plain'}|${path}`;
+      // A plain mount load joins a plain fetch already in flight (another hook on the same path).
+      const d = await coalescedFetch(key, () => apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {}), { since, join: !fresh });
       if (n > applied.current) { applied.current = n; setData(d); setError(null); }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : String(e));
@@ -97,9 +109,11 @@ export function useApi<T>(
   // A new path or persona: ignore every fetch still in flight for the old one.
   useEffect(() => { applied.current = seq.current; void load(false); }, [load, handle]);
   const derived = data && channelsOf ? channelsOf(data) : [];
-  useChannel(ready ? [...channels, ...derived] : [], (channel, payload) => {
+  useChannel(ready ? [...channels, ...derived] : [], (channel, payload, arrived) => {
     if (patch) setData((prev) => (prev ? patch(prev, channel, payload) : prev));
-    void load(true);
+    const cur = dataRef.current;
+    if (skip && cur && !payload.resync && skip(cur, channel, payload)) return;
+    void load(true, arrived);
   });
   return { data, error, loading, refetch };
 }
@@ -107,7 +121,9 @@ export function useApi<T>(
 /** Quests near a point; refetches when any listed quest's seats change or someone posts a new plan. */
 export function useQuests(center: { lat: number; lng: number } | null, radiusM = 3000): ApiState<{ quests: Quest[] }> {
   const path = center ? `/api/quests?lat=${center.lat}&lng=${center.lng}&radiusM=${radiusM}` : null;
-  return useApi<{ quests: Quest[] }>(path, ['quests:new'], (d) => d.quests.map((q) => `quest:${q.id}`));
+  return useApi<{ quests: Quest[] }>(path, ['quests:new'], (d) => d.quests.map((q) => `quest:${q.id}`), undefined,
+    // quests:new for a plan already on the map (this tab created it and refetched) needs no reload.
+    (d, channel, payload) => channel === 'quests:new' && typeof payload.questId === 'string' && d.quests.some((q) => q.id === payload.questId));
 }
 
 export function useQuest(id: string | null) {

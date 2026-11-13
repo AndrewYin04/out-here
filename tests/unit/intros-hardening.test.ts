@@ -262,6 +262,7 @@ class FakeSupabase {
       select() { if (op === 'select') op = 'select'; else returning = true; return b; },
       order() { return b; },
       range(from: number, to: number) { range = [from, to]; return b; },
+      abortSignal() { return b; },
       eq(c: string, v: unknown) { filters.push((r) => r[c] === v); return b; },
       in(c: string, v: unknown[]) { filters.push((r) => v.includes(r[c])); return b; },
       insert(r: Row[]) { op = 'insert'; rows = r; return b; },

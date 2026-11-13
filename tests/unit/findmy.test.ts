@@ -5,6 +5,7 @@ import { subscribe, type RealtimeMessage } from '@/features/data/realtime-server
 import type { CoreStore } from '@/features/data/core';
 import { hangCopyIssue, writeHangCopy } from '@/features/muse';
 import { clearOfQuests, placeChips, placeChipsSided, questBox, type ChipItem } from '@/features/map/friends/chips';
+import { myShareSkip } from '@/features/map/friends/useFindMy';
 
 const id = (h: string) => profileId(h);
 let store: CoreStore;
@@ -66,17 +67,28 @@ describe('Find My: friend pins', () => {
 });
 
 describe('Find My: editing my share', () => {
-  it('updates the bubble and notifies the audience on user channels only', async () => {
+  it('updates the bubble and notifies the audience on location channels only, never user:', async () => {
     const got: RealtimeMessage[] = [];
     const off = subscribe((m) => got.push(m));
     await store.updateMyLocation(id('maya'), { bubble: { thought: 'ramen instead?' } });
     off();
-    expect(got.some((m) => m.channel === `user:${id('alex')}` && m.payload.type === 'location' && m.payload.id === id('maya'))).toBe(true);
-    expect(got.some((m) => m.channel.startsWith('location:'))).toBe(false);
-    expect(got.some((m) => m.channel === `user:${id('nina')}`)).toBe(false);
+    expect(got.some((m) => m.channel === `location:${id('alex')}` && m.payload.type === 'location' && m.payload.id === id('maya'))).toBe(true);
+    expect(got.some((m) => m.channel.startsWith('user:'))).toBe(false);
+    expect(got.some((m) => m.channel === `location:${id('nina')}`)).toBe(false);
     const pin = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
     expect(pin.bubble.thought).toBe('ramen instead?');
     expect(pin.bubble.emoji).toBe('🥟');
+  });
+
+  it("a friend's move does not refetch the watcher's own share; the mover's own tabs do (E2)", async () => {
+    const got: RealtimeMessage[] = [];
+    const off = subscribe((m) => got.push(m));
+    await store.updateMyLocation(id('alex'), { location: { lat: 37.485, lng: -122.148 } });
+    off();
+    const toMaya = got.find((m) => m.channel === `location:${id('maya')}`)!;
+    const toAlex = got.find((m) => m.channel === `location:${id('alex')}`)!;
+    expect(myShareSkip(id('maya'))(null, toMaya.channel, toMaya.payload as Record<string, unknown>)).toBe(true);
+    expect(myShareSkip(id('alex'))(null, toAlex.channel, toAlex.payload as Record<string, unknown>)).toBe(false);
   });
 
   it('only_me hides the pin and still notifies the old audience', async () => {
@@ -84,7 +96,7 @@ describe('Find My: editing my share', () => {
     const off = subscribe((m) => got.push(m));
     await store.updateMyLocation(id('maya'), { audience: 'only_me' });
     off();
-    expect(got.some((m) => m.channel === `user:${id('alex')}`)).toBe(true);
+    expect(got.some((m) => m.channel === `location:${id('alex')}`)).toBe(true);
     expect(await handles('alex')).not.toContain('maya');
   });
 
