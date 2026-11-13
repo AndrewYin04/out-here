@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "errors": [],
+  "checked": [
+    "model load",
+    "follow_back",
+    "talk_front",
+    "render gallery"
+  ]
+}

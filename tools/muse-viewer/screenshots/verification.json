@@ -1,0 +1,307 @@
+{
+  "passed": true,
+  "errors": [],
+  "warnings": [
+    "[.WebGL-0x10c0043ae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[.WebGL-0x10c0043ae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[.WebGL-0x10c0043ae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[.WebGL-0x10c0043ae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+  ],
+  "states": [
+    {
+      "muse": "follow_back",
+      "person": "person_idle",
+      "autoDemo": false,
+      "walking": false,
+      "actions": [
+        {
+          "name": "person_idle",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "person_run",
+          "weight": 1,
+          "running": false
+        },
+        {
+          "name": "follow_back",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "thinking",
+          "weight": 1,
+          "running": false
+        },
+        {
+          "name": "talk_front",
+          "weight": 1,
+          "running": false
+        }
+      ],
+      "museRotation": [
+        0,
+        -0.08370999940316247,
+        0,
+        "XYZ"
+      ],
+      "eyes": [
+        1,
+        1,
+        1
+      ],
+      "dots": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ],
+      "bubble": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ]
+    },
+    {
+      "muse": "thinking",
+      "person": "person_idle",
+      "autoDemo": false,
+      "walking": false,
+      "actions": [
+        {
+          "name": "person_idle",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "person_run",
+          "weight": 1,
+          "running": false
+        },
+        {
+          "name": "follow_back",
+          "weight": 0.3333337604999542,
+          "running": false
+        },
+        {
+          "name": "thinking",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "talk_front",
+          "weight": 1,
+          "running": false
+        }
+      ],
+      "museRotation": [
+        0,
+        1.5705346837209222,
+        0,
+        "XYZ"
+      ],
+      "eyes": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "dots": [
+        1.1436625736142236,
+        1.1436625736142236,
+        1.1436625736142236
+      ],
+      "bubble": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ]
+    },
+    {
+      "muse": "talk_front",
+      "person": "person_idle",
+      "autoDemo": false,
+      "walking": false,
+      "actions": [
+        {
+          "name": "person_idle",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "person_run",
+          "weight": 1,
+          "running": false
+        },
+        {
+          "name": "follow_back",
+          "weight": 0.3333337604999542,
+          "running": false
+        },
+        {
+          "name": "thinking",
+          "weight": 2.3647750424515834e-14,
+          "running": false
+        },
+        {
+          "name": "talk_front",
+          "weight": 1,
+          "running": false
+        }
+      ],
+      "museRotation": [
+        -2.973432064546353,
+        -0.43937675523650727,
+        -3.0695044234367868,
+        "XYZ"
+      ],
+      "eyes": [
+        1,
+        1,
+        1
+      ],
+      "dots": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ],
+      "bubble": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "muse": "talk_front",
+      "person": "person_run",
+      "autoDemo": false,
+      "walking": false,
+      "actions": [
+        {
+          "name": "person_idle",
+          "weight": 0.0000012715649972960819,
+          "running": false
+        },
+        {
+          "name": "person_run",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "follow_back",
+          "weight": 0.3333337604999542,
+          "running": false
+        },
+        {
+          "name": "thinking",
+          "weight": 2.3647750424515834e-14,
+          "running": false
+        },
+        {
+          "name": "talk_front",
+          "weight": 1,
+          "running": false
+        }
+      ],
+      "museRotation": [
+        -2.973432064546353,
+        -0.43937675523650727,
+        -3.0695044234367868,
+        "XYZ"
+      ],
+      "eyes": [
+        1,
+        1,
+        1
+      ],
+      "dots": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ],
+      "bubble": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "muse": "talk_front",
+      "person": "person_idle",
+      "autoDemo": false,
+      "walking": false,
+      "actions": [
+        {
+          "name": "person_idle",
+          "weight": 1,
+          "running": true
+        },
+        {
+          "name": "person_run",
+          "weight": 0.0000012715649972960819,
+          "running": false
+        },
+        {
+          "name": "follow_back",
+          "weight": 0.3333337604999542,
+          "running": false
+        },
+        {
+          "name": "thinking",
+          "weight": 2.3647750424515834e-14,
+          "running": false
+        },
+        {
+          "name": "talk_front",
+          "weight": 1,
+          "running": false
+        }
+      ],
+      "museRotation": [
+        -2.973432064546353,
+        -0.4393767552365071,
+        -3.0695044234367868,
+        "XYZ"
+      ],
+      "eyes": [
+        1,
+        1,
+        1
+      ],
+      "dots": [
+        0.0010000000474974513,
+        0.0010000000474974513,
+        0.0010000000474974513
+      ],
+      "bubble": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "trail": {
+    "moving": 12,
+    "lifetime": 1.7,
+    "stoppedActive": 0
+  },
+  "checks": [
+    "All five buttons",
+    "Independent Muse/person playback",
+    "Companion scale and correct follow placement",
+    "Unified body mesh without separate leg objects",
+    "Fleece normal map and fine fibers",
+    "Blue platform present",
+    "Talk eye contact before and after orbiting and during walking",
+    "Camera targets and centers Muse",
+    "Person local transform unchanged",
+    "Shared parent movement",
+    "World-space trail remains behind",
+    "Trail fades and stops emitting when stationary",
+    "OrbitControls drag",
+    "Rapid crossfades",
+    "Auto demo loop",
+    "Mobile screenshots",
+    "Render comparison screenshot",
+    "No console errors"
+  ]
+}

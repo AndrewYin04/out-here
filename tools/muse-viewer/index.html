@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jolly · Muse companion</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; overflow: hidden; color: #3c342d; background: #fff8ec; font: 14px/1.5 system-ui, sans-serif; }
+    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    header { position: fixed; top: 24px; left: 24px; pointer-events: none; }
+    h1 { margin: 0 0 4px; font-size: 20px; font-weight: 650; }
+    header p { margin: 0; color: #69737c; }
+    #state { display: inline-block; margin-top: 12px; padding: 5px 10px; background: white; border: 1px solid #dce1e5; border-radius: 20px; }
+    #controls { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100% - 24px); padding: 14px; background: #ffffffed; border: 1px solid #dce1e5; border-radius: 16px; box-shadow: 0 8px 28px #26334210; }
+    .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .row + .row { margin-top: 8px; }
+    .row span { width: 52px; color: #69737c; }
+    button { border: 1px solid #dce1e5; background: white; border-radius: 8px; padding: 8px 11px; font: inherit; color: inherit; cursor: pointer; }
+    button[aria-pressed="true"] { background: #263a46; color: white; border-color: #263a46; }
+    button:focus-visible { outline: 3px solid #64a8ee; outline-offset: 2px; }
+    button:disabled { opacity: .45; cursor: wait; }
+    #demo { margin-left: auto; }
+    #bubble { position: fixed; top: 0; left: 0; width: 245px; max-width: calc(100vw - 24px); padding: 12px 16px; border: 1px solid #dce1e5; border-radius: 15px; background: white; box-shadow: 0 5px 20px #26334216; text-align: center; pointer-events: none; transform: translate(-50%, calc(-100% - 12px)); }
+    #bubble::after { content: ''; position: absolute; top: 100%; left: 50%; border: 7px solid transparent; border-top-color: white; transform: translateX(-50%); }
+    #error { position: fixed; top: 130px; left: 24px; right: 24px; padding: 12px; color: #822a2a; background: #fff0f0; border-radius: 8px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 500px) { header { top: 16px; left: 16px; } #controls { bottom: 12px; padding: 10px; } button { padding: 8px; } }
+  </style>
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header><h1>Jolly · Muse companion</h1><p>Drag to orbit · Scroll to zoom</p><div id="state" role="status">Loading companion…</div></header>
+  <main id="viewport" aria-label="Interactive 3D Muse and person viewer"></main>
+  <div id="bubble" hidden>2 seats left at Dumpling Den, 9 min walk</div>
+  <div id="error" role="alert" hidden></div>
+  <div id="controls" aria-label="Animation controls">
+    <div class="row" role="group" aria-label="Muse">
+      <span>Muse</span>
+      <button data-muse="follow_back" aria-pressed="false" disabled>follow_back</button>
+      <button data-muse="thinking" aria-pressed="false" disabled>thinking</button>
+      <button data-muse="talk_front" aria-pressed="false" disabled>talk_front</button>
+    </div>
+    <div class="row" role="group" aria-label="Person">
+      <span>Person</span>
+      <button data-person="person_idle" aria-pressed="false" disabled>idle</button>
+      <button data-person="person_run" aria-pressed="false" disabled>run</button>
+      <button id="demo" aria-pressed="false" disabled>Auto demo</button>
+    </div>
+    <div class="row" role="group" aria-label="Movement preview">
+      <span>Motion</span><button id="walk" aria-pressed="false" disabled>Walk together</button>
+    </div>
+  </div>
+  <script>
+    function showError(message) {
+      const el = document.querySelector('#error');
+      el.textContent = message; el.hidden = false;
+      document.querySelector('#state').textContent = 'Viewer error';
+    }
+    window.addEventListener('error', event => showError(event.message || 'A viewer module failed to load. Check your connection to jsDelivr.'));
+    window.addEventListener('unhandledrejection', event => showError(String(event.reason)));
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { createPlatformEffects } from './platform-effects.js';
+
+    const scene = new THREE.Scene();
+    const journey = new THREE.Group(); journey.name = 'CompanionMovementPreview'; scene.add(journey);
+    scene.background = new THREE.Color('#fff8ec');
+    const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.05, 100);
+    // +Z is forward; -X is the person's right, so this is behind/right.
+    camera.position.set(-2.2, 1.9, -4.3);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.querySelector('#viewport').appendChild(renderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-0.15, 1.0, 0);
+    controls.enableDamping = true;
+    controls.minDistance = 1.5;
+    controls.maxDistance = 12;
+    controls.update();
+    scene.add(new THREE.HemisphereLight(0xfff6e8, 0xe8c9a8, 1.35));
+    // Approximate 4500 K studio white, matching the Blender Blackbody lights.
+    const key = new THREE.DirectionalLight(0xffdbba, 2.0);
+    key.position.set(-3, 5, -4); scene.add(key);
+    const fill = new THREE.DirectionalLight(0xffdbba, 1.05);
+    fill.position.set(3, 3, 3); scene.add(fill);
+
+    const stateLabel = document.querySelector('#state');
+    const bubble = document.querySelector('#bubble');
+    const demoButton = document.querySelector('#demo');
+    const walkButton = document.querySelector('#walk');
+    const actions = new Map();
+    const active = { muse: null, person: null };
+    const cleanup = new Map();
+    let mixer, bubbleNode, museNode, platformNode, museState, demoTimer;
+    let walking = false;
+    const effects = createPlatformEffects(scene, renderer, camera);
+    const travelDelta = new THREE.Vector3();
+    const centerWorld = new THREE.Vector3();
+    const personTarget = new THREE.Vector3(-0.15, 1.0, 0);
+    const talkCenter = new THREE.Vector3();
+    const talkRotation = new THREE.Quaternion();
+    const facingMatrix = new THREE.Matrix4();
+    const offset = new THREE.Vector3();
+    const facePosition = new THREE.Vector3();
+    const desiredRoot = new THREE.Vector3();
+    const desiredTarget = new THREE.Vector3();
+    let autoDemo = false;
+    const sequence = [['follow_back', 3000], ['thinking', 1500], ['talk_front', 3000]];
+
+    function play(group, name) {
+      const next = actions.get(name);
+      const previous = active[group];
+      if (!next) throw new Error(`Missing animation: ${name}`);
+      clearTimeout(cleanup.get(next));
+      next.stopFading().reset().setEffectiveTimeScale(1).setEffectiveWeight(1).play();
+      if (previous && previous !== next) {
+        previous.stopFading().crossFadeTo(next, 0.3, false);
+        clearTimeout(cleanup.get(previous));
+        cleanup.set(previous, setTimeout(() => { if (active[group] !== previous) previous.stop(); }, 350));
+      }
+      active[group] = next;
+      document.querySelectorAll(`[data-${group}]`).forEach(button => {
+        button.setAttribute('aria-pressed', String(button.dataset[group] === name));
+      });
+      if (group === 'muse') {
+        if (name === 'talk_front' && museState !== 'talk_front') {
+          // Fly onto the screen's center ray, 0.4 m closer than follow mode.
+          const followCenter = new THREE.Vector3(-0.35, 1.1, -0.25);
+          const localCamera = camera.position.clone().sub(journey.position);
+          const advance = localCamera.distanceTo(personTarget) - (localCamera.distanceTo(followCenter) - 0.4);
+          talkCenter.copy(localCamera).sub(personTarget).normalize().multiplyScalar(advance).add(personTarget);
+        }
+        museState = name;
+        stateLabel.textContent = `Muse: ${name}`;
+      }
+    }
+
+    function stopDemo() {
+      clearTimeout(demoTimer); autoDemo = false;
+      demoButton.setAttribute('aria-pressed', 'false');
+    }
+    function demoStep(index) {
+      const [name, duration] = sequence[index];
+      play('muse', name);
+      demoTimer = setTimeout(() => demoStep((index + 1) % sequence.length), duration);
+    }
+    document.querySelectorAll('[data-muse]').forEach(button => button.addEventListener('click', () => {
+      stopDemo(); play('muse', button.dataset.muse);
+    }));
+    document.querySelectorAll('[data-person]').forEach(button => button.addEventListener('click', () => {
+      if (button.dataset.person === 'person_idle') { walking = false; walkButton.setAttribute('aria-pressed', 'false'); }
+      play('person', button.dataset.person);
+    }));
+    walkButton.addEventListener('click', () => {
+      walking = !walking; walkButton.setAttribute('aria-pressed', String(walking));
+      play('person', walking ? 'person_run' : 'person_idle');
+    });
+    demoButton.addEventListener('click', () => {
+      if (autoDemo) return stopDemo();
+      autoDemo = true; demoButton.setAttribute('aria-pressed', 'true'); demoStep(0);
+    });
+
+    try {
+      const gltf = await new GLTFLoader().loadAsync('../../assets/muse-companion/muse-companion.glb?revision=plush-final-review-2');
+      journey.add(gltf.scene);
+      mixer = new THREE.AnimationMixer(gltf.scene);
+      for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip));
+      for (const name of ['follow_back', 'thinking', 'talk_front', 'person_idle', 'person_run']) {
+        if (!actions.has(name)) throw new Error(`Missing animation: ${name}`);
+      }
+      bubbleNode = gltf.scene.getObjectByName('Muse_SpeechBubble');
+      museNode = gltf.scene.getObjectByName('Muse');
+      platformNode = gltf.scene.getObjectByName('Muse_Platform');
+      if (!platformNode) throw new Error('Missing node: Muse_Platform');
+      if (!bubbleNode) throw new Error('Missing node: Muse_SpeechBubble');
+      // The short talk clip holds its final pose; clicking again replays its bounce.
+      actions.get('talk_front').setLoop(THREE.LoopOnce, 1).clampWhenFinished = true;
+      play('muse', 'follow_back'); play('person', 'person_idle');
+      document.querySelectorAll('button').forEach(button => { button.disabled = false; });
+      // Read-only access for local inspection, including independent animation weights.
+      window.museViewer = { scene, model: gltf.scene, camera, controls, mixer, actions, journey,
+        get effects() { return effects.state; },
+        get state() { return { muse: museState, person: active.person.getClip().name, autoDemo, walking }; } };
+      document.body.dataset.ready = 'true';
+    } catch (error) { showError(`Could not load companion: ${error.message}`); console.error(error); }
+
+    const clock = new THREE.Clock();
+    const projected = new THREE.Vector3();
+    function render() {
+      requestAnimationFrame(render);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      mixer?.update(dt);
+      if (walking) {
+        travelDelta.set(0, 0, dt * 0.6);
+        journey.position.add(travelDelta); camera.position.add(travelDelta); controls.target.add(travelDelta);
+      }
+      const talkAction = actions.get('talk_front');
+      const talkWeight = talkAction?.isScheduled() && talkAction.enabled ? talkAction.getEffectiveWeight() : 0;
+      desiredTarget.copy(personTarget).lerp(talkCenter, talkWeight).add(journey.position);
+      controls.target.lerp(desiredTarget, 1 - Math.exp(-10 * dt));
+      controls.update();
+      if (museNode && talkWeight > 0) {
+        // The face's local +Z points at the real camera, never at Person.
+        // Rotate about the body's center so eye contact does not shift its framing.
+        centerWorld.copy(talkCenter).add(journey.position);
+        facePosition.copy(centerWorld);
+        for (let i = 0; i < 3; i++) {
+          facingMatrix.lookAt(camera.position, facePosition, camera.up);
+          talkRotation.setFromRotationMatrix(facingMatrix);
+          offset.set(0, 0.275, 0).applyQuaternion(talkRotation);
+          desiredRoot.copy(centerWorld).sub(offset);
+          facePosition.set(0, 0.418, 0.075).applyQuaternion(talkRotation).add(desiredRoot);
+        }
+        desiredRoot.sub(journey.position);
+        museNode.position.lerp(desiredRoot, talkWeight);
+        museNode.quaternion.slerp(talkRotation, talkWeight);
+      }
+      scene.updateMatrixWorld(true);
+      camera.updateMatrixWorld();
+      effects.update(platformNode, walking, performance.now() / 1000);
+      bubble.hidden = true;
+      if (bubbleNode && museState === 'talk_front') {
+        bubbleNode.getWorldPosition(projected).project(camera);
+        if (projected.z > -1 && projected.z < 1 && Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1) {
+          bubble.hidden = false;
+          bubble.style.left = `${(projected.x * .5 + .5) * innerWidth}px`;
+          bubble.style.top = `${(-projected.y * .5 + .5) * innerHeight}px`;
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      effects.resize();
+    });
+    render();
+  </script>
+</body>
+</html>

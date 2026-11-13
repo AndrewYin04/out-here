@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "errors": [],
+  "museStates": [
+    "follow_back",
+    "thinking",
+    "talk_front"
+  ],
+  "personClips": [
+    "person_run",
+    "person_idle"
+  ]
+}

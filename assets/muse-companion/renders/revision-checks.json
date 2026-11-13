@@ -1,0 +1,36 @@
+{
+  "person_before": "96f3a87bc41b863afaa8f1aa775d7a657d11de843b030d04881a592ce3e851ae",
+  "person_after": "96f3a87bc41b863afaa8f1aa775d7a657d11de843b030d04881a592ce3e851ae",
+  "person_unchanged": true,
+  "original_glb_binary_prefix_unchanged": true,
+  "person_glb_animations_unchanged": true,
+  "muse_height_m": 0.55,
+  "muse_width_m": 0.43,
+  "follow_center_gltf": [
+    -0.35,
+    1.1,
+    -0.25
+  ],
+  "talk_center_gltf": [
+    -0.4561980366706848,
+    1.1344283819198608,
+    -0.6422690749168396
+  ],
+  "studio_temperature_kelvin": 4500,
+  "render_resolution": [
+    1024,
+    1024
+  ],
+  "reference": "Attached plush photos and user-supplied fleece/shell-fur assets",
+  "browser_fibers": 26000,
+  "fine_strands_blender_only": 200000,
+  "continuous_body": true,
+  "blue_platform": true,
+  "plaque_included": false,
+  "headphones_included": true,
+  "assumptions": [
+    "Warm cream palette retained; reference materials are unpainted clay previews",
+    "Provided fleece maps used; supplied shell-fur 4.X is retained as an optional disabled preset",
+    "No orb, cape, star, plaque, or added headphone cable"
+  ]
+}

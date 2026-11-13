@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "person_digest": "0c27416e22b97f49650398932da38aae05f7094d220e8f7bc3e6bea5be5fb21c",
+  "person_geometry_rig_skin_weights_and_animation_unchanged": true,
+  "person_glb_binary_and_json_unchanged": true,
+  "dimensions_blender_xyz_m": [
+    0.3721128851175308,
+    0.2380760908126831,
+    0.550000011920929
+  ],
+  "fine_strands_blender": 36000,
+  "clumps_glb": 22000,
+  "plaque_present": false,
+  "pedestal_exported": false,
+  "transparent_1024_renders": 4,
+  "glb_bytes": 20815440
+}

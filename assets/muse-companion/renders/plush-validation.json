@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "person_digest": "0c27416e22b97f49650398932da38aae05f7094d220e8f7bc3e6bea5be5fb21c",
+  "person_geometry_rig_skin_weights_and_animation_unchanged": true,
+  "person_glb_binary_and_json_unchanged": true,
+  "dimensions_blender_xyz_m": [
+    0.40017537772655487,
+    0.23132610321044922,
+    0.550000011920929
+  ],
+  "fine_strands_blender": 200000,
+  "browser_fibers": 26000,
+  "body_components": 1,
+  "body_boundary_edges": 0,
+  "body_nonmanifold_edges": 0,
+  "back_view_occluded_facial_samples": 1359,
+  "blue_platform_present": true,
+  "head_width_m": 0.27396515011787415,
+  "lower_torso_width_m": 0.2940807044506073,
+  "pear_width_ratio": 1.0734237705930056,
+  "body_depth_m": 0.22346529364585876,
+  "previous_body_depth_m": 0.18332263082265854,
+  "plaque_present": false,
+  "pedestal_exported": false,
+  "transparent_1024_renders": 4,
+  "glb_bytes": 32196832
+}
