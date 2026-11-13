@@ -8,7 +8,7 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
 import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
@@ -57,16 +57,25 @@ function useNow(intervalMs = 30_000): Date {
  * Switching from one plan to another replaces the entry (Back returns to the map, not plan A).
  */
 const QUEST_ENTRY = 'ohQuest';
-function setQuestParam(id: string | null, key: 'quest' | 'listing' = 'quest') {
+function setQuestParam(id: string | null) {
   const url = new URL(window.location.href);
-  const had = url.searchParams.has(key);
+  const had = url.searchParams.has('quest');
   if (!id && !had) return;
-  if (id) url.searchParams.set(key, id);
-  else url.searchParams.delete(key);
+  if (id) url.searchParams.set('quest', id);
+  else url.searchParams.delete('quest');
   const state = window.history.state as Record<string, unknown> | null;
   if (!id && state?.[QUEST_ENTRY]) { window.history.back(); return; }
   if (id && !had) window.history.pushState({ ...(state ?? {}), [QUEST_ENTRY]: true }, '', url.toString());
   else window.history.replaceState(state, '', url.toString());
+}
+
+/** ?listing=<id>: the open Marketplace listing. It replaces the entry, so Back stays with plans
+ *  and never pops the plan entry from under an open listing. */
+function setListingParam(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('listing', id);
+  else url.searchParams.delete('listing');
+  window.history.replaceState(window.history.state, '', url.toString());
 }
 
 export function OutHereView() {
@@ -106,7 +115,7 @@ export function OutHereView() {
     const id = params.get('quest');
     if (id) setSelectedId(id);
     const lid = params.get('listing');
-    if (lid && !id) setListingId(lid);
+    if (lid && !id) { setListingId(lid); setMode('explore'); }
     // ?sell=popup: the demo seller's tab opens the Campus Thrift Pop-Up, items filled in.
     if (params.get('sell') === 'popup') {
       setPopUp(true);
@@ -232,11 +241,11 @@ export function OutHereView() {
   const select = useCallback((id: string | null) => {
     setSelectedId(id);
     setQuestParam(id);
-    if (id) { setListingId(null); setQuestParam(null, 'listing'); }
+    if (id) { setListingId(null); setListingParam(null); }
   }, []);
   const openListing = useCallback((id: string | null) => {
     setListingId(id);
-    setQuestParam(id, 'listing');
+    setListingParam(id);
     if (id) { setSelectedId(null); setQuestParam(null); }
   }, []);
 
@@ -263,6 +272,7 @@ export function OutHereView() {
   }, [map, openListing]);
   const openedListing = listingId ?listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
   const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
+  const walkMin = openedListing?.listing.location && ctx?.origin ? walkingMinutes(ctx.origin, openedListing.listing.location) : null;
   // Back and Forward: the plan in the URL is the plan on screen.
   useEffect(() => {
     const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
@@ -621,7 +631,7 @@ export function OutHereView() {
 
       {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
-      {mode === 'explore' && (
+      {mode === 'explore' && !unsupported && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
       )}
 
@@ -699,6 +709,7 @@ export function OutHereView() {
           listingId={listingId}
           viewerId={persona.id}
           driveMin={driveMin}
+          walkMin={walkMin}
           museLine={allFinds.find((f) => f.listingId === listingId)?.line ?? null}
           onClose={() => openListing(null)}
           onChanged={() => { void listingsApi.refetch(); }}
