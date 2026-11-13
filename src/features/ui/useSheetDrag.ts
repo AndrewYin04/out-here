@@ -4,7 +4,7 @@
 // is a real button, so mouse, touch and keyboard all work: Enter or Space toggles half and full,
 // ArrowUp expands, ArrowDown collapses (and closes from half). Under prefers-reduced-motion the
 // snap is instant. The sheet opens where it always did; dragging is optional.
-import { useCallback, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { reducedMotion } from './motion';
 
 export type SheetSnap = 'half' | 'full';
@@ -20,6 +20,9 @@ export function useSheetDrag({ onClose, initial = 'half' }: { onClose: () => voi
   // The open animation keeps its end transform (fill: both), which would override the drag. Once
   // the sheet has been touched, drop it (it has long finished, so nothing visible changes).
   const [touched, setTouched] = useState(false);
+  // Read after mount: the server cannot know it, and both renders must match (hydration).
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => setReduce(reducedMotion()), []);
   const start = useRef<{ y: number; t: number; id: number } | null>(null);
   // The two latest pointer samples: the flick speed is measured over the last move.
   const last = useRef<{ y: number; t: number }>({ y: 0, t: 0 });
@@ -80,7 +83,7 @@ export function useSheetDrag({ onClose, initial = 'half' }: { onClose: () => voi
   /** Spread on the sheet: follows the finger while dragging, eases to the snap after. */
   const sheetStyle: CSSProperties = {
     transform: dragY ? `translateY(${dragY}px)` : undefined,
-    transition: dragging || reducedMotion() ? 'none' : 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1), max-height 240ms cubic-bezier(0.22, 1, 0.36, 1)',
+    transition: dragging || reduce ? 'none' : 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1), max-height 240ms cubic-bezier(0.22, 1, 0.36, 1)',
     touchAction: dragging ? 'none' : undefined,
     animation: touched ? 'none' : undefined,
   };

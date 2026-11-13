@@ -956,7 +956,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       </div>
 
       {/* Bottom right: the HQ tour, "Back to me", and the location source. */}
-      <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[136px]">
+      <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[160px]">
         {tools && hqLabels.length > 0 && !tour && (
           <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
             Tour Meta HQ
@@ -1007,7 +1007,7 @@ function Joystick({ stick }: { stick: MutableRefObject<{ x: number; y: number }>
   };
   const end = () => { active.current = null; setKnob({ x: 0, y: 0 }); stick.current = { x: 0, y: 0 }; };
   return (
-    <div className="absolute bottom-[88px] left-3 max-md:bottom-[136px]">
+    <div className="absolute bottom-[88px] left-3 max-md:bottom-[160px]">
       <div
         ref={base}
         data-testid="joystick"
