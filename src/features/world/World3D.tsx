@@ -8,7 +8,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
-import { useApi } from '@/features/data';
+import { useApi, useWhere } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,setMuseDockFrom,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
@@ -140,6 +140,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   /** While true, following also eases the zoom down to street level (the fly-in). */
   const entering = useRef(true);
   const [follow, setFollowState] = useState(false);
+  /** Where a scroll or trackpad pinch is taking the zoom; the follow loop eases there around you. */
+  const zoomGoal = useRef<number | null>(null);
   const setFollow = useCallback((v: boolean) => { followRef.current = v; setFollowState(v); }, []);
   const keys = useRef(new Set<string>());
   const stick = useRef({ x: 0, y: 0 });
@@ -233,6 +235,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   useEffect(()=>{if(!companion.open&&manualChatCamera.current){map.setMaxZoom(MAX_3D_ZOOM);conversationCamera.current=false;}manualChatCamera.current=false;},[map,companion.open]);
   const upNext = useUpNext();
   const tools = useDemoTools();
+  // Here (your real location): show the joystick so you can walk around from where you are.
+  const hereOn = useWhere().mode === 'here';
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petBoost = useRef(1);
@@ -365,12 +369,27 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const zoomEnd = () => {
       if (!entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
     };
+    // Scroll and trackpad pinch while following: zoom around your character, eased every frame by
+    // the follow loop. MapLibre's own scroll zoom pivots on the screen center (you sit below it) and
+    // fights the follow camera, which reads as choppy.
+    const wheel = (e: WheelEvent) => {
+      if (!followRef.current || touring.current || chatOpen.current) return;
+      e.preventDefault(); e.stopPropagation();
+      entering.current = false;
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      const rate = e.ctrlKey ? 0.012 : 0.0028; // a trackpad pinch sends small deltas with ctrlKey
+      const from = zoomGoal.current ?? map.getZoom();
+      zoomGoal.current = Math.max(map.getMinZoom(), Math.min(MAX_3D_ZOOM, from - Math.max(-120, Math.min(120, px)) * rate));
+    };
+    const wheelHost = map.getContainer();
+    wheelHost.addEventListener('wheel', wheel, { capture: true, passive: false });
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
     map.on('zoomstart', userZoom);
     map.on('zoomend', zoomEnd);
 
     return () => {
+      wheelHost.removeEventListener('wheel', wheel, { capture: true });
       cancelled = true;
       unsubLooks?.();
       map.off('load', add);
@@ -414,11 +433,30 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // Home arrives after the first render: start the demo walk there if nothing moved yet.
   // A home inside a building outline starts on the nearest open ground instead (the tree refresh
   // repeats this once the buildings around it have loaded).
+  // A big jump in home (the dock's Here / Demo city toggle) moves you there even after you've walked:
+  // you, Jolly and the camera go to the new spot, and you can walk from there.
+  const lastHome = useRef<LatLng | null>(null);
   useEffect(() => {
-    if (!home || moved.current || sourceRef.current !== 'demo') return;
+    if (!home) return;
+    const jumped = !!lastHome.current && haversineMeters(lastHome.current, home) > 200;
+    lastHome.current = home;
+    if (jumped) {
+      stopWalk();
+      sourceRef.current = 'demo';
+      setSourceState('demo');
+      moved.current = false;
+      streetHeadingSet.current = false;
+      entering.current = true;
+      setFollow(true);
+    }
+    if (moved.current || sourceRef.current !== 'demo') return;
     pos.current = blockedRef.current ? nearestOpen(home, blockedRef.current) : home;
     petPos.current = pos.current;
     snapPending.current = true;
+    // Far from the 3D frame's origin the characters lose float precision and vanish: re-center it.
+    if (jumped) layerRef.current?.rebase(pos.current);
+    if (jumped) map.jumpTo({ center: [pos.current.lng, pos.current.lat] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [home]);
 
   // ---- Keyboard: arrows / WASD walk forward-back and turn ----
@@ -488,6 +526,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!origin) return;
     void buildSfCity(origin,Object.entries(DEMO_CITY_STARTS).map(([id,center])=>({id,center}))).then(city=>{
       if (cancelled || !layerRef.current) { city.dispose(); return; }
+      city.group.userData.builtAt=origin;city.group.userData.base=city.group.position.clone();
       layerRef.current.setStatic('sf-city',city.group);
       dispose=city.dispose;cityBounds.current=city.bounds;
       cityContains.current=blockerTest(city.bounds.map(ring=>[ring]));
@@ -1006,6 +1045,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const busy = map.isZooming() || (!followRef.current && map.isMoving());
       if (followRef.current && !busy) {
         let z = zoom;
+        if (zoomGoal.current != null) {
+          const goal = zoomGoal.current;
+          z = reducedMotion() ? goal : zoom + (goal - zoom) * (1 - Math.exp(-dt * 12));
+          if (Math.abs(goal - z) < 0.003) { z = goal; zoomGoal.current = null; }
+          // Zoomed out to city level by scroll: hand over to the 2D map.
+          if (z < EXIT_3D_ZOOM) { zoomGoal.current = null; onZoomOutRef.current?.(); }
+        }
         if (entering.current) {
           z = reducedMotion() ? ENTER_ZOOM : zoom + (ENTER_ZOOM - zoom) * (1 - Math.exp(-dt * 2.2));
           if (Math.abs(ENTER_ZOOM - z) < 0.02) { z = ENTER_ZOOM; entering.current = false; }
@@ -1014,6 +1060,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const h = map.getContainer().clientHeight;
         compose(pos.current.lng, pos.current.lat, z, camBearing.current, 0, Math.round(h * 0.2));
       } else if (!busy) {
+        zoomGoal.current = null;
         previousCamera = null;
         camBearing.current = map.getBearing();
       }
@@ -1429,7 +1476,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         {farKm != null && (
           <p role="status" className="pointer-events-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
-            You’re {farKm} km from Menlo Park, where the demo plans are.{' '}
+            You’re {farKm} km from the demo city. Turn on Here in the dock for plans around you.{' '}
             <button type="button" onClick={() => void chooseSource('demo')} className="font-semibold text-fb-blue hover:underline">Use the demo walk</button>
           </p>
         )}
@@ -1467,7 +1514,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Bottom left, above the view toggle: the joystick (demo walk only). */}
       {/* The joystick is a rehearsal tool: Let's go walks you there on its own. */}
-      {source === 'demo' && tools && <Joystick stick={stick} />}
+      {source === 'demo' && (tools || hereOn) && <Joystick stick={stick} />}
     </div>
   );
 }

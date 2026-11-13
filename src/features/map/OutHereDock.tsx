@@ -10,15 +10,16 @@
 //      Memories opens the Memories page
 //  - Three heights: peek (tabs only, the default), half (the tab's list) and full. Drag or tap the
 //    handle, or use the keyboard (Enter toggles, ArrowUp/ArrowDown step, Escape folds).
-import { CalendarCheck, Images, LocateFixed, Map as MapIcon, MapPin, Plus, Store, Users } from 'lucide-react';
+import { CalendarCheck, Images, LocateFixed, Map as MapIcon, MapPin, Navigation, Plus, Store, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { setWhere, useWhere } from '@/features/data';
 import { PeopleList, SharingSheet, flyToPin, useFriendPins } from '@/features/map/friends';
 import { YourPlans } from '@/features/memories';
 import { MuseDockButton, setMuseViewport } from '@/features/muse-companion';
 import { ImFreeButton } from '@/features/outhere';
 import { CategoryIcon, cn } from '@/features/ui';
-import type { Quest } from '@/shared';
+import { DEMO_AREA_LABEL, type Quest } from '@/shared';
 import { seatBadge, seatsLeftOf, startsLabel, walkLabel } from './format';
 import type { MapMode } from './types';
 
@@ -225,6 +226,7 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
           <span aria-hidden className="h-1 w-10 rounded-full bg-fb-divider" />
         </button>
 
+        <WhereToggle />
         <nav aria-label="Out Here" className="flex shrink-0 gap-1 px-3 pb-3">
           <TabButton id="friends" on={tab === 'friends'} label="Friends" icon={<Users size={22} aria-hidden />} onClick={() => choose('friends')} testId="map-mode-friends" />
           <TabButton id="explore" on={tab === 'explore'} label="Explore" icon={<MapPin size={22} aria-hidden />} onClick={() => choose('explore')} testId="map-mode-explore" />
@@ -296,5 +298,29 @@ function TabButton({ id, on, label, icon, onClick, testId }: { id: DockTab; on: 
       {icon}
       {on && <span aria-hidden className="animate-[oh-tab-label_500ms_ease-in-out] whitespace-nowrap text-[15px] font-semibold motion-reduce:animate-none">{label}</span>}
     </button>
+  );
+}
+
+/** Where Out Here starts from: the demo city, or your real location ("Here"). */
+function WhereToggle() {
+  const where = useWhere();
+  const note = where.status === 'asking' ? 'Finding you…'
+    : where.status === 'denied' ? 'Location is blocked for this site'
+      : where.status === 'unavailable' ? 'Location isn’t available here'
+        : where.mode === 'here' ? 'Plans and walking times start from where you are' : null;
+  return (
+    <div className="flex shrink-0 items-center gap-2 px-3 pb-2" data-testid="where-toggle">
+      <div role="group" aria-label={`Where you are: ${DEMO_AREA_LABEL} demo or your real location`} className="flex shrink-0 rounded-full bg-fb-input p-0.5">
+        {(['demo', 'here'] as const).map((m) => (
+          <button key={m} type="button" aria-pressed={where.mode === m} data-testid={`where-${m}`}
+            onClick={() => setWhere(m)}
+            className={cn('inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[13px] font-semibold transition-colors',
+              where.mode === m ? 'bg-fb-surface text-fb-blue shadow-card' : 'text-fb-text-2 hover:text-fb-text')}>
+            {m === 'here' ? <><Navigation size={13} aria-hidden />Here</> : 'Demo city'}
+          </button>
+        ))}
+      </div>
+      {note && <span className="min-w-0 truncate text-[12px] text-fb-text-2" aria-live="polite">{note}</span>}
+    </div>
   );
 }
