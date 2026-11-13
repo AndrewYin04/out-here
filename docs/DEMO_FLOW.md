@@ -30,11 +30,12 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 ### Scene 1. Scrolling Facebook, a comics listing catches his eye
 
 - **Screen:** laptop A.
-- **The judge sees:** Alex scrolls the Feed and sees a Marketplace post: a box of comics he likes.
-- **Status:** partly built.
-- **Exists:** Feed, Marketplace pages, 30 seeded listings.
-- **Needs:** Theo's comics listing in the seed, and the listing showing up in the Feed.
-- **Owner:** Andrew's agent (seed).
+- **The judge sees:** Alex opens Marketplace. It shows only what fits what he watches: "Picked by Muse from what you watch · comics · local music". Theo's box of comics is first, with Muse's reason ("You've watched 26 min of comics videos this week…") and "Why this?" showing the videos behind it. Muse hid the other 28 listings.
+- **✨ Muse (live moment):** Alex opens Video, plays "35mm film for beginners" for 8 s, goes back: the 35mm film camera slides in as "New · You just watched…". A topic chip's ✕ removes its items (you control what Muse uses).
+- **Status:** built on `feat/muse-watch-picks` (Rishab). The comics box shows once Theo's listing (`wt/event-intro`) reaches main; until then the picks are the bass and the film camera.
+- **Exists:** Video page with Alex's seeded week of viewing (`src/shared/seed/videos.json`), `/api/muse/marketplace-picks` (Ember taste and picks, code checks every video, listing and number), migration 0009 `watch_events`.
+- **Needs:** Theo's listing on main, and 0009 on the demo database before `seed:demo`.
+- **Owners:** Rishab (Muse picks), Andrew's agent (seed).
 
 ### Scene 2. The seller makes it an open house
 
