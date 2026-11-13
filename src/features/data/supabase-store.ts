@@ -112,9 +112,7 @@ export class SupabaseBackend implements Backend {
       // take the last snapshot and trigger one background reload. Writes bump `gen`, which skips
       // this branch, and realtime-triggered refetches are fresh, so cross-tab updates stay exact.
       if (startedAfter === -Infinity && age < SNAPSHOT_STALE_MS) {
-        if (!this.refreshing) {
-          this.refreshing = this.loadAndCache().catch(() => undefined).finally(() => { this.refreshing = null; });
-        }
+        if (!this.refreshing) this.revalidate();
         return c.db;
       }
     }
@@ -124,15 +122,45 @@ export class SupabaseBackend implements Backend {
   private refreshing: Promise<unknown> | null = null;
 
   /**
+   * The background reload behind stale-while-revalidate. The finished snapshot replaces the
+   * cache only once it has loaded (and only if no write happened meanwhile), so readers keep
+   * getting the previous snapshot at once instead of waiting on the reload in flight.
+   */
+  private revalidate(): void {
+    const gen = this.gen;
+    const at = Date.now();
+    this.refreshing = this.load()
+      .then((db) => {
+        if (this.gen === gen && (!this.cache || this.cache.at < at)) this.cache = { gen, at, db: Promise.resolve(db) };
+      })
+      .catch(() => undefined)
+      .finally(() => { this.refreshing = null; });
+  }
+
+  /**
    * In a route: the request's working snapshot. It is loaded once and then kept current with the
    * request's own writes. A fresh request only takes a load that began after it arrived (so it
-   * sees every write committed before it was sent); other requests may take any cached load.
+   * sees every write committed before it was sent); other requests may take any cached load,
+   * then re-read the tables in scope.refresh.
    * Outside a route: the shared cache.
    */
   async snapshot(): Promise<Db> {
     const scope = currentScope();
     if (!scope) return { ...(await this.shared()) };
-    scope.working ??= this.shared(scope.fresh ? scope.since : -Infinity).then((db) => ({ ...db }));
+    if (!scope.working) {
+      const base = this.shared(scope.fresh ? scope.since : -Infinity);
+      // A load this request started itself is already current (a stale-while-revalidate
+      // background reload does not count: `base` is then the older snapshot).
+      const ownLoad = this.cache?.db === base && this.cache.at >= scope.since;
+      scope.working = base.then(async (cached) => {
+        const db = { ...cached };
+        if (!scope.fresh && !ownLoad && scope.refresh.length > 0) {
+          const rows = await Promise.all(scope.refresh.map((k) => this.loadTable(k)));
+          scope.refresh.forEach((k, i) => { (db[k] as unknown[]) = rows[i]; });
+        }
+        return db;
+      });
+    }
     return { ...(await scope.working) };
   }
 

@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { z, ZodError, type ZodType } from 'zod';
 import { isAudience, type Audience, type Profile } from '@/shared';
 import {
-  flushOutbox, FRESH_HEADER, getStore, getViewer, HttpError, newScope, runInScope, type DataStore,
+  flushOutbox, FRESH_HEADER, getStore, getViewer, HttpError, newScope, runInScope, type DataStore, type TableKey,
 } from '@/features/data/server';
 
 export type Ctx<P extends Record<string, string> = Record<string, string>> = { params: Promise<P> };
@@ -31,12 +31,18 @@ type Handler<P extends Record<string, string>> = (args: {
  * sent with x-outhere-fresh: 1 (refetches a realtime message triggered), read the database
  * instead of the shared snapshot cache. Queued Supabase Broadcasts go out in one call before the
  * response. The Server-Timing header reports total time, full table loads and queries.
+ *
+ * `opts.refresh` lists the only tables a POST must read fresh. The request then reuses the shared
+ * snapshot and re-reads just those tables (a few small queries instead of every table), which
+ * matters for routes people wait on (a Muse plan, a vote). Use it only where the handler's
+ * correctness depends on those tables alone.
  */
-export function route<P extends Record<string, string> = Record<string, string>>(fn: Handler<P>) {
+export function route<P extends Record<string, string> = Record<string, string>>(fn: Handler<P>, opts: { refresh?: TableKey[] } = {}) {
   return async (req: Request, ctx: Ctx<P>) => {
     const started = performance.now();
-    const fresh = req.method !== 'GET' || req.headers.get(FRESH_HEADER) === '1';
-    const scope = newScope(fresh);
+    const partial = req.method !== 'GET' && !!opts.refresh;
+    const fresh = !partial && (req.method !== 'GET' || req.headers.get(FRESH_HEADER) === '1');
+    const scope = newScope(fresh, partial ? opts.refresh : []);
     let res: Response;
     let broadcasts = 0;
     try {
@@ -62,6 +68,12 @@ export function route<P extends Record<string, string> = Record<string, string>>
     return res;
   };
 }
+
+/**
+ * The tables that change while people use Out Here (free windows, quests and seats, shared plans,
+ * live locations). Routes people wait on re-read only these and reuse the snapshot for the rest.
+ */
+export const LIVE_TABLES: TableKey[] = ['availability', 'quests', 'questMembers', 'togetherPlans', 'locationShares'];
 
 /** Parses the JSON body with a zod schema (400 on bad JSON or invalid input). */
 export async function body<T>(req: Request, schema: ZodType<T>): Promise<T> {

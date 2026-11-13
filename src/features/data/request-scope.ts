@@ -1,17 +1,20 @@
 // Per-request state for route handlers (server-only), carried with AsyncLocalStorage.
 // - fresh: read the database instead of the shared snapshot cache (mutations, and refetches a
 //   realtime message triggered, so they see the write that caused the message).
+// - refresh: tables a cached (non-fresh) request re-reads before it starts, so a route can reuse
+//   the shared snapshot for the slow-changing tables and still see the latest seats and free windows.
 // - working: this request's own snapshot. SupabaseBackend loads it once, then applies the
 //   request's own writes to it, so a mutation reads the database once instead of after every write.
 // - outbox: Supabase Broadcast messages, sent in one REST call when the handler finishes.
 // - timing: counters for the Server-Timing header, used to measure latency on the deployed build.
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Db } from './db';
+import type { Db, TableKey } from './db';
 
 export type OutboxMessage = { topic: string; event: string; payload: Record<string, unknown> };
 
 export type RequestScope = {
   fresh: boolean;
+  refresh: TableKey[];
   /** When the request arrived (ms). A fresh request may reuse a load that started after this. */
   since: number;
   working: Promise<Db> | null;
@@ -27,8 +30,8 @@ export function currentScope(): RequestScope | undefined {
   return als.getStore();
 }
 
-export function newScope(fresh: boolean): RequestScope {
-  return { fresh, since: Date.now(), working: null, outbox: [], loads: 0, queries: 0 };
+export function newScope(fresh: boolean, refresh: TableKey[] = []): RequestScope {
+  return { fresh, refresh, since: Date.now(), working: null, outbox: [], loads: 0, queries: 0 };
 }
 
 export function runInScope<T>(scope: RequestScope, fn: () => Promise<T>): Promise<T> {
