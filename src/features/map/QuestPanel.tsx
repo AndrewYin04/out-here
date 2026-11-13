@@ -5,6 +5,7 @@ import { ChevronRight, Clock, Footprints, MapPin, Users, Wallet, X } from 'lucid
 import Link from 'next/link';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
+import { useLetsGo } from '@/features/outhere';
 import { Avatar, Button, IconButton, Skeleton, bump, celebrateJoin, cn, useToast } from '@/features/ui';
 import type { ListingResponse, PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
@@ -56,6 +57,7 @@ function friendsFirst(members: PersonCard[], hostId: string | undefined, viewerI
 export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onChanged, museReason = null }: QuestPanelProps) {
   const { data, error, loading, refetch } = useApi<QuestDetail>(`/api/quests/${questId}`, [`quest:${questId}`]);
   const toast = useToast();
+  const letsGo = useLetsGo();
   const { viewer } = useViewer();
   /** Join/leave shown at once (optimistic); cleared when the server answers. */
   const [pending, setPending] = useState<'join' | 'leave' | null>(null);
@@ -256,11 +258,22 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
       {q && shown && (
         <div className="shrink-0 border-t border-fb-divider-soft px-4 pb-3 pt-3">
           {isMember ? (
-            isHost ? (
-              <p className="text-center text-fb-body font-semibold text-fb-text-2">You&apos;re hosting this plan</p>
-            ) : (
-              <Button variant="secondary" block disabled={busy} onClick={() => void act('leave')}>Leave</Button>
-            )
+            // Joined: the next step is getting there (docs/UX_PLAN.md). Leave stays, but small.
+            <>
+              {q.status !== 'done' && (
+                <Button variant="primary" block icon={<Footprints size={18} />} data-testid="quest-lets-go" onClick={() => { onClose(); letsGo(questId); }}>
+                  {walkMinutes != null ? `Let’s go · ${walkMinutes} min walk` : 'Let’s go'}
+                </Button>
+              )}
+              {isHost ? (
+                <p className="mt-2 text-center text-[13px] font-semibold text-fb-text-2">You&apos;re hosting this plan</p>
+              ) : (
+                <button type="button" data-testid="quest-leave" disabled={busy} onClick={() => void act('leave')}
+                  className="mx-auto mt-2 block text-[13px] font-semibold text-fb-text-2 hover:underline disabled:opacity-50">
+                  Leave this plan
+                </button>
+              )}
+            </>
           ) : (
             <Button variant="primary" block disabled={busy || seatsLeft === 0} onClick={(e) => void act('join', e)}>
               {seatsLeft === 0 ? 'Full' : 'Join'}

@@ -7,18 +7,22 @@
 // GPS. Neither writes a position to the server; Find My keeps doing location sharing.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
-import { cn } from '@/features/ui';
+import { ArrivalSelfie, OPEN_SELFIE } from '@/features/memories';
+import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
+import { cn, useDemoTools } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import { buildHq, loadHq, type HqLabel } from './hq';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, type Area, type Street } from './trees';
 import {
-  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
+  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
+import { StadiumLabels } from './StadiumLabels';
+import { stadiumLabels } from './stadiums';
 import { useGps } from './useGps';
+import { useWalkTogether } from './useWalkTogether';
 import { WorldLayer, type BeaconSpec } from './WorldLayer';
 
 export type World3DProps = {
@@ -30,10 +34,17 @@ export type World3DProps = {
   picks: string[] | null;
   selectedId: string | null;
   friendPins: FriendPin[];
-  onSelect: (questId: string) => void;
+  onSelect: (questId: string | null) => void;
   onOpenFriend: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
+  /** A hand pinch/scroll ended zoomed out past EXIT_3D_ZOOM. */
+  onZoomOut?: () => void;
+  /** A joined plan requested from Up Next, even if its pin is filtered out. */
+  walkTo?: Quest | null;
+  onWalkStop?: (questId: string) => void;
+  /** Called once when you arrive at a plan (walked there or walked into it). */
+  onArrive?: (questId: string) => void;
 };
 
 type Source = 'demo' | 'gps';
@@ -59,10 +70,28 @@ const typing = (t: EventTarget | null) => {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 };
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+/** Muse's hello follows where you are in the journey: no "tap I'm free" once you have a plan. */
+function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
+  if (!next) return `Hi ${name}! Tap ✨ I’m free and I’ll find something nearby.`;
+  const mins = Math.round((Date.parse(next.quest.startsAt) - Date.now()) / 60_000);
+  const when = mins <= 0 ? 'is happening now' : `starts in ${mins} min`;
+  return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
+}
 
-export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit }: World3DProps) {
+export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onWalkStop, onArrive }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
+  // Until the tilted map has drawn its first frame of streets, show a loading veil instead of a
+  // grey void with floating pins (docs/UX_PLAN.md).
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!ready || settled) return;
+    let done = false;
+    const finish = () => { if (!done) { done = true; setSettled(true); } };
+    map.once('idle', finish);
+    const t = window.setTimeout(finish, 12_000);
+    return () => { done = true; map.off('idle', finish); window.clearTimeout(t); };
+  }, [ready, settled, map]);
   /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
   const [hqLabels, setHqLabels] = useState<HqLabel[]>([]);
   const hqBox = useRef<number[][] | null>(null);
@@ -91,9 +120,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const walkRef = useRef<Walk | null>(null);
   const [walk, setWalkState] = useState<Walk | null>(null);
   const setWalk = useCallback((w: Walk | null) => { walkRef.current = w; setWalkState(w); }, []);
+  const stopWalk = useCallback(() => {
+    const questId = walkRef.current?.questId;
+    setWalk(null);
+    if (questId) onWalkStop?.(questId);
+  }, [onWalkStop, setWalk]);
   const [walkMin, setWalkMin] = useState<number | null>(null);
   const [arrival, setArrival] = useState<{ id: string; text: string } | null>(null);
   const arrived = useRef(new Set<string>());
+  const requestedWalk = useRef<Quest | null>(null);
   const [source, setSourceState] = useState<Source>('demo');
   const sourceRef = useRef<Source>('demo');
   const gps = useGps(source === 'gps');
@@ -104,11 +139,27 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const questsRef = useRef(quests);
   questsRef.current = quests;
   const friendsRef = useRef(friendPins);
+  // ---- Walking there together (#46): your steps out, the other members' walks in ----
+  const walkQuests = useMemo(
+    () => walkTo && !quests.some((q) => q.id === walkTo.id) ? [...quests, walkTo] : quests,
+    [quests, walkTo],
+  );
+  const together = useWalkTogether(walkQuests, viewer.id, walk?.questId ?? null);
+  const stepRef = useRef(together.step);
+  stepRef.current = together.step;
+  const walkersRef = useRef(together.walkers);
+  walkersRef.current = together.walkers;
+  /** Where each walker's avatar is drawn: it glides toward their latest reported position. */
+  const walkerPos = useRef(new Map<string, { at: LatLng; heading: number; moving: boolean }>());
   friendsRef.current = friendPins;
+  const onZoomOutRef = useRef(onZoomOut);
+  onZoomOutRef.current = onZoomOut;
 
   // ---- Muse pet: what it says and where it floats ----
   const planOpen = usePlanOpen();
   const plan = usePlanStatus();
+  const upNext = useUpNext();
+  const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petPos = useRef<LatLng>(start);
@@ -116,7 +167,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const [hello, setHello] = useState(true);
   const [showReason, setShowReason] = useState(false);
   const [cheer, setCheer] = useState<string | null>(null);
-  useEffect(() => { const t = window.setTimeout(() => setHello(false), 7000); return () => window.clearTimeout(t); }, []);
+  // The hello starts once the street view is on screen, not behind the loading veil.
+  useEffect(() => { if (!settled) return; const t = window.setTimeout(() => setHello(false), 7000); return () => window.clearTimeout(t); }, [settled]);
   useEffect(() => {
     setShowReason(false);
     if (plan.state !== 'done' || !plan.topReason) return;
@@ -140,7 +192,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           : planOpen
             ? { text: 'What are you up for?', tone: 'plain' }
             : hello
-              ? { text: `Hi ${firstName(viewer.name)}! Tap ✨ I’m free and I’ll find something nearby.`, tone: 'plain' }
+              ? { text: helloLine(firstName(viewer.name), upNext), tone: 'plain' }
               : null;
   const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
   const nextPetState = cheer ? 'happy' : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
@@ -202,9 +254,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); setFollow(false); } };
     // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
     const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
+    // Zoomed out to city level hands over to the 2D map (one zoom, two views). Only the fly-in and
+    // the HQ tour move the zoom on their own, and neither zooms out, so any other zoom that ends
+    // out here was the viewer's. (The follow loop's own camera calls end zooms mid-gesture, so a
+    // per-gesture "by hand" flag would miss the last one.)
+    const zoomEnd = () => {
+      if (!entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
+    };
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
     map.on('zoomstart', userZoom);
+    map.on('zoomend', zoomEnd);
 
     return () => {
       cancelled = true;
@@ -214,6 +274,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       map.off('dragstart', detach);
       map.off('rotatestart', detach);
       map.off('zoomstart', userZoom);
+      map.off('zoomend', zoomEnd);
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
       undoTheme?.();
       layerRef.current = null;
@@ -262,15 +323,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); window.removeEventListener('blur', blur); };
   }, []);
 
-  // ---- Plan beacons ----
+  // ---- Plan beacons and stadiums (#23): an arena with one seat per spot under each beam ----
   useEffect(() => {
     const strong = new Set([...(picks ?? []), ...(selectedId ? [selectedId] : [])]);
+    const pickSet = new Set(picks ?? []);
     const specs: BeaconSpec[] = quests
       .filter((q) => q.status !== 'done' && q.capacity - q.memberIds.length > 0)
       .map((q) => ({
         id: q.id, pos: q.location, strong: strong.has(q.id),
         color: strong.has(q.id) ? '#0866FF' : CATEGORY_COLOR[q.category] ?? '#65676B',
         height: strong.has(q.id) ? 90 : 45,
+        capacity: q.capacity, taken: q.memberIds.length, pick: pickSet.has(q.id),
       }));
     layerRef.current?.setBeacons(specs);
   }, [quests, picks, selectedId, ready]);
@@ -440,6 +503,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let lastMin: number | null = null;
     let lastMe = '';
     let lastPet = '';
+    const walkerState = new Map<string, string>();
     let lastSecond = 0;
 
     const tick = (now: number) => {
@@ -478,7 +542,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const s = stick.current;
         const mag = Math.min(1, Math.hypot(s.x, s.y));
         if (turn || fwd || mag > 0.15) {
-          if (walkRef.current) setWalk(null);
+          if (walkRef.current) stopWalk();
           if (!followRef.current) setFollow(true);
           moved.current = true;
         }
@@ -503,13 +567,42 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             arrived.current.add(w.questId);
             layer.setState('me', 'wave');
             setArrival({ id: w.questId, text: `You’re at ${w.emoji} ${w.title}` });
-            onSelect(w.questId);
+            if (w.questId !== requestedWalk.current?.id) onSelect(w.questId);
           }
         }
       }
       const meState = moving ? 'walk' : 'idle';
       if (meState !== lastMe) { layer.setState('me', meState); lastMe = meState; }
       layer.setPose('me', pos.current, heading.current, 0);
+      if (moving && sourceRef.current === 'demo') stepRef.current(pos.current);
+
+      // People walking to the same plan: each avatar glides to their latest step.
+      const walking = walkersRef.current;
+      const walkIds = new Set(walking.map((w) => `w:${w.id}`));
+      for (const id of layer.actorIds()) {
+        if (id.startsWith('w:') && !walkIds.has(id)) { layer.removeActor(id); walkerPos.current.delete(id); walkerState.delete(id); }
+      }
+      for (const w of walking) {
+        const id = `w:${w.id}`;
+        let cur = walkerPos.current.get(id);
+        if (!cur) {
+          layer.upsertActor(id, 'avatar', w.id);
+          cur = { at: w.location, heading: bearingDeg(w.location, pos.current), moving: false };
+          walkerPos.current.set(id, cur);
+        }
+        const gap = haversineMeters(cur.at, w.location);
+        // Steps arrive every ~1.5 s: cover the gap at walking pace, snap if it is far behind.
+        if (gap > 120) cur.at = w.location;
+        else if (gap > 0.3) {
+          const b = bearingDeg(cur.at, w.location);
+          cur.at = moveMeters(cur.at, Math.min(gap, Math.max(gap * (1 - Math.exp(-dt * 1.6)), STICK_MPS * 0.6 * dt)), b);
+          cur.heading = lerpDeg(cur.heading, b, 1 - Math.exp(-dt * 8));
+        }
+        cur.moving = gap > 1;
+        const st = cur.moving ? 'walk' : 'idle';
+        if (walkerState.get(id) !== st) { layer.setState(id, st); walkerState.set(id, st); }
+        layer.setPose(id, cur.at, cur.heading, 0);
+      }
 
       // The pet: at your shoulder, or in front of you facing the camera while it talks.
       const front = petMode.current === 'front';
@@ -528,7 +621,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Friends near you become avatars (nearest few), the rest stay as map pins.
       if (now - lastNear > 1000) {
         lastNear = now;
+        const walkingIds = new Set(walkersRef.current.map((w) => w.id));
         const near = friendsRef.current
+          .filter((p) => !walkingIds.has(p.friend.id))
           .map((p) => ({ p, d: haversineMeters(pos.current, p.location) }))
           .filter((x) => x.d <= FRIEND_RADIUS_M)
           .sort((a, b) => a.d - b.d)
@@ -587,14 +682,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, tryMove]);
+  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, stopWalk, tryMove]);
 
   // ---- GPS source ----
   const chooseSource = async (next: Source) => {
     if (next === 'gps') await gps.requestCompass();
     sourceRef.current = next;
     setSourceState(next);
-    setWalk(null);
+    stopWalk();
     if (next === 'demo') { pos.current = home ?? DEMO_CENTER; moved.current = false; setFarKm(null); }
     setFollow(true);
   };
@@ -621,6 +716,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     setFarKm(d > FAR_FROM_DEMO_M ? Math.round(d / 1000) : null);
   }, [source, gps.status, gps.reading]);
 
+  const questWhere = useMemo(() => new Map(quests.map((q) => [q.id, q.location])), [quests]);
+
   // ---- Walk to the selected plan ----
   const selected = useMemo(() => quests.find((q) => q.id === selectedId) ?? null, [quests, selectedId]);
   const selectedMin = selected ? minutesLeft(pos.current, selected.location) : null;
@@ -630,12 +727,73 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     setArrival(null);
     setWalk({ questId: selected.id, title: selected.title, emoji: selected.emoji, to: selected.location });
     setFollow(true);
+    onSelect(null);
   };
   useEffect(() => {
     if (!arrival) return;
     const t = window.setTimeout(() => setArrival(null), 5000);
     return () => window.clearTimeout(t);
   }, [arrival]);
+  // Arriving at a plan you joined opens the selfie (#47), once per plan in this visit.
+  // A snapshot, not a live lookup: saving the photo completes the plan, which drops it from the map.
+  const [selfieQuest, setSelfieQuest] = useState<Quest | null>(null);
+  const selfieShown = useRef(new Set<string>());
+  useEffect(() => {
+    if (!arrival || selfieShown.current.has(arrival.id)) return;
+    const q = questsRef.current.find((x) => x.id === arrival.id) ?? requestedWalk.current;
+    if (q?.id !== arrival.id || !q.memberIds.includes(viewer.id)) return;
+    selfieShown.current.add(q.id);
+    setSelfieQuest(q);
+  }, [arrival, viewer.id]);
+  // "Take a photo together" on the Up next card reopens this dialog (one photo prompt).
+  useEffect(() => {
+    const on = (e: Event) => {
+      const q = questsRef.current.find((x) => x.id === (e as CustomEvent<string>).detail);
+      if (!q?.memberIds.includes(viewer.id)) return;
+      e.preventDefault();
+      selfieShown.current.add(q.id);
+      setSelfieQuest(q);
+    };
+    window.addEventListener(OPEN_SELFIE, on);
+    return () => window.removeEventListener(OPEN_SELFIE, on);
+  }, [viewer.id]);
+  // Closed while early: the selfie comes back when the plan starts, if you're still there.
+  const selfieWaiting = useRef<Quest | null>(null);
+  const closeSelfie = useCallback(() => {
+    setSelfieQuest((q) => {
+      selfieWaiting.current = q && new Date(q.startsAt).getTime() > Date.now() ? q : null;
+      return null;
+    });
+  }, []);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const q = selfieWaiting.current;
+      if (!q || new Date(q.startsAt).getTime() > Date.now()) return;
+      selfieWaiting.current = null;
+      if (haversineMeters(pos.current, q.location) <= ARRIVE_METERS * 3) setSelfieQuest(q);
+    }, 5000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (arrival) onArrive?.(arrival.id);
+  }, [arrival, onArrive]);
+
+  useEffect(() => {
+    if (!walkTo) {
+      if (requestedWalk.current && walkRef.current?.questId === requestedWalk.current.id) setWalk(null);
+      requestedWalk.current = null;
+      return;
+    }
+    if (requestedWalk.current?.id === walkTo.id) return;
+    requestedWalk.current = walkTo;
+    setArrival(null);
+    arrived.current.delete(walkTo.id);
+    sourceRef.current = 'demo';
+    setSourceState('demo');
+    setWalk({ questId: walkTo.id, title: walkTo.title, emoji: walkTo.emoji, to: walkTo.location });
+    setFollow(true);
+  }, [walkTo, setFollow, setWalk]);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);
@@ -658,6 +816,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       data-lng={pos.current.lng.toFixed(5)}
       className="pointer-events-none absolute inset-0 z-[5]"
     >
+      {!settled && (
+        <div data-testid="world-loading" className="absolute inset-0 z-[1] flex items-center justify-center bg-[#EEF0F2]">
+          <p role="status" className="flex items-center gap-2 rounded-pill bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-card">
+            <span aria-hidden className="animate-pulse">✨</span> Getting the street view ready…
+          </p>
+        </div>
+      )}
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
       <style>{'[data-view3d] [data-map-marker="me"]{display:none}'}</style>
 
@@ -676,6 +841,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             </button>
           </div>
         )}
+        {together.walkers.map((w) => (
+          <div key={w.id} ref={bindLabel(`w:${w.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
+            <span data-testid="world-walker" className="block whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
+              🚶 {firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
+            </span>
+          </div>
+        ))}
         {nearFriends.map((f) => (
           <div key={f.id} ref={bindLabel(`f:${f.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
             <button
@@ -701,6 +873,16 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         </div>
       )}
 
+      {/* Quest stadiums: name, spots left and the walk from you, above each nearby arena. */}
+      {ready && map.getZoom() >= CHARACTER_MIN_ZOOM && (
+        <StadiumLabels
+          labels={stadiumLabels(quests, pos.current, { picks, selectedId })}
+          where={questWhere}
+          layer={layerRef.current}
+          onSelect={onSelect}
+        />
+      )}
+
       {/* Bottom centre: walking countdown, arrival, "Walk there", GPS notes. */}
       <div className={cn(
         'absolute inset-x-0 flex flex-col items-center gap-2 px-4',
@@ -712,18 +894,53 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <button type="button" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="shrink-0 font-semibold text-[#8AB4FF] hover:underline">End tour</button>
           </div>
         )}
+        {/* One walk bar: while you walk, the countdown below says who you're walking with. */}
+        {together.plan && !walk && (
+          <div role="status" data-testid="walk-together" className="pointer-events-auto flex max-w-[360px] items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[13px] text-fb-text shadow-popover">
+            <span aria-hidden>👥</span>
+            <span className="min-w-0 truncate">
+              {together.walkers.length > 0
+                ? (
+                  <button
+                    type="button"
+                    data-testid="walk-together-show"
+                    title="Show them on the map"
+                    onClick={() => {
+                      // Look at the nearest walker; "Back to me" brings the camera home.
+                      const at = walkerPos.current.get(`w:${together.walkers[0].id}`)?.at ?? together.walkers[0].location;
+                      entering.current = false;
+                      stopTour();
+                      setFollow(false);
+                      map.easeTo({ center: [at.lng, at.lat], duration: reducedMotion() ? 0 : 900 });
+                    }}
+                    className="truncate text-left hover:underline"
+                  >
+                    <b>Walking with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</b> to {together.plan.emoji} {clip(together.plan.title, 22)}
+                  </button>
+                )
+                : together.sharing ? <>Your walk to {together.plan.emoji} {clip(together.plan.title, 22)} is shown to the people going</> : <>Your walk is not shared</>}
+            </span>
+            <button type="button" data-testid="walk-share-toggle" onClick={() => together.setSharing(!together.sharing)} className="shrink-0 font-semibold text-fb-blue hover:underline">
+              {together.sharing ? 'Stop sharing' : 'Share'}
+            </button>
+          </div>
+        )}
         {walk && walkMin != null && (
           <div role="status" data-testid="walk-countdown" className="pointer-events-auto flex items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-popover">
             <span aria-hidden>🚶</span>
             <span>{walkMin <= 1 ? 'Almost there' : `${walkMin} min`} to {walk.emoji} {clip(walk.title, 28)}</span>
-            <button type="button" onClick={() => setWalk(null)} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
+            {together.plan?.id === walk.questId && together.walkers.length > 0 && (
+              <span data-testid="walk-with" className="font-normal text-fb-text-2">· with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</span>
+            )}
+            <button type="button" onClick={stopWalk} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
           </div>
         )}
-        {arrival && !walk && (
+        {arrival && !walk && !selfieQuest && (
           <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
             📍 {arrival.text}
           </div>
         )}
+        <ArrivalSelfie quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
             🚶 Walk there · {selectedMin} min
@@ -740,7 +957,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Bottom right: the HQ tour, "Back to me", and the location source. */}
       <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[136px]">
-        {hqLabels.length > 0 && !tour && (
+        {tools && hqLabels.length > 0 && !tour && (
           <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
             🏢 Tour Meta HQ
           </button>
@@ -750,7 +967,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             ◎ Back to me
           </button>
         )}
-        <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
+        {(tools || source === 'gps') && <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
           {(['demo', 'gps'] as const).map((s) => (
             <button
               key={s}
@@ -763,7 +980,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               {s === 'demo' ? '🕹️ Demo walk' : '📡 Live GPS'}
             </button>
           ))}
-        </div>
+        </div>}
         {gpsLine && <p className="rounded-pill bg-fb-surface px-2.5 py-1 text-[12px] text-fb-text-2 shadow-card">{gpsLine} · stays on this device</p>}
       </div>
 

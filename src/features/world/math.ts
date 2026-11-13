@@ -18,6 +18,12 @@ export const MAX_3D_ZOOM = 20.6;
 export const MAX_3D_PITCH = 78;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */
 export const CHARACTER_MIN_ZOOM = 15.8;
+/**
+ * One zoom, two views. Pinching the 3D view out past this zoom (the camera is flat by then) hands
+ * over to the 2D map. The map area's ENTER_3D_ZOOM (map/view3d.ts) is the way back in; the gap
+ * between them keeps it from flipping back and forth.
+ */
+export const EXIT_3D_ZOOM = 15.4;
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const smoothstep = (t: number) => t * t * (3 - 2 * t);
