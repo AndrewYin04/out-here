@@ -6,7 +6,7 @@ const PLACEHOLDER = "hungry, got like 40 min, under $15";
 
 test.describe("Muse picks on the map", () => {
   test("a plan highlights the dumpling pin and dims the rest; closing restores them", async ({ page }) => {
-    await page.goto("/out-here?as=alex");
+    await page.goto("/out-here?as=alex&mode=explore");
     const dumplings = page.getByTestId("quest-pin-dumplings");
     await expect(dumplings).toBeAttached({ timeout: 15_000 });
     await expect(page.getByTestId("muse-pick")).toHaveCount(0);
@@ -17,7 +17,7 @@ test.describe("Muse picks on the map", () => {
     await page.getByRole("button", { name: "Find a plan" }).click();
     await expect(page.getByTestId("plan-summary")).toBeVisible({ timeout: 15_000 });
 
-    await expect(dumplings.getByTestId("muse-pick")).toHaveText("✨ Muse pick");
+    await expect(dumplings.getByTestId("muse-pick")).toHaveText("Muse pick");
     await expect(dumplings).toHaveAttribute("aria-label", /^Muse pick: /);
     const dimmed = page.locator("[data-dimmed]");
     expect(await dimmed.count()).toBeGreaterThan(0);

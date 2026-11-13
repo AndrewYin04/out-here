@@ -14,6 +14,8 @@ export type PlanResponse = MusePlan & {
     friendsFree?: { firstName: string; freeUntil: string }[];
     models?: { parse: string; rank: string }; rankFallback?: boolean;
     timings?: { totalMs: number };
+    /** Agent coordination checks availability, never attendance or consent. */
+    coordination?: boolean;
   };
 };
 /** "mock" = offline heuristic text, "fallback" = code answered after a live model step failed. */

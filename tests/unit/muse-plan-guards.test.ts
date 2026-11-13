@@ -39,6 +39,7 @@ const never = () => new Promise<never>(() => {});
 function rankWith(build: (cands: { id: string; title: string; friendsWhoCanCome: { id: string }[] }[]) => object): MuseTransport {
   return async (req) => {
     if (req.schemaName === 'intent') return { content: INTENT_40, usage };
+    if (typeof req.messages[1].content !== 'string') throw new Error('Expected text ranking input');
     const user = JSON.parse(req.messages[1].content) as { candidates: { id: string; title: string; friendsWhoCanCome: { id: string }[] }[] };
     return { content: JSON.stringify(build(user.candidates)), usage };
   };
