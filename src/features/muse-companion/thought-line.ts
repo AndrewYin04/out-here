@@ -56,6 +56,13 @@ export function companionThoughts(state: MuseState, encounter: AgentEncounter | 
   if (state === 'error' || !freshReply || last?.role !== 'muse' || !last.plan?.intent || !last.plan.meta) return [];
 
   const plan = last.plan;
+  if (plan.meta.coordination) {
+    // A friend's Muse answered: its finding (the evidence line) and the next step, nothing parsed.
+    const top = plan.suggestions?.[0];
+    if (!top) return [];
+    const focus: ThoughtFocus | null = top.questId ? { kind: 'quest', id: top.questId, friendIds: top.friendIds ?? [] } : top.friendIds?.length ? { kind: 'friends', ids: top.friendIds } : null;
+    return [top.reason, `${top.emoji} ${top.title}`, 'They still need to say yes'].filter(Boolean).map((text) => ({ text: clip(text), focus }));
+  }
   const steps = museSteps(plan, last.source);
   if (plan.meta.understood === false) return steps.map((s) => ({ text: clip(s.text), focus: { kind: 'me' } }));
   const picks = (plan.suggestions ?? []).filter((s) => s.questId);

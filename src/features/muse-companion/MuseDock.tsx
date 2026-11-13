@@ -136,7 +136,7 @@ export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
   const above = row ? 'bottom-full right-0 mb-3' : 'bottom-full right-0 mb-4';
 
   return (
-    <div className={cn(row ? 'relative shrink-0' : 'fixed bottom-[136px] right-3 z-30 max-md:bottom-[318px]')}>
+    <div className={cn(row ? 'relative shrink-0' : 'fixed bottom-4 right-4 z-30 max-md:bottom-[72px] max-md:right-3')}>
       <button
         ref={ref}
         type="button"
@@ -158,8 +158,8 @@ export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
           <span aria-hidden className="muse-dock-spark" />
         </span>
         {!row && (
-          // Desktop: a small "Ask Muse" tag beside him. Phones: just Jolly.
-          <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-card transition-transform group-hover:-translate-x-0.5 max-md:sr-only">Ask Muse</span>
+          // Desktop: an "Ask Muse" tag on hover or focus (it would cover the Contacts list). Phones: just Jolly.
+          <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text opacity-0 shadow-card transition group-hover:-translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100 max-md:sr-only">Ask Muse</span>
         )}
       </button>
       {thought && (

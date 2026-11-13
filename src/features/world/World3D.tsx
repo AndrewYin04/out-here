@@ -482,14 +482,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Real downtown towers (OSM extrusions) would swallow the Kenney blocks: hide every building
       // with a corner inside a district, by id (MapLibre's 'within' does not filter polygons).
       // Re-checked when new tiles arrive; the colorful real skyline stays everywhere else.
-      const hidden=new Set<number>();
+      const hidden=new Set<number>(),checked=new Set<number>();
+      // The districts' outer box: most buildings are rejected by four comparisons, never a polygon test.
+      const xs=city.bounds.flat().map(p=>p[0]),ys=city.bounds.flat().map(p=>p[1]);
+      const box={w:Math.min(...xs),e:Math.max(...xs),s:Math.min(...ys),n:Math.max(...ys)};
       hideCityBuildings=()=>{
         const src=tileSourceId(map);if(!src||!map.getLayer(BUILDINGS_ID))return;
         const before=hidden.size;
         for(const f of map.querySourceFeatures(src,{sourceLayer:'building'})){
-          if(f.id==null||hidden.has(Number(f.id)))continue;
+          if(f.id==null)continue;const id=Number(f.id);if(checked.has(id))continue;checked.add(id);
           const g=f.geometry;const rings=g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.flat():[];
-          if(rings.some(r=>r.some(([lng,lat])=>cityContains.current({lat,lng}))))hidden.add(Number(f.id));
+          if(rings.some(r=>r.some(([lng,lat])=>lng>=box.w&&lng<=box.e&&lat>=box.s&&lat<=box.n&&cityContains.current({lat,lng}))))hidden.add(id);
         }
         if(hidden.size!==before||before===0)map.setFilter(BUILDINGS_ID,hidden.size?['!',['in',['id'],['literal',[...hidden]]]]:null);
       };
@@ -838,7 +841,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const at=(a:LatLng,b:LatLng):LatLng=>({lat:a.lat+(b.lat-a.lat)*mix,lng:a.lng+(b.lng-a.lng)*mix});
         const own=at(f.origin,near);
         // Delivering: their Muse flies off with the envelope (toward its person, off to the side) and back.
-        if(f.deliver>=0&&f.deliver<1){f.deliver=reducedMotion()?1:Math.min(1,f.deliver+dt/2.4);if(f.deliver>=1)f.delivered=true;}
+        if(f.deliver>=0&&f.deliver<1){f.deliver=reducedMotion()?1:Math.min(1,f.deliver+dt/1.5);if(f.deliver>=1)f.delivered=true;}
         const out=f.deliver>=0&&f.deliver<1?Math.sin(f.deliver*Math.PI):0;
         const other=moveMeters(at(peerStart,far),7*f.scale*out,f.bearing+95);
         const altitude=f.altitude+f.motion.arc;

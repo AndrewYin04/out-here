@@ -261,6 +261,9 @@ export function PlanSheet({ className }: { className?: string }) {
         addPlanStage(mine, e);
       }, ctrl.signal);
       if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      // The last step ("Double-checked every fact") ticks visibly before Muse's decision replaces the rail.
+      if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) await new Promise((ok) => window.setTimeout(ok, 500));
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
       finishPlanRun(mine, { plan: r.plan, source: r.museSource });
       finishMuseActivity(activity,{outcome:r.plan.suggestions.length?'success':'empty',message:r.plan.suggestions.length?'Your picks are ready.':'No plans fit yet. Try another time or activity.',live:r.museSource==='muse',cached:r.plan.meta?.cache?.rank===true});
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);

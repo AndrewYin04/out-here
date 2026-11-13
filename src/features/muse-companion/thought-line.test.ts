@@ -96,3 +96,11 @@ it('while a run is going, the thought follows the last finished stage', () => {
   expect(t.focus).toEqual({ kind: 'checked', lit: [], dropped: [{ id: 'q1', label: 'too far' }], friends: ['maya'] });
   expect(stageThought([{ stage: 'rank', ms: 1, model: 'muse-spark-1.0', cached: false, fallback: false, picks: 2 }]).text).toBe('Ranked 2 with Spark · double-checking the facts');
 });
+
+it('after a friend’s Muse replies, says what it found, never an invented ask', () => {
+  const coord = { id: 'c1', role: 'muse', text: '', source: 'muse', ask: '', plan: { intent: { activities: [] }, summary: '', meta: { dropped: [], coordination: true },
+    suggestions: [{ questId: null, friendIds: ['maya'], emoji: '💬', title: 'Invite Maya for food', reason: 'Maya shared a free window from 8:25 to 9:14 AM.', travelMinutes: 0, seatsLeft: null }] } } as unknown as ChatMessage;
+  const lines = companionThoughts('idle', null, coord, true);
+  expect(lines).toEqual(['Maya shared a free window from 8:25 to 9:14 AM.', '💬 Invite Maya for food', 'They still need to say yes']);
+  expect(lines.join(' ')).not.toMatch(/anything nearby|Got it/);
+});

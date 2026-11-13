@@ -54,6 +54,35 @@ function boxOf(rings: Ring[]): Box {
 }
 const inBox = (p: LatLng, b: Box) => p.lng >= b.minLng && p.lng <= b.maxLng && p.lat >= b.minLat && p.lat <= b.maxLat;
 
+/** Grid cell for the blocker index, in degrees (about 45 m). */
+const CELL = 0.0005;
+/**
+ * "Is this point inside any of these polygons?", fast for thousands of polygons (downtown SF): each
+ * polygon is filed under the grid cells its box covers, so a lookup tests only that cell's few.
+ */
+function indexedTest(items: { rings: Ring[]; box: Box }[]): (p: LatLng) => boolean {
+  const grid = new Map<number, number[]>();
+  const huge: number[] = [];
+  const key = (x: number, y: number) => x * 1_000_003 + y;
+  items.forEach((it, i) => {
+    if (!Number.isFinite(it.box.minLng)) return;
+    const x0 = Math.floor(it.box.minLng / CELL), x1 = Math.floor(it.box.maxLng / CELL);
+    const y0 = Math.floor(it.box.minLat / CELL), y1 = Math.floor(it.box.maxLat / CELL);
+    // Huge polygons (water, big parks) are few: always tested, never filed per cell.
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 400) { huge.push(i); return; }
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
+      const k = key(x, y); const list = grid.get(k); if (list) list.push(i); else grid.set(k, [i]);
+    }
+  });
+  const hit = (p: LatLng, i: number) => { const b = items[i]; return inBox(p, b.box) && inPolygon(p, b.rings); };
+  return (p) => {
+    const ids = grid.get(key(Math.floor(p.lng / CELL), Math.floor(p.lat / CELL)));
+    if (ids) for (const i of ids) if (hit(p, i)) return true;
+    for (const i of huge) if (hit(p, i)) return true;
+    return false;
+  };
+}
+
 /**
  * Trees for the area within `radiusM` of `center`: inside green `areas`, beside `streets`, and
  * never inside a `blockers` polygon (buildings). The nearest `cap` are returned.
@@ -64,7 +93,7 @@ export function placeTrees(opts: {
 }): TreeSpot[] {
   const { origin, center, radiusM, cap } = opts;
   const blockers = opts.blockers.map((rings) => ({ rings, box: boxOf(rings) }));
-  const blocked = (p: LatLng) => blockers.some((b) => inBox(p, b.box) && inPolygon(p, b.rings));
+  const blocked = indexedTest(blockers);
   const near = (p: LatLng) => haversineMeters(center, p) <= radiusM;
   const roadCells=new Map<string,{ax:number;ay:number;dx:number;dy:number;len2:number;r:number}[]>(),cell=24,focus=offsetMeters(origin,center);
   for(const st of opts.streets)for(let k=1;k<st.coords.length;k++){
@@ -133,7 +162,7 @@ export function placeTrees(opts: {
 /** A fast "is this point inside a building?" test over many polygons (bounding boxes first). */
 export function blockerTest(polys: Ring[][]): (p: LatLng) => boolean {
   const items = polys.filter((r) => r.length && r[0].length > 2).map((rings) => ({ rings, box: boxOf(rings) }));
-  return (p) => items.some((b) => inBox(p, b.box) && inPolygon(p, b.rings));
+  return indexedTest(items);
 }
 
 /** The nearest point to `p` that is not blocked: rings of 24 directions, every 4 m out to 150 m. */
