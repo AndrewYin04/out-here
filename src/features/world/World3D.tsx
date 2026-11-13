@@ -12,7 +12,7 @@ import { useApi, useWhere } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,setMuseDockFrom,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
-import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
+import { OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea, museConversationArea, museStage} from './muse-layout';
 import {placeStreetFurniture} from './street-furniture';
@@ -25,7 +25,7 @@ import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import type { HqLabel } from './hq';
 import { buildSfCity } from './sf-city';
-import { blockerTest, nearestOnLines, nearestOpen, placeTrees, streetHeading,type Area, type Street } from './trees';
+import { blockerTest, nearestOnLines, nearestOpen, openHeading, placeTrees, streetHeading,type Area, type Street } from './trees';
 import {
   ARRIVE_METERS, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
@@ -664,7 +664,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const onStreet = cityContains.current(start)?start:nearestOnLines(start, roads, 250) ?? nearestOnLines(start, paths, 150) ?? start;
         pos.current = nearestOpen(onStreet, blockedRef.current);
         petPos.current = pos.current;
-        if(followRef.current&&!streetHeadingSet.current&&!cityContains.current(pos.current)){const aligned=streetHeading(pos.current,roads.length?roads:paths,heading.current);if(aligned!==null){heading.current=aligned;streetHeadingSet.current=true;}}
+        if(followRef.current&&!streetHeadingSet.current&&!cityContains.current(pos.current)&&buildings.length){
+          // Look down the street, whichever way has open ground ahead (never straight at a wall).
+          const aligned=streetHeading(pos.current,roads.length?roads:paths,heading.current);
+          const open=openHeading(pos.current,blockedRef.current,aligned===null?[]:[aligned,(aligned+180)%360]);
+          if(open!==null){heading.current=open;camBearing.current=open;streetHeadingSet.current=true;}
+        }
       }
       const spots=placeTrees({ origin: DEMO_CENTER, center: focus, radiusM: 650, cap: 480, areas, streets, blockers });layer.setTrees(spots);
       layer.setStreetFurniture(placeStreetFurniture({origin:DEMO_CENTER,center:focus,streets,blockers,radiusM:500,cap:48}).filter(lamp=>!spots.some(tree=>haversineMeters(lamp,tree)<3)));
