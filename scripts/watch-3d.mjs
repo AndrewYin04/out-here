@@ -104,20 +104,23 @@ await step('Walk the route until “You’re at Dumpling Den”', async () => {
   return await page.getByTestId('arrival').textContent();
 });
 
-await step('Scroll out: the 3D view flattens into the overhead map', async () => {
+await step('Scroll out: the 3D view flattens and hands over to the 2D map', async () => {
   const sheetClose = page.getByTestId('quest-sheet').getByRole('button', { name: 'Close' });
   if (await sheetClose.count()) await sheetClose.click();
   await page.mouse.move(1050, 600);
   for (let i = 0; i < 12; i++) { await page.mouse.wheel(0, 260); await page.waitForTimeout(140); }
   await page.waitForTimeout(2800);
-  const pitch = Number(await attr('data-pitch'));
-  if (pitch > 15) throw new Error(`tilt still ${pitch}°`);
-  return `zoom ${await attr('data-zoom')}, tilt ${pitch}°`;
+  const view = await page.getByTestId('out-here-map').getAttribute('data-view');
+  if (view !== 'map') throw new Error(`view is ${view}`);
+  const pitch = await page.evaluate(() => Math.round(window.__ohMap?.getPitch() ?? -1));
+  if (pitch > 5) throw new Error(`tilt still ${pitch}°`);
+  return `2D map, tilt ${pitch}°`;
 });
 
-await step('Scroll back in: it tilts back down behind the avatar', async () => {
-  for (let i = 0; i < 12; i++) { await page.mouse.wheel(0, -260); await page.waitForTimeout(140); }
-  await page.waitForTimeout(2800);
+await step('Scroll back in near you: it steps into 3D behind the avatar', async () => {
+  for (let i = 0; i < 14; i++) { await page.mouse.wheel(0, -260); await page.waitForTimeout(140); }
+  await page.getByTestId('world-3d').waitFor({ timeout: 8000 });
+  await page.waitForTimeout(3500);
   return `zoom ${await attr('data-zoom')}, tilt ${await attr('data-pitch')}°`;
 });
 

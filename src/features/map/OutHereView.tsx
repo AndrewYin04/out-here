@@ -17,19 +17,21 @@ import { MapAttribution } from './MapAttribution';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
+import { initialView, shouldEnter3d, type MapView } from './view3d';
 
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 // The 3D street view (world area). Loaded only when someone opens it, so three.js and the
 // models stay out of the map's first load.
 const World3D = dynamic(() => import('@/features/world').then((m) => m.World3D), { ssr: false });
 
-type MapView = 'map' | '3d';
+// Remembered per tab, so a fresh visit always lands on the 3D view (#13) and moving around the
+// app and back keeps whichever view this tab was on.
 const VIEW_KEY = 'outhere.view';
-function readView(): MapView {
-  try { return window.localStorage.getItem(VIEW_KEY) === '3d' ? '3d' : 'map'; } catch { return 'map'; }
+function readSavedView(): string | null {
+  try { return window.sessionStorage.getItem(VIEW_KEY); } catch { return null; }
 }
 function saveView(v: MapView) {
-  try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* private mode: not remembered */ }
+  try { window.sessionStorage.setItem(VIEW_KEY, v); } catch { /* private mode: not remembered */ }
 }
 
 /** Seeded quests get a readable test id ("quest-pin-dumplings"); others use their id. */
@@ -76,9 +78,8 @@ export function OutHereView() {
     if (id) setSelectedId(id);
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
-    // ?view=3d|map opens that view (the demo link); otherwise the last one used.
-    const v = params.get('view');
-    setViewState(v === '3d' || v === 'map' ? v : readView());
+    // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
+    setViewState(initialView(params.get('view'), readSavedView(), navigator.webdriver === true));
   }, []);
 
   // The Muse plan on screen: its picked pins stand out, and the map frames them with the viewer
@@ -230,6 +231,28 @@ export function OutHereView() {
     setView('map');
     setViewNote('3D was running slowly on this device, so you’re back on the map.');
   }, [setView]);
+  // One zoom, two views: pinching 3D out to the city hands over to the 2D map, and pinching the
+  // 2D map back in near you steps into 3D behind your avatar.
+  const zoomOut3d = useCallback(() => setView('map'), [setView]);
+  const meRef = useRef<LatLng>(DEMO_CENTER);
+  meRef.current = ctx?.origin ?? DEMO_CENTER;
+  const busyRef = useRef(false);
+  busyRef.current = !!creating;
+  useEffect(() => {
+    if (!map || view !== 'map' || unsupported) return;
+    let hand = false;
+    const start = (e: { originalEvent?: unknown }) => { if (e.originalEvent) hand = true; };
+    const end = () => {
+      const wasHand = hand;
+      hand = false;
+      if (!wasHand || busyRef.current || map.getContainer().hasAttribute('data-view3d')) return;
+      const c = map.getCenter();
+      if (shouldEnter3d(map.getZoom(), { lat: c.lat, lng: c.lng }, meRef.current)) setView('3d');
+    };
+    map.on('zoomstart', start);
+    map.on('zoomend', end);
+    return () => { map.off('zoomstart', start); map.off('zoomend', end); };
+  }, [map, view, unsupported, setView]);
   useEffect(() => {
     if (!viewNote) return;
     const t = window.setTimeout(() => setViewNote(null), 6000);
@@ -275,12 +298,14 @@ export function OutHereView() {
           onSelect={select}
           onOpenFriend={openFriend}
           onExit={exit3d}
+          onZoomOut={zoomOut3d}
         />
       )}
 
-      {/* Map / 3D: one camera, two starting points. Bottom left, clear of the I'm free pill. */}
+      {/* Map / 3D: one camera, two starting points. Bottom left on desktop; on a phone the bottom
+          row belongs to I'm free, so it sits above the 3D joystick instead. */}
       {!unsupported && (
-        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-20">
+        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-[250px]">
           <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
             {(['map', '3d'] as const).map((v) => (
               <button

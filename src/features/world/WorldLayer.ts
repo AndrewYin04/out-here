@@ -338,8 +338,11 @@ export class WorldLayer implements CustomLayerInterface {
         this.tmp.set(o.east, y, -o.north, 1).applyMatrix4(this.full);
         const visible = showChars && this.tmp.w > 0;
         if (visible) {
-          const x = ((this.tmp.x / this.tmp.w + 1) / 2) * w;
+          const raw = ((this.tmp.x / this.tmp.w + 1) / 2) * w;
           const py = ((1 - this.tmp.y / this.tmp.w) / 2) * h;
+          // Keep the whole label on screen (the pet's speech bubble on a phone), while its anchor is.
+          const half = a.label.offsetWidth / 2;
+          const x = raw > 0 && raw < w && half > 0 && half * 2 + 16 < w ? Math.min(Math.max(raw, half + 8), w - half - 8) : raw;
           a.label.style.transform = `translate(${x.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -100%)`;
           a.label.style.visibility = x > -200 && x < w + 200 && py > -100 && py < h + 200 ? 'visible' : 'hidden';
         } else {

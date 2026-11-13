@@ -15,7 +15,7 @@ import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import { buildHq, loadHq, type HqLabel } from './hq';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, type Area, type Street } from './trees';
 import {
-  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
+  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
 import { StadiumLabels } from './StadiumLabels';
@@ -36,6 +36,8 @@ export type World3DProps = {
   onOpenFriend: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
+  /** A hand pinch/scroll ended zoomed out past EXIT_3D_ZOOM: the parent hands over to the 2D map. */
+  onZoomOut?: () => void;
 };
 
 type Source = 'demo' | 'gps';
@@ -62,7 +64,7 @@ const typing = (t: EventTarget | null) => {
 };
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
-export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit }: World3DProps) {
+export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
   /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
@@ -107,6 +109,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   questsRef.current = quests;
   const friendsRef = useRef(friendPins);
   friendsRef.current = friendPins;
+  const onZoomOutRef = useRef(onZoomOut);
+  onZoomOutRef.current = onZoomOut;
 
   // ---- Muse pet: what it says and where it floats ----
   const planOpen = usePlanOpen();
@@ -204,9 +208,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); setFollow(false); } };
     // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
     const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
+    // Zoomed out to city level hands over to the 2D map (one zoom, two views). Only the fly-in and
+    // the HQ tour move the zoom on their own, and neither zooms out, so any other zoom that ends
+    // out here was the viewer's. (The follow loop's own camera calls end zooms mid-gesture, so a
+    // per-gesture "by hand" flag would miss the last one.)
+    const zoomEnd = () => {
+      if (!entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
+    };
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
     map.on('zoomstart', userZoom);
+    map.on('zoomend', zoomEnd);
 
     return () => {
       cancelled = true;
@@ -216,6 +228,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       map.off('dragstart', detach);
       map.off('rotatestart', detach);
       map.off('zoomstart', userZoom);
+      map.off('zoomend', zoomEnd);
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
       undoTheme?.();
       layerRef.current = null;
