@@ -103,9 +103,12 @@ export function heuristicSuggestion(c: PlanCandidate, intent: MuseIntent): PlanS
 export function summaryText(suggestions: PlanSuggestion[], intent: MuseIntent, friendsFreeNames: string[]): string {
   const w = windowText(intent);
   if (suggestions.length === 0) {
-    // With a friend free, the sheet follows this with a plan Muse drafts for you two.
-    const friends = friendsFreeNames.length ? ` But ${joinNames(friendsFreeNames.slice(0, 2))} ${friendsFreeNames.length === 1 ? 'is' : 'are'} free too.` : '';
-    return `Nothing posted nearby fits your ${w} right now.${friends}`;
+    // A friend who's free is the plan. Don't open with "nothing nearby" and then offer them.
+    if (friendsFreeNames.length) {
+      const who = joinNames(friendsFreeNames.slice(0, 2));
+      return `${who} ${friendsFreeNames.length === 1 ? 'is' : 'are'} free for your ${w}. Here's a plan for you.`;
+    }
+    return `Nothing posted nearby fits your ${w} right now.`;
   }
   const top = suggestions[0];
   const withFriend = top.friendIds.length > 0 && top.bridge ? ` ${top.bridge}` : '';

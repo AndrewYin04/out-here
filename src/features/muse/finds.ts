@@ -82,7 +82,7 @@ export async function parseWant(text: string, userId: ID | null): Promise<{ want
 export type FindCandidate = Omit<MuseFind, 'line' | 'source'> & { want: MuseWant; walkMin?: number };
 
 /** Up to this many minutes on foot, Muse says "a 4-minute walk" instead of the drive. */
-export const WALKABLE_MIN = 15;
+export const WALKABLE_MIN = 25;
 
 /** Minutes of slack needed between arriving and the end of the pickup window. */
 export const ARRIVE_BEFORE_END_MIN = 5;

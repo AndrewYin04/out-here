@@ -412,7 +412,7 @@ export function PlanSheet({ className }: { className?: string }) {
                     <div data-testid="plan-summary" className="mb-3 flex animate-step-in items-start gap-2.5">
                       <span aria-hidden className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[16px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
                       <p className="min-w-0 flex-1 rounded-[18px] rounded-tl-md bg-fb-surface px-3 py-2 text-[15px] leading-5 text-fb-text shadow-card">
-                        {offline && <span data-testid="offline-label" className="mb-1 inline-flex rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[11px] font-semibold text-fb-text-2">Offline suggestions</span>}
+                        {offline && <span data-testid="offline-label" className="mb-1 inline-flex rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[11px] font-semibold text-fb-text-2">Who&apos;s free nearby</span>}
                         <span className="block">{summary}</span>
                       </p>
                     </div>

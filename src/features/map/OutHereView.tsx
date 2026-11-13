@@ -6,7 +6,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useInviteOnScreen, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast, sfx } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
 import type { MapListing } from '@/shared/api';
@@ -96,7 +96,10 @@ export function OutHereView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
-  const [view, setViewState] = useState<MapView>('map');
+  const [view, setViewState] = useState<MapView>(() => {
+    if (typeof window === 'undefined') return 'map';
+    return initialView(new URLSearchParams(window.location.search).get('view'), readSavedView(), navigator.webdriver === true);
+  });
   const [viewNote, setViewNote] = useState<string | null>(null);
   const [walkTo, setWalkTo] = useState<{ questId: string } | null>(null);
   const setView = useCallback((v: MapView) => {
@@ -443,8 +446,10 @@ export function OutHereView() {
   }, [letsGo]);
   /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
   const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
-  // Up next steps aside for an open plan, a sheet, the create and sell sheets, and the walk.
-  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !!upNext && !upNextClosed;
+  const inviteOnScreen = useInviteOnScreen();
+  // Up next steps aside for an open plan, a sheet, the create and sell sheets, the walk, an invite
+  // card (it already has Let's go), and the arrival sheet.
+  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !inviteOnScreen && !arrivedId && !!upNext && !upNextClosed;
   // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
   const recenter = useCallback(() => {
     if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }

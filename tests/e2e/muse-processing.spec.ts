@@ -52,7 +52,7 @@ test('opening chat frames Muse closely and closing restores the walking zoom', a
   await page.goto('/out-here?as=alex&view=3d');
   const world=page.getByTestId('world-3d');
   await expect(world).toBeVisible();
-  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeGreaterThan(21.2);
+  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeGreaterThan(18.2);
   const walkingZoom=Number(await world.getAttribute('data-zoom'));
   await page.getByTestId('muse-launcher').click();
   const phone=(page.viewportSize()?.width ?? 1440)<768;

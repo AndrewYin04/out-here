@@ -166,7 +166,7 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
                 ) : null}
               </span>
               <span className="w-full truncate text-center text-[11px] font-semibold text-fb-text">{p.you ? 'You' : first(p.name)}</span>
-              <span className="sr-only">{p.here ? 'is here' : p.minutes != null ? `${p.minutes} min away` : 'not on the way yet'}</span>
+              <span className="sr-only">{p.here ? (p.you ? "You're here" : 'is here') : p.minutes != null ? `${p.minutes} min away` : 'not on the way yet'}</span>
             </li>
           ))}
         </ul>

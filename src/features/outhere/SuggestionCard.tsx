@@ -21,7 +21,7 @@ export function MuseLabel({ className }: { className?: string }) {
 export function OfflineLabel({ className }: { className?: string }) {
   return (
     <span data-testid="offline-label" className={cn('inline-flex items-center rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[12px] font-semibold text-fb-text-2', className)}>
-      Offline suggestions
+      Who&apos;s free nearby
     </span>
   );
 }

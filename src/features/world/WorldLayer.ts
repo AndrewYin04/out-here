@@ -7,8 +7,8 @@
 import { MercatorCoordinate, type CustomLayerInterface, type CustomRenderMethodInput, type Map as MapLibreMap } from 'maplibre-gl';
 import * as THREE from 'three';
 import type { LatLng } from '@/shared';
-import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
-import { AVATAR_SCALE } from './chibi';
+import { makeAvatar, makePet, PET_ROOT_SCALE, type Character, type ModelSet } from './characters';
+import { characterOpacityForZoom } from '@/features/map/view3d';
 import { characterScale, offsetMeters } from './math';
 import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
 import { stadiumSeats } from './stadiums';
@@ -17,6 +17,23 @@ import {buildTreeBatch,type TreeBatch} from './vegetation';
 import {loadSceneryAssets,type SceneryAssets} from './scenery-assets';
 import type {StreetLamp} from './street-furniture';
 import {makeSightline,applySightlineCutaway,cameraFromProjection,blocksSightline} from './cutaway';
+import { buildToyPad, toyPadOpacity } from './toyPad';
+
+/** Multiply each mesh material's authored opacity by `opacity` (remembers the base once). */
+function applyRootOpacity(root: THREE.Object3D, opacity: number) {
+  root.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const m of mats) {
+      if (!m || !('opacity' in m)) continue;
+      const mat = m as THREE.Material & { opacity: number; transparent: boolean; depthWrite: boolean; userData: Record<string, unknown> };
+      if (mat.userData.ohBaseOpacity == null) mat.userData.ohBaseOpacity = mat.opacity;
+      mat.transparent = true;
+      mat.opacity = (mat.userData.ohBaseOpacity as number) * opacity;
+      mat.depthWrite = opacity > 0.92;
+    }
+  });
+}
 
 export type ActorKind = 'avatar' | 'pet';
 type Actor = {
@@ -163,6 +180,14 @@ export class WorldLayer implements CustomLayerInterface {
   private frameCount = 0;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
+  /** Clip toy-block pad fixed in world space at street zoom (does not follow the walker). */
+  private toyPad: THREE.Group | null = null;
+  /** LatLng the pad was planted on; set once so walking never drags the block. */
+  private toyPadAt: LatLng | null = null;
+  private blueRing: THREE.Mesh | null = null;
+  private blueRingMat = new THREE.MeshBasicMaterial({
+    color: '#0866FF', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
+  });
 
   constructor(origin: LatLng) {
     this.origin = origin;
@@ -178,6 +203,17 @@ export class WorldLayer implements CustomLayerInterface {
     const sun = new THREE.DirectionalLight('#FFE9C4', 2.6);
     sun.position.set(-5,8,7);
     this.scene.add(sun);
+
+    this.toyPad = buildToyPad();
+    this.toyPad.visible = false;
+    this.scene.add(this.toyPad);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 48), this.blueRingMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    ring.renderOrder = 2;
+    ring.visible = false;
+    this.blueRing = ring;
+    this.scene.add(ring);
   }
 
   /** Swap in loaded models; existing placeholder characters are rebuilt from them. */
@@ -193,16 +229,22 @@ export class WorldLayer implements CustomLayerInterface {
     }
   }
 
-  /** Rebuild people's characters (a look was customized, or a pronoun hint arrived). */
+  /** Rebuild people and Pip (a look was customized, or a pronoun hint arrived). */
   refreshAvatars() {
     for (const a of this.actors.values()) {
-      if (a.kind === 'pet') continue;
       const previous = a.char;
-      const next = makeAvatar(this.models, a.seed);
+      const next = a.kind === 'pet' ? makePet(this.models, a.seed) : makeAvatar(this.models, a.seed);
       next.root.position.copy(previous.root.position); next.root.quaternion.copy(previous.root.quaternion); next.root.scale.copy(previous.root.scale);
       next.setState(a.state);
       this.charScene.remove(previous.root); previous.dispose(); a.char = next; this.charScene.add(next.root);
     }
+  }
+
+  /** Drive Pip's trail colors from the dresser glow swatch. */
+  setPetGlow(id: string, glow: string) {
+    const a = this.actors.get(id);
+    if (!a?.trail) return;
+    a.trail.setConfig({ color: glow, brightBlue: glow, cyanAccent: '#FFFFFF', paleBlue: '#FFFFFF' });
   }
 
   upsertActor(id: string, kind: ActorKind, seed: string) {
@@ -416,6 +458,9 @@ export class WorldLayer implements CustomLayerInterface {
     this.setBeacons([]);
     this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
+    if (this.toyPad) { this.scene.remove(this.toyPad); this.toyPad = null; this.toyPadAt = null; }
+    if (this.blueRing) { this.scene.remove(this.blueRing); this.blueRing.geometry.dispose(); this.blueRing = null; }
+    this.blueRingMat.dispose();
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
@@ -437,7 +482,9 @@ export class WorldLayer implements CustomLayerInterface {
 
     const zoom = map.getZoom();
     const scale = characterScale(zoom);
-    const showChars = zoom >= this.minZoom;
+    // Crossfade with the flat-map pins: fully on at street zoom, gone before the 2D handoff.
+    const charOpacity = this.minZoom > 0 ? characterOpacityForZoom(zoom) : (zoom >= this.minZoom ? 1 : 0);
+    const showChars = charOpacity > 0.02;
     const markerMode=showChars?'true':'false',container=map.getContainer();if(container.dataset.worldCharacters!==markerMode)container.dataset.worldCharacters=markerMode;
     if(this.vegetation)this.vegetation.object.visible=zoom>=15.5;
     if(this.furniture)this.furniture.visible=zoom>=17;
@@ -449,10 +496,24 @@ export class WorldLayer implements CustomLayerInterface {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
+    const me = this.actors.get('me');
+    const padOp = toyPadOpacity(zoom) * charOpacity;
+    if (this.toyPad) {
+      // Plant once at the first known street spot, then leave it — walking must not drag the block.
+      if (!this.toyPadAt && me) {
+        this.toyPadAt = { ...me.pos };
+        const o = offsetMeters(this.origin, this.toyPadAt);
+        this.toyPad.position.set(o.east, 0, -o.north);
+      }
+      this.toyPad.visible = !!this.toyPadAt && padOp > 0.02;
+      if (this.toyPad.visible) applyRootOpacity(this.toyPad, padOp);
+    }
+
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
-      const s = a.kind === 'pet' ? scale * 0.9 : scale;
+      const s = a.kind === 'pet' ? scale * PET_ROOT_SCALE : scale;
       a.char.root.visible = showChars;
+      if (showChars) applyRootOpacity(a.char.root, charOpacity);
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
       const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
       const delta=Math.atan2(Math.sin(target-current),Math.cos(target-current));
@@ -464,7 +525,20 @@ export class WorldLayer implements CustomLayerInterface {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
         a.shadow.visible = showChars;
         a.shadow.position.set(o.east, 0.04, -o.north);
-        a.shadow.scale.set(s * 1.05 * AVATAR_SCALE, s * 1.05 * AVATAR_SCALE, 1);
+        // Footprint from the character's measured height (GLB scale is already in height).
+        const foot = Math.max(0.8, a.char.height * 0.22) * s;
+        a.shadow.scale.set(foot, foot, 1);
+        const shadowMat = a.shadow.material as THREE.MeshBasicMaterial;
+        if (shadowMat.userData.ohBaseOpacity == null) shadowMat.userData.ohBaseOpacity = shadowMat.opacity;
+        shadowMat.opacity = (shadowMat.userData.ohBaseOpacity as number) * charOpacity;
+      }
+      if (a.kind === 'avatar' && a === me && this.blueRing) {
+        this.blueRing.visible = showChars;
+        this.blueRing.position.set(o.east, 0.06, -o.north);
+        // RingGeometry radius ~0.6; scale so the ring sits under the feet (~1.2 m), never a screen-filling disc.
+        const r = Math.min(2.2, Math.max(1.1, a.char.height * 0.55)) * s;
+        this.blueRing.scale.setScalar(r);
+        this.blueRingMat.opacity = 0.55 * charOpacity;
       }
       if (a.trail) {
         if (showChars) {

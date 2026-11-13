@@ -8,17 +8,17 @@ import { haversineMeters, walkingMinutesExact, type LatLng } from '@/shared';
 export const FLAT_ZOOM = 15;
 /** At this zoom the camera reaches STREET_PITCH. */
 export const STREET_ZOOM = 18.5;
-export const STREET_PITCH = 60;
-/** Zoomed in closer than street level, the camera drops lower toward the horizon. */
-export const CLOSE_ZOOM = 21.5;
-// Close behind the avatar the camera looks further ahead, toward the street and the horizon.
-export const CLOSE_PITCH = 72;
-/** Zoom the 3D view eases to when it opens: close behind the avatar. */
-export const ENTER_ZOOM = 21.3;
+export const STREET_PITCH = 62;
+/** Zoomed in closer than street level, the camera drops a little, still over the shoulder. */
+export const CLOSE_ZOOM = 21;
+// Low, like Pokémon Go: looking across the neighborhood, not down from above the roofs.
+export const CLOSE_PITCH = 74;
+/** Zoom the 3D view eases to: human-scale Kenney person (~1.72 m) full body in frame. */
+export const ENTER_ZOOM = 20.2;
 export const MAX_3D_ZOOM = 22.5;
 export const MAX_3D_PITCH = 75;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */
-export const CHARACTER_MIN_ZOOM = 18.2;
+export const CHARACTER_MIN_ZOOM = 18.8;
 /**
  * One zoom, two views. Pinching the 3D view out past this zoom (the camera is flat by then) hands
  * over to the 2D map. The map area's ENTER_3D_ZOOM (map/view3d.ts) is the way back in; the gap

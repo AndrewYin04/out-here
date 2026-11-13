@@ -3,7 +3,7 @@
 // The map page renders <ImFreeButton/> and <PlanSheet/>; <InviteInbox/> can be mounted anywhere
 // (PlanSheet already renders one). Server code imports './server/plan-context' directly.
 export { ImFreeButton, PlanSheet, COMPOSER_PLACEHOLDER } from './PlanSheet';
-export { InviteInbox } from './InviteInbox';
+export { InviteInbox, useInviteOnScreen } from './InviteInbox';
 export { BothFreeNudge, StatusCard, useMyAvailability, useMyStatus } from './FreeStatus';
 export { TogetherSheet } from './TogetherSheet';
 export { UpNextCard, useUpNext, useUpNextDismissed } from './UpNext';

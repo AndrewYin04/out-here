@@ -102,10 +102,13 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, cla
   }, [phase, arrived, q.id]);
 
   const withShort = others.length === 0 ? 'just you' : `with ${first(others[0]!.name)}${others.length > 1 ? ` +${others.length - 1}` : ''}`;
-  const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
-  // One short line that fits on a phone: when it starts, then when to leave. Who's going is in the
-  // faces below; the walk time is on Let's go and the plan card.
-  const leave = arrived ? 'You’re here'
+  const when = arrived ? 'You’re here'
+    : phase === 'live' ? 'Happening now'
+      : minsToStart < 60 ? `Starts in ${minsToStart} min`
+        : `Starts ${formatDemoTime(q.startsAt)}`;
+  // One short line that fits on a phone: when it starts, then when to leave. Once you've arrived,
+  // the line is just "You're here" (not "Starts in 9 min · You're here").
+  const leave = arrived ? null
     : walking ? 'On your way'
       : phase === 'later' ? `Leave by ${formatDemoTime(new Date(leaveBy).toISOString())}`
         : phase === 'go' ? 'Time to go' : `${plan.walkMinutes} min walk`;
@@ -138,7 +141,7 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, cla
           <p className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wide text-fb-blue">Up next</p>
           <p className="truncate text-[15px] font-bold leading-5 text-fb-text" data-testid="up-next-title">{q.title}</p>
           <p className={cn('truncate text-[13px] leading-[18px]', phase === 'go' && !arrived && !walking ? 'font-semibold text-fb-blue' : 'text-fb-text-2')} data-testid="up-next-when">
-            {when} · {leave}
+            {leave ? `${when} · ${leave}` : when}
           </p>
         </div>
         <button type="button" data-testid="up-next-see" onClick={() => onSee(q.id)}

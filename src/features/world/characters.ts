@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { currentLook } from './avatarLook';
+import { currentLook, currentPipLook, type PipLook } from './avatarLook';
 import { ChibiAvatar } from './chibi';
 
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
@@ -37,7 +37,15 @@ export function hashString(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * Map My look onto the Kenney materials: top → Mat_Primary, pants → Mat_Secondary, skin → Mat_Accent.
+ * Friends without a saved look still get a stable palette from their id.
+ */
 export function colorsFor(seed: string): { primary: string; secondary: string; accent: string } {
+  if (seed) {
+    const look = currentLook(seed);
+    return { primary: look.topColor, secondary: look.bottomColor, accent: look.skin };
+  }
   const h = hashString(seed);
   return {
     primary: PALETTE[h % PALETTE.length],
@@ -45,6 +53,17 @@ export function colorsFor(seed: string): { primary: string; secondary: string; a
     accent: PALETTE[(h >>> 7) % PALETTE.length],
   };
 }
+
+/**
+ * Root scale for Pip beside the ~1.72 m Kenney person. Muse after manifest scale is ~1.6 m;
+ * ~0.55 puts Pip at roughly half the person's height.
+ */
+export const PET_ROOT_SCALE = 0.55;
+/**
+ * Person in muse-companion.glb is already ~1.72 m tall — never multiply up to "map giant" scale.
+ * Kept as a named constant so callers/tests can read the intended world height factor.
+ */
+export const PERSON_WORLD_SCALE = 1;
 
 const ONE_SHOT = new Set(['wave', 'celebrate', 'happy']);
 const ONE_SHOT_SECONDS: Record<string, number> = { wave: 1.6, celebrate: 1.9, happy: 1.6 };
@@ -308,6 +327,155 @@ function adaptClip(clip: THREE.AnimationClip, keep: Set<string>, rootName: strin
   return tracks.length ? new THREE.AnimationClip(clip.name, clip.duration, tracks) : null;
 }
 
+/** Three-step toon ramp shared by every person on the map. */
+let toonGradient: THREE.DataTexture | null = null;
+function toonGradientMap(): THREE.DataTexture {
+  if (toonGradient) return toonGradient;
+  const data = new Uint8Array([80, 80, 80, 255, 160, 160, 160, 255, 255, 255, 255, 255]);
+  toonGradient = new THREE.DataTexture(data, 3, 1);
+  toonGradient.magFilter = THREE.NearestFilter;
+  toonGradient.minFilter = THREE.NearestFilter;
+  toonGradient.generateMipmaps = false;
+  toonGradient.needsUpdate = true;
+  return toonGradient;
+}
+
+type LookColors = { primary: string; secondary: string; accent: string };
+
+/** Kenney Person atlas prototypes (skin / shirt / pants) sampled from muse-companion.glb. */
+const ATLAS_SKIN = [
+  { r: 245, g: 147, b: 114 },
+  { r: 228, g: 120, b: 62 },
+  { r: 245, g: 140, b: 106 },
+] as const;
+const ATLAS_TOP = [
+  { r: 240, g: 90, b: 67 },
+  { r: 242, g: 101, b: 76 },
+  { r: 240, g: 84, b: 62 },
+] as const;
+const ATLAS_PANTS = [
+  { r: 23, g: 84, b: 124 },
+  { r: 19, g: 70, b: 106 },
+] as const;
+
+function dist2(r: number, g: number, b: number, ref: { r: number; g: number; b: number }): number {
+  const dr = r - ref.r, dg = g - ref.g, db = b - ref.b;
+  return dr * dr + dg * dg + db * db;
+}
+
+function nearestDist(r: number, g: number, b: number, refs: readonly { r: number; g: number; b: number }[]): number {
+  let best = Infinity;
+  for (const ref of refs) best = Math.min(best, dist2(r, g, b, ref));
+  return best;
+}
+
+function parseHex(hex: string): { r: number; g: number; b: number } {
+  const n = parseInt(hex.slice(1), 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/**
+ * Recolor the single "skin" atlas so My look skin/top/pants show on the Kenney person.
+ * Preserves luminance so shading in the texture still reads.
+ */
+function tintPersonAtlas(srcMap: THREE.Texture, colors: LookColors, ownedTex: THREE.Texture[]): THREE.Texture {
+  const img = srcMap.image as CanvasImageSource | undefined;
+  if (!img || typeof document === 'undefined') return srcMap;
+  const w = (img as { width: number }).width;
+  const h = (img as { height: number }).height;
+  if (!w || !h) return srcMap;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return srcMap;
+  ctx.drawImage(img, 0, 0);
+  const image = ctx.getImageData(0, 0, w, h);
+  const d = image.data;
+  const skin = parseHex(colors.accent);
+  const top = parseHex(colors.primary);
+  const pants = parseHex(colors.secondary);
+  // Thresholds from atlas sampling; hair/eyes/white stay untouched.
+  const SKIN_MAX = 48 * 48, TOP_MAX = 55 * 55, PANTS_MAX = 48 * 48;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a < 8) continue;
+    const ds = nearestDist(r, g, b, ATLAS_SKIN);
+    const dt = nearestDist(r, g, b, ATLAS_TOP);
+    const dp = nearestDist(r, g, b, ATLAS_PANTS);
+    let target: { r: number; g: number; b: number } | null = null;
+    if (ds <= SKIN_MAX && ds <= dt && ds <= dp) target = skin;
+    else if (dt <= TOP_MAX && dt <= ds && dt <= dp) target = top;
+    else if (dp <= PANTS_MAX && dp <= ds && dp <= dt) target = pants;
+    if (!target) continue;
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    d[i] = Math.min(255, Math.round(target.r * (0.55 + lum * 0.9)));
+    d[i + 1] = Math.min(255, Math.round(target.g * (0.55 + lum * 0.9)));
+    d[i + 2] = Math.min(255, Math.round(target.b * (0.55 + lum * 0.9)));
+  }
+  ctx.putImageData(image, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = srcMap.colorSpace;
+  tex.flipY = srcMap.flipY;
+  tex.wrapS = srcMap.wrapS;
+  tex.wrapT = srcMap.wrapT;
+  tex.magFilter = srcMap.magFilter;
+  tex.minFilter = srcMap.minFilter;
+  tex.needsUpdate = true;
+  ownedTex.push(tex);
+  return tex;
+}
+
+function toonFrom(
+  src: THREE.Material,
+  tint: string | undefined,
+  owned: THREE.Material[],
+  ownedTex: THREE.Texture[],
+  colors: LookColors,
+): THREE.Material {
+  const std = src as THREE.MeshStandardMaterial;
+  // Keep albedo — the Kenney person is one atlas ("skin"); flat color alone washes them white.
+  const m = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradientMap() });
+  m.name = src.name;
+  if (src.name === 'skin' && std.map) {
+    m.map = tintPersonAtlas(std.map, colors, ownedTex);
+  } else if (std.map) {
+    m.map = std.map;
+  } else if (tint) {
+    m.color.set(tint);
+  } else if (std.color) {
+    m.color.copy(std.color);
+  }
+  // Named Mat_* slots (when present) get a solid tint on top of any map.
+  if (tint && src.name !== 'skin') m.color.set(tint);
+  owned.push(m);
+  return m;
+}
+
+/** Thin black silhouette; child of the mesh so skinned people keep the outline while they move. */
+function addOutlineHull(mesh: THREE.Mesh, owned: THREE.Material[]): void {
+  try {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1c1e21, side: THREE.BackSide });
+    owned.push(mat);
+    const skinned = mesh as THREE.SkinnedMesh;
+    let outline: THREE.Mesh;
+    if (skinned.isSkinnedMesh && skinned.skeleton) {
+      const skinnedOutline = new THREE.SkinnedMesh(skinned.geometry, mat);
+      skinnedOutline.bind(skinned.skeleton, skinned.bindMatrix);
+      outline = skinnedOutline;
+    } else {
+      outline = new THREE.Mesh(mesh.geometry, mat);
+    }
+    outline.userData.outline = true;
+    outline.frustumCulled = false;
+    outline.scale.setScalar(1.035);
+    outline.renderOrder = -1;
+    mesh.add(outline);
+  } catch {
+    // Outline is optional; a missing silhouette is better than a blank map.
+  }
+}
+
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
@@ -322,6 +490,7 @@ class GltfCharacter implements Character {
   private oneShotLeft = 0;
   private hopLeft = 0;
   private owned: THREE.Material[] = [];
+  private ownedTex: THREE.Texture[] = [];
 
   constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
     const scene = cloneSkinned(spec.gltf.scene);
@@ -341,18 +510,27 @@ class GltfCharacter implements Character {
       keepNames.add(o.name);
       if (hide.has(o.name)) o.visible = false;
     });
-    model.scale.setScalar(spec.scale);
+    // Avatar: use manifest scale only (Person is authored at human height). Pet keeps its own scale.
+    model.scale.setScalar(kind === 'avatar' ? (spec.scale || PERSON_WORLD_SCALE) : spec.scale);
 
-    // Persona tint on the materials named for it (Mat_Primary / Mat_Secondary / Mat_Accent).
+    // Persona tint: Mat_Primary / Mat_Secondary / Mat_Accent when present; Kenney atlas "skin" is recolored.
+    // Collect meshes first — adding outline children during traverse nests forever.
     const c = colorsFor(seed);
     const tints: Record<string, string> = { Mat_Primary: c.primary, Mat_Secondary: c.secondary, Mat_Accent: c.accent };
+    const meshes: THREE.Mesh[] = [];
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh) return;
+      if (mesh.isMesh) meshes.push(mesh);
+    });
+    for (const mesh of meshes) {
       mesh.frustumCulled = false;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const next = mats.map((m) => {
-        const tint = kind === 'avatar' ? tints[m.name] : undefined;
+        if (kind === 'avatar') {
+          // Toon + outline so people read off the gray campus buildings.
+          return toonFrom(m, tints[m.name], this.owned, this.ownedTex, c);
+        }
+        const tint = tints[m.name];
         if (!tint || !(m as THREE.MeshStandardMaterial).color) return m;
         const copy = (m as THREE.MeshStandardMaterial).clone();
         copy.color.set(tint);
@@ -360,7 +538,8 @@ class GltfCharacter implements Character {
         return copy;
       });
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
-    });
+      if (kind === 'avatar') addOutlineHull(mesh, this.owned);
+    }
 
     this.effectBody = model.getObjectByName('Muse_Body') as THREE.Mesh | undefined ?? null;
     if (this.effectBody?.isMesh) this.effectBody.geometry.computeBoundingBox();
@@ -430,7 +609,12 @@ class GltfCharacter implements Character {
     } else out.set(0, this.height / 2, 0).applyMatrix4(this.root.matrixWorld);
   }
 
-  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); }
+  dispose() {
+    this.mixer.stopAllAction();
+    this.mixer.uncacheRoot(this.mixer.getRoot());
+    this.owned.forEach((m) => m.dispose());
+    this.ownedTex.forEach((t) => t.dispose());
+  }
 }
 
 // ---- Loading ----
@@ -450,6 +634,11 @@ export type ModelSet = { avatar: CharacterSpec | null; pet: CharacterSpec | null
 
 let modelsPromise: Promise<ModelSet> | null = null;
 
+/** Drop the cached GLB set so the next loadModels() re-reads manifest scale (e.g. after a human-size fix). */
+export function invalidateModels(): void {
+  modelsPromise = null;
+}
+
 /** Loads public/models/manifest.json and its models once. Missing or broken files fall back to placeholders. */
 export function loadModels(): Promise<ModelSet> {
   if (modelsPromise) return modelsPromise;
@@ -457,7 +646,8 @@ export function loadModels(): Promise<ModelSet> {
     const none: ModelSet = { avatar: null, pet: null };
     let m: ModelManifest;
     try {
-      const r = await fetch('/models/manifest.json', { cache: 'no-cache' });
+      // Cache-bust so a stale service worker / browser cache cannot keep avatar scale:34.
+      const r = await fetch(`/models/manifest.json?v=${PERSON_WORLD_SCALE}`, { cache: 'no-cache' });
       if (!r.ok) return none;
       m = (await r.json()) as ModelManifest;
     } catch {
@@ -487,16 +677,69 @@ export function loadModels(): Promise<ModelSet> {
 }
 
 /**
- * People are the procedural little characters (chibi.ts): each person's own look, customizable for
- * the viewer. The shared glTF person stays available behind USE_GLTF_PEOPLE.
+ * People are the Kenney Person from muse-companion.glb (person_idle / person_run), toon-shaded
+ * with My look atlas tints. Chibi is only the fallback before the GLB loads or if construction fails.
  */
-const USE_GLTF_PEOPLE = false;
 export function makeAvatar(models: ModelSet | null, seed: string): Character {
-  if (USE_GLTF_PEOPLE && models?.avatar) return new GltfCharacter(models.avatar, 'avatar', seed);
+  if (models?.avatar) {
+    try { return new GltfCharacter(models.avatar, 'avatar', seed); }
+    catch (err) { console.error('[world] Kenney person failed; using chibi', err); }
+  }
   if (!seed) return new PlaceholderAvatar(seed);
   return new ChibiAvatar(currentLook(seed));
 }
 
 export function makePet(models: ModelSet | null, seed: string): Character {
-  return models?.pet ? new GltfCharacter(models.pet, 'pet', seed) : new PlaceholderPet();
+  const pip = seed ? currentPipLook(seed) : null;
+  if (!models?.pet) return new PlaceholderPet();
+  const char = new GltfCharacter(models.pet, 'pet', seed);
+  if (pip) decoratePip(char.root, pip);
+  return char;
+}
+
+/** Coat tint + kind ears on the Muse body so Pip matches the dresser. */
+function decoratePip(root: THREE.Object3D, pip: PipLook): void {
+  const coat = new THREE.Color(pip.coat);
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) {
+      const std = m as THREE.MeshStandardMaterial;
+      if (!std?.color) continue;
+      const n = (std.name || '').toLowerCase();
+      if (n.includes('fur') || n.includes('body') || n.includes('fiber') || mesh.name === 'Muse_Body') {
+        std.color.copy(coat);
+      }
+    }
+  });
+  const head = root.getObjectByName('Muse_Body') ?? root.getObjectByName('Muse') ?? root;
+  const earMat = new THREE.MeshStandardMaterial({ color: pip.coat, roughness: 0.7 });
+  const bowMat = new THREE.MeshStandardMaterial({ color: '#E8505B', roughness: 0.5 });
+  const addEar = (x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 10), earMat);
+    ear.position.set(x, y, z);
+    ear.scale.set(sx, sy, sz);
+    ear.userData.pipDecor = true;
+    head.add(ear);
+  };
+  if (pip.kind === 'bun') {
+    addEar(-0.18, 0.55, 0, 0.7, 1.6, 0.5);
+    addEar(0.18, 0.55, 0, 0.7, 1.6, 0.5);
+    const bow = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8), bowMat);
+    bow.position.set(0.12, 0.72, 0.05);
+    bow.userData.pipDecor = true;
+    head.add(bow);
+  } else if (pip.kind === 'kit') {
+    addEar(-0.2, 0.5, 0, 0.55, 1.2, 0.35);
+    addEar(0.2, 0.5, 0, 0.55, 1.2, 0.35);
+  } else if (pip.kind === 'bear') {
+    addEar(-0.28, 0.35, 0, 1.1, 1.1, 0.6);
+    addEar(0.28, 0.35, 0, 1.1, 1.1, 0.6);
+  } else if (pip.kind === 'sam') {
+    const sprout = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), new THREE.MeshStandardMaterial({ color: '#24A148' }));
+    sprout.position.set(0, 0.65, 0);
+    sprout.userData.pipDecor = true;
+    head.add(sprout);
+  }
 }

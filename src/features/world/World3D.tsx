@@ -22,12 +22,13 @@ import { Footprints, LocateFixed, MapPin, Shirt, Sparkles, X } from 'lucide-reac
 
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { EncounterMotion } from './encounter-motion';
-import { loadModels } from './characters';
+import { invalidateModels, loadModels } from './characters';
 import { AvatarEditor } from './AvatarEditor';
-import { onLooksChanged, setAvatarHint } from './avatarLook';
+import { currentPipLook, onLooksChanged, setAvatarHint } from './avatarLook';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import { buildHq, loadHq, type HqLabel } from './hq';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, streetHeading,type Area, type Street } from './trees';
+import { fireAvatar, fireAvatarEnd, markerOpacityForZoom } from '@/features/map/view3d';
 import {
   ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
@@ -145,6 +146,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const pos = useRef<LatLng>(start);
   const heading = useRef(0);
   const [editingLook, setEditingLook] = useState(false);
+  /** Short "new look" chip above you after My look closes (the beat at the end of the customize clip). */
+  const [newLook, setNewLook] = useState(false);
+  /** After Save: start tight on the body, then ease back to the block. */
+  const savePull = useRef(false);
+  useEffect(() => {
+    if (!newLook) return;
+    savePull.current = true;
+    targetZoom.current = Math.min(MAX_3D_ZOOM, ENTER_ZOOM + 0.85);
+    const t = window.setTimeout(() => setNewLook(false), 3500);
+    return () => window.clearTimeout(t);
+  }, [newLook]);
   /** Arrival cinematic: a slow orbit around you and the plan, pulled back, then home behind you. */
   const orbit = useRef<{ start: number; from: number } | null>(null);
   const camBearing = useRef(map.getBearing());
@@ -158,6 +170,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const followRef = useRef(false);
   /** While true, following also eases the zoom down to street level (the fly-in). */
   const entering = useRef(true);
+  /** Zoom the follow loop eases toward while locked on the character (wheel / pinch update this). */
+  const targetZoom = useRef(ENTER_ZOOM);
   const [follow, setFollowState] = useState(false);
   const setFollow = useCallback((v: boolean) => { followRef.current = v; setFollowState(v); }, []);
   const keys = useRef(new Set<string>());
@@ -225,6 +239,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   },[map,companion.open]);
   const chatOpen = useRef(companion.open);
   chatOpen.current = companion.open;
+  // One sheet at a time: Muse chat and My look both cover the street.
+  useEffect(() => { if (companion.open) setEditingLook(false); }, [companion.open]);
   const upNext = useUpNext();
   const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
@@ -256,7 +272,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       ? { text: 'Checking who’s free and what fits…', tone: 'plain', pending: true }
       : plan.state === 'done' && planOpen
         // The sheet below carries the summary and the reasons; Muse says each thing once.
-        ? { text: plan.topTitle ? 'Here’s what fits 👇' : 'Nothing fits that yet. Try a longer time 👇', tone: plan.live ? 'muse' : 'plain' }
+        ? { text: plan.topTitle || (plan.summary && !plan.summary.startsWith('Nothing')) ? 'Here’s what fits 👇' : 'Nothing fits that yet. Try a longer time 👇', tone: plan.live ? 'muse' : 'plain' }
         : plan.state === 'error' && planOpen
           ? { text: plan.error ?? 'I couldn’t make a plan right now.', tone: 'plain' }
           : walkingLine
@@ -284,12 +300,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let unsubLooks: (() => void) | null = null;
     let cancelled = false;
     map.setMaxPitch(MAX_3D_PITCH);
-    map.setVerticalFieldOfView(48);
+    map.setVerticalFieldOfView(54);
     map.setMaxZoom(MAX_3D_ZOOM);
     map.dragRotate.enable();
-    map.touchZoomRotate.enable({ around: 'center' });
-    map.touchZoomRotate.enableRotation();
-    map.scrollZoom.enable({ around: 'center' });
+    // Follow owns zoom (wheel/pinch → targetZoom). Detached look-around uses native zoom around center.
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disable();
     map.getContainer().setAttribute('data-view3d', '');
     // One camera: on every update (pinch, scroll, animation, the follow loop) the tilt comes from
     // the zoom, so zooming out lifts the camera to the overhead map in one continuous motion.
@@ -313,11 +329,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       layer.minZoom = CHARACTER_MIN_ZOOM;
       map.addLayer(layer);
       layer.upsertActor('me', 'avatar', viewer.id);
-      // A customized look (or a pronoun hint) rebuilds the characters live.
-      unsubLooks = onLooksChanged(() => layer?.refreshAvatars());
+      // A customized look (or a pronoun hint) rebuilds the characters live; Pip glow follows the dresser.
+      unsubLooks = onLooksChanged(() => {
+        layer?.refreshAvatars();
+        const glow = currentPipLook(viewer.id).glow;
+        layer?.setPetGlow('pet', glow);
+      });
       layer.upsertActor('pet', 'pet', viewer.id);
+      layer.setPetGlow('pet', currentPipLook(viewer.id).glow);
       layerRef.current = layer;
       setReady(true);
+      invalidateModels();
       void loadModels().then((models) => { if (!cancelled && (models.avatar || models.pet)) layer?.setModels(models); });
 
       // Follow the avatar and ease down to street level behind it (see `entering` in the loop).
@@ -331,7 +353,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       heading.current = target ? bearingDeg(pos.current, target) : normalizeDeg(map.getBearing());
       camBearing.current = heading.current;
       entering.current = true;
+      targetZoom.current = ENTER_ZOOM;
       setFollow(true);
+      fireAvatar(map, {
+        lat: pos.current.lat, lng: pos.current.lng,
+        markerOpacity: markerOpacityForZoom(map.getZoom()),
+        avatarFriendIds: [],
+      });
     };
     add();
     map.on('load', add);
@@ -339,15 +367,21 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.on('idle', add);
 
     // Dragging or rotating the map by hand looks around; "Back to me" follows again.
-    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { if (encounterRef.current) finishAgentEncounter(encounterRef.current.id); entering.current = false; stopTour(); setFollow(false); } };
-    // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
+    const detach = (e: { originalEvent?: unknown }) => {
+      if (!e.originalEvent) return;
+      if (encounterRef.current) finishAgentEncounter(encounterRef.current.id);
+      entering.current = false;
+      stopTour();
+      setFollow(false);
+      targetZoom.current = map.getZoom();
+      map.scrollZoom.enable({ around: 'center' });
+      map.touchZoomRotate.enable({ around: 'center' });
+      map.touchZoomRotate.enableRotation();
+    };
+    // Native zoom (only while detached) ends the fly-in; follow-zoom is handled in the frame loop.
     const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
-    // Zoomed out to city level hands over to the 2D map (one zoom, two views). Only the fly-in and
-    // the HQ tour move the zoom on their own, and neither zooms out, so any other zoom that ends
-    // out here was the viewer's. (The follow loop's own camera calls end zooms mid-gesture, so a
-    // per-gesture "by hand" flag would miss the last one.)
     const zoomEnd = () => {
-      if (!entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
+      if (!followRef.current && !entering.current && !touring.current && map.getZoom() < EXIT_3D_ZOOM) onZoomOutRef.current?.();
     };
     map.on('dragstart', detach);
     map.on('rotatestart', detach);
@@ -364,6 +398,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       map.off('rotatestart', detach);
       map.off('zoomstart', userZoom);
       map.off('zoomend', zoomEnd);
+      fireAvatarEnd(map);
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
       undoTheme?.();
       layerRef.current = null;
@@ -491,6 +526,51 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.stop();
   }, [map]);
 
+  // While following, wheel and pinch only change targetZoom; the frame loop keeps the character centered.
+  useEffect(() => {
+    if (!follow) return;
+    map.scrollZoom.disable();
+    map.touchZoomRotate.disable();
+    const canvas = map.getCanvas();
+    const clampZ = (z: number) => Math.min(MAX_3D_ZOOM, Math.max(EXIT_3D_ZOOM - 0.2, z));
+    const onWheel = (e: WheelEvent) => {
+      if (!followRef.current || touring.current || chatOpen.current) return;
+      e.preventDefault();
+      entering.current = false;
+      stopTour();
+      let d = e.deltaY;
+      if (e.deltaMode === 1) d *= 40;
+      else if (e.deltaMode === 2) d *= 800;
+      targetZoom.current = clampZ(targetZoom.current - d / 220);
+    };
+    let pinch: { dist: number; zoom: number } | null = null;
+    const pinchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onTouchStart = (e: TouchEvent) => {
+      if (!followRef.current || e.touches.length !== 2) { pinch = null; return; }
+      pinch = { dist: Math.max(1, pinchDist(e.touches)), zoom: targetZoom.current };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (!pinch || !followRef.current || e.touches.length !== 2) return;
+      e.preventDefault();
+      entering.current = false;
+      stopTour();
+      targetZoom.current = clampZ(pinch.zoom + Math.log2(pinchDist(e.touches) / pinch.dist));
+    };
+    const onTouchEnd = () => { pinch = null; };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchend', onTouchEnd);
+    canvas.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      canvas.removeEventListener('wheel', onWheel);
+      canvas.removeEventListener('touchstart', onTouchStart);
+      canvas.removeEventListener('touchmove', onTouchMove);
+      canvas.removeEventListener('touchend', onTouchEnd);
+      canvas.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [map, follow, stopTour]);
+
   /** Orbit the classic campus (MPK 10–18), then MPK 20's rooftop park, with captions. */
   const startTour = useCallback(async () => {
     const at = (re: RegExp) => hqLabels.filter((l) => re.test(l.name));
@@ -508,6 +588,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     touring.current = true;
     entering.current = false;
     setFollow(false);
+    map.scrollZoom.enable({ around: 'center' });
+    map.touchZoomRotate.enable({ around: 'center' });
+    map.touchZoomRotate.enableRotation();
     const quick = reducedMotion();
     const run = (start: () => void) => new Promise<void>((resolve) => { map.once('moveend', () => resolve()); start(); });
     for (const st of stops) {
@@ -824,8 +907,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       if (now - lastSecond > 1000) { lastSecond = now; setSecond((n) => n + 1); }
 
       // Camera: behind the avatar while following. The tilt is set from the zoom on every camera
-      // update by transformCameraUpdate (setup effect), so it changes smoothly during a pinch or
-      // scroll. Any camera call stops MapLibre's gestures, so following waits out a user zoom.
+      // update by transformCameraUpdate (setup effect). While following, zoom is ours (targetZoom),
+      // so the character stays the pivot instead of a cursor zoom that snaps back.
       hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
       if (chatOpen.current) {
@@ -842,7 +925,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const area=museCameraArea(bounds,[panel,viewportRef.current.occlusion]);
         if(!area)return;
         const targetX=area.x,targetY=area.y;
-        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone
+        const chatZ = encounterRef.current ? (phone ? 22.2 : 22.5) : phone
           ? 23 + Math.log2(Math.max(80, Math.min(125, area.height * .35)) / 80)
           : 23.8;
         const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 4);
@@ -851,7 +934,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const cameraFocus=flight ? moveMeters(flight.origin,1.5*flight.scale,flight.bearing+70) : petPos.current;
         map.easeTo({
           center: [cameraFocus.lng, cameraFocus.lat],
-          zoom: zoom + (targetZoom - zoom) * easing,
+          zoom: zoom + (chatZ - zoom) * easing,
           offset: [targetX - bounds.width / 2, targetY - bounds.height / 2], duration: 0,
         });
         return;
@@ -863,13 +946,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         map.easeTo({center:[c.lng+(target.center[0]-c.lng)*k,c.lat+(target.center[1]-c.lat)*k],zoom:zoom+(target.zoom-zoom)*k,bearing:lerpDeg(map.getBearing(),target.bearing,k),duration:0});
         if(reducedMotion()||now>=restoringUntil||Math.abs(map.getZoom()-target.zoom)<.005){
           map.jumpTo({center:target.center,zoom:target.zoom,bearing:target.bearing,elevation:target.elevation});map.setMaxZoom(MAX_3D_ZOOM);map.setCenterClampedToGround(true);returnCamera=null;restoringUntil=0;
+          targetZoom.current = target.zoom;
         }
         return; // Never overwrite a restored camera with the zoom sampled before restoration.
       }
-      const busy = map.isZooming() || (!followRef.current && map.isMoving());
-      if (followRef.current && !busy) {
+      if (followRef.current) {
         let z = zoom;
         if (entering.current) {
+          targetZoom.current = ENTER_ZOOM;
           z = reducedMotion() ? ENTER_ZOOM : zoom + (ENTER_ZOOM - zoom) * (1 - Math.exp(-dt * 2.2));
           if (Math.abs(ENTER_ZOOM - z) < 0.02) { z = ENTER_ZOOM; entering.current = false; }
         }
@@ -880,15 +964,36 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           const ease = t * t * (3 - 2 * t);
           camBearing.current = normalizeDeg(o.from + 150 * ease);
           z = ENTER_ZOOM - 0.9 * Math.sin(Math.PI * Math.min(1, t * 1.15));
+          targetZoom.current = z;
           if (t >= 1) orbit.current = null; // then the normal follow glides back behind you
-        } else {
+        } else if (!entering.current) {
           camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
+          if (savePull.current) {
+            targetZoom.current = ENTER_ZOOM;
+            if (Math.abs(zoom - ENTER_ZOOM) < 0.03) savePull.current = false;
+          }
+          const want = targetZoom.current;
+          z = reducedMotion() ? want : zoom + (want - zoom) * (1 - Math.exp(-dt * (savePull.current ? 1.6 : 10)));
+          if (Math.abs(want - z) < 0.01) z = want;
         }
         const h = map.getContainer().clientHeight;
-        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, offset: [0, Math.round(h * 0.2)], duration: 0 });
-      } else if (!busy) {
+        // Character stays the focal point: center + zoom ease every frame (no cursor-pivot snap).
+        map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, offset: [0, Math.round(h * 0.06)], duration: 0 });
+        if (!entering.current && z < EXIT_3D_ZOOM) onZoomOutRef.current?.();
+      } else if (!map.isZooming() && !map.isMoving()) {
         camBearing.current = map.getBearing();
+        targetZoom.current = zoom;
       }
+
+      // Keep the flat-map You pin on the avatar and crossfade it (and friend pins with 3D bodies).
+      const avatarIds: string[] = [];
+      for (const id of layer.actorIds()) if (id.startsWith('f:')) avatarIds.push(id.slice(2));
+      fireAvatar(map, {
+        lat: pos.current.lat,
+        lng: pos.current.lng,
+        markerOpacity: markerOpacityForZoom(zoom),
+        avatarFriendIds: avatarIds,
+      });
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); clearFlight(); const previous = chatCamera ?? returnCamera; if (previous) { map.jumpTo({ center: previous.center, zoom: previous.zoom, bearing: previous.bearing, elevation: previous.elevation }); map.setCenterClampedToGround(true); } };
@@ -952,11 +1057,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const setSelfieQuest = useCallback((q: Quest | null | ((cur: Quest | null) => Quest | null)) => {
     setSelfieQuestState((cur) => {
       const next = typeof q === 'function' ? q(cur) : q;
-      if (next && !cur) minimizeChat(); // one panel at a time: the photo takes over from the chat
       selfieOpenRef.current = !!next;
       return next;
     });
   }, []);
+  // One panel at a time: the photo takes over from the chat. Not inside the state updater,
+  // which would update MuseChat while World3D is rendering.
+  useEffect(() => { if (selfieQuest) minimizeChat(); }, [selfieQuest]);
   // A persona switch closes the other persona's photo.
   useEffect(() => { setSelfieQuestState(null); selfieOpenRef.current = false; }, [viewer.id]);
   const selfieShown = useRef(new Set<string>());
@@ -1088,10 +1195,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
   // "Back to you" from the map's control stack.
   useEffect(() => {
-    const on = () => { stopTour(); entering.current = true; setFollow(true); };
+    const on = () => {
+      stopTour();
+      entering.current = true;
+      targetZoom.current = ENTER_ZOOM;
+      setFollow(true);
+      map.scrollZoom.disable();
+      map.touchZoomRotate.disable();
+    };
     window.addEventListener('outhere:recenter', on);
     return () => window.removeEventListener('outhere:recenter', on);
-  }, [stopTour, setFollow]);
+  }, [map, stopTour, setFollow]);
   // The walking capsule measures progress from where the walk started.
   const walkStart = useRef<{ id: string; meters: number } | null>(null);
   if (walk && walkStart.current?.id !== walk.questId) {
@@ -1168,23 +1282,46 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         onClose={closeSelfie}
         onTakePhoto={() => setPhotoOpen(true)}
       />
-      {/* My character: dress your little 3D self (top-left, out of the way of the plan UI). */}
-      {!walk && !selfieQuest && !chatFriend && (
-        <button type="button" data-testid="edit-avatar" onClick={() => setEditingLook((v) => !v)} aria-pressed={editingLook}
-          className="pointer-events-auto absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-1.5 rounded-full bg-fb-surface/95 px-3 text-[13px] font-semibold text-fb-text shadow-popover backdrop-blur hover:bg-fb-hover">
+      {/* Clip street chrome (hidden while the dresser is open). */}
+      {!editingLook && !walk && !selfieQuest && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between gap-2 px-3">
+          <div className="inline-flex items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21] bg-[#1C1E21] px-3 py-1.5 text-[12px] font-bold text-white shadow-sm">
+            <span className="size-2 rounded-full bg-[#31A24C]" aria-hidden />Out Here
+          </div>
+          <div className="inline-flex items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21]/15 bg-white/95 px-3 py-1.5 text-[12px] font-semibold text-[#1C1E21] shadow-sm backdrop-blur">
+            <span className="size-2 rounded-full bg-[#E8505B]" aria-hidden />
+            {friendPins.length} friends out
+            <span className="text-[#65676B]">· {new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+          </div>
+        </div>
+      )}
+      {/* My character: opens the full You / Pip dresser. */}
+      {!editingLook && !walk && !selfieQuest && !chatFriend && (
+        <button type="button" data-testid="edit-avatar" onClick={() => { minimizeChat(); setEditingLook(true); }} aria-pressed={editingLook}
+          className="pointer-events-auto absolute left-3 top-14 z-20 inline-flex h-9 items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21]/10 bg-fb-surface/95 px-3 text-[13px] font-semibold text-fb-text shadow-popover backdrop-blur hover:bg-fb-hover">
           <Shirt size={16} aria-hidden />My look
         </button>
       )}
-      {editingLook && <AvatarEditor userId={viewer.id} onClose={() => setEditingLook(false)} />}
+      {editingLook && (
+        <AvatarEditor userId={viewer.id} avatarUrl={viewer.avatarUrl}
+          onClose={() => { setEditingLook(false); setNewLook(true); }} />
+      )}
       {chatFriend && !selfieQuest && (
         <FriendChat friend={chatFriend} viewerId={viewer.id} incoming={chat?.incoming ?? false} onReply={onReply}
           onWalk={walkToFriend} walking={walk?.questId === `f:${chatFriend.id}`} onClose={() => setChat(null)} />
       )}
-      {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
-      <style>{'[data-view3d] [data-map-marker="me"]{transition:opacity .18s}[data-view3d][data-world-characters="true"] [data-map-marker="me"]{opacity:0;pointer-events:none}@media(prefers-reduced-motion:reduce){[data-view3d] [data-map-marker="me"]{transition:none}}'}</style>
+      {/* You-pin / origin puck / friend-pin opacity is driven by outhere:avatar (crossfade with 3D bodies). */}
+      <style>{'[data-view3d] [data-map-marker="me"],[data-view3d] [data-map-marker="origin"],[data-view3d] [data-friend-id]{transition:opacity .15s linear}@media(prefers-reduced-motion:reduce){[data-view3d] [data-map-marker="me"],[data-view3d] [data-map-marker="origin"],[data-view3d] [data-friend-id]{transition:none}}'}</style>
 
       {/* Labels the world layer keeps above heads: the pet's speech, friends' names and status. */}
       <div className="absolute inset-0 overflow-hidden">
+        {newLook && (
+          <div ref={bindLabel('me', 0.35)} data-testid="new-look" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border-[2.5px] border-[#1C1E21] bg-[#F2A900] px-3 py-1 text-[13px] font-bold text-[#1C1E21] shadow-card animate-pop-in">
+              <Sparkles size={12} aria-hidden />new look
+            </span>
+          </div>
+        )}
         {bubble ? (
           <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
             <button
@@ -1250,7 +1387,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       {/* Quest stadiums: name, spots left and the walk from you, above each nearby arena. */}
       {ready && map.getZoom() >= CHARACTER_MIN_ZOOM && (
         <StadiumLabels
-          labels={stadiumLabels(quests, pos.current, { picks, selectedId })}
+          labels={stadiumLabels(quests, pos.current, { picks, selectedId, focusId: walk?.questId ?? selfieQuest?.id ?? arrival?.id ?? null })}
           where={questWhere}
           layer={layerRef.current}
           onSelect={onSelect}

@@ -29,7 +29,7 @@ export type ListingSheetProps = {
 
 const ETAS = [15, 30, 45, 60] as const;
 /** Same cut-off as Muse's find line: up to this many minutes on foot reads as a walk, not a drive. */
-const WALKABLE_MIN = 15;
+const WALKABLE_MIN = 25;
 
 function useTick(ms: number): Date {
   const [t, setT] = useState(() => new Date());

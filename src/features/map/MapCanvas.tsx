@@ -13,6 +13,7 @@ import { CATEGORY_STYLE, bump, categorySvg, dropIn, markSvg, squash } from '@/fe
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
+import { onAvatar, onAvatarEnd } from './view3d';
 
 export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 /** Menlo Park framing: Meta campus, Bayfront Park (north), Belle Haven (east), Willow Rd toward downtown. */
@@ -87,6 +88,11 @@ export type MapCanvasProps = {
   /** The plan being created: a draggable pin with its category's icon. */
   draft?: { at: LatLng; category: string } | null;
   onDraftMove?: (at: LatLng) => void;
+  /**
+   * When false, skip the blue origin puck (FriendsLayer's You pin is the single you-mark).
+   * Default true for callers that do not mount Find My.
+   */
+  showOriginDot?: boolean;
 };
 
 type PinParts = {
@@ -219,7 +225,7 @@ function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
 
 export default function MapCanvas({
   quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
-  onPickLocation, draft, onDraftMove,
+  onPickLocation, draft, onDraftMove, showOriginDot = true,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -528,19 +534,37 @@ export default function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey, draft?.category, hasDraft]);
 
-  // The viewer's own dot (where walking times are measured from).
+  // The viewer's own dot (where walking times are measured from). Out Here hides this when
+  // FriendsLayer's You pin is the single you-mark; other map hosts can keep it.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !origin) return;
+    if (!map || !origin || !showOriginDot) return;
     const el = document.createElement('div');
-    el.setAttribute('data-map-marker', 'me');
+    // "origin" (not "me"): FriendsLayer's You pin uses data-map-marker="me". When that pin is up,
+    // [data-has-my-pin] hides this blue puck so the flat map has a single you-mark.
+    el.setAttribute('data-map-marker', 'origin');
     el.setAttribute('aria-label', 'You');
     el.setAttribute('role', 'img');
     el.style.cssText = 'width:18px;height:18px;border-radius:9999px;background:#0866FF;border:3px solid #fff;box-shadow:0 0 0 6px rgba(8,102,255,.2),0 1px 3px rgba(0,0,0,.3);';
     const marker = new Marker({ element: el, anchor: 'center' }).setLngLat([origin.lng, origin.lat]).addTo(map);
     me.current = marker;
-    return () => { marker.remove(); if (me.current === marker) me.current = null; };
-  }, [origin]);
+    const unsub = onAvatar(map, (e) => {
+      marker.setLngLat([e.lng, e.lat]);
+      el.style.opacity = String(e.markerOpacity);
+      el.style.pointerEvents = e.markerOpacity < 0.05 ? 'none' : '';
+    });
+    const unsubEnd = onAvatarEnd(map, () => {
+      el.style.opacity = '';
+      el.style.pointerEvents = '';
+      marker.setLngLat([origin.lng, origin.lat]);
+    });
+    return () => {
+      unsub();
+      unsubEnd();
+      marker.remove();
+      if (me.current === marker) me.current = null;
+    };
+  }, [origin, showOriginDot]);
 
   // Keep the selected pin in view beside the panel (desktop) or above the sheet (phones);
   // clear the padding when the panel closes.

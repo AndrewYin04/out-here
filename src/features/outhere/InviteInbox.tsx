@@ -1,7 +1,7 @@
 'use client';
 
 import { Footprints, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, IconButton, celebrateJoin, sfx } from '@/features/ui';
 import { useLetsGo } from './lets-go';
@@ -13,6 +13,22 @@ const RECENT_MS = 3 * 60 * 60_000;
 
 /** Quest ids with an invite card on screen right now (UpNext stays quiet for those plans). */
 export const pendingInviteQuests = new Set<string>();
+
+/** Any invite card still on screen (pending or just accepted) hides Up next, so two Let's go buttons don't stack. */
+let inviteCards = 0;
+const inviteCardSubs = new Set<() => void>();
+function setInviteCards(n: number) {
+  if (n === inviteCards) return;
+  inviteCards = n;
+  inviteCardSubs.forEach((fn) => fn());
+}
+export function useInviteOnScreen(): boolean {
+  return useSyncExternalStore(
+    (cb) => { inviteCardSubs.add(cb); return () => { inviteCardSubs.delete(cb); }; },
+    () => inviteCards > 0,
+    () => false,
+  );
+}
 
 type Shown = InviteView & { result?: string; error?: string; busy?: boolean };
 
@@ -96,6 +112,8 @@ export function InviteInbox() {
       patch(inv.id, { busy: false, error: errorText(e, "Couldn't answer. Try again.") });
     }
   };
+
+  useEffect(() => { setInviteCards(items.length); return () => setInviteCards(0); }, [items.length]);
 
   if (items.length === 0) return null;
   return (
