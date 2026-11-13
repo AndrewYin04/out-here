@@ -26,6 +26,7 @@ function fail(table: string, error: DbError): void {
   throw new HttpError(502, `database error on ${table}: ${error.message}`);
 }
 
+/** Warn once per missing optional table (OPTIONAL_TABLES in db.ts); see loadTable. */
 const warned = new Set<string>();
 function warnMissing(table: string) {
   if (warned.has(table)) return;

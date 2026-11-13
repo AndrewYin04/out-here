@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { Camera, Sparkles } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { apiFetch, apiPost } from '@/features/data';
-import { Button } from '@/features/ui';
+import { Button, burst, flash } from '@/features/ui';
 import type { CompleteQuestResponse } from '@/shared';
 
 const MAX_BYTES = 3_500_000;
@@ -37,6 +37,8 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   const [pending, setPending] = useState<'save' | 'caption' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedCrew, setSavedCrew] = useState<string | null>(null);
+  const savedRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => { if (savedCrew) burst(savedRef.current, ['📸', '✨', '💛'], 10); }, [savedCrew]);
 
   useEffect(() => {
     if (!photo) { setPreview(null); return; }
@@ -83,7 +85,7 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   }
 
   if (savedCrew) return (
-    <p role="status" className="mt-4 rounded-card bg-fb-blue-tint p-3 text-sm text-fb-text">
+    <p ref={savedRef} role="status" className="mt-4 animate-pop-in rounded-card bg-fb-blue-tint p-3 text-sm text-fb-text">
       Photo saved to your crew album. <Link href={`/memories#crew-${savedCrew}`} className="font-semibold text-fb-blue hover:underline">View memory</Link>
     </p>
   );
@@ -92,10 +94,10 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
       <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden />Take a photo together</label>
       <input id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
         className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-surface file:px-3 file:py-2 file:font-semibold"
-        onChange={(event) => { setPhoto(event.currentTarget.files?.[0] ?? null); setError(null); }} />
+        onChange={(event) => { const f = event.currentTarget.files?.[0] ?? null; if (f) flash(); setPhoto(f); setError(null); }} />
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={preview} alt="Photo preview" className="max-h-48 w-full rounded-btn object-contain" />
+        <img key={preview} src={preview} alt="Photo preview" className="max-h-48 w-full animate-polaroid rounded-btn bg-fb-surface object-contain p-1.5 shadow-card" />
       )}
       <p className="text-sm text-fb-text-2">Shared with the people from this hangout.</p>
       <label className="block space-y-1 text-sm font-semibold">

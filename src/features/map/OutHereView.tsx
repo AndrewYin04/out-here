@@ -25,6 +25,18 @@ import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
+// The 3D street view (world area). Loaded only when someone opens it, so three.js and the
+// models stay out of the map's first load.
+const World3D = dynamic(() => import('@/features/world').then((m) => m.World3D), { ssr: false });
+
+type MapView = 'map' | '3d';
+const VIEW_KEY = 'outhere.view';
+function readView(): MapView {
+  try { return window.localStorage.getItem(VIEW_KEY) === '3d' ? '3d' : 'map'; } catch { return 'map'; }
+}
+function saveView(v: MapView) {
+  try { window.localStorage.setItem(VIEW_KEY, v); } catch { /* private mode: not remembered */ }
+}
 
 /** Seeded quests get a readable test id ("quest-pin-dumplings"); others use their id. */
 const KEY_BY_ID = new Map(DEMO_QUESTS.map((q) => [seedId('quest', q.key), q.key]));
@@ -55,6 +67,9 @@ export function OutHereView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
+  const [view, setViewState] = useState<MapView>('map');
+  const [viewNote, setViewNote] = useState<string | null>(null);
+  const setView = useCallback((v: MapView) => { setViewState(v); saveView(v); }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
   // "Post a plan" or "Sell for pickup": the draft pin's spot and emoji while that sheet is open.
   const [creating, setCreating] = useState<{ at: LatLng; emoji: string; kind: 'plan' | 'sell' } | null>(null);
@@ -74,6 +89,9 @@ export function OutHereView() {
     if (lid) setListingId(lid);
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
+    // ?view=3d|map opens that view (the demo link); otherwise the last one used.
+    const v = params.get('view');
+    setViewState(v === '3d' || v === 'map' ? v : readView());
   }, []);
 
   // The Muse plan on screen: its picked pins stand out, and the map frames them with the viewer
@@ -133,7 +151,8 @@ export function OutHereView() {
   const hasOrigin = !!ctx?.origin;
   const friendPinsReady = allFriendPins.length > 0;
   useEffect(() => {
-    if (!map) return;
+    // The 3D street view keeps its own camera (behind the avatar); only the 2D map reframes.
+    if (!map || map.getContainer().hasAttribute('data-view3d')) return;
     if (!filter.on) {
       const cam = savedCamera.current;
       savedCamera.current = null;
@@ -212,6 +231,14 @@ export function OutHereView() {
   }, [map, openListing]);
   const openedListing = listingId ? listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
   const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
+  const togetherId = useTogetherId();
+  const sheetOpen = planOpen || togetherId !== null;
+  // "See it on the map" from a confirmed shared plan opens that quest's panel here.
+  useEffect(() => {
+    const on = (e: Event) => select((e as CustomEvent<string>).detail);
+    window.addEventListener('outhere:select-quest', on);
+    return () => window.removeEventListener('outhere:select-quest', on);
+  }, [select]);
 
   // Long-press / right-click on the map, or the ＋ button (map centre): start a new plan there.
   const startCreate = useCallback((at?: LatLng) => {
@@ -245,21 +272,28 @@ export function OutHereView() {
     select(q.id);
     toast.show('Your plan is live on the map.');
   }, [questsApi, select, toast]);
-  const togetherId = useTogetherId();
-  const sheetOpen = planOpen || togetherId !== null;
-  // "See it on the map" from a confirmed shared plan opens that quest's panel here.
-  useEffect(() => {
-    const on = (e: Event) => select((e as CustomEvent<string>).detail);
-    window.addEventListener('outhere:select-quest', on);
-    return () => window.removeEventListener('outhere:select-quest', on);
-  }, [select]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
   const noSelect = useCallback(() => {}, []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
+  // A friend tapped in the 3D view opens their Find My card (it lives in Friends mode).
+  const openFriend = useCallback((id: string) => {
+    setMode('friends');
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id } })), 60);
+  }, []);
+  const exit3d = useCallback(() => {
+    setView('map');
+    setViewNote('3D was running slowly on this device, so you’re back on the map.');
+  }, [setView]);
+  useEffect(() => {
+    if (!viewNote) return;
+    const t = window.setTimeout(() => setViewNote(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [viewNote]);
+  const show3d = view === '3d' && !unsupported && !!map;
 
   return (
-    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode}>
+    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
         <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
@@ -282,6 +316,49 @@ export function OutHereView() {
           draft={creating}
           onDraftMove={moveDraft}
         />
+      )}
+
+      {show3d && map && (
+        <World3D
+          map={map}
+          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name }}
+          home={ctx?.origin ?? null}
+          quests={shown}
+          picks={picks}
+          selectedId={selectedId}
+          friendPins={allFriendPins}
+          onSelect={select}
+          onOpenFriend={openFriend}
+          onExit={exit3d}
+        />
+      )}
+
+      {/* Map / 3D: one camera, two starting points. Bottom left, clear of the I'm free pill. */}
+      {!unsupported && (
+        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-20">
+          <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
+            {(['map', '3d'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                data-testid={`view-${v}`}
+                onClick={() => setView(v)}
+                className={cn(
+                  'h-8 rounded-pill px-3 text-[14px] font-semibold transition-colors',
+                  view === v ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
+                )}
+              >
+                {v === 'map' ? 'Map' : '3D'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {viewNote && (
+        <p role="status" className="absolute inset-x-4 top-[60px] z-[16] mx-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
+          {viewNote}
+        </p>
       )}
 
       {/* Explore / Friends, and the Muse filter chip beside them */}
@@ -440,7 +517,6 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* One row at the bottom: "I'm free" (it also shows your status), ＋ Post a plan, and Your plans. */}
       {mode === 'explore' && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating ? undefined : openListing(id))} />
       )}
@@ -457,22 +533,11 @@ export function OutHereView() {
         </div>
       )}
 
+      {/* One row at the bottom: "I'm free" (it also shows your status), Marketplace, Your plans, and ＋ Post a plan. */}
       {!creating && !sheetOpen && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
           <div className="pointer-events-auto flex items-center gap-2">
             <ImFreeButton />
-            {!unsupported && (
-              <button
-                type="button"
-                data-testid="create-plan-btn"
-                aria-label="Post a plan"
-                title="Post a plan (or long-press the map)"
-                onClick={() => startCreate()}
-                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
-              >
-                <Plus size={26} aria-hidden />
-              </button>
-            )}
             {!unsupported && (
               <MarketMenu
                 wants={wants}
@@ -486,6 +551,18 @@ export function OutHereView() {
               className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
               <CalendarCheck size={22} aria-hidden />
             </Link>
+            {!unsupported && (
+              <button
+                type="button"
+                data-testid="create-plan-btn"
+                aria-label="Post a plan"
+                title="Post a plan (or long-press the map)"
+                onClick={() => startCreate()}
+                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
+              >
+                <Plus size={26} aria-hidden />
+              </button>
+            )}
           </div>
         </div>
       )}

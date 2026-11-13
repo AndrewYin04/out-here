@@ -9,6 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
 import { useEffect, useRef, useState } from 'react';
 import type { ID, LatLng, Quest } from '@/shared';
+import { bump, dropIn, squash } from '@/features/ui';
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
@@ -187,12 +188,11 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   paintFaces(p, faces);
 }
 
-function pulse(el: HTMLElement) {
-  el.dataset.pulse = String(Date.now());
-  el.animate?.(
-    [{ transform: 'translateX(-50%) scale(1)' }, { transform: 'translateX(-50%) scale(1.45)' }, { transform: 'translateX(-50%) scale(1)' }],
-    { duration: 500, iterations: 3, easing: 'ease-in-out' },
-  );
+/** Someone took or freed a seat: the badge bumps and the pin squashes, on every screen. */
+function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
+  p.badge.dataset.pulse = String(Date.now());
+  bump(p.badge, 'translateX(-50%)');
+  squash(p.circle);
 }
 
 export default function MapCanvas({
@@ -364,6 +364,7 @@ export default function MapCanvas({
     if (!map) return;
     const seen = new Set<string>();
     const pickSet = picks ? new Set(picks) : null;
+    let dropped = 0;
     for (const q of quests) {
       seen.add(q.id);
       const lngLat: [number, number] = [q.location.lng, q.location.lat];
@@ -375,10 +376,11 @@ export default function MapCanvas({
         const marker = new Marker({ element: parts.root, anchor: 'center' }).setLngLat(lngLat).addTo(map);
         ref = { ...parts, marker, seats: seatsLeftOf(q), facesKey: '' };
         pins.current.set(q.id, ref);
+        dropIn(parts.circle, Math.min(dropped++ * 35, 420));
       } else {
         ref.marker.setLngLat(lngLat);
         const seats = seatsLeftOf(q);
-        if (seats !== ref.seats) { ref.seats = seats; pulse(ref.badge); }
+        if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
       paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
     }
@@ -397,7 +399,8 @@ export default function MapCanvas({
   const fitKey = (fitTo ?? []).map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(';');
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !picksKey) return;
+    // In the 3D street view the camera stays behind the avatar; beacons and the pet show the picks.
+    if (!map || !picksKey || map.getContainer().hasAttribute('data-view3d')) return;
     const ids = new Set(picksKey.split(','));
     const b = new LngLatBounds();
     let n = 0;

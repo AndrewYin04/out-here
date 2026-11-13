@@ -41,7 +41,7 @@
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
 // POST /api/muse/regroup               body: { crewId, now? }           -> { suggestion: PlanSuggestion, message: string }
 // POST /api/muse/create-quest          body: { text, location, now? }   -> { draft: Partial<Quest> & { durationMin }, pitch: string }
-// POST /api/muse/caption               body: { questId, crewId }        -> { caption: string }
+// POST /api/muse/caption               body: { questId }                -> { caption: string }
 // POST /api/muse/daily                 body: { date }                   -> DailyQuest
 // POST /api/muse/verify-photo          body: { date, photoUrl }         -> { verified: boolean, note: string }
 // POST /api/muse/wrapped               body: { userId, month }          -> { cards: { title: string; body: string; stat?: string; photoUrl?: string }[] }
@@ -167,7 +167,7 @@ export type MuseCreateQuestBody = { text: string; location: LatLng; now?: string
 export type MuseQuestDraft = Pick<Quest, 'title' | 'emoji' | 'category' | 'description' | 'venueName' | 'startsAt' | 'endsAt'
   | 'capacity' | 'priceMax' | 'tags' | 'placeId' | 'bubbleText'> & { location: LatLng };
 export type MuseCreateQuestResponse = { draft: MuseQuestDraft; pitch: string };
-export type MuseCaptionBody = { questId: ID; crewId: ID };
+export type MuseCaptionBody = { questId: ID };
 export type MuseCaptionResponse = { caption: string };
 export type MuseDailyBody = { date: string };
 export type MuseVerifyPhotoBody = { date: string; photoUrl: string };

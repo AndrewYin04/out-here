@@ -18,7 +18,7 @@ type Common = {
 
 function classes({ size = 'lg', tone = 'grey', active = false }: Pick<Common, 'size' | 'tone' | 'active'>) {
   return cn(
-    'relative inline-flex shrink-0 items-center justify-center rounded-full transition-colors',
+    'oh-press relative inline-flex shrink-0 items-center justify-center rounded-full',
     SIZES[size],
     active
       ? 'bg-fb-blue-tint text-fb-blue'

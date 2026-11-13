@@ -98,6 +98,7 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
 };
 
 /** Tables added by later migrations: a missing table reads as empty instead of failing every page. */
+/** Tables from later migrations: they read as empty until the migration is applied. */
 export const OPTIONAL_TABLES = new Set<TableKey>(['togetherPlans', 'questCheckins', 'questReports', 'listingHolds', 'museWants']);
 
 export function emptyDb(): Db {

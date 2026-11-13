@@ -7,7 +7,7 @@ import {
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite, type QuestVisibility, type TogetherOption,
+  type Story, type Invite, type TogetherOption, type QuestVisibility,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
@@ -741,9 +741,9 @@ export class CoreStore {
     const after = await this.view();
     const q = after.questById.get(id)!;
     await publish(`quest:${id}`, { seatsLeft: after.seatsLeft(q), memberCount: after.questMemberIds(id).length });
+    await publish(`user:${viewerId}`, { type: 'quest', id });
     // Ids only: every map refetches /api/quests, which applies canSeeQuest for its viewer.
     await publish('quests:new', { questId: id });
-    await publish(`user:${viewerId}`, { type: 'quest', id });
     return after.questFor(viewerId, q);
   }
 
