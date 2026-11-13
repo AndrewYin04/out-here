@@ -29,7 +29,12 @@ export function TogetherSheet() {
 
 function Sheet({ id }: { id: string }) {
   const { viewer } = useViewer();
-  const api = useApi<TogetherResponse>(`/api/together/${id}`, [`together:${id}`, `user:${viewer.id}`]);
+  // A vote message carries the plan's status: "It's a plan!" shows at once, the refetch confirms it.
+  const api = useApi<TogetherResponse>(`/api/together/${id}`, [`together:${id}`, `user:${viewer.id}`], undefined, (prev, channel, payload) => {
+    const p = payload as { status?: TogetherView['status']; confirmedQuestId?: string | null } | null;
+    if (!channel.startsWith('together:') || !p?.status) return prev;
+    return { plan: { ...prev.plan, status: p.status, confirmedQuestId: p.confirmedQuestId ?? prev.plan.confirmedQuestId } };
+  });
   const [busyOn, setBusyOn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** Your "I'm in" taps, shown at once (optimistic) until the server's copy arrives. */

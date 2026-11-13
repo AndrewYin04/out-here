@@ -79,6 +79,7 @@ export interface DataStore {
   openTogether: CoreStore['openTogether'];
   createTogether: CoreStore['createTogether'];
   togetherPlans: CoreStore['togetherPlans'];
+  resetStory: CoreStore['resetStory'];
   together: CoreStore['together'];
   voteTogether: CoreStore['voteTogether'];
   friendAvailability: CoreStore['friendAvailability'];
@@ -104,6 +105,9 @@ export interface DataStore {
   friendPins: CoreStore['friendPins'];
   myLocation: CoreStore['myLocation'];
   updateMyLocation: CoreStore['updateMyLocation'];
+  // walking there together (#46)
+  walkers: CoreStore['walkers'];
+  postWalkStep: CoreStore['postWalkStep'];
   hangInvite: CoreStore['hangInvite'];
   hangSuggestion: CoreStore['hangSuggestion'];
   // Muse Intros storage (features/intros applies the rules and per-side visibility)

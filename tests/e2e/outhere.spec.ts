@@ -34,7 +34,7 @@ test.describe("Out Here plan sheet", () => {
     const box = page.locator("#imfree-text");
     await expect(box).toBeFocused();
     // picking a time selects it (no text typed, nothing sent yet)
-    const fifteen = page.getByRole("button", { name: "15 min" });
+    const fifteen = page.getByTestId("free-composer").getByRole("button", { name: "15 min", exact: true });
     await fifteen.click();
     await expect(fifteen).toHaveAttribute("aria-pressed", "true");
     await expect(box).toHaveValue("");
