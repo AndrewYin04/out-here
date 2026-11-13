@@ -14,11 +14,16 @@
 import { DEMO_CENTER } from '../src/shared/demo';
 import { profileId } from '../src/shared/seed/ids';
 
+// The composer's time chips (PlanSheet DURATIONS).
+type Chip = '15 min' | '30 min' | '1 hr' | '2 hr' | 'tonight';
+
 type Step =
   | { kind: 'reset'; label: string }
-  | { kind: 'free'; label: string; as: string; text: string; minutes: number }
+  // "Just show I'm free" with no moods and no text: PlanSheet.justFree posts the note 'free'.
+  | { kind: 'free'; label: string; as: string; note?: string; minutes: number }
   | { kind: 'busy'; label: string; as: string }
-  | { kind: 'plan'; label: string; as: string; text: string }
+  // A composer ask: picked moods (their ask words), typed text, and the time chip, if any.
+  | { kind: 'plan'; label: string; as: string; moods?: string[]; typed?: string; chip?: Chip }
   | { kind: 'freeWithMe'; label: string; as: string }
   | { kind: 'together'; label: string; as: string; with: string[] }
   | { kind: 'upNext'; label: string; as: string }
@@ -26,30 +31,44 @@ type Step =
   | { kind: 'intro'; label: string; as: string };
 
 // The demo's scripted asks, in stage order (docs/DEMO_FLOW.md). Edit this list to match the
-// exact words used on stage: the cache only matches the same persona and the same words
-// (case and extra spaces do not matter). Composer asks are built like PlanSheet's composeAsk:
-// the picked moods, the typed text, then the time chip ("15 min", "30 min", "1 hr", "2 hr", "tonight").
+// exact taps and words used on stage: the cache only matches the same persona and the same
+// words (case and extra spaces do not matter), and the plan keys also include which friends
+// are free and from where, so each step writes availability the way the stage UI does:
+// - free: "Just show I'm free" posts the note 'free' from the persona's shared location.
+// - plan with a chip: PlanSheet sets the status first (note = moods + typed text, no time),
+//   from the shared location, then asks Muse.
+// - plan without a chip: PlanSheet asks Muse, then shareAvailability posts the note for the
+//   window Muse resolved, from the plan's origin.
+// Plan together keys on everyone's notes, so it is warmed right after both "show I'm free"
+// taps (notes 'free') and again after the hungry asks (notes 'hungry').
 export const STEPS: Step[] = [
   { kind: 'reset', label: 'presenter reset' },
   // Scene 4: Alex's "I'm free", before anyone else is free.
-  { kind: 'plan', label: "Alex: I'm free (typed)", as: 'alex', text: 'free for an hour, want to try something new, under $20' },
-  { kind: 'plan', label: 'Alex: hungry 30 min', as: 'alex', text: 'hungry, 30 min' },
-  { kind: 'plan', label: 'Alex: hungry 1 hr', as: 'alex', text: 'hungry, 1 hr' },
-  { kind: 'plan', label: 'Alex: hungry 2 hr', as: 'alex', text: 'hungry, 2 hr' },
-  { kind: 'plan', label: 'Alex: meet people 1 hr', as: 'alex', text: 'meet people, 1 hr' },
-  { kind: 'plan', label: 'Alex: live music tonight', as: 'alex', text: 'live music, tonight' },
-  { kind: 'plan', label: 'Alex: cheap 1 hr', as: 'alex', text: 'something cheap, 1 hr' },
-  { kind: 'plan', label: 'Alex: comics with someone', as: 'alex', text: "i'm free and bored, want someone to go with who likes comics, 1 hr" },
-  // Alex and Maya both say they are free ("Just show I'm free"), then the pre-check and plan together.
-  { kind: 'free', label: 'Alex: show I am free', as: 'alex', text: 'free, want to try something new', minutes: 60 },
-  { kind: 'free', label: 'Maya: show I am free', as: 'maya', text: 'craving dumplings', minutes: 60 },
+  { kind: 'plan', label: "Alex: I'm free (typed)", as: 'alex', typed: 'free for an hour, want to try something new, under $20' },
+  { kind: 'plan', label: 'Alex: hungry 30 min', as: 'alex', moods: ['hungry'], chip: '30 min' },
+  { kind: 'plan', label: 'Alex: hungry 1 hr', as: 'alex', moods: ['hungry'], chip: '1 hr' },
+  { kind: 'plan', label: 'Alex: hungry 2 hr', as: 'alex', moods: ['hungry'], chip: '2 hr' },
+  { kind: 'plan', label: 'Alex: meet people 1 hr', as: 'alex', moods: ['meet people'], chip: '1 hr' },
+  { kind: 'plan', label: 'Alex: live music tonight', as: 'alex', moods: ['live music'], chip: 'tonight' },
+  { kind: 'plan', label: 'Alex: cheap 1 hr', as: 'alex', moods: ['something cheap'], chip: '1 hr' },
+  { kind: 'plan', label: 'Alex: comics with someone', as: 'alex', typed: "i'm free and bored, want someone to go with who likes comics, 1 hr" },
+  // Alex and Maya both tap "Just show I'm free", then the pre-check and plan together.
+  { kind: 'free', label: 'Alex: show I am free', as: 'alex', minutes: 60 },
+  { kind: 'free', label: 'Maya: show I am free', as: 'maya', minutes: 60 },
   { kind: 'freeWithMe', label: 'Alex: free with me (no Muse)', as: 'alex' },
-  { kind: 'plan', label: "Alex: I'm free, Maya free (pre-check)", as: 'alex', text: 'free for an hour, want to try something new, under $20' },
-  { kind: 'plan', label: 'Alex: hungry 1 hr, Maya free', as: 'alex', text: 'hungry, 1 hr' },
-  { kind: 'plan', label: "Maya: I'm free, Alex free", as: 'maya', text: 'hungry, 1 hr' },
-  { kind: 'together', label: 'Alex: plan together with Maya', as: 'alex', with: ['maya'] },
+  { kind: 'together', label: 'Alex: plan together (both just free)', as: 'alex', with: ['maya'] },
+  // One open shared plan per group: reset closes it so the second plan together asks Muse
+  // again (without DEMO_RESET_TOKEN it reuses the first plan). Then both are free again.
+  { kind: 'reset', label: 'presenter reset (close shared plan)' },
+  { kind: 'free', label: 'Alex: show I am free (again)', as: 'alex', minutes: 60 },
+  { kind: 'free', label: 'Maya: show I am free (again)', as: 'maya', minutes: 60 },
+  { kind: 'plan', label: "Alex: I'm free, Maya free (pre-check)", as: 'alex', typed: 'free for an hour, want to try something new, under $20' },
+  { kind: 'plan', label: 'Alex: hungry 1 hr, Maya free', as: 'alex', moods: ['hungry'], chip: '1 hr' },
+  { kind: 'plan', label: "Maya: I'm free, Alex free", as: 'maya', moods: ['hungry'], chip: '1 hr' },
+  { kind: 'together', label: 'Alex: plan together (both hungry)', as: 'alex', with: ['maya'] },
   { kind: 'upNext', label: 'Alex: Up next (no Muse)', as: 'alex' },
-  // Scene 2: one sentence becomes a plan draft (✨ Draft). Nothing is posted.
+  // Scene 2: one sentence becomes a plan draft (✨ Draft). Nothing is posted. The draft key
+  // includes the places near the pin, so only a pin near DEMO_CENTER is served from the cache.
   { kind: 'draft', label: 'Alex: draft a plan', as: 'alex', text: 'comics open house at the cafe in 30 min, me + 3' },
   { kind: 'draft', label: 'Alex: draft boba', as: 'alex', text: 'boba after class at 4' },
   // Scene 5: an intro round for Alex (only where /api/intros exists).
@@ -58,6 +77,29 @@ export const STEPS: Step[] = [
   { kind: 'busy', label: 'Maya: busy again', as: 'maya' },
   { kind: 'reset', label: 'presenter reset' },
 ];
+
+// ---------- the composer, as PlanSheet builds it ----------
+// Copies of composeAsk, noteFor and the chip minutes in src/features/outhere/PlanSheet.tsx.
+// Keep them in step with that file.
+
+const CHIP_MIN: Record<Exclude<Chip, 'tonight'>, number> = { '15 min': 15, '30 min': 30, '1 hr': 60, '2 hr': 120 };
+function minutesUntilTonight(): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })
+    .formatToParts(new Date());
+  const h = Number(parts.find((x) => x.type === 'hour')?.value ?? 0);
+  const m = Number(parts.find((x) => x.type === 'minute')?.value ?? 0);
+  return Math.max(60, 23 * 60 - (h * 60 + m));
+}
+const chipMinutes = (chip: Chip | undefined): number | null =>
+  !chip ? null : chip === 'tonight' ? minutesUntilTonight() : CHIP_MIN[chip];
+const mentionsTime = (t: string) => /\b\d+\s*(m|min|mins|minutes|h|hr|hrs|hour|hours)\b|\b(tonight|till|until|before|after)\b/i.test(t);
+export function composeAsk(moods: string[], typed: string, chip: Chip | undefined): string {
+  const t = typed.trim().replace(/[,\s]+$/, '');
+  const parts = [...moods, t];
+  if (chip && !mentionsTime(t)) parts.push(chip);
+  return parts.filter(Boolean).join(', ');
+}
+export const noteFor = (moods: string[], typed: string): string => [...moods, typed.trim()].filter(Boolean).join(', ') || 'free';
 
 // ---------- args ----------
 
@@ -107,6 +149,38 @@ const errText = (r: Res) => {
   return `HTTP ${r.status}${typeof e === 'string' ? `: ${e.slice(0, 80)}` : ''}`;
 };
 
+// ---------- availability, the way the stage UI writes it ----------
+
+/** The location FreeStatus posts from: the persona's shared location, else DEMO_CENTER. */
+async function sharedLocation(as: string): Promise<{ lat: number; lng: number }> {
+  const r = await call('GET', '/api/locations/me', { as });
+  const loc = (r.body as { share?: { location?: { lat: number; lng: number } } | null })?.share?.location;
+  return r.status < 400 && loc ? loc : DEMO_CENTER;
+}
+
+/** useMyStatus().setFree(0, minutes, note): free from a few seconds ago, from the shared location. */
+async function setFree(as: string, minutes: number, note: string): Promise<Res> {
+  const now = Date.now();
+  return call('POST', '/api/availability', {
+    as,
+    body: {
+      text: note.trim() || 'free', location: await sharedLocation(as),
+      startsAt: new Date(now - 5_000).toISOString(), endsAt: new Date(now + minutes * 60_000).toISOString(),
+    },
+  });
+}
+
+/** plan-api shareAvailability: the window Muse resolved, from the plan's origin. */
+async function shareAvailability(as: string, note: string, plan: unknown): Promise<void> {
+  const p = plan as { intent?: { windowStart?: string; windowEnd?: string }; meta?: { origin?: { lat: number; lng: number } | null } };
+  const startsAt = new Date(Math.max(Date.now(), Date.parse(p.intent?.windowStart ?? '') || Date.now()));
+  const endsAt = new Date(Date.parse(p.intent?.windowEnd ?? '') || 0);
+  if (!(endsAt > startsAt)) return;
+  await call('POST', '/api/availability', {
+    as, body: { text: note, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), location: p.meta?.origin ?? DEMO_CENTER },
+  });
+}
+
 // ---------- steps ----------
 
 async function run(step: Step): Promise<Res | 'skipped'> {
@@ -115,17 +189,21 @@ async function run(step: Step): Promise<Res | 'skipped'> {
       if (flag('--no-reset')) return 'skipped';
       if (!resetKey) return 'skipped';
       return call('POST', '/api/demo/reset', { as: 'alex', headers: { 'x-demo-key': resetKey } });
-    case 'free': {
-      const now = Date.now();
-      return call('POST', '/api/availability', {
-        as: step.as,
-        body: { text: step.text, startsAt: new Date(now).toISOString(), endsAt: new Date(now + step.minutes * 60_000).toISOString(), location: DEMO_CENTER },
-      });
-    }
+    case 'free':
+      return setFree(step.as, step.minutes, step.note ?? 'free');
     case 'busy':
       return call('DELETE', '/api/availability', { as: step.as });
-    case 'plan':
-      return call('POST', '/api/muse/plan', { as: step.as, body: { text: step.text } });
+    case 'plan': {
+      const moods = step.moods ?? [];
+      const typed = step.typed ?? '';
+      const note = noteFor(moods, typed);
+      const picked = chipMinutes(step.chip);
+      // A picked time sets the status before Muse answers (PlanSheet.submit).
+      if (picked !== null) await setFree(step.as, picked, note);
+      const r = await call('POST', '/api/muse/plan', { as: step.as, body: { text: composeAsk(moods, typed, step.chip) } });
+      if (picked === null && r.status < 400) await shareAvailability(step.as, note, r.body);
+      return r;
+    }
     case 'freeWithMe':
       return call('GET', '/api/availability/free-with-me', { as: step.as, headers: { 'x-outhere-fresh': '1' } });
     case 'together':

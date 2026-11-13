@@ -33,7 +33,7 @@ export type { PlanInput, PlanMeta, PlanOutput, PlanSource, PlanTimings } from '.
 export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
 export type { TimeExpression } from './time';
 export {
-  QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftMessages, mockDraft, nearbyPlaces, validateDraft,
+  QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftCacheKey, draftMessages, mockDraft, nearbyPlaces, validateDraft,
 } from './create-quest';
 export type { CreateQuestContext, DraftPlace, RawDraft } from './create-quest';
 export {

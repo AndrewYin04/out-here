@@ -27,6 +27,7 @@ Without Supabase (builders, tests, MemoryStore e2e) the same cache lives in proc
 | text: NFKC, lower case, single spaces, trimmed | yes | yes | yes | no |
 | intent's activities, budget, wantsFriends, openToNewPeople, vibe | | yes | | |
 | the ORDERED shortlist: each quest id with the friend ids listed under it | | yes | | |
+| the ORDERED ids of the places near the pin (400 m) that Muse chose from | | | yes | |
 | user message, with the clock removed | | | | yes |
 
 Left out of the parse, rank and draft keys: the clock label, the live seat counts, walk minutes, start times and "starts in" minutes, the window label, and the draft's nearby-place walk labels.
@@ -44,7 +45,7 @@ What stays live after a cached answer:
 
 - Parse answers are relative ("60 minutes", "17:00"), and code resolves them against the current clock.
 - After a cached ranking, `validate()` recomputes travel minutes and seats from live data and drops picks that are full or no longer fit. The claim check replaces a reason, bridge or invite whose numbers no longer match.
-- `validateDraft` re-checks a cached place id against today's nearby places.
+- `validateDraft` re-checks a cached place id against today's nearby places. When the id is not near this pin, or the pitch names a different nearby place or other walk minutes, the pitch becomes the code pitch ("I picked <place>, N min from your pin." or "I kept your pin as the spot.").
 
 ## When the cache is used
 
@@ -79,6 +80,14 @@ Warm close to the demo: `seed:demo` and the presenter reset time plans relative 
 Flags: `--base <url>` (default `http://localhost:3000`), `--clear`, `--passes 2` (runs the list twice in one go), `--no-enable` (store answers but leave prebaked off), `--no-reset`, `--only <text>`.
 
 The asks live in one array, `STEPS` in `scripts/warm-demo.ts`: Alex's "I'm free" ask and the composer's mood and time variants, Alex and Maya showing they are free, the pre-check (Alex asking again with Maya free), plan together, Up next (no Muse call; timed only), two ✨ Draft sentences, and an intro round for Alex (skipped where `/api/intros` does not exist). **Edit it to the exact words and personas used on stage**: case and spacing do not matter, other differences do.
+
+Plan steps are written as the composer's inputs (`moods`, `typed`, `chip`), and the script builds the ask and the status note the way `PlanSheet` does (`composeAsk`, `noteFor`; copies in the script, keep them in step). Each step also writes availability the way the stage UI does, because the rank keys depend on which friends are free and from where, and plan together keys on everyone's notes:
+
+- `free` ("Just show I'm free") posts the note `free` from the persona's shared location (`GET /api/locations/me`), as `FreeStatus` does; DEMO_CENTER only when there is no share.
+- A plan with a time chip sets the status first (note: moods and typed text, no time), from the shared location.
+- A plan without a chip asks Muse, then posts the note for the window Muse resolved, from the plan's `meta.origin`, as `shareAvailability` does.
+
+Plan together is warmed twice: right after both "show I'm free" taps (both notes `free`, so Muse gets "something fun, N min") and after the hungry asks ("hungry, N min"). The ✨ Draft steps drop the pin at DEMO_CENTER, so on stage only a pin with the same nearby places is served from the cache; any other pin goes live.
 
 For each step it prints the latency and one of:
 
