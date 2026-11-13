@@ -65,7 +65,12 @@ export function OutHereView() {
   const [unsupported, setUnsupported] = useState(false);
   const [view, setViewState] = useState<MapView>('map');
   const [viewNote, setViewNote] = useState<string | null>(null);
-  const setView = useCallback((v: MapView) => { setViewState(v); saveView(v); }, []);
+  const [walkTo, setWalkTo] = useState<{ questId: string } | null>(null);
+  const setView = useCallback((v: MapView) => {
+    if (v === 'map') setWalkTo(null);
+    setViewState(v);
+    saveView(v);
+  }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
   const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
   const planOpen = usePlanOpen();
@@ -261,21 +266,24 @@ export function OutHereView() {
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
 
-  // Up next: your next plan stays on the map. "Let's go" walks you there in 3D; arriving turns
-  // the card into "Take a photo together".
+  // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();
-  const [walkTo, setWalkTo] = useState<{ questId: string; nonce: number } | null>(null);
+  const nextQuest = upNext?.quest;
+  // Let's go can come from any plan you joined (a plan's panel, an accepted invite), not only Up next.
+  const walkQuest = !walkTo ? null
+    : nextQuest?.id === walkTo.questId ? nextQuest
+      : (questsApi.data?.quests ?? []).find((q) => q.id === walkTo.questId) ?? null;
   const [arrivedId, setArrivedId] = useState<string | null>(null);
   const letsGo = useCallback((questId: string) => {
+    if (unsupported) { select(questId); return; }
     select(null);
     setArrivedId(null);
-    if (unsupported) { select(questId); return; }
     setView('3d');
-    setWalkTo({ questId, nonce: Date.now() });
+    setWalkTo({ questId });
   }, [select, setView, unsupported]);
-  const walkingTo = show3d && walkTo && walkTo.questId !== arrivedId ? walkTo.questId : null;
-  // Arriving at your next plan: keep the Up next card (it turns into "Take a photo together")
-  // instead of the plan's panel, which the 3D view opens on arrival.
+  const finishWalk = useCallback((questId: string) => {
+    setWalkTo((current) => current?.questId === questId ? null : current);
+  }, []);
   // Every "Let's go" in the app (accepted invite, "Maya's in", a joined plan's panel) lands here;
   // from another page it arrives as ?go=<questId>.
   useEffect(() => listenLetsGo(letsGo), [letsGo]);
@@ -292,12 +300,12 @@ export function OutHereView() {
     letsGo(id);
   }, [letsGo]);
   const onArrive = useCallback((questId: string) => {
+    finishWalk(questId);
     setArrivedId(questId);
-    if (upNext?.quest.id === questId) select(null);
-  }, [upNext?.quest.id, select]);
+  }, [finishWalk]);
 
   return (
-    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkTo?.questId ?? undefined} data-arrived={arrivedId ?? undefined}>
+    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkQuest?.id ?? undefined} data-arrived={arrivedId ?? undefined}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
         <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
@@ -335,16 +343,15 @@ export function OutHereView() {
           onOpenFriend={openFriend}
           onExit={exit3d}
           onZoomOut={zoomOut3d}
-          walkTo={walkTo}
+          walkTo={walkQuest}
+          onWalkStop={finishWalk}
           onArrive={onArrive}
         />
       )}
 
-      {/* Map / 3D: one camera, two starting points. Bottom left on desktop; on a phone the bottom
-          row belongs to I'm free, so it sits above it, and in 3D above the joystick too (in 2D that
-          height would cover the plan pins). */}
+      {/* Keep the camera toggle clear of the action row and the 3D joystick. */}
       {!unsupported && (
-        <div className={`absolute bottom-6 left-3 z-20 ${view === '3d' ? 'max-md:bottom-[250px]' : 'max-md:bottom-20'}`}>
+        <div className={`absolute bottom-6 left-3 z-20 ${view === '3d' ? 'max-md:bottom-[250px]' : 'max-md:bottom-6'}`}>
           <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
             {(['map', '3d'] as const).map((v) => (
               <button
@@ -519,23 +526,33 @@ export function OutHereView() {
         </>
       )}
 
-      {/* Up next (your next plan), else "You and Maya are both free": under the toggle. Hidden while
-          a sheet is open, which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && (
+      {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
+          which already shows the plan (one next step on screen at a time). */}
+      {!selectedId && !creating && !sheetOpen && upNext && (
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
-          {upNext ? (
-            <UpNextCard
-              key={upNext.quest.id}
-              plan={upNext}
-              arrived={arrivedId === upNext.quest.id}
-              walking={walkingTo === upNext.quest.id}
-              onGo={letsGo}
-              onSee={select}
-              className="pointer-events-auto w-full max-w-[440px]"
-            />
-          ) : (
-            <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
-          )}
+          <UpNextCard
+            key={upNext.quest.id}
+            plan={upNext}
+            arrived={arrivedId === upNext.quest.id}
+            walking={show3d && walkQuest?.id === upNext.quest.id}
+            onGo={letsGo}
+            onSee={select}
+            className="pointer-events-auto w-full max-w-[440px]"
+          />
+        </div>
+      )}
+
+      {/* Dock the availability card at the edge to leave room for the map and avatar. */}
+      {!selectedId && !creating && !sheetOpen && !upNext && (
+        <div className={cn(
+          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
+          show3d
+            ? mode === 'friends' && visible.length > 0
+              ? filter.on ? 'top-32' : 'top-24'
+              : filter.on ? 'top-24' : 'top-[60px]'
+            : 'bottom-[136px] md:bottom-auto',
+        )}>
+          <BothFreeNudge className="pointer-events-auto w-full" />
         </div>
       )}
 

@@ -1,13 +1,9 @@
 'use client';
-// "Up next": once you have a plan starting soon, it stays on the map until it's over, so a plan
-// you made never disappears. It counts down to when to leave, says "Time to go" (with a toast)
-// at leave time, starts the walk there in the 3D view ("Let's go"), and after you arrive turns
-// into "Take a photo together" → crew album → "Get this group together again".
-import Link from 'next/link';
+// The next plan stays on the map with a leave-time reminder and a way to start the 3D walk.
 import { Camera, ChevronDown, ChevronUp, Footprints, MapPin } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useViewer } from '@/features/data';
-import { MemoryCapture, requestSelfie } from '@/features/memories';
+import { requestSelfie } from '@/features/memories';
 import { Avatar, cn, useToast } from '@/features/ui';
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
 
@@ -59,8 +55,6 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   const toast = useToast();
   const now = useClock();
   const [open, setOpen] = useState(true);
-  const [photo, setPhoto] = useState(false);
-  const [savedCrew, setSavedCrew] = useState<string | null>(null);
   const q = plan.quest;
   const starts = Date.parse(q.startsAt);
   const leaveBy = starts - plan.walkMinutes * 60_000;
@@ -81,10 +75,9 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, arrived, q.id]);
 
-  // Arriving: the 3D view opens the selfie dialog itself, so this card only offers to reopen it
-  // (one photo prompt, not two). Without the 3D view, the photo form opens here.
-  useEffect(() => { if (arrived) setOpen(true); }, [arrived]);
-  const takePhoto = () => { if (!requestSelfie(q.id)) setPhoto(true); };
+  // Arriving: the 3D view opens the selfie dialog itself. If it was closed, this reopens it
+  // (one photo prompt, not two); without the 3D view, See plan is the way in.
+  const takePhoto = () => { if (!requestSelfie(q.id)) onSee(q.id); };
 
   const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
   const leave = arrived ? `You’re here 🎉 ${others.length > 0 ? `Say hi to ${names(others.slice(0, 2).map((m) => first(m.name)))}` : ''}`
@@ -131,20 +124,16 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
                 See plan
               </button>
             </div>
-          ) : !photo ? (
-            <button type="button" data-testid="up-next-photo-btn" onClick={takePhoto}
-              className="oh-press inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-btn bg-fb-blue text-[15px] font-semibold text-white">
-              <Camera size={18} aria-hidden />Take a photo together
-            </button>
           ) : (
-            <div data-testid="up-next-photo">
-              {/* The form stays mounted while it uploads; it says "Photo saved" itself. */}
-              <MemoryCapture questId={q.id} crewId={plan.crewId} onSaved={setSavedCrew} />
-              {savedCrew && (
-                <Link href={`/memories#crew-${savedCrew}`} className="oh-press mt-2 inline-flex h-10 w-full items-center justify-center rounded-btn bg-fb-secondary-btn text-[14px] font-semibold text-fb-text">
-                  Get this group together again
-                </Link>
-              )}
+            <div className="flex gap-2">
+              <button type="button" data-testid="up-next-photo-btn" onClick={takePhoto}
+                className="oh-press inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover">
+                <Camera size={18} aria-hidden />Take a photo together
+              </button>
+              <button type="button" onClick={() => onSee(q.id)}
+                className="oh-press h-10 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
+                See plan
+              </button>
             </div>
           )}
         </div>

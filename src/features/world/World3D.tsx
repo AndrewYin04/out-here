@@ -38,10 +38,11 @@ export type World3DProps = {
   onOpenFriend: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
-  /** A hand pinch/scroll ended zoomed out past EXIT_3D_ZOOM: the parent hands over to the 2D map. */
+  /** A hand pinch/scroll ended zoomed out past EXIT_3D_ZOOM. */
   onZoomOut?: () => void;
-  /** Start the demo walk to this plan (e.g. "Let's go" on the Up next card). A new nonce restarts it. */
-  walkTo?: { questId: string; nonce: number } | null;
+  /** A joined plan requested from Up Next, even if its pin is filtered out. */
+  walkTo?: Quest | null;
+  onWalkStop?: (questId: string) => void;
   /** Called once when you arrive at a plan (walked there or walked into it). */
   onArrive?: (questId: string) => void;
 };
@@ -77,7 +78,7 @@ function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
   return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
 }
 
-export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onArrive }: World3DProps) {
+export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onWalkStop, onArrive }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
   // Until the tilted map has drawn its first frame of streets, show a loading veil instead of a
@@ -119,9 +120,15 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const walkRef = useRef<Walk | null>(null);
   const [walk, setWalkState] = useState<Walk | null>(null);
   const setWalk = useCallback((w: Walk | null) => { walkRef.current = w; setWalkState(w); }, []);
+  const stopWalk = useCallback(() => {
+    const questId = walkRef.current?.questId;
+    setWalk(null);
+    if (questId) onWalkStop?.(questId);
+  }, [onWalkStop, setWalk]);
   const [walkMin, setWalkMin] = useState<number | null>(null);
   const [arrival, setArrival] = useState<{ id: string; text: string } | null>(null);
   const arrived = useRef(new Set<string>());
+  const requestedWalk = useRef<Quest | null>(null);
   const [source, setSourceState] = useState<Source>('demo');
   const sourceRef = useRef<Source>('demo');
   const gps = useGps(source === 'gps');
@@ -133,7 +140,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   questsRef.current = quests;
   const friendsRef = useRef(friendPins);
   // ---- Walking there together (#46): your steps out, the other members' walks in ----
-  const together = useWalkTogether(quests, viewer.id, walk?.questId ?? null);
+  const walkQuests = useMemo(
+    () => walkTo && !quests.some((q) => q.id === walkTo.id) ? [...quests, walkTo] : quests,
+    [quests, walkTo],
+  );
+  const together = useWalkTogether(walkQuests, viewer.id, walk?.questId ?? null);
   const stepRef = useRef(together.step);
   stepRef.current = together.step;
   const walkersRef = useRef(together.walkers);
@@ -531,7 +542,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const s = stick.current;
         const mag = Math.min(1, Math.hypot(s.x, s.y));
         if (turn || fwd || mag > 0.15) {
-          if (walkRef.current) setWalk(null);
+          if (walkRef.current) stopWalk();
           if (!followRef.current) setFollow(true);
           moved.current = true;
         }
@@ -556,14 +567,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             arrived.current.add(w.questId);
             layer.setState('me', 'wave');
             setArrival({ id: w.questId, text: `You’re at ${w.emoji} ${w.title}` });
-            onSelect(w.questId);
+            if (w.questId !== requestedWalk.current?.id) onSelect(w.questId);
           }
         }
       }
       const meState = moving ? 'walk' : 'idle';
       if (meState !== lastMe) { layer.setState('me', meState); lastMe = meState; }
       layer.setPose('me', pos.current, heading.current, 0);
-      if (moving) stepRef.current(pos.current);
+      if (moving && sourceRef.current === 'demo') stepRef.current(pos.current);
 
       // People walking to the same plan: each avatar glides to their latest step.
       const walking = walkersRef.current;
@@ -671,14 +682,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, tryMove]);
+  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, stopWalk, tryMove]);
 
   // ---- GPS source ----
   const chooseSource = async (next: Source) => {
     if (next === 'gps') await gps.requestCompass();
     sourceRef.current = next;
     setSourceState(next);
-    setWalk(null);
+    stopWalk();
     if (next === 'demo') { pos.current = home ?? DEMO_CENTER; moved.current = false; setFarKm(null); }
     setFollow(true);
   };
@@ -729,8 +740,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const selfieShown = useRef(new Set<string>());
   useEffect(() => {
     if (!arrival || selfieShown.current.has(arrival.id)) return;
-    const q = questsRef.current.find((x) => x.id === arrival.id);
-    if (!q?.memberIds.includes(viewer.id)) return;
+    const q = questsRef.current.find((x) => x.id === arrival.id) ?? requestedWalk.current;
+    if (q?.id !== arrival.id || !q.memberIds.includes(viewer.id)) return;
     selfieShown.current.add(q.id);
     setSelfieQuest(q);
   }, [arrival, viewer.id]);
@@ -764,26 +775,25 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => window.clearInterval(t);
   }, []);
 
-  // Up next → "Let's go": walk to that plan, the same as tapping Walk there on it.
-  const onArriveRef = useRef(onArrive);
-  onArriveRef.current = onArrive;
   useEffect(() => {
-    if (arrival) onArriveRef.current?.(arrival.id);
-  }, [arrival]);
-  const walkHandled = useRef<number | null>(null);
+    if (arrival) onArrive?.(arrival.id);
+  }, [arrival, onArrive]);
+
   useEffect(() => {
-    if (!walkTo || walkHandled.current === walkTo.nonce) return;
-    const q = quests.find((x) => x.id === walkTo.questId);
-    if (!q) return;
-    walkHandled.current = walkTo.nonce;
+    if (!walkTo) {
+      if (requestedWalk.current && walkRef.current?.questId === requestedWalk.current.id) setWalk(null);
+      requestedWalk.current = null;
+      return;
+    }
+    if (requestedWalk.current?.id === walkTo.id) return;
+    requestedWalk.current = walkTo;
     setArrival(null);
-    arrived.current.delete(q.id);
-    setWalk({ questId: q.id, title: q.title, emoji: q.emoji, to: q.location });
+    arrived.current.delete(walkTo.id);
+    sourceRef.current = 'demo';
+    setSourceState('demo');
+    setWalk({ questId: walkTo.id, title: walkTo.title, emoji: walkTo.emoji, to: walkTo.location });
     setFollow(true);
-    // Only a new request (nonce) starts a walk; walkHandled keeps quest refreshes from restarting it,
-    // and quests is here so a request that arrived before the plans loaded still starts.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkTo?.nonce, quests]);
+  }, [walkTo, setFollow, setWalk]);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);
@@ -922,7 +932,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             {together.plan?.id === walk.questId && together.walkers.length > 0 && (
               <span data-testid="walk-with" className="font-normal text-fb-text-2">· with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</span>
             )}
-            <button type="button" onClick={() => setWalk(null)} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
+            <button type="button" onClick={stopWalk} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
           </div>
         )}
         {arrival && !walk && !selfieQuest && (
