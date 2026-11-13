@@ -90,6 +90,17 @@ describe('ratings store: server rules', () => {
     expect((await store.hangAgainAbout(alex)).every((a) => a.subjectId === alex)).toBe(true);
   });
 
+  it('mutualHangAgainMany gives each id what mutualHangAgain gives, in one call', async () => {
+    const no = (await store.hangAgainSignals(alex)).find((a) => !a.again)!.subjectId;
+    const stranger = (await store.view()).db.profiles.find((p) => ![alex, maya, no].includes(p.id))!.id;
+    const ids = [no, maya, stranger];
+    const many = await store.mutualHangAgainMany(alex, ids);
+    expect(Object.keys(many)).toEqual(ids);
+    expect(many).toEqual({ [maya]: 'both_yes', [no]: 'one_no', [stranger]: 'unknown' });
+    for (const id of ids) expect(many[id]).toBe(await store.mutualHangAgain(alex, id));
+    expect(await store.mutualHangAgainMany(alex, [])).toEqual({});
+  });
+
   it('state has only the viewer\'s own rating and answers, other attendees, and past ratings', async () => {
     const s = await store.ratingState(alex, pastDumplings);
     expect(s.rating?.raterId).toBe(alex);

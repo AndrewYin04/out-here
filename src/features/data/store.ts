@@ -115,6 +115,7 @@ export interface DataStore {
   hangAgainSignals: CoreStore['hangAgainSignals'];
   hangAgainAbout: CoreStore['hangAgainAbout'];
   mutualHangAgain: CoreStore['mutualHangAgain'];
+  mutualHangAgainMany: CoreStore['mutualHangAgainMany'];
   hangoutRatings: CoreStore['hangoutRatings'];
 }
 

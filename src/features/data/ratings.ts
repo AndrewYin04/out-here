@@ -220,6 +220,32 @@ export async function mutualHangAgain(store: CoreStore, a: ID, b: ID): Promise<'
   return aYes && bYes ? 'both_yes' : 'unknown';
 }
 
+/**
+ * mutualHangAgain for many people at once, in one pass over the hang_again snapshot: for each id in
+ * otherIds, the same 'both_yes' | 'one_no' | 'unknown' as mutualHangAgain(viewerId, id).
+ */
+export async function mutualHangAgainMany(
+  store: CoreStore, viewerId: ID, otherIds: ID[],
+): Promise<Record<ID, 'both_yes' | 'one_no' | 'unknown'>> {
+  const want = new Set(otherIds);
+  const seen = new Map<ID, { no: boolean; mine: boolean; theirs: boolean }>();
+  for (const x of (await store.view()).db.hangAgain) {
+    const other = x.raterId === viewerId ? x.subjectId : x.subjectId === viewerId ? x.raterId : null;
+    if (other === null || other === viewerId || !want.has(other)) continue;
+    const s = seen.get(other) ?? { no: false, mine: false, theirs: false };
+    if (!x.again) s.no = true;
+    else if (x.raterId === viewerId) s.mine = true;
+    else s.theirs = true;
+    seen.set(other, s);
+  }
+  const out: Record<ID, 'both_yes' | 'one_no' | 'unknown'> = {};
+  for (const id of otherIds) {
+    const s = seen.get(id);
+    out[id] = !s ? 'unknown' : s.no ? 'one_no' : s.mine && s.theirs ? 'both_yes' : 'unknown';
+  }
+  return out;
+}
+
 export async function hangoutRatings(store: CoreStore, userId: ID): Promise<HangoutRating[]> {
   return (await store.view()).db.hangoutRatings.filter((r) => r.raterId === userId)
     .sort((a, b) => b.score - a.score).map((r) => ({ ...r, highlights: [...r.highlights], photoIds: [...r.photoIds] }));

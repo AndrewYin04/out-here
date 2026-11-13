@@ -22,7 +22,7 @@ import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
-  hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, myRatings,
+  hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, mutualHangAgainMany, myRatings,
   promptEndedHangouts, promptRatings, rateHangout, ratingState,
 } from './ratings';
 
@@ -1241,6 +1241,8 @@ export class CoreStore {
   hangAgainAbout(userId: ID) { return hangAgainAbout(this, userId); }
   /** Server-only (Muse matching): 'one_no' if either said no, 'both_yes' if both said yes, else 'unknown'. */
   mutualHangAgain(a: ID, b: ID) { return mutualHangAgain(this, a, b); }
+  /** Server-only (Muse matching): mutualHangAgain(viewerId, id) for each id, in one pass. */
+  mutualHangAgainMany(viewerId: ID, otherIds: ID[]) { return mutualHangAgainMany(this, viewerId, otherIds); }
   /** Server-only (Muse matching): this user's ratings with highlights and private notes. */
   hangoutRatings(userId: ID) { return hangoutRatings(this, userId); }
 }
