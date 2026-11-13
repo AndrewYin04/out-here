@@ -1235,16 +1235,16 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             </button>
           </div>
         ) : !companion.open && (
-          // Tap Jolly: a small target over the pet's head opens the chat (the 3D pet itself is not pickable).
+          // Tap Jolly: an invisible target over the pet opens the chat (the 3D pet itself is not pickable).
           <div ref={bindLabel('pet', 0.15)} data-testid="pet-tap" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-1">
             <button
               type="button"
               aria-label="Talk to Muse"
               onClick={() => openMuseChat()}
-              className="pointer-events-auto flex min-h-10 min-w-16 items-center justify-center rounded-pill bg-fb-surface/90 px-2 py-0.5 text-[12px] font-bold text-fb-blue shadow-card hover:bg-fb-surface"
-            >
-              ✨ Muse
-            </button>
+              // Invisible: tapping Jolly himself opens the chat. The one visible Muse button is the
+              // hovering Jolly at the side (MuseChat), the same in every view.
+              className="pointer-events-auto block size-16 translate-y-10 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue"
+            />
           </div>
         )}
         {together.walkers.map((w) => (

@@ -135,14 +135,13 @@ export function MuseChat() {
     else el.scrollTop = el.scrollHeight;
   }, [messages, thinking, snap.open]);
   // Hand focus back to the launcher after closing, so keyboard users are not dropped.
-  // In 3D Jolly is in the world (the launcher is a plain pill); everywhere else he hovers docked at
-  // the side. When the 3D world closes, he flies from his last spot in the world to the dock: up
-  // toward you as the camera pulls back, then across and down into place.
+  // One Muse button in every view: Jolly hovering at the side. When the 3D world closes, he flies
+  // from his last spot in the world to that spot: up toward you as the camera pulls back, then
+  // across and down into place.
   const inWorld = useMuseInWorld();
-  const docked = !inWorld;
   const showLauncher = !snap.open && !planOpen;
   useLayoutEffect(() => {
-    if (!docked || !showLauncher) return;
+    if (inWorld || !showLauncher) return;
     const from = takeMuseDockFrom();
     const el = launcherRef.current;
     if (!from || !el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -157,7 +156,7 @@ export function MuseChat() {
     ], { duration: 1250, easing: 'cubic-bezier(.33,.7,.3,1)' });
     a.onfinish = a.oncancel = () => el.classList.remove('muse-dock-flying');
     return () => a.cancel();
-  }, [docked, showLauncher]);
+  }, [inWorld, showLauncher]);
   // A nudge (a friend just got free) shows by the docked Jolly for a minute, or until acted on.
   const nudge = useMuseNudge();
   useEffect(() => {
@@ -203,8 +202,8 @@ export function MuseChat() {
   return (
     <>
       <MuseStyles />
-      {!snap.open && !planOpen && docked && (
-        // On the map Jolly hovers at the side as a little agent; tap him to talk. Leaving 3D, he
+      {!snap.open && !planOpen && (
+        // In every view (map and 3D) Jolly hovers at the side as a little agent; tap him to talk. Leaving 3D, he
         // flies out from where he was in the world to this spot (see the layout effect above).
         <button
           ref={launcherRef}
@@ -226,7 +225,7 @@ export function MuseChat() {
           <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-card transition-transform group-hover:-translate-x-0.5 max-md:sr-only">Ask Muse</span>
         </button>
       )}
-      {!snap.open && !planOpen && docked && nudge && (
+      {!snap.open && !planOpen && nudge && (
         // Muse speaking up from the dock, from a real event (a friend just shared that they're free).
         <div key={nudge.id} role="status" data-testid="muse-nudge" className="muse-nudge fixed z-30 w-[248px] rounded-card bg-fb-surface p-3 shadow-popover right-[84px] bottom-[128px] max-md:bottom-auto max-md:top-[192px] max-md:right-[80px] max-md:w-[228px]">
           <p className="flex items-center gap-1 text-[12px] font-bold text-fb-blue"><span aria-hidden>✨</span>Muse</p>
@@ -239,20 +238,6 @@ export function MuseChat() {
           </div>
           <span aria-hidden className="absolute -right-1.5 top-6 size-3 rotate-45 bg-fb-surface max-md:top-5" />
         </div>
-      )}
-      {!snap.open && !planOpen && !docked && (
-        <button
-          ref={launcherRef}
-          type="button"
-          data-testid="muse-launcher"
-          aria-label="Ask Muse"
-          onClick={openChat}
-          className="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[208px] max-md:size-12 max-md:justify-center max-md:p-0"
-        >
-          <MuseOrb state={snap.state} size={32} />
-          {/* Phones: just the orb, up by the map chips, so it never covers a sheet's buttons. */}
-          <span className="max-md:sr-only">Ask Muse</span>
-        </button>
       )}
 
       {snap.open && (
