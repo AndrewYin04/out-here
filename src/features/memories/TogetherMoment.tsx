@@ -7,6 +7,7 @@
 // Uses the same endpoints as MemoryCapture: complete → crew album, POST /api/memories, /api/muse/caption.
 import { Camera, ImagePlus, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch, apiPost, useApi, type QuestDetail } from '@/features/data';
 import { Avatar, burst, cn, flash } from '@/features/ui';
 import type { CompleteQuestResponse, Memory, Quest } from '@/shared';
@@ -40,8 +41,12 @@ export function TogetherMoment({ quest, viewer, walkers, onClose }: {
   walkers: Walker[];
   onClose: () => void;
 }) {
-  if (!quest) return null;
-  return <Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} />;
+  // Rendered at the map's top level: the 3D layer sits under the map's own buttons (I'm free, the
+  // control stack), which would otherwise cover this sheet and catch its taps.
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setHost(document.querySelector<HTMLElement>('[data-testid="out-here-map"]') ?? document.body); }, []);
+  if (!quest || !host) return null;
+  return createPortal(<Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} />, host);
 }
 
 function Moment({ quest, viewer, walkers, onClose }: {
@@ -159,7 +164,7 @@ function Moment({ quest, viewer, walkers, onClose }: {
   const groupName = detail.data?.group?.name ?? 'your crew';
   return (
     <section ref={sheetRef} aria-label="You made it" data-testid="together-moment" data-stage={stage}
-      className="pointer-events-auto absolute inset-x-0 bottom-0 z-30 flex max-h-[86%] animate-sheet-up flex-col rounded-t-[24px] bg-fb-surface shadow-popover md:bottom-4 md:left-1/2 md:w-[460px] md:-translate-x-1/2 md:rounded-[24px]">
+      className="pointer-events-auto absolute inset-x-0 bottom-0 z-40 flex max-h-[86%] animate-sheet-up flex-col rounded-t-[24px] bg-fb-surface shadow-popover md:bottom-4 md:left-1/2 md:w-[460px] md:-translate-x-1/2 md:rounded-[24px]">
       <div className="relative flex h-8 shrink-0 items-center justify-center">
         <span className="h-1 w-10 rounded-full bg-fb-divider" aria-hidden />
         <button type="button" aria-label="Close" onClick={onClose} className="absolute right-2 top-1 flex size-8 items-center justify-center rounded-full text-fb-text-2 hover:bg-fb-hover">
@@ -167,7 +172,7 @@ function Moment({ quest, viewer, walkers, onClose }: {
         </button>
       </div>
 
-      <div className="min-h-0 overflow-y-auto px-4 pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
         {stage === 'arrived' && (
           <div className="flex items-center gap-3 animate-step-in">
             <div className="min-w-0 flex-1">
