@@ -82,7 +82,12 @@ const WATCH_FIND_MAX_AGE_MIN = 60;
  * as map finds when a matching listing has just gone up nearby. Same card as a want find; the
  * line is Muse's reason ("like the denim Reel you saved"). Refetches when a listing goes up.
  */
-export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | undefined, refetchListings?: () => unknown): MuseFind[] {
+/** A video or Reel behind a find, as the card shows it ("You watched this Reel for 2 min 25 s"). */
+export type ViewedEvidence = { key: string; title: string; posterUrl: string; format: 'video' | 'reel'; seconds: number };
+/** A find plus what Muse noticed: the videos and Reels behind a pick from what you watch. */
+export type ShownFind = MuseFind & { viewed?: ViewedEvidence[]; topic?: string };
+
+export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | undefined, refetchListings?: () => unknown): ShownFind[] {
   const path = origin ? `/api/muse/marketplace-picks?lat=${origin.lat.toFixed(5)}&lng=${origin.lng.toFixed(5)}` : null;
   const api = useApi<MarketplacePicksResponse>(path, ['listings:new']);
   // A pick for a listing the map doesn't have yet means the map missed its listings:new message
@@ -102,7 +107,7 @@ export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | un
   return useMemo(() => {
     const onMap = new Map((listings ?? []).map((l) => [l.listing.id, l]));
     const t = Date.now();
-    return (api.data?.picks ?? []).flatMap((p): MuseFind[] => {
+    return (api.data?.picks ?? []).flatMap((p): ShownFind[] => {
       const l = onMap.get(p.listing.id);
       // l.status, not l.listing.status: a held listing keeps its row status but is reserved.
       if (!l || l.status !== 'available' || !l.listing.pickupUntil) return [];
@@ -112,6 +117,13 @@ export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | un
         listingId: l.listing.id, wantId: `watch:${p.topic}`, title: cleanTitle(l.listing.title), priceUsd: l.listing.priceUsd,
         imageUrl: l.listing.imageUrl, driveMin: p.driveMin ?? 0, pickupUntil: l.listing.pickupUntil, listedMinAgo: ageMin,
         sellerFirstName: p.seller.name.split(' ')[0] ?? p.seller.name, line: p.reason, source: api.data?.source ?? 'fallback',
+        topic: p.topic,
+        // One row per video, most watched first: the evidence the card shows under "Noticed".
+        viewed: Object.values(p.evidence.reduce<Record<string, ViewedEvidence>>((acc, e) => {
+          const prev = acc[e.video.key];
+          acc[e.video.key] = { key: e.video.key, title: e.video.title, posterUrl: e.video.posterUrl, format: e.video.format, seconds: (prev?.seconds ?? 0) + e.seconds };
+          return acc;
+        }, {})).sort((a, b) => b.seconds - a.seconds).slice(0, 2),
       }];
     });
   }, [api.data, listings]);

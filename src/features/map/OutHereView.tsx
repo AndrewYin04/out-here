@@ -673,6 +673,11 @@ export function OutHereView() {
             key={find.listingId}
             find={find}
             watch={watchFor(find.listingId)}
+            want={wants.find((w) => w.id === find.wantId) ?? null}
+            walkMin={(() => {
+              const at = listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location;
+              return at && ctx?.origin ? walkingMinutes(ctx.origin, at) : null;
+            })()}
             onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
             onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
           />
