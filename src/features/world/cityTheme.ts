@@ -43,6 +43,7 @@ const SKY: SkySpecification = {
 /** The vector source that holds OpenMapTiles layers (OpenFreeMap names it "openmaptiles"). */
 export function tileSourceId(map: MapLibreMap): string | null {
   const style = map.getStyle();
+  if (!style?.layers) return map.getSource('openmaptiles') ? 'openmaptiles' : null;
   const layer = style.layers.find((l) => 'source-layer' in l && l['source-layer'] === 'building');
   const id = layer && 'source' in layer ? String(layer.source) : 'openmaptiles';
   return map.getSource(id) ? id : null;

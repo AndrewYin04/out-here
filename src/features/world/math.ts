@@ -13,8 +13,8 @@ export const STREET_PITCH = 62;
 export const CLOSE_ZOOM = 21;
 // Low, like Pokémon Go: looking across the neighborhood, not down from above the roofs.
 export const CLOSE_PITCH = 74;
-/** Zoom the 3D view eases to: human-scale Kenney person (~1.72 m) full body in frame. */
-export const ENTER_ZOOM = 20.2;
+/** Zoom the 3D view eases to: map-readable Kenney person (~10 m) full body in frame. */
+export const ENTER_ZOOM = 19.4;
 export const MAX_3D_ZOOM = 22.5;
 export const MAX_3D_PITCH = 75;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */

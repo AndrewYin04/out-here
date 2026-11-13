@@ -146,16 +146,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const pos = useRef<LatLng>(start);
   const heading = useRef(0);
   const [editingLook, setEditingLook] = useState(false);
-  /** Short "new look" chip above you after My look closes (the beat at the end of the customize clip). */
+  /** Blue "new look" chip over you for a few seconds after Save, matching the clip's pullback. */
   const [newLook, setNewLook] = useState(false);
-  /** After Save: start tight on the body, then ease back to the block. */
-  const savePull = useRef(false);
   useEffect(() => {
     if (!newLook) return;
-    savePull.current = true;
-    targetZoom.current = Math.min(MAX_3D_ZOOM, ENTER_ZOOM + 0.85);
-    const t = window.setTimeout(() => setNewLook(false), 3500);
-    return () => window.clearTimeout(t);
+    targetZoom.current = Math.min(MAX_3D_ZOOM, ENTER_ZOOM + 1.1);
+    const pull = window.setTimeout(() => { targetZoom.current = ENTER_ZOOM; }, 700);
+    const hide = window.setTimeout(() => setNewLook(false), 3500);
+    return () => { window.clearTimeout(pull); window.clearTimeout(hide); };
   }, [newLook]);
   /** Arrival cinematic: a slow orbit around you and the plan, pulled back, then home behind you. */
   const orbit = useRef<{ start: number; from: number } | null>(null);
@@ -968,12 +966,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           if (t >= 1) orbit.current = null; // then the normal follow glides back behind you
         } else if (!entering.current) {
           camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
-          if (savePull.current) {
-            targetZoom.current = ENTER_ZOOM;
-            if (Math.abs(zoom - ENTER_ZOOM) < 0.03) savePull.current = false;
-          }
           const want = targetZoom.current;
-          z = reducedMotion() ? want : zoom + (want - zoom) * (1 - Math.exp(-dt * (savePull.current ? 1.6 : 10)));
+          z = reducedMotion() ? want : zoom + (want - zoom) * (1 - Math.exp(-dt * 10));
           if (Math.abs(want - z) < 0.01) z = want;
         }
         const h = map.getContainer().clientHeight;
@@ -1282,23 +1276,20 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         onClose={closeSelfie}
         onTakePhoto={() => setPhotoOpen(true)}
       />
-      {/* Clip street chrome (hidden while the dresser is open). */}
+      {/* My character: opens the full You / Pip dresser. */}
       {!editingLook && !walk && !selfieQuest && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start justify-between gap-2 px-3">
-          <div className="inline-flex items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21] bg-[#1C1E21] px-3 py-1.5 text-[12px] font-bold text-white shadow-sm">
+        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex items-start gap-2 px-3">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[13px] font-semibold text-[#1C1E21] shadow-popover">
             <span className="size-2 rounded-full bg-[#31A24C]" aria-hidden />Out Here
           </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21]/15 bg-white/95 px-3 py-1.5 text-[12px] font-semibold text-[#1C1E21] shadow-sm backdrop-blur">
-            <span className="size-2 rounded-full bg-[#E8505B]" aria-hidden />
-            {friendPins.length} friends out
-            <span className="text-[#65676B]">· {new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+          <div className="inline-flex items-center rounded-full bg-white px-3 py-1.5 text-[13px] font-semibold text-[#1C1E21] shadow-popover">
+            {friendPins.length} friends out now
           </div>
         </div>
       )}
-      {/* My character: opens the full You / Pip dresser. */}
       {!editingLook && !walk && !selfieQuest && !chatFriend && (
         <button type="button" data-testid="edit-avatar" onClick={() => { minimizeChat(); setEditingLook(true); }} aria-pressed={editingLook}
-          className="pointer-events-auto absolute left-3 top-14 z-20 inline-flex h-9 items-center gap-1.5 rounded-full border-[2px] border-[#1C1E21]/10 bg-fb-surface/95 px-3 text-[13px] font-semibold text-fb-text shadow-popover backdrop-blur hover:bg-fb-hover">
+          className="pointer-events-auto absolute left-3 top-14 z-20 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[13px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
           <Shirt size={16} aria-hidden />My look
         </button>
       )}
@@ -1317,12 +1308,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       <div className="absolute inset-0 overflow-hidden">
         {newLook && (
           <div ref={bindLabel('me', 0.35)} data-testid="new-look" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
-            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border-[2.5px] border-[#1C1E21] bg-[#F2A900] px-3 py-1 text-[13px] font-bold text-[#1C1E21] shadow-card animate-pop-in">
+            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#0866FF] px-3 py-1 text-[13px] font-semibold text-white shadow-popover">
               <Sparkles size={12} aria-hidden />new look
             </span>
           </div>
         )}
-        {bubble ? (
+        {bubble && (
           <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
             <button
               type="button"
@@ -1333,18 +1324,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               {bubble.tone === 'muse' && <span className="mb-0.5 flex items-center gap-1 text-[12px] font-bold text-fb-blue"><Sparkles size={12} aria-hidden />Muse</span>}
               <span className={cn(bubble.pending && 'animate-pulse')}>{bubble.text}</span>
               <span aria-hidden className="absolute -bottom-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
-            </button>
-          </div>
-        ) : !companion.open && (
-          // Tap Jolly: a small target over the pet's head opens the chat (the 3D pet itself is not pickable).
-          <div ref={bindLabel('pet', 0.15)} data-testid="pet-tap" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-1">
-            <button
-              type="button"
-              aria-label="Talk to Muse"
-              onClick={() => openMuseChat()}
-              className="pointer-events-auto block rounded-pill bg-fb-surface/90 px-2 py-0.5 text-[12px] font-bold text-fb-blue shadow-card hover:bg-fb-surface"
-            >
-              ✨ Muse
             </button>
           </div>
         )}

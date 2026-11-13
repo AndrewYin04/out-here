@@ -3,49 +3,69 @@
 // (own WebGL canvas so MapLibre keeps the street context), colors / patterns / hats,
 // meetup locks, and “Muse, style me”. Save writes the look and closes onto the street.
 import {
-  Crown, Gift, Lock, Palette, PawPrint, Pencil, Shirt, Sparkles, Target, User, X,
+  Crown, Gift, Lock, Palette, PawPrint, Shirt, Sparkles, Target, User, X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import { cn, sfx } from '@/features/ui';
 import {
-  BOTTOM_COLORS, CLIP_TOP_COLORS, HAIR_COLORS, HAIR_STYLES, HATS, PATTERNS, PIP_COATS, PIP_GLOWS,
-  PIP_KINDS, SHOE_COLORS, SKIN, VARSITY_LOCK, VIEWER_MEETUPS,
+  BOTTOM_COLORS, CLIP_TOP_COLORS, HAIR_COLORS, HATS, PATTERNS, PIP_COATS, PIP_GLOWS,
+  PIP_KINDS, SKIN, VARSITY_LOCK, VIEWER_MEETUPS,
   currentLook, currentPipLook, hatUnlocked, museStylePip, museStyleYou, pipUnlocked,
   saveLook, savePipLook, type AvatarLook, type Hat, type Pattern, type PipKind, type PipLook,
 } from './avatarLook';
 import { loadModels, makeAvatar, makePet, type Character } from './characters';
 
 type Tab = 'you' | 'pip';
-type YouCat = 'body' | 'skin' | 'hair' | 'top' | 'bottoms' | 'shoes' | 'hat';
-type PipCat = 'kind' | 'coat' | 'extras' | 'glow' | 'name' | 'moves';
+/** Only tabs that change the Kenney Person or Pip you can see. */
+type YouCat = 'skin' | 'hair' | 'top' | 'bottoms' | 'hat';
+type PipCat = 'kind' | 'coat' | 'glow';
 
 const YOU_CATS: { id: YouCat; label: string; Icon: typeof Shirt }[] = [
-  { id: 'body', label: 'Body', Icon: User },
   { id: 'skin', label: 'Skin', Icon: User },
   { id: 'hair', label: 'Hair', Icon: User },
   { id: 'top', label: 'Top', Icon: Shirt },
   { id: 'bottoms', label: 'Bottoms', Icon: Shirt },
-  { id: 'shoes', label: 'Shoes', Icon: Shirt },
   { id: 'hat', label: 'Hat', Icon: Crown },
 ];
 
 const PIP_CATS: { id: PipCat; label: string; Icon: typeof PawPrint }[] = [
   { id: 'kind', label: 'Kind', Icon: PawPrint },
   { id: 'coat', label: 'Coat', Icon: Palette },
-  { id: 'extras', label: 'Extras', Icon: Gift },
   { id: 'glow', label: 'Glow', Icon: Target },
-  { id: 'name', label: 'Name', Icon: Pencil },
-  { id: 'moves', label: 'Moves', Icon: Sparkles },
 ];
 
 const HAT_LABEL: Record<Hat, string> = {
-  none: 'None', beanie: 'Beanie', cap: 'Cap', bucket: 'Bucket', dumpling: 'Dumpling Den', crown: 'Crown',
+  none: 'None', beanie: 'Beanie', cap: 'Cap', bucket: 'Bucket', dumpling: 'Dumpling', crown: 'Crown',
 };
 const KIND_LABEL: Record<PipKind, string> = {
   jolly: 'Jolly', bun: 'Bun', kit: 'Kit', bear: 'Bear', sam: 'Meet Sam 2×', rooftop: 'First rooftop',
 };
+
+function HatGlyph({ hat }: { hat: Hat }) {
+  if (hat === 'none') return <span className="flex h-7 items-center text-[16px] text-[#65676B]">—</span>;
+  const fill = hat === 'cap' ? '#E8505B' : '#F2A900';
+  return (
+    <span className="relative flex h-7 w-10 items-end justify-center">
+      {hat === 'beanie' && <span className="h-5 w-6 rounded-t-full" style={{ background: fill }} />}
+      {hat === 'cap' && (
+        <>
+          <span className="absolute bottom-1.5 h-3.5 w-5 rounded-t-full" style={{ background: fill }} />
+          <span className="absolute bottom-1 h-1 w-8 rounded-full" style={{ background: fill }} />
+        </>
+      )}
+      {hat === 'bucket' && (
+        <>
+          <span className="absolute bottom-2 h-3 w-4 rounded-sm" style={{ background: fill }} />
+          <span className="h-1 w-8 rounded-full" style={{ background: fill }} />
+        </>
+      )}
+      {hat === 'dumpling' && <span className="mb-0.5 size-6 rounded-full" style={{ background: fill }} />}
+      {hat === 'crown' && <span className="mb-0.5 h-4 w-6" style={{ background: fill, clipPath: 'polygon(0 100%, 0 40%, 20% 70%, 35% 20%, 50% 70%, 65% 20%, 80% 70%, 100% 40%, 100% 100%)' }} />}
+    </span>
+  );
+}
 
 export function AvatarEditor({
   userId, avatarUrl, onClose,
@@ -57,7 +77,7 @@ export function AvatarEditor({
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => { setHost(document.querySelector<HTMLElement>('[data-testid="out-here-map"]') ?? document.body); }, []);
   const [tab, setTab] = useState<Tab>('you');
-  const [youCat, setYouCat] = useState<YouCat>('top');
+  const [youCat, setYouCat] = useState<YouCat>('skin');
   const [pipCat, setPipCat] = useState<PipCat>('kind');
   const [look, setLook] = useState<AvatarLook>(() => currentLook(userId));
   const [pip, setPip] = useState<PipLook>(() => currentPipLook(userId));
@@ -95,27 +115,27 @@ export function AvatarEditor({
     <section
       aria-label="My character"
       data-testid="avatar-editor"
-      className="pointer-events-auto absolute inset-0 z-40 flex flex-col bg-[#F4EFE6] text-[#1C1E21]"
+      className="pointer-events-auto absolute inset-0 z-40 flex flex-col bg-[#F0F2F5] text-[#1C1E21]"
     >
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-2 pt-3">
         <button type="button" aria-label="Close" onClick={onClose}
-          className="flex size-10 items-center justify-center rounded-full border-[2.5px] border-[#1C1E21] bg-white shadow-sm">
-          <X size={18} strokeWidth={2.5} />
+          className="flex size-10 items-center justify-center rounded-full bg-[#E4E6EB] text-[#1C1E21]">
+          <X size={18} strokeWidth={2.25} />
         </button>
-        <div className="flex items-center rounded-full border-[2.5px] border-[#1C1E21] bg-white p-1 shadow-sm">
+        <div className="flex items-center rounded-full bg-[#E4E6EB] p-1">
           <button type="button" aria-pressed={tab === 'you'} onClick={() => setTab('you')}
-            className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold transition',
-              tab === 'you' ? 'bg-[#1C1E21] text-white' : 'text-[#1C1E21]')}>
+            className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition',
+              tab === 'you' ? 'bg-white text-[#1C1E21] shadow-sm' : 'text-[#65676B]')}>
             {avatarUrl
               ? <img src={avatarUrl} alt="" className="size-5 rounded-full object-cover" />
               : <User size={14} />}
             You
           </button>
           <button type="button" aria-pressed={tab === 'pip'} onClick={() => setTab('pip')}
-            className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-bold transition',
-              tab === 'pip' ? 'bg-[#1C1E21] text-white' : 'text-[#1C1E21]')}>
-            <span className="flex size-5 items-center justify-center rounded-full bg-[#F5F0E6] text-[10px]">●</span>
+            className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition',
+              tab === 'pip' ? 'bg-white text-[#1C1E21] shadow-sm' : 'text-[#65676B]')}>
+            <span className="size-2 rounded-full bg-[#C9CDD2]" />
             Pip
           </button>
         </div>
@@ -126,27 +146,22 @@ export function AvatarEditor({
       </div>
 
       {/* Stage */}
-      <div className="relative mx-3 min-h-0 flex-1 overflow-hidden rounded-[28px] border-[2.5px] border-[#1C1E21] bg-[#FAF6EF]"
-        style={{ backgroundImage: 'radial-gradient(#D9D0C3 1.5px, transparent 1.5px)', backgroundSize: '18px 18px' }}>
-        <div className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border-[2px] border-[#1C1E21] bg-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide">
-          <Gift size={12} />{meetups} Meetups
+      <div className="relative mx-3 h-[42%] min-h-[200px] shrink-0 overflow-hidden rounded-[28px] bg-[#F7F8FA] shadow-sm">
+        <div className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[12px] font-semibold text-[#65676B] shadow-sm">
+          <Gift size={12} />{meetups} meetups
         </div>
-        {tab === 'you' && (
-          <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border-[2px] border-[#1C1E21] bg-[#31A24C] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white">
-            <Gift size={12} />1 New
-          </div>
-        )}
+        <div className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-[#E7F6EC] px-2.5 py-1 text-[12px] font-semibold text-[#1B7A3A]">
+          <Gift size={12} />1 new
+        </div>
         <StudioPreview userId={userId} look={look} pip={pip} focus={tab} />
         <button type="button" onClick={styleMe}
-          className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 rounded-full border-[2.5px] border-[#1C1E21] bg-[#F2A900] px-3 py-2 text-[13px] font-bold shadow-sm animate-pop-in">
-          <Sparkles size={14} />Muse, style me
+          className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[13px] font-semibold text-[#1C1E21] shadow-md ring-1 ring-[#0866FF]/30">
+          <Sparkles size={14} className="text-[#7B61FF]" />Muse, style me
         </button>
-        {/* Pedestal hint */}
-        <div className="pointer-events-none absolute bottom-6 left-1/2 h-3 w-36 -translate-x-1/2 rounded-full bg-black/10 blur-[2px]" />
       </div>
 
       {/* Controls */}
-      <div className="shrink-0 space-y-3 px-3 pb-3 pt-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 pb-3 pt-3">
         {tab === 'you' ? (
           <>
             <CatRow>
@@ -158,14 +173,7 @@ export function AvatarEditor({
             </CatRow>
             {youCat === 'skin' && <Swatches colors={SKIN} value={look.skin} onPick={(c) => setYou('skin', c)} />}
             {youCat === 'hair' && (
-              <div className="space-y-2">
-                <Swatches colors={HAIR_COLORS} value={look.hairColor} onPick={(c) => setYou('hairColor', c)} />
-                <div className="flex flex-wrap gap-2">
-                  {HAIR_STYLES.map((h) => (
-                    <Chip key={h} active={look.hair === h} onClick={() => setYou('hair', h)}>{h}</Chip>
-                  ))}
-                </div>
-              </div>
+              <Swatches colors={HAIR_COLORS} value={look.hairColor} onPick={(c) => setYou('hairColor', c)} />
             )}
             {youCat === 'top' && (
               <div className="space-y-2">
@@ -177,33 +185,31 @@ export function AvatarEditor({
                   ))}
                 </div>
                 {meetups < VARSITY_LOCK && (
-                  <div className="flex items-center gap-2 rounded-full border-[2px] border-[#1C1E21] bg-white px-3 py-2 text-[12px] font-semibold">
-                    <Lock size={14} />Varsity jacket · {VARSITY_LOCK - meetups} more meetups
+                  <div className="flex items-center justify-between rounded-2xl bg-white px-3 py-2.5 text-[13px] font-semibold shadow-sm">
+                    <span className="inline-flex items-center gap-2 text-[#1C1E21]"><Lock size={14} />Varsity jacket</span>
+                    <span className="text-[12px] font-medium text-[#65676B]">{VARSITY_LOCK - meetups} more meetups</span>
                   </div>
                 )}
               </div>
             )}
             {youCat === 'bottoms' && <Swatches colors={BOTTOM_COLORS} value={look.bottomColor} onPick={(c) => setYou('bottomColor', c)} />}
-            {youCat === 'shoes' && <Swatches colors={SHOE_COLORS} value={look.shoeColor} onPick={(c) => setYou('shoeColor', c)} />}
             {youCat === 'hat' && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {HATS.map((h) => {
                   const locked = !hatUnlocked(h, meetups);
                   return (
                     <button key={h} type="button" disabled={locked} aria-pressed={look.hat === h}
                       onClick={() => !locked && setYou('hat', h)}
-                      className={cn('relative flex aspect-square flex-col items-center justify-center rounded-[18px] border-[2.5px] text-[11px] font-bold uppercase',
-                        look.hat === h ? 'border-[#0866FF] bg-[#F2A900]' : 'border-[#1C1E21] bg-white',
-                        locked && 'opacity-60')}>
-                      {locked && <span className="absolute right-1 top-1 rounded bg-[#1C1E21] px-1 text-[9px] text-white">10</span>}
-                      {h === 'none' ? '⌀' : HAT_LABEL[h]}
+                      className={cn('relative flex h-[4.75rem] w-[4.75rem] shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl border bg-white p-1.5 text-[12px] font-semibold',
+                        look.hat === h ? 'border-[#0866FF] bg-[#E7F3FF]' : 'border-black/[0.06]',
+                        locked && 'opacity-70')}>
+                      {locked && <span className="absolute right-1 top-1 text-[9px] font-medium text-[#65676B]">10</span>}
+                      <HatGlyph hat={h} />
+                      {HAT_LABEL[h]}
                     </button>
                   );
                 })}
               </div>
-            )}
-            {(youCat === 'body') && (
-              <p className="text-center text-[12px] text-[#65676B]">Pick Skin, Hair, Top, Bottoms, Shoes, or Hat.</p>
             )}
           </>
         ) : (
@@ -216,15 +222,15 @@ export function AvatarEditor({
               ))}
             </CatRow>
             {pipCat === 'kind' && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {PIP_KINDS.map((k) => {
                   const locked = !pipUnlocked(k, meetups);
                   return (
                     <button key={k} type="button" disabled={locked} aria-pressed={pip.kind === k}
                       onClick={() => !locked && setPipField('kind', k)}
-                      className={cn('relative flex aspect-square flex-col items-center justify-center rounded-[18px] border-[2.5px] px-1 text-[11px] font-bold uppercase',
-                        pip.kind === k ? 'border-[#0866FF] bg-[#F2A900]' : 'border-[#1C1E21] bg-white',
-                        locked && 'opacity-60')}>
+                      className={cn('relative flex h-[4.75rem] w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-2xl border bg-white px-1 text-[12px] font-semibold',
+                        pip.kind === k ? 'border-[#0866FF] bg-[#E7F3FF]' : 'border-black/[0.06]',
+                        locked && 'opacity-70')}>
                       {locked && <Lock size={12} className="absolute right-1.5 top-1.5" />}
                       {KIND_LABEL[k]}
                     </button>
@@ -236,20 +242,15 @@ export function AvatarEditor({
             {pipCat === 'glow' && (
               <div className="space-y-2">
                 <Swatches colors={PIP_GLOWS} value={pip.glow} onPick={(c) => setPipField('glow', c)} />
-                <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-[#65676B]">
-                  Glow · leaves a trail on the map
+                <p className="text-center text-[12px] text-[#65676B]">
+                  Glow leaves a soft trail behind Pip on the map
                 </p>
               </div>
             )}
-            {(pipCat === 'extras' || pipCat === 'name' || pipCat === 'moves') && (
-              <p className="text-center text-[12px] text-[#65676B]">
-                {pipCat === 'extras' ? 'More extras unlock from real meetups.' : pipCat === 'name' ? 'Pip keeps their name for now.' : 'Moves unlock as you hang out.'}
-              </p>
-            )}
           </>
         )}
-        <p className="text-center text-[10px] font-semibold uppercase tracking-wide text-[#8A8D91]">
-          Items unlock from real meetups · never for sale
+        <p className="text-center text-[12px] text-[#8A8D91]">
+          Items unlock from real meetups · Never for sale
         </p>
       </div>
     </section>,
@@ -263,20 +264,11 @@ function CatRow({ children }: { children: React.ReactNode }) {
 
 function CatChip({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" aria-label={label} aria-pressed={active} onClick={onClick} title={label}
-      className={cn('flex size-11 shrink-0 items-center justify-center rounded-[14px] border-[2.5px] border-[#1C1E21] transition',
-        active ? 'bg-[#1C1E21] text-white' : 'bg-white text-[#1C1E21]')}>
+    <button type="button" aria-label={label} aria-pressed={active} onClick={onClick}
+      className={cn('flex w-[4.25rem] shrink-0 flex-col items-center gap-1 rounded-2xl border bg-white py-2 text-[11px] font-semibold',
+        active ? 'border-[#0866FF] text-[#0866FF] shadow-sm' : 'border-black/[0.06] text-[#1C1E21]')}>
       {children}
-    </button>
-  );
-}
-
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" aria-pressed={active} onClick={onClick}
-      className={cn('rounded-full border-[2px] border-[#1C1E21] px-3 py-1 text-[12px] font-bold capitalize',
-        active ? 'bg-[#1C1E21] text-white' : 'bg-white')}>
-      {children}
+      <span>{label}</span>
     </button>
   );
 }
@@ -286,8 +278,8 @@ function Swatches({ colors, value, onPick }: { colors: readonly string[]; value:
     <div className="flex flex-wrap gap-2">
       {colors.map((c) => (
         <button key={c} type="button" aria-label={c} aria-pressed={value === c} onClick={() => onPick(c)}
-          className={cn('size-9 rounded-full border-[2.5px] transition-transform hover:scale-110',
-            value === c ? 'border-[#0866FF] ring-2 ring-[#0866FF]/40' : 'border-[#1C1E21]/30')}
+          className={cn('size-8 rounded-full border-2 transition-transform hover:scale-110',
+            value === c ? 'border-[#0866FF] ring-2 ring-[#0866FF]/25' : 'border-white shadow-sm')}
           style={{ background: c }} />
       ))}
     </div>
@@ -303,10 +295,10 @@ function PatternCard({ pattern, color, active, onClick }: { pattern: Pattern; co
   }, [pattern, color]);
   return (
     <button type="button" aria-pressed={active} onClick={onClick}
-      className={cn('flex h-20 w-20 shrink-0 flex-col overflow-hidden rounded-[16px] border-[3px]',
-        active ? 'border-[#0866FF] ring-2 ring-[#F2A900]' : 'border-[#1C1E21]')}>
+      className={cn('flex h-[4.5rem] w-[4.5rem] shrink-0 flex-col overflow-hidden rounded-2xl border-2 bg-white',
+        active ? 'border-[#0866FF]' : 'border-transparent shadow-sm')}>
       <div className="min-h-0 flex-1" style={{ background: bg }} />
-      <span className="bg-white py-1 text-center text-[10px] font-bold uppercase tracking-wide">{pattern}</span>
+      <span className="bg-white py-1 text-center text-[11px] font-semibold capitalize">{pattern}</span>
     </button>
   );
 }
@@ -375,16 +367,17 @@ function StudioPreview({
     void loadModels().then((models) => {
       if (disposed) return;
       try {
-        avatar = makeAvatar(models, userId);
+        // Life-size on the pedestal (street applies PERSON_WORLD_SCALE on the map).
+        avatar = makeAvatar(models, userId, { look, worldScale: 1 });
         pet = makePet(models, userId);
       } catch (err) {
         console.error('[avatar-editor] studio models failed', err);
         return;
       }
       avatar.root.position.set(-0.35, 0, 0);
-      avatar.root.rotation.y = Math.PI; // face the camera (models face +Z / south)
+      avatar.root.rotation.y = 0;
       pet.root.position.set(0.55, 0, 0.1);
-      pet.root.rotation.y = Math.PI;
+      pet.root.rotation.y = 0;
       pet.root.scale.setScalar(0.55);
       avatar.setState('idle');
       pet.setState('hover');

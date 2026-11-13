@@ -9,8 +9,9 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { currentLook, currentPipLook, type PipLook } from './avatarLook';
+import { currentLook, currentPipLook, type AvatarLook, type Pattern, type PipLook } from './avatarLook';
 import { ChibiAvatar } from './chibi';
+import { buildHat } from './hatMesh';
 
 export type AvatarState = 'idle' | 'walk' | 'wave' | 'celebrate' | 'talk';
 export type PetState = 'hover' | 'fly' | 'talk' | 'think' | 'happy';
@@ -41,29 +42,37 @@ export function hashString(s: string): number {
  * Map My look onto the Kenney materials: top → Mat_Primary, pants → Mat_Secondary, skin → Mat_Accent.
  * Friends without a saved look still get a stable palette from their id.
  */
-export function colorsFor(seed: string): { primary: string; secondary: string; accent: string } {
-  if (seed) {
-    const look = currentLook(seed);
-    return { primary: look.topColor, secondary: look.bottomColor, accent: look.skin };
+export function colorsFor(
+  seed: string,
+  lookOverride?: AvatarLook | null,
+): { primary: string; secondary: string; accent: string; hair: string; pattern: Pattern } {
+  const look = lookOverride ?? (seed ? currentLook(seed) : null);
+  if (look) {
+    return {
+      primary: look.topColor,
+      secondary: look.bottomColor,
+      accent: look.skin,
+      hair: look.hairColor,
+      pattern: look.pattern,
+    };
   }
   const h = hashString(seed);
   return {
     primary: PALETTE[h % PALETTE.length],
     secondary: ['#2B2D42', '#3D405B', '#4A4E69', '#22333B'][(h >>> 3) % 4],
     accent: PALETTE[(h >>> 7) % PALETTE.length],
+    hair: '#3D2B1F',
+    pattern: 'plain',
   };
 }
 
 /**
- * Root scale for Pip beside the ~1.72 m Kenney person. Muse after manifest scale is ~1.6 m;
- * ~0.55 puts Pip at roughly half the person's height.
+ * Root scale for Pip beside the map-readable Kenney person (~10 m).
+ * ~0.55 keeps Pip about half the person's height.
  */
 export const PET_ROOT_SCALE = 0.55;
-/**
- * Person in muse-companion.glb is already ~1.72 m tall — never multiply up to "map giant" scale.
- * Kept as a named constant so callers/tests can read the intended world height factor.
- */
-export const PERSON_WORLD_SCALE = 1;
+/** Person is ~1.72 m in the GLB; ×6 reads on the plaza without the old ×34 giant. */
+export const PERSON_WORLD_SCALE = 6;
 
 const ONE_SHOT = new Set(['wave', 'celebrate', 'happy']);
 const ONE_SHOT_SECONDS: Record<string, number> = { wave: 1.6, celebrate: 1.9, happy: 1.6 };
@@ -340,9 +349,9 @@ function toonGradientMap(): THREE.DataTexture {
   return toonGradient;
 }
 
-type LookColors = { primary: string; secondary: string; accent: string };
+type LookColors = { primary: string; secondary: string; accent: string; hair: string; pattern: Pattern };
 
-/** Kenney Person atlas prototypes (skin / shirt / pants) sampled from muse-companion.glb. */
+/** Kenney Person atlas prototypes (skin / shirt / pants / hair) sampled from muse-companion.glb. */
 const ATLAS_SKIN = [
   { r: 245, g: 147, b: 114 },
   { r: 228, g: 120, b: 62 },
@@ -356,6 +365,13 @@ const ATLAS_TOP = [
 const ATLAS_PANTS = [
   { r: 23, g: 84, b: 124 },
   { r: 19, g: 70, b: 106 },
+] as const;
+const ATLAS_HAIR = [
+  { r: 61, g: 43, b: 31 },
+  { r: 45, g: 30, b: 20 },
+  { r: 80, g: 55, b: 35 },
+  { r: 38, g: 28, b: 22 },
+  { r: 90, g: 60, b: 40 },
 ] as const;
 
 function dist2(r: number, g: number, b: number, ref: { r: number; g: number; b: number }): number {
@@ -395,19 +411,35 @@ function tintPersonAtlas(srcMap: THREE.Texture, colors: LookColors, ownedTex: TH
   const skin = parseHex(colors.accent);
   const top = parseHex(colors.primary);
   const pants = parseHex(colors.secondary);
-  // Thresholds from atlas sampling; hair/eyes/white stay untouched.
-  const SKIN_MAX = 48 * 48, TOP_MAX = 55 * 55, PANTS_MAX = 48 * 48;
-  for (let i = 0; i < d.length; i += 4) {
+  const hair = parseHex(colors.hair);
+  // Thresholds from atlas sampling; eyes / white stay untouched.
+  const SKIN_MAX = 48 * 48, TOP_MAX = 55 * 55, PANTS_MAX = 48 * 48, HAIR_MAX = 42 * 42;
+  for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+    const x = p % w;
+    const y = (p / w) | 0;
     const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
     if (a < 8) continue;
     const ds = nearestDist(r, g, b, ATLAS_SKIN);
     const dt = nearestDist(r, g, b, ATLAS_TOP);
     const dp = nearestDist(r, g, b, ATLAS_PANTS);
+    const dh = nearestDist(r, g, b, ATLAS_HAIR);
     let target: { r: number; g: number; b: number } | null = null;
-    if (ds <= SKIN_MAX && ds <= dt && ds <= dp) target = skin;
-    else if (dt <= TOP_MAX && dt <= ds && dt <= dp) target = top;
-    else if (dp <= PANTS_MAX && dp <= ds && dp <= dt) target = pants;
-    if (!target) continue;
+    let region: 'skin' | 'top' | 'pants' | 'hair' | null = null;
+    if (dh <= HAIR_MAX && dh <= ds && dh <= dt && dh <= dp) { target = hair; region = 'hair'; }
+    else if (ds <= SKIN_MAX && ds <= dt && ds <= dp) { target = skin; region = 'skin'; }
+    else if (dt <= TOP_MAX && dt <= ds && dt <= dp) { target = top; region = 'top'; }
+    else if (dp <= PANTS_MAX && dp <= ds && dp <= dt) { target = pants; region = 'pants'; }
+    if (!target || !region) continue;
+    // Patterns only on the shirt region so hair / skin never pick up stripes.
+    if (region === 'top' && colors.pattern !== 'plain') {
+      const stripe = Math.max(2, Math.round(h / 28));
+      if (colors.pattern === 'stripes' && Math.floor(y / stripe) % 2 === 1) target = { r: 255, g: 255, b: 255 };
+      else if (colors.pattern === 'dots' && (x % 10) < 3 && (y % 10) < 3) target = { r: 255, g: 255, b: 255 };
+      else if (colors.pattern === 'ticket') {
+        const band = Math.floor(y / Math.max(4, Math.round(h / 12))) % 6;
+        if (band === 2 || band === 3) target = { r: 28, g: 30, b: 33 };
+      }
+    }
     const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     d[i] = Math.min(255, Math.round(target.r * (0.55 + lum * 0.9)));
     d[i + 1] = Math.min(255, Math.round(target.g * (0.55 + lum * 0.9)));
@@ -435,7 +467,7 @@ function toonFrom(
 ): THREE.Material {
   const std = src as THREE.MeshStandardMaterial;
   // Keep albedo — the Kenney person is one atlas ("skin"); flat color alone washes them white.
-  const m = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradientMap() });
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0 });
   m.name = src.name;
   if (src.name === 'skin' && std.map) {
     m.map = tintPersonAtlas(std.map, colors, ownedTex);
@@ -450,6 +482,21 @@ function toonFrom(
   if (tint && src.name !== 'skin') m.color.set(tint);
   owned.push(m);
   return m;
+}
+
+/** Prefer the Head bone in the Person rig (scene graph or skinned skeleton). */
+function findHeadBone(model: THREE.Object3D): THREE.Object3D | null {
+  const named = model.getObjectByName('Head') ?? model.getObjectByName('Head_end');
+  if (named) return named;
+  let found: THREE.Object3D | null = null;
+  model.traverse((o) => {
+    if (found) return;
+    const skinned = o as THREE.SkinnedMesh;
+    if (!skinned.isSkinnedMesh || !skinned.skeleton) return;
+    const bone = skinned.skeleton.bones.find((b) => b.name === 'Head' || b.name === 'mixamorigHead');
+    if (bone) found = bone;
+  });
+  return found;
 }
 
 /** Thin black silhouette; child of the mesh so skinned people keep the outline while they move. */
@@ -491,8 +538,16 @@ class GltfCharacter implements Character {
   private hopLeft = 0;
   private owned: THREE.Material[] = [];
   private ownedTex: THREE.Texture[] = [];
+  /** Hat rides on hop and tracks the Head bone so a floating bind pose cannot hide it. */
+  private hat: THREE.Object3D | null = null;
+  private headBone: THREE.Object3D | null = null;
 
-  constructor(spec: CharacterSpec, kind: 'avatar' | 'pet', seed: string) {
+  constructor(
+    spec: CharacterSpec,
+    kind: 'avatar' | 'pet',
+    seed: string,
+    opts?: { look?: AvatarLook | null; worldScale?: number },
+  ) {
     const scene = cloneSkinned(spec.gltf.scene);
     let model: THREE.Object3D = scene;
     if (spec.node) {
@@ -510,12 +565,14 @@ class GltfCharacter implements Character {
       keepNames.add(o.name);
       if (hide.has(o.name)) o.visible = false;
     });
-    // Avatar: use manifest scale only (Person is authored at human height). Pet keeps its own scale.
-    model.scale.setScalar(kind === 'avatar' ? (spec.scale || PERSON_WORLD_SCALE) : spec.scale);
+    // Avatar: street uses PERSON_WORLD_SCALE; the dresser pedestal can pass worldScale: 1.
+    const avatarScale = opts?.worldScale ?? (spec.scale || PERSON_WORLD_SCALE);
+    model.scale.setScalar(kind === 'avatar' ? avatarScale : spec.scale);
 
     // Persona tint: Mat_Primary / Mat_Secondary / Mat_Accent when present; Kenney atlas "skin" is recolored.
     // Collect meshes first — adding outline children during traverse nests forever.
-    const c = colorsFor(seed);
+    const look = opts?.look ?? (seed ? currentLook(seed) : null);
+    const c = colorsFor(seed, look);
     const tints: Record<string, string> = { Mat_Primary: c.primary, Mat_Secondary: c.secondary, Mat_Accent: c.accent };
     const meshes: THREE.Mesh[] = [];
     model.traverse((o) => {
@@ -538,7 +595,6 @@ class GltfCharacter implements Character {
         return copy;
       });
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
-      if (kind === 'avatar') addOutlineHull(mesh, this.owned);
     }
 
     this.effectBody = model.getObjectByName('Muse_Body') as THREE.Mesh | undefined ?? null;
@@ -548,6 +604,26 @@ class GltfCharacter implements Character {
     this.root.add(this.hop);
     const box = new THREE.Box3().setFromObject(model);
     this.height = Math.max(0.3, box.max.y);
+    if (kind === 'avatar' && look) {
+      const hat = buildHat(look.hat);
+      const head = findHeadBone(model);
+      // Parent to the Head bone so the hat sits on the hair and follows idle/run.
+      if (head && hat) {
+        // Head's bind pose floats above the skinned crown; parenting directly put the hat on
+        // the chest. Keep the hat in hop space at the measured crown and track Head XZ.
+        this.headBone = head;
+        this.hat = hat;
+        hat.name = 'HatSocket';
+        // BBox max.y is near the chest on this bind; 2.1 seats on the hair for the pedestal.
+        hat.scale.setScalar(Math.min(0.52, this.height * 0.34));
+        hat.position.set(0, this.height * 2.1, this.height * 0.05);
+        hat.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh) { m.frustumCulled = false; m.renderOrder = 10; }
+        });
+        this.hop.add(hat);
+      }
+    }
     this.mixer = new THREE.AnimationMixer(model);
     for (const clip of spec.gltf.animations) {
       const adapted = adaptClip(clip, keepNames, spec.node, spec.relativeRoot, hide);
@@ -598,7 +674,7 @@ class GltfCharacter implements Character {
     if (this.hopLeft > 0) {
       this.hopLeft = Math.max(0, this.hopLeft - dt);
       this.hop.position.y = Math.abs(Math.sin(this.hopLeft * 9)) * 0.22;
-    } else this.hop.position.y = 0;
+    } else     this.hop.position.y = 0;
   }
 
   getEffectCenter(out: THREE.Vector3): void {
@@ -610,6 +686,13 @@ class GltfCharacter implements Character {
   }
 
   dispose() {
+    this.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.userData.hat) return;
+      mesh.geometry.dispose();
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((m) => m.dispose());
+    });
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.mixer.getRoot());
     this.owned.forEach((m) => m.dispose());
@@ -680,13 +763,17 @@ export function loadModels(): Promise<ModelSet> {
  * People are the Kenney Person from muse-companion.glb (person_idle / person_run), toon-shaded
  * with My look atlas tints. Chibi is only the fallback before the GLB loads or if construction fails.
  */
-export function makeAvatar(models: ModelSet | null, seed: string): Character {
+export function makeAvatar(
+  models: ModelSet | null,
+  seed: string,
+  opts?: { look?: AvatarLook | null; worldScale?: number },
+): Character {
   if (models?.avatar) {
-    try { return new GltfCharacter(models.avatar, 'avatar', seed); }
+    try { return new GltfCharacter(models.avatar, 'avatar', seed, opts); }
     catch (err) { console.error('[world] Kenney person failed; using chibi', err); }
   }
   if (!seed) return new PlaceholderAvatar(seed);
-  return new ChibiAvatar(currentLook(seed));
+  return new ChibiAvatar(opts?.look ?? currentLook(seed));
 }
 
 export function makePet(models: ModelSet | null, seed: string): Character {

@@ -17,7 +17,6 @@ import {buildTreeBatch,type TreeBatch} from './vegetation';
 import {loadSceneryAssets,type SceneryAssets} from './scenery-assets';
 import type {StreetLamp} from './street-furniture';
 import {makeSightline,applySightlineCutaway,cameraFromProjection,blocksSightline} from './cutaway';
-import { buildToyPad, toyPadOpacity } from './toyPad';
 
 /** Multiply each mesh material's authored opacity by `opacity` (remembers the base once). */
 function applyRootOpacity(root: THREE.Object3D, opacity: number) {
@@ -180,10 +179,6 @@ export class WorldLayer implements CustomLayerInterface {
   private frameCount = 0;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
-  /** Clip toy-block pad fixed in world space at street zoom (does not follow the walker). */
-  private toyPad: THREE.Group | null = null;
-  /** LatLng the pad was planted on; set once so walking never drags the block. */
-  private toyPadAt: LatLng | null = null;
   private blueRing: THREE.Mesh | null = null;
   private blueRingMat = new THREE.MeshBasicMaterial({
     color: '#0866FF', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
@@ -204,9 +199,6 @@ export class WorldLayer implements CustomLayerInterface {
     sun.position.set(-5,8,7);
     this.scene.add(sun);
 
-    this.toyPad = buildToyPad();
-    this.toyPad.visible = false;
-    this.scene.add(this.toyPad);
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 48), this.blueRingMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.05;
@@ -458,7 +450,6 @@ export class WorldLayer implements CustomLayerInterface {
     this.setBeacons([]);
     this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
-    if (this.toyPad) { this.scene.remove(this.toyPad); this.toyPad = null; this.toyPadAt = null; }
     if (this.blueRing) { this.scene.remove(this.blueRing); this.blueRing.geometry.dispose(); this.blueRing = null; }
     this.blueRingMat.dispose();
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
@@ -497,17 +488,6 @@ export class WorldLayer implements CustomLayerInterface {
     const h = canvas.clientHeight;
 
     const me = this.actors.get('me');
-    const padOp = toyPadOpacity(zoom) * charOpacity;
-    if (this.toyPad) {
-      // Plant once at the first known street spot, then leave it — walking must not drag the block.
-      if (!this.toyPadAt && me) {
-        this.toyPadAt = { ...me.pos };
-        const o = offsetMeters(this.origin, this.toyPadAt);
-        this.toyPad.position.set(o.east, 0, -o.north);
-      }
-      this.toyPad.visible = !!this.toyPadAt && padOp > 0.02;
-      if (this.toyPad.visible) applyRootOpacity(this.toyPad, padOp);
-    }
 
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
