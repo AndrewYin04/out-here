@@ -96,6 +96,16 @@ export interface DataStore {
   // marketplace, reels, uploads
   listings: CoreStore['listings'];
   listing: CoreStore['listing'];
+  mapListings: CoreStore['mapListings'];
+  mapListing: CoreStore['mapListing'];
+  createListing: CoreStore['createListing'];
+  requestHold: CoreStore['requestHold'];
+  respondHold: CoreStore['respondHold'];
+  releaseHold: CoreStore['releaseHold'];
+  markSold: CoreStore['markSold'];
+  museWants: CoreStore['museWants'];
+  addMuseWant: CoreStore['addMuseWant'];
+  removeMuseWant: CoreStore['removeMuseWant'];
   reels: CoreStore['reels'];
   uploadFile: CoreStore['uploadFile'];
   /** Raw tables + view helpers for server-side Muse candidate generation. Never send to the browser. */

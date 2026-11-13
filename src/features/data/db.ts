@@ -3,7 +3,7 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, TogetherPlan,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, TogetherPlan, MuseWant,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -24,6 +24,12 @@ export type InviteRow = Invite & { respondedAt: string | null };
 export type PlaceRow = Place & { description: string };
 /** member_key = sorted member ids joined by ','; one open plan per key (unique index in 0005). */
 export type TogetherRow = TogetherPlan & { memberKey: string };
+/** Stored hold statuses; 'expired' is derived on read (accepted and past expiresAt). */
+export type ListingHoldRow = {
+  id: ID; listingId: ID; buyerId: ID; offerUsd: number; message: string; etaMin: number;
+  status: 'requested' | 'accepted' | 'declined' | 'cancelled' | 'completed';
+  createdAt: string; acceptedAt: string | null; expiresAt: string | null;
+};
 
 export type Db = {
   profiles: Profile[];
@@ -58,6 +64,8 @@ export type Db = {
   reels: Reel[];
   locationShares: LocationShare[];
   togetherPlans: TogetherRow[];
+  listingHolds: ListingHoldRow[];
+  museWants: MuseWant[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -73,6 +81,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares', togetherPlans: 'together_plans',
+  listingHolds: 'listing_holds', museWants: 'muse_wants',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -85,10 +94,11 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
   notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'], togetherPlans: ['id'],
+  listingHolds: ['id'], museWants: ['id'],
 };
 
 /** Tables added by later migrations: a missing table reads as empty instead of failing every page. */
-export const OPTIONAL_TABLES = new Set<TableKey>(['togetherPlans', 'questCheckins', 'questReports']);
+export const OPTIONAL_TABLES = new Set<TableKey>(['togetherPlans', 'questCheckins', 'questReports', 'listingHolds', 'museWants']);
 
 export function emptyDb(): Db {
   return Object.fromEntries(TABLE_KEYS.map((k) => [k, []])) as unknown as Db;
@@ -98,8 +108,8 @@ export function emptyDb(): Db {
 const camel = (s: string) => s.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
 const snake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
-const TIME_KEYS = /(_at|^starts_at|^ends_at)$/;
-const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level']);
+const TIME_KEYS = /(_at|^starts_at|^ends_at|_until)$/;
+const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level', 'offer_usd', 'max_price']);
 const JSON_KEYS = new Set(['field_visibility', 'hours', 'intent', 'output', 'options', 'votes']);
 
 /** Postgres row (snake_case) -> Db row (camelCase). */
