@@ -25,10 +25,11 @@ const BOX_W = 46;
 const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
+const LABEL_GAP = 6;
 /** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
 const PHONE_RESULTS_SHEET = 0.5;
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
-const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
+const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 14;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
 const MOBILE_LABELS = 5;
 const LABEL_ALL_ZOOM = 15;
@@ -110,7 +111,7 @@ function buildPin(q: Quest, testId: string): PinParts {
 
   const label = document.createElement('span');
   label.setAttribute('data-role', 'pin-label');
-  label.style.cssText = 'position:absolute;left:50%;top:48px;transform:translateX(-50%);white-space:nowrap;font:600 12px/15px var(--font-sans);color:#080809;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff,0 0 4px #fff;pointer-events:none;';
+  label.style.cssText = 'position:absolute;white-space:nowrap;font:600 12px/16px var(--font-sans);color:#080809;background:rgba(255,255,255,.85);border-radius:6px;padding:0 4px;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff,0 0 4px #fff;pointer-events:none;';
 
   const faces = document.createElement('span');
   faces.setAttribute('aria-hidden', 'true');
@@ -160,25 +161,27 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
 }
 
 /** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null) {
+/** mine: the viewer joined this plan, so it reads "You're going" and stands out (docs/UX_PLAN.md). */
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, mine = false) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
-  p.badge.textContent = seatText;
-  p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
-  p.label.textContent = `${shortTitle(q.title)} · ${time}`;
+  p.badge.textContent = mine ? 'Going' : seatText;
+  p.badge.style.background = mine ? '#24832C' : seats > 0 ? '#0866FF' : '#65686C';
+  p.label.textContent = `${mine ? 'You’re going · ' : ''}${shortTitle(q.title)} · ${time}`;
+  p.root.toggleAttribute('data-mine', mine);
   p.bubble.textContent = q.bubbleText ?? '';
   const glyph = VIS_GLYPH[q.visibility ?? 'community'];
   p.vis.textContent = glyph ?? '';
   p.vis.style.display = glyph ? 'block' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${mine ? 'You’re going: ' : ''}${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-  const ring = selected || picked ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
+  const ring = selected || picked || mine ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
-  p.circle.style.transform = selected || picked ? 'scale(1.1)' : 'none';
-  p.root.style.zIndex = selected ? '4' : picked ? '3' : '1';
-  const dimmed = picked === false && !selected;
+  p.circle.style.transform = selected || picked || mine ? 'scale(1.1)' : 'none';
+  p.root.style.zIndex = selected ? '4' : picked || mine ? '3' : '1';
+  const dimmed = picked === false && !selected && !mine;
   // MapLibre owns the marker root's opacity, so the pin button carries the dimming.
   p.button.style.opacity = dimmed ? '0.4' : '1';
   p.button.style.transition = 'opacity .2s';
@@ -207,6 +210,7 @@ export default function MapCanvas({
   const order = useRef<string[]>([]);
   const framed = useRef(false);
   const frame = useRef(0);
+  const symbolLayers = useRef<string[]>([]);
   const select = useRef(onSelect);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
@@ -233,23 +237,45 @@ export default function MapCanvas({
     // Labels go to the shown pins in priority order, wherever they clear every pin and label.
     const maxLabels = isDesktop() || map.getZoom() >= LABEL_ALL_ZOOM ? Infinity : MOBILE_LABELS;
     const shownBoxes = input.filter((x) => g.has(x.id));
+    const { clientWidth, clientHeight } = map.getContainer();
+    const layers = symbolLayers.current;
     const taken: Box[] = [];
     for (const { id, p } of shownBoxes) {
       const ref = pins.current.get(id)!;
       const lw = labelWidth(ref.label.textContent ?? '');
-      const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
-      // While a plan shows, dimmed pins drop their labels so the "✨ Muse pick" pills have room.
-      const fits = !ref.root.hasAttribute('data-dimmed')
-        && taken.length < maxLabels
-        && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
-        && !taken.some((t) => overlaps(t, lb));
-      const show = fits || id === selectedRef.current;
-      if (show) taken.push(lb);
-      ref.label.style.display = show ? 'block' : 'none';
+      const selected = id === selectedRef.current;
+      const dimmed = ref.root.hasAttribute('data-dimmed');
       // Text bubble: zoomed in or selected, and never on top of a "✨ Muse pick" pill.
-      const bubbleOn = !!ref.bubble.textContent && !ref.pick.isConnected && !ref.root.hasAttribute('data-dimmed')
-        && (id === selectedRef.current || map.getZoom() >= BUBBLE_ZOOM);
+      const bubbleOn = !!ref.bubble.textContent && !ref.pick.isConnected && !dimmed
+        && (selected || map.getZoom() >= BUBBLE_ZOOM);
       ref.bubble.style.display = bubbleOn ? 'block' : 'none';
+      const below = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM, w: lw, h: LABEL_H };
+      let label: Box | undefined;
+      if (selected || (!dimmed && taken.length < maxLabels)) {
+        const sideY = p.y - LABEL_H / 2;
+        const side = BOX_W / 2 + LABEL_GAP;
+        const candidates: Box[] = [
+          below,
+          { ...below, x: p.x + side, y: sideY },
+          { ...below, x: p.x - side - lw, y: sideY },
+        ];
+        if (!bubbleOn && !ref.pick.isConnected) candidates.push({ ...below, y: p.y - BOX_TOP - LABEL_GAP - LABEL_H });
+        label = candidates.find((box) => (
+          box.x >= 0 && box.y >= 0 && box.x + box.w <= clientWidth && box.y + box.h <= clientHeight
+          && !shownBoxes.some((other) => other.id !== id && overlaps(other.box, box))
+          && !taken.some((other) => overlaps(other, box))
+          && (layers.length === 0 || map.queryRenderedFeatures(
+            [[box.x, box.y], [box.x + box.w, box.y + box.h]], { layers },
+          ).length === 0)
+        ));
+        if (!label && selected) label = below;
+      }
+      ref.label.style.display = label ? 'block' : 'none';
+      if (label) {
+        taken.push(label);
+        ref.label.style.left = `${label.x - p.x + PIN / 2}px`;
+        ref.label.style.top = `${label.y - p.y + PIN / 2}px`;
+      }
     }
     for (const [id, ref] of pins.current) {
       const members = g.get(id);
@@ -313,11 +339,16 @@ export default function MapCanvas({
     framed.current = false; // a new map (dev Strict Mode remounts) needs its own first framing
     let loaded = false;
     const timer = window.setTimeout(() => { if (!loaded) setTiles('failed'); }, TILE_TIMEOUT_MS);
-    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); });
+    map.on('style.load', () => {
+      symbolLayers.current = map.getStyle().layers.filter((layer) => layer.type === 'symbol').map((layer) => layer.id);
+      schedule();
+    });
+    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); schedule(); });
     // Tile or style errors are shown as the plain-background state, not thrown to the console.
     map.on('error', () => {});
     map.on('move', schedule);
     map.on('resize', schedule);
+    map.on('idle', schedule);
     // Drop a pin: right-click (desktop) or long-press (touch). Markers stop their own clicks,
     // so this only fires on the map itself.
     map.on('contextmenu', (e) => {
@@ -348,6 +379,7 @@ export default function MapCanvas({
       cancelPress();
       cancelAnimationFrame(frame.current);
       current.clear();
+      symbolLayers.current = [];
       draftMarker.current = null;
       me.current = null;
       onMap(null);
@@ -382,7 +414,7 @@ export default function MapCanvas({
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null);
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, !!viewerId && q.memberIds.includes(viewerId));
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }

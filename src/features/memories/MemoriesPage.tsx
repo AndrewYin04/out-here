@@ -9,6 +9,7 @@ import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, LinkButton, Skeleton } from '@/features/ui';
 import { memoryImgSrc } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
+import { MEMORY_SAVED } from './arrival';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
 type CrewMeta = {
@@ -41,6 +42,12 @@ function MemoriesView({ handle }: { handle: string | null }) {
   useChannel([`user:${viewer.id}`], (_channel, payload) => {
     if (payload.type === 'memory' || payload.type === 'rating' || payload.resync) setRefresh((value) => value + 1);
   });
+  // Your own new photo (the arrival selfie, #47): the server's broadcast only reaches the others.
+  useEffect(() => {
+    const bump = () => setRefresh((value) => value + 1);
+    window.addEventListener(MEMORY_SAVED, bump);
+    return () => window.removeEventListener(MEMORY_SAVED, bump);
+  }, []);
 
   // /memories?rate=<questId> (the "How was it?" notification) opens the questionnaire.
   useEffect(() => {

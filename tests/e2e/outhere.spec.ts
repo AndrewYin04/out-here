@@ -34,7 +34,7 @@ test.describe("Out Here plan sheet", () => {
     const box = page.locator("#imfree-text");
     await expect(box).toBeFocused();
     // picking a time selects it (no text typed, nothing sent yet)
-    const fifteen = page.getByRole("button", { name: "15 min" });
+    const fifteen = page.getByTestId("free-composer").getByRole("button", { name: "15 min", exact: true });
     await fifteen.click();
     await expect(fifteen).toHaveAttribute("aria-pressed", "true");
     await expect(box).toHaveValue("");
@@ -190,7 +190,7 @@ test.describe("Out Here plan sheet", () => {
     await expect(card.getByTestId("invite-result")).toContainText("You're in with Alex");
     await expect(card.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
     await expect(top.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
-    await expect(top.getByRole("button", { name: "You're going" })).toBeVisible({ timeout: 3_000 });
+    await expect(top.getByRole("button", { name: /Let.s go/ })).toBeVisible({ timeout: 3_000 });
     // the inviter's payoff: Maya said yes, and when to leave
     await expect(top.getByTestId("invite-outcome")).toContainText("Maya's in. You're both going to Dumpling Den", { timeout: 3_000 });
 

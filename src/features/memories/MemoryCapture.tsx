@@ -94,9 +94,12 @@ export function AddPhotoTile({ questId, crewId, onMemory }: {
   );
 }
 
-/** Photo upload with an optional caption to the hangout's crew album (the plan card's "Add a photo"). */
-export function MemoryCapture({ questId, crewId, onSaved }: {
-  questId: string; crewId: string | null; onSaved: (id: string) => void;
+/**
+ * Photo upload to the hangout's crew album. With `onMemory`, the form stays open after each save
+ * (the arrival selfie and the rating questionnaire take over) and reports each saved memory.
+ */
+export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
+  questId: string; crewId: string | null; onSaved: (id: string) => void; onMemory?: (memory: Memory) => void;
 }) {
   const inputId = useId();
   const [photo, setPhoto] = useState<File | null>(null);
@@ -105,6 +108,7 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   const [pending, setPending] = useState<'save' | 'caption' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedCrew, setSavedCrew] = useState<string | null>(null);
+  const [inputKey, setInputKey] = useState(0);
   const savedRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (savedCrew) burst(savedRef.current, ['📸', '✨', '💛'], 10); }, [savedCrew]);
 
@@ -134,10 +138,14 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
     setPending('save');
     setError(null);
     try {
-      const { crewId: id } = await uploadPhoto(photo, questId, crewId, caption);
+      const { crewId: id, memory } = await uploadPhoto(photo, questId, crewId, caption);
       onSaved(id);
       setPhoto(null);
-      setSavedCrew(id);
+      if (onMemory) {
+        onMemory(memory);
+        setCaption('');
+        setInputKey((k) => k + 1);
+      } else setSavedCrew(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t save your photo.');
     } finally {
@@ -153,7 +161,7 @@ export function MemoryCapture({ questId, crewId, onSaved }: {
   return (
     <form className="mt-4 space-y-3 rounded-card bg-fb-bg p-3" onSubmit={save}>
       <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden />Take a photo together</label>
-      <input id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
+      <input key={inputKey} id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
         className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-surface file:px-3 file:py-2 file:font-semibold"
         onChange={(event) => { const f = event.currentTarget.files?.[0] ?? null; if (f) flash(); setPhoto(f); setError(null); }} />
       {preview && (

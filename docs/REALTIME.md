@@ -25,6 +25,7 @@ arrives.
 | `user:<userId>` | a notification, invite, message, friendship, availability, memory or location change for that user | `{ type: "notification" \| "invite" \| "message" \| "friendship" \| "availability" \| "memory" \| "location", id: string }` |
 | `thread:<threadId>` | a message is posted in the thread | `{ messageId: string }` |
 | `presence:online` | (Presence) a tab opens or closes | presence state: `{ userId: string }` per tab |
+| `together:<planId>` | a member votes "I'm in" (or takes it back), or the plan locks | `{ status: 'proposing' \| 'confirmed' \| 'expired', confirmedQuestId: string \| null }` |
 | `post:<postId>` | a reaction or comment changes | `{ reactions: number, comments: number }` (totals) |
 | `event:<eventId>` | an RSVP changes (Facebook Events) | `{ goingCount: number, interestedCount: number }` |
 
