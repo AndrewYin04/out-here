@@ -618,7 +618,9 @@ export function OutHereView() {
       {/* Dock the availability card at the edge to leave room for the map and avatar. */}
       {!selectedId && !creating && !sheetOpen && !upNext && (
         <div className={cn(
-          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
+          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:max-w-[380px]',
+          // Desktop Friends mode: below the People / Your status row, which sits at top-16.
+          mode === 'friends' ? 'md:top-[116px]' : 'md:top-16',
           show3d
             ? mode === 'friends' && visible.length > 0
               ? filter.on ? 'top-32' : 'top-24'
