@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { now as demoNow } from '@/shared';
 import {
-  draftMessages, mockDraft, museJSON, nearbyPlaces, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, reportFallback, validateDraft,
+  draftCacheKey, draftMessages, mockDraft, museJSON, nearbyPlaces, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, reportFallback, validateDraft,
   type CreateQuestContext,
 } from '@/features/muse';
 import { body, LatLngZ, route } from '@/lib/api';
@@ -39,9 +39,13 @@ export const POST = route(async ({ store, viewer, req }) => {
       schemaName: 'create_quest', schema: RawDraftZ, jsonSchema: RAW_DRAFT_JSON_SCHEMA,
       messages: draftMessages(ctx), model: 'fast', effort: 'minimal',
       mock: () => mockDraft(ctx), route: routeName, userId: viewer.id, deadline: Date.now() + 12_000,
+      // Key: persona + normalized sentence + the ordered ids of the places near this pin (+ prompt
+      // template); not the clock or the walk labels. A pin with other places nearby goes live.
+      // validateDraft re-checks the place id and replaces a pitch that no longer fits it.
+      cacheKey: draftCacheKey(ctx),
     });
     return NextResponse.json(validateDraft(res.data, ctx), {
-      headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model },
+      headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model, 'x-muse-cache': res.cached ? 'hit' : 'miss' },
     });
   } catch (err) {
     const msg = String((err as Error)?.message ?? err).slice(0, 200);
