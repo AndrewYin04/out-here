@@ -145,7 +145,7 @@ test.describe('phone 390', () => {
     await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('friends-filter-chip')).toHaveText(`Plans your friends joined · ${friendsCount}`);
     await page.getByTestId('dock-handle').click();
-    await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai going/);
+    await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai( and .+)? going/); // Maya may be in too (outhere.spec)
     await page.getByTestId('quest-pin-dumplings').click();
     await expect(page.getByTestId('quest-sheet').getByTestId('quest-friends-going')).toHaveText(/Kai Nakamura (is|and .+ are) going/);
     await page.getByTestId('quest-sheet').getByRole('button', { name: 'Close' }).click();
