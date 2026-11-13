@@ -19,10 +19,12 @@ export type IntroPlanView = {
   canHold: boolean;
   options: IntroPlanOption[];
   /**
-   * Muse's reveal once both are on the plan: "It's on. Exact spot: Ivy Commons, side gate on
-   * Ivy Dr: .... 9 min walk for you, starts in 30 min." Null before that.
+   * Muse's reveal once both are on the plan: "It's on. Exact spot: Courtyard by the bike racks,
+   * Willow Court Apartments. 9 min walk for you, today 6:30 PM." Null before that.
    */
   reveal: string | null;
+  /** The viewer's walk to the plan, from the same rule as the plan sheet (View.walkToPlan); null when unknown. */
+  walkMinutes: number | null;
 };
 
 /**
@@ -35,6 +37,8 @@ export type IntroCardData = IntroCardView & { plan: IntroPlanView | null; joinLi
 /** One person Muse found for a plan; the viewer picks one before anyone is asked. */
 export type IntroChoice = {
   introId: ID; kind: IntroKind; score: number;
+  /** The plan this choice is for. */
+  questId: ID | null;
   other: { id: ID; handle: string; firstName: string; avatarUrl: string };
   /** "You both know Maya". */
   trustPath: string;

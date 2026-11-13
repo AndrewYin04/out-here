@@ -141,7 +141,7 @@ function MusePlan({ intro, onPlan }: { intro: IntroCardData; onPlan: (id: string
               </p>
               {plan.questId && (
                 <LinkButton href={`/out-here?go=${encodeURIComponent(plan.questId)}`} size="sm" icon={<Footprints size={14} aria-hidden />} data-testid="intro-go">
-                  Go
+                  {plan.walkMinutes != null ? `Go · ${plan.walkMinutes} min walk` : 'Go'}
                 </LinkButton>
               )}
             </div>

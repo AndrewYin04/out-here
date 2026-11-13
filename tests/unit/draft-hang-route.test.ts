@@ -67,7 +67,8 @@ describe('POST /api/muse/draft-hang', () => {
   it('says so when nobody is free with you', async () => {
     const s = createMemoryStore(NOW);
     store.current = s;
-    viewerId.current = profileId('jordan');
+    // Leah (the closet sale seller) has no friends in the seed; Jordan now has a free window.
+    viewerId.current = profileId('leah');
     const body = await (await draft({ text: 'hungry' })).json();
     expect(body).toMatchObject({ draft: null, reason: 'no_friend_free' });
   });

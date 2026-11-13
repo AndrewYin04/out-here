@@ -147,7 +147,7 @@ const ACTIVITY_RULES: [RegExp, string[]][] = [
   [/\bvolleyball\b/, ['volleyball']],
   [/\bboard ?games?\b/, ['board games']],
   [/\b(video games?|gaming|smash)\b/, ['games']],
-  [/\b(thrift\w*|vintage|closet sales?|clothing swaps?|flea markets?|denim|secondhand)\b/, ['thrifting']],
+  [/\b(thrift\w*|vintage|closet sales?|clothing swaps?|flea markets?|denim|secondhand|try[- ]?ons?)\b/, ['thrifting']],
   [/\b(study|studying|focus|homework)\b/, ['study']],
   [/\b(art|gallery|sketch\w*|museum)\b/, ['art']],
   [/\b(outside|outdoors?|hike|hiking|sunset|walk)\b/, ['outdoors']],

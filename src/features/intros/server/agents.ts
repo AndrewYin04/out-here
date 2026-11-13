@@ -87,8 +87,8 @@ export const stepOf = (q: QuestRow): FirstStep => ({ text: `${q.emoji} ${q.title
 
 /**
  * The first step for A and B: the best upcoming quest, led by the fact A reads first ("You both
- * love comics" puts the comics open house ahead of a band pregame that matches more interests)
- * and by the words of an on-request ask ("someone into comics to go to the comics open house with").
+ * love thrifting" puts the closet sale ahead of a band pregame that matches more interests)
+ * and by the words of an on-request ask ("someone into thrifting to go to the closet sale with").
  */
 export function pickFirstStep(v: View, a: Profile, b: Profile, facts: SharedFact[], nowMs: number, ask = ''): FirstStep {
   const lead = orderedFacts(facts, 'a')[0]?.topic ?? [];

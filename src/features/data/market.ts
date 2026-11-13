@@ -180,6 +180,12 @@ export async function respondHold(store: CoreStore, viewerId: ID, holdId: ID, ac
     if (others.length) await store.backend.update('listingHolds', { id: others.map((x) => x.id) }, { status: 'declined' });
     await store.notify(v, h.buyerId, 'listing_update', viewerId, 'listing', l.id,
       `${seller} accepted. ${l.title} is held for you till ${formatDemoTime(iso(expiresAt))}.`);
+    // Accepting confirms the buyer, so Muse shares the exact spot in their chat with the seller.
+    if (l.pickupSpot) {
+      const thread = await store.openThread(viewerId, [h.buyerId]);
+      await store.sendMessage(viewerId, thread.id,
+        `✨ Muse: ${seller} accepted your hold on ${l.title}, held till ${formatDemoTime(iso(expiresAt))}. Exact spot: ${l.pickupSpot}. Text ${seller} when you're here.`, 'muse');
+    }
     for (const o of others) {
       await store.notify(v, o.buyerId, 'listing_update', viewerId, 'listing', l.id, `${l.title} was reserved by someone else.`);
     }

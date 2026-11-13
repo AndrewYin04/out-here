@@ -77,14 +77,21 @@ function Choices({ choices, onPicked }: { choices: IntroChoice[]; onPicked: (pic
   );
 }
 
-function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult | null) => void; plan: PlanFor | null; onClearPlan: () => void }) {
+function AskMuse({ onResult, plan, onClearPlan, saved }: {
+  onResult: (r: RoundResult | null) => void; plan: PlanFor | null; onClearPlan: () => void;
+  /** Unpicked choices from an earlier ask for this plan (GET /api/intros), shown again after a reload. */
+  saved?: IntroChoice[];
+}) {
   const [kind, setKind] = useState<IntroKind>('friendship');
   const [lookingFor, setLookingFor] = useState('');
   const [busy, setBusy] = useState(false);
   const [answer, setAnswer] = useState<string | null>(null);
   const [choices, setChoices] = useState<IntroChoice[] | null>(null);
+  // This ask's answer wins; before any ask, the saved choices for this plan (one row per person).
+  const [asked, setAsked] = useState(false);
+  const shown = asked ? choices : saved?.length ? saved : null;
   const ask = async () => {
-    setBusy(true); setAnswer(null); setChoices(null);
+    setBusy(true); setAnswer(null); setChoices(null); setAsked(true);
     try {
       // For a plan, Muse tries every kind you have on and keeps the best match.
       const r = await apiPost<RoundResult>('/api/intros/request', plan ? { lookingFor, questId: plan.id } : { kind, lookingFor });
@@ -119,14 +126,14 @@ function AskMuse({ onResult, plan, onClearPlan }: { onResult: (r: RoundResult | 
       <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); void ask(); }}>
         <label className="sr-only" htmlFor="ask-looking">What are you looking for?</label>
         <input id="ask-looking" value={lookingFor} onChange={(e) => setLookingFor(e.target.value)} maxLength={140}
-          placeholder={plan ? 'e.g. someone who likes comics' : PLACEHOLDERS[kind]}
+          placeholder={plan ? 'e.g. someone into thrifting' : PLACEHOLDERS[kind]}
           className="h-10 w-full min-w-0 shrink-0 rounded-pill bg-fb-input sm:w-auto sm:flex-1 px-4 text-[15px] text-fb-text outline-none placeholder:text-fb-text-2 focus:ring-2 focus:ring-fb-blue" />
         <Button type="submit" disabled={busy} icon={<Sparkles size={16} aria-hidden />}>{busy ? 'Muse is looking…' : 'Ask Muse'}</Button>
       </form>
       {answer && <p className="text-[15px] text-fb-text" data-testid="ask-answer" aria-live="polite">{answer}</p>}
-      {choices && (
-        <Choices choices={choices} onPicked={(id) => {
-          const c = choices.find((x) => x.introId === id);
+      {shown && (
+        <Choices choices={shown} onPicked={(id) => {
+          const c = shown.find((x) => x.introId === id);
           setChoices(null);
           setAnswer(c ? `Muse is asking ${c.other.firstName}. Their card is below.` : null);
           onResult(null);
@@ -224,7 +231,7 @@ function IntroSettings({ open, onClose }: { open: boolean; onClose: () => void }
 
 export function IntrosPage() {
   const { viewer } = useViewer();
-  const { data, loading, refetch } = useApi<{ intros: IntroCardData[] }>('/api/intros', [`user:${viewer.id}`]);
+  const { data, loading, refetch } = useApi<{ intros: IntroCardData[]; choices?: IntroChoice[] }>('/api/intros', [`user:${viewer.id}`]);
   const [round, setRound] = useState<string | null>(null);
   const [busy, setBusy] = useState<null | 'run' | 'reset'>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -237,13 +244,17 @@ export function IntrosPage() {
   useEffect(() => { setPlanId(new URLSearchParams(window.location.search).get('quest')); }, []);
   const planData = useApi<QuestDetail>(planId ? `/api/quests/${encodeURIComponent(planId)}` : null).data;
   const pq = planData && planData.quest.id === planId ? planData.quest : null;
-  const planFor: PlanFor | null = pq ? { id: pq.id, label: `${pq.emoji} ${pq.title} at ${pq.venueName}`, when: formatDemoTime(pq.startsAt) } : null;
+  // Before the viewer is on the plan it shows only the general area, like the map (QuestDetail.areaLabel).
+  const place = pq && !pq.memberIds.includes(viewer.id) && planData?.areaLabel ? planData.areaLabel : pq?.venueName;
+  // The same start time the plan page and the intro card show (formatDemoTime, to the minute).
+  const planFor: PlanFor | null = pq ? { id: pq.id, label: `${pq.emoji} ${pq.title} at ${place}`, when: `Today ${formatDemoTime(pq.startsAt)}` } : null;
+  const savedChoices = planFor ? (data?.choices ?? []).filter((c) => c.questId === planFor.id) : [];
   const clearPlan = () => { setPlanId(null); window.history.replaceState(null, '', '/intros'); };
 
   const runRound = async () => {
     setBusy('run'); setRound(null);
     try {
-      // The demo round is a friendship round: the comic open house story introduces a new friend.
+      // The demo round is a friendship round: the closet sale story introduces a new friend.
       const r = await apiPost<RoundResult>('/api/intros/run', { kind: 'friendship' });
       setRound(r.message);
       await refetch();
@@ -291,7 +302,7 @@ export function IntrosPage() {
       </Card>
 
       {/* Asked from a plan: the pre-filled ask comes first, above the inbox. */}
-      {planFor && <AskMuse key={planFor.id} onResult={onAsk} plan={planFor} onClearPlan={clearPlan} />}
+      {planFor && <AskMuse key={planFor.id} onResult={onAsk} plan={planFor} onClearPlan={clearPlan} saved={savedChoices} />}
 
       <section aria-label="Your intros" className="space-y-3">
         {loading && !data && <Card padded><Skeleton className="h-40 w-full" /></Card>}

@@ -1,4 +1,4 @@
-# Demo flow: the comic open house
+# Demo flow: the closet sale
 
 The demo is Fri Nov 13, 10:30 AM PT: 5 minutes on stage, then 3 minutes of Q&A. This file is the plan for those 5 minutes. Any task that does not move one of the 11 scenes below waits until after the demo.
 
@@ -6,7 +6,7 @@ Status was checked against `origin/main` on Thu Nov 12 (after PRs #10, #39, #42 
 
 ## The story
 
-Alex likes comics. Scrolling Facebook, he sees a seller's box of comics on Marketplace, and the seller has turned it into an open house today. Alex tells Muse he is free and wants someone to go with. Muse vets people and introduces Jordan, a stranger who also likes comics; the trust path is "you both know Maya". Both say yes. They walk there together on the 3D map, take a selfie, and each rates the hangout in private, so Muse matches better next time. Every scene below serves this one story.
+Alex likes thrifting and vintage. Scrolling Facebook, he sees a recent grad's closet clean-out on Marketplace, and she has turned it into a closet sale today where people can try things on. Alex tells Muse he is free and wants someone to go with. Muse vets people and introduces Jordan, a stranger who also thrifts and collects band tees; the trust path is "you both know Maya". The map shows only the general area of the sale until you are confirmed, like a normal Marketplace pickup; once Alex and Jordan are on the plan, Muse messages them the exact spot. Both say yes. They walk there together on the 3D map, take a selfie, and each rates the hangout in private, so Muse matches better next time. Every scene below serves this one story.
 
 Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows that it also works on mobile.
 
@@ -14,23 +14,26 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 
 - **Person 1** is Alex, on laptop A.
 - **Person 2** is Jordan, on laptop B. Jordan and Alex are strangers. The trust path is "you both know Maya": Jordan is already Maya's roommate in the seed.
-- **The seller** is Theo Nakamura (handle `theo`), a new fictional persona. Theo is not a friend of Alex or Jordan.
-- **The open house** is "📚 Comics open house" at Inkwell Comics Café, a fictional public venue about 580 m from Alex in a straight line. It starts 30 minutes after the reseed, lasts 2 hours, is free, and has 8 spots with 3 taken, so 5 are open. The walk to the exact spot is about 9 minutes (80 m/min with the 1.3 route factor). Before Alex joins, the sheet uses the ~200 m fuzzed spot and reads "7 min walk"; say "about 7 minutes" in the script.
-- **Scene 2** is done live if Rishab's listing-to-plan link (#48) lands by Fri 6 AM PT. Otherwise the open house is pre-seeded and scene 2 takes about 10 seconds: show the listing, then the plan it names.
+- **The seller** is Leah Moreno (handle `leah`), a new fictional persona: a recent grad clearing out her closet before she moves to Seattle. Leah is not a friend of Alex or Jordan. (The handle `priya` was already taken in the seed.)
+- **The closet sale** is "🧥 Closet sale + try-ons", hosted by Leah in the courtyard of Willow Court Apartments, a fictional apartment complex in Belle Haven about 580 m from Alex in a straight line. It starts 30 minutes after the reseed, lasts 2 hours, is free, and has 8 spots with 3 taken, so 5 are open.
+- **Location rule (Andrew):** the map, the plan page, the plan sheet, the listing page and the intro card show only the general area, "Belle Haven, near Ivy Dr", with the pin fuzzed about 200 m, until the viewer is confirmed. Joining the plan, or Leah accepting a hold on the listing, confirms you. Muse then posts a ✨ Muse note in your Messenger chat with Leah: "You're confirmed for Leah's closet sale + try-ons at <start time>. Exact spot: Courtyard by the bike racks, Willow Court Apartments. Text Leah when you're here." The pin switches to the exact spot and the sheet shows "Exact spot unlocked".
+- **Walks:** Alex's sheet, intro card, Go button and Muse's notes all read "10 min walk" before and after he joins: a plan with a named area measures the walk to the area, so the number never changes and never hints at the exact spot. Jordan is 6 minutes away from his "I'm free" spot. The intro card, the plan sheet and Muse's notes use one walk rule (`walkToPlanMinutes`), so the numbers agree on every screen.
+- **Start time:** every screen names the clock time from the plan's `startsAt` to the minute (`formatDemoTime`): the plan page, the intro card ("Today 10:47 AM") and Muse's notes. No screen stores a "Starts in N min" string.
+- **Scene 2** is done live if Rishab's listing-to-plan link (#48) lands by Fri 6 AM PT. Otherwise the closet sale is pre-seeded and scene 2 takes about 10 seconds: show the listing, then the plan it names.
 - **The selfie** uses the laptop camera, with a prepared photo file as the backup.
-- **The demo database** (`out-here-demo`) is reseeded around Fri 6 to 7 AM PT, so dry runs use the real times, and again about 10 minutes before going on stage, so the open house still starts about 20 minutes after the demo begins.
+- **The demo database** (`out-here-demo`) is reseeded around Fri 6 to 7 AM PT, so dry runs use the real times, and again about 10 minutes before going on stage, so the closet sale still starts about 20 minutes after the demo begins.
 - **The production URL** will be getouthere.vercel.app.
 
 ## What the seed holds for this story
 
-Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.json`, `supabase/seed-places.json`). Every name and comic title is invented.
+Built on `wt/thrift-story` (`src/shared/seed/thrift.ts`, `src/shared/seed/story.ts`, `src/shared/seed/intros.ts`, `supabase/seed-content.json`, `supabase/seed-places.json`). Every name, venue and item is invented; there are no brand names.
 
-- **Theo's listing** (`l31`): "Box of indie comics: Night Courier #1–12 + 30 more", $60, with a drawn photo of the box. Its description ends "Open house today at Inkwell Comics Café, come flip through."
-- **Theo's Feed post** (`p301`): a public post in Menlo Park New Grads, a Group Alex is in, posted 24 minutes before the reseed, so it is near the top of Alex's Feed. Sage has commented.
-- **The plan** (quest key `comics-open-house`): hosted by Theo, with Sage and Yuki already in. Its bubble reads "bring a comic to trade 🔁" and its tags include zines and small-press. It carries the tag `listing:<listing id>` until #48 adds a real link; the plan's sheet shows "Hosted by Theo Nakamura" and a row for the $60 listing, and the listing page shows the plan.
-- **Posts that back the interest:** Alex commented on Theo's post ("been meaning to get into indie comics, is Night Courier a good place to start?"). Jordan posted about the zine swap at El Camino Coffee Works and Night Courier (`p302`). The intro reasons quote these.
-- **Alex and Jordan** both list comics and zines in their interests. Their friendship intro settings ask for friends for local shows, comic shops and open houses. A friendship intro round for Alex picks Jordan at 91 (local bands, comics, zines). The first reason is "You both love comics. Jordan posted: …" and the suggested first step is the Comics open house. The /intros button ("Run a friendship intro round (demo)") runs this friendship round, and Ask Muse with Friendship and "someone into comics to go to the comics open house with" gives the same intro. A round over all kinds (the API with no kind) still makes the coffee-chat intro at 97, also with the open house as its first step.
-- **Jordan's history:** one past hangout, a zine swap at El Camino Coffee Works 9 days ago with Sage, with a crew and one photo.
+- **Leah's listing** (`l31`): "Closet clean-out: vintage denim jackets, band tees, sneakers, $5–25 each", from $5, with a drawn picture of a clothing rack. It is a Marketplace pickup (PR #58): `pickup_until` is 2 hours after the reseed, `pickup_label` is "Belle Haven, near Ivy Dr" and `pickup_spot` is the courtyard. Its description ends "The map shows the area; Muse shares the exact spot once you join the sale on Out Here or I accept your hold."
+- **Leah's Feed post** (`p301`): a public post in Menlo Park New Grads, a Group Alex is in, posted 24 minutes before the reseed, so it is near the top of Alex's Feed: "Closet sale today, come try stuff on 🧥 …". It has no relative times ("in half an hour") that go stale. Bea and June have commented. Alex and Jordan never appear as seeded reactors on the story's posts, so Alex's Like on stage is his own.
+- **The plan** (quest key `closet-sale`): hosted by Leah, with June and Sage already in. Its tags include thrifting, vintage, closet sale, try-on, denim and band tees, plus `listing:<listing id>` (PR #58 has no plan link, so the tag stays). The plan's sheet shows "Hosted by Leah Moreno" and a row for the listing, and the listing page shows the plan with its general area.
+- **Alex and Jordan** both list thrifting, vintage and band tees; Jordan keeps local bands, indie music and vinyl. Their friendship intro settings ask for friends for local shows, thrift runs and closet sales. A friendship intro round for Alex picks Jordan at 97 with 3 reasons, each quoting a different sentence of Jordan's thrift-walk post (`p302`): band tees, vintage and thrifting. The trust path is "You both know Maya" and the suggested first step is the closet sale.
+- **Who is free for the sale:** Jordan ("around Belle Haven for the next hour or so, down to browse a sale"), Bea ("day off, hunting for vintage", trust path via Tyler) and Grace ("free before volleyball", in Menlo Park New Grads with Alex) each have a seeded "I'm free" window over the sale. "Find someone to go with ✨" on the plan, with "someone into thrifting to go with", returns 3 choices that all clear the 85 bar: Jordan 97, Bea 91, Grace 91.
+- **Jordan's history:** one past hangout, a thrift walk at Willow Thrift Co. 9 days ago with Bea, with a crew and one photo.
 
 ## Status key
 
@@ -40,24 +43,24 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 
 ## Act 1: Discover (0:00 to 0:40, proposed)
 
-### Scene 1. Scrolling Facebook, a comics listing catches his eye
+### Scene 1. Scrolling Facebook, a closet sale catches his eye
 
 - **Screen:** laptop A.
-- **The judge sees:** Alex scrolls the Feed and sees a Marketplace post: a box of comics he likes.
-- **Status:** built in the seed (`wt/comic-seed`).
-- **Exists:** Feed, the Marketplace grid and item pages (`/marketplace`, `/marketplace/<id>`), 31 seeded listings. Theo's Feed post shows a Marketplace share card ($60, title, "View listing") that opens the item page.
+- **The judge sees:** Alex scrolls the Feed and sees Leah's post: a closet sale with vintage denim and band tees.
+- **Status:** built in the seed (`wt/thrift-story`).
+- **Exists:** Feed, the Marketplace grid and item pages (`/marketplace`, `/marketplace/<id>`), 31 seeded listings. Leah's Feed post shows a Marketplace share card ($5, title, "View listing") that opens the item page.
 - **Needs:** nothing.
 - **Owner:** Andrew's agent (seed).
 
-### Scene 2. The seller makes it an open house
+### Scene 2. The seller makes it a closet sale
 
-- **Screen:** Theo (either laptop, or pre-made in the seed).
-- **The judge sees:** Theo turns the listing into "Comics open house, today": a plan linked to the item, live on the map.
+- **Screen:** Leah (either laptop, or pre-made in the seed).
+- **The judge sees:** Leah's listing has a closet sale plan, live on the map as a general area.
 - **✨ Muse:** fills in the title, time and invite copy from one sentence.
-- **Status:** partly built.
-- **Exists on main (PR #43, Rishab #36):** "＋ Post a plan" from the map with the Muse one-line draft, plan visibility, check-ins, reports, and the plan page `/out-here/plan/<id>`. A new plan appears on everyone's map over the `quests:new` channel.
-- **Exists in the seed (`wt/comic-seed`):** the item page shows "Comics open house · today 7:00 PM" with a link to the plan on the map, and the plan's map sheet shows the listing row and "Hosted by Theo Nakamura". Both are linked by the quest tag `listing:<listingId>`.
-- **Needs:** starting the plan from the listing live (#48) replaces the tag with a real link.
+- **Status:** built in the seed; live creation is partly built.
+- **Exists on main (PR #43, PR #58):** "＋ Post a plan" from the map with the Muse one-line draft, plan visibility, check-ins and the plan page `/out-here/plan/<id>`. Marketplace pickups (PR #58): pickup windows, holds, and the exact spot only for a buyer whose hold the seller accepted.
+- **Exists in the seed (`wt/thrift-story`):** the item page shows "Closet sale + try-ons" at "Belle Haven, near Ivy Dr" with a link to the plan, and the plan's map sheet shows the listing row and "Hosted by Leah Moreno". They are linked by the quest tag `listing:<listingId>`.
+- **Needs:** starting the plan from the listing live.
 - **Owner:** Rishab.
 
 ## Act 2: Muse brokers the match (0:40 to 2:40, proposed; the AI core)
@@ -81,15 +84,15 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 - **Needs:** the conversation itself inside a Muse panel on the 3D map: Muse's question, his answer, and the choices.
 - **Owners:** Alan (panel and animation), Ally (Muse model), Alex (what Muse says).
 
-### Scene 5. "The comic open house, but with someone who likes comics too"
+### Scene 5. "The closet sale, but with someone into thrifting too"
 
 - **Screen:** laptop A.
-- **The judge sees:** Muse vets candidates while he watches the reasoning: shared interests, past hangouts, who wants to meet new people. Muse offers 2 or 3 choices, each with a one-line why.
-- **✨ Muse:** this is the AI centerpiece. Agents vet each other, private hangout ratings count as signal, and every reason comes from real data.
-- **Status:** partly built.
-- **Exists:** on main, "who's free when you are" and plan together (PR #39). On `overnight` only, until #17 merges it to main: Muse Intros with agent vetting, the score bar and the trust path. Private hang-again answers are in review (#18).
-- **Needs:** an intro anchored to this plan ("find me someone to go to this with"), and the choices shown in the 3D Muse panel.
-- **Owners:** Alex (matching), Andrew's agent (intros), Rishab (the plan).
+- **The judge sees:** on the plan, Alex taps "Find someone to go with ✨" and types "someone into thrifting to go with". Muse vets the people in his reach who are free and within a 25 min walk, and offers 3 choices, each with the trust path, a one-line why from real posts, and "Go with them".
+- **✨ Muse:** agents vet each other, and every reason comes from real data. Nobody hears anything until Alex picks one.
+- **Status:** built on `wt/thrift-story` (mock mode on a fresh seed).
+- **Exists:** plan-anchored intros (`wt/event-intro`), the choices list, and "Go with them". Choices are marked on the server (`FirstStep.choice`): they stay out of the inbox, come back after a reload, and asking again replaces them, one per person. Picking one removes the others and asks only that person. The intro's first step is the closet sale, never the band pregame.
+- **Needs:** the choices shown in the 3D Muse panel.
+- **Owners:** Alex (matching), Andrew's agent (intros), Alan (panel).
 
 ### Scene 6. Jordan gets the ping and says yes
 
@@ -97,17 +100,16 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 - **The judge sees:** a notification arrives on laptop B. Muse gives Jordan a rundown of Alex and why they would get along. Jordan says yes.
 - **✨ Muse:** double opt-in. Nothing is shared until both say yes.
 - **Status:** partly built.
-- **Exists on `overnight` (main gets it with #17):** the intro notification, the intro card and Accept, live on both screens in about 2 seconds.
+- **Exists on `overnight` (main gets it with #17):** the intro notification, the intro card and Accept, live on both screens in about 2 seconds. Jordan's card says "Saying yes adds you to 🧥 Closet sale + try-ons · Today <time> · <N> min walk".
 - **Needs:** the rundown and the Yes button in Jordan's Muse panel on the 3D map.
 - **Owners:** Alex (what Muse says), Alan (panel).
 
 ### Scene 7. "It's happening. Head there now."
 
 - **Screen:** both laptops.
-- **The judge sees:** both screens show Muse confirming the plan at the same moment, with the walk time and a Go button.
-- **Status:** partly built.
-- **Exists on main:** the connected state, live seats, and the "It's a plan!" card with "Show on map" (PR #42).
-- **Needs:** the "head there now" moment in the Muse panel on both screens, with Go starting the walk.
+- **The judge sees:** after both say yes, both are on the plan. Each connected card shows "✨ Muse · 📍 It's on. Exact spot: Courtyard by the bike racks, Willow Court Apartments. 10 min walk for you, today <time>." and a "Go · 10 min walk" button. Muse posts the same spot in their shared chat and in each one's chat with Leah. Go opens `/out-here?go=<questId>`, which starts the walk through Up next's Let's go (the World3D `walkTo` hook).
+- **Status:** built on `wt/thrift-story`.
+- **Needs:** the "head there now" moment inside the Muse panel on the 3D map.
 - **Owners:** Alan (panel), Alex (copy).
 
 ## Act 3: Meet (2:40 to 3:40, proposed)
@@ -115,7 +117,7 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 ### Scene 8. Walk there together on the 3D map
 
 - **Screen:** both laptops.
-- **The judge sees:** each person steers with a joystick. Each sees the other's avatar moving toward the open house, and the walk minutes count down.
+- **The judge sees:** each person steers with a joystick. Each sees the other's avatar moving toward the closet sale, and the walk minutes count down.
 - **Status:** partly built.
 - **Exists on main (PR #43):** the demo walk with a joystick, arrow keys and "Walk there", the walking countdown, and plan beacons. Friends stand as avatars at their shared Find My location.
 - **Needs:** the walking position sent to the other laptop. Today the demo walk never writes a position to the server, so Jordan does not see Alex move. It should reuse the `location:<userId>` Broadcast (ids only, then refetch). Real GPS (#40) stays off on stage.
@@ -154,11 +156,11 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 
 ## What the demo still needs, in order of risk
 
-1. **The comic story in the seed.** Built on `wt/comic-seed`: Theo, his listing and post, the open house plan, Alex and Jordan as comic fans, and Jordan's past hangout. It reaches the demo with a reseed. Owner: Andrew's agent.
-2. **Event-anchored intro.** Muse Intros match people in general. The demo needs "find me someone to go to this plan with", which joins Rishab's plan, Alex's matching and the intro double opt-in. Owners: Alex (matching), with Andrew's agent (intros) and Rishab (the plan).
+1. **The thrift story in the seed.** Built on `wt/thrift-story`: Leah, her pickup listing and post, the closet sale plan with its general area and exact spot, Alex and Jordan as thrifters, Bea and Grace as the other choices, and Jordan's past thrift walk. It reaches the demo with a reseed. Owner: Andrew's agent.
+2. **Event-anchored intro.** Built on `wt/thrift-story` (from `wt/event-intro`): "find me someone to go to this plan with" returns 2 or 3 choices, and a double yes puts both on the plan. Owners: Alex (matching), with Andrew's agent (intros) and Rishab (the plan).
 3. **Muse talks inside the 3D view.** The conversation, the choices, Jordan's rundown and "head there now" belong in a Muse panel on the 3D map, not in Messenger. The companion and its speech bubble are on main. Owners: Alan (panel and animation), Ally (Muse model), Alex (what Muse says).
 4. **Two avatars walking together.** The joystick and the walk are on main. The missing part is each laptop seeing the other's avatar move live. Owner: Alan.
-5. **Listing to plan link.** Posting a plan works on main. The missing part is starting it from the comics listing and showing the item on the plan page. Owner: Rishab (#36).
+5. **Listing to plan link.** Posting a plan works on main. The missing part is starting it from the closet clean-out listing live. Owner: Rishab (#36).
 6. **Arrival opens the selfie.** Arrival is detected on main but only shows a toast. It needs to open the photo capture, and the photo feeds the memory board and the rating. Owners: Alan (arrival), Ally (memory board, #19), Andrew's agent (rating, #18).
 
 ## Who carries which scenes
@@ -168,7 +170,7 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 | Alex | 5, 6, 7: who Muse picks and what it says; 9: photo capture | #20, #21 |
 | Alan | 3, 4, 7, 8, 9: 3D view, Muse panel, walk, arrival | #13, #24, #25 |
 | Ally | 3, 4: the Muse and avatar models; 11: the memory board | #37, #19 |
-| Rishab | 2: listing to open house plan | #36, #14 |
+| Rishab | 2: listing to closet sale plan | #36, #14 |
 | Andrew's agent | the seed story, 5 (intros), 10 (rating), reasoning on screen, integration and deploys | #12, #18, #28, #38 |
 
 ## Not on stage (it stays in the app)
@@ -176,7 +178,7 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 - The Messenger inbox as its own screen. Muse's conversation lives in the 3D panel instead.
 - The Muse filter toggle on the 2D map.
 - Groups, the Events discover page, and the Partiful-style plan page (#26).
-- Marketplace "home now" pickups (#22), except the one comics listing.
+- Marketplace "home now" pickups (#22), except the closet sale listing.
 - Announcements (#27), Reels, Daily Quest, streaks, and Wrapped (#29).
 - Real GPS (#40). The joystick drives the walk on stage.
 

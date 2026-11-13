@@ -1,13 +1,15 @@
 // Plan-anchored intros ("find someone to go to THIS plan with", issue #44): who can be a
 // candidate for a plan, the interest-to-plan reason, and both people joining on double accept.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { offsetPoint, profileId, type ID } from '@/shared';
+import { offsetPoint, profileId, THRIFT_AREA, THRIFT_MEET_SPOT, type ID } from '@/shared';
 import { createMemoryStore, type DataStore } from '@/features/data/server';
 import { candidatesFor, factsFor, freeForPlan, planFacts } from './rules';
 import { requestIntro, respondIntro } from './service';
 
 const alex = profileId('alex');
 const jordan = profileId('jordan');
+const SALE = 'Closet sale + try-ons';
+const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 beforeAll(() => { process.env.MUSE_MOCK = '1'; });
 
@@ -76,10 +78,11 @@ describe('plan reasons', () => {
   it('the other person\'s interest alone counts too, written to each side', async () => {
     const store = createMemoryStore();
     const { view } = await store.museContext();
-    const q = await questByTitle(store, 'Thrift walk on Willow');
-    const [f] = planFacts(view, view.profileById.get(alex)!, view.profileById.get(jordan)!, q);
-    expect(f.forA).toBe('Jordan is into thrifting, a fit for 🧥 Thrift walk on Willow');
-    expect(f.forB).toBe('Alex wants company for 🧥 Thrift walk on Willow, and you\'re into thrifting');
+    // Alex runs and Jordan does not: Jordan asks for company to the 5K.
+    const q = await questByTitle(store, 'Easy 5K along the bay trail');
+    const [f] = planFacts(view, view.profileById.get(jordan)!, view.profileById.get(alex)!, q);
+    expect(f.forA).toBe('Alex is into running, a fit for 🏃 Easy 5K along the bay trail');
+    expect(f.forB).toBe('Jordan wants company for 🏃 Easy 5K along the bay trail, and you\'re into running');
   });
 
   it('replaces the generic shared-interest reason instead of repeating it', async () => {
@@ -100,6 +103,7 @@ describe('double accept joins the plan', () => {
   async function anchored(store: DataStore, title: string) {
     const q = await questByTitle(store, title);
     await jordanFree(store, q);
+    await onlyJordan(store, q.id);
     const r = await requestIntro(store, alex, 'networking', '', q.id);
     expect(r.intro?.other.handle).toBe('jordan');
     expect(r.intro?.step.anchored).toBe(true);
@@ -114,7 +118,7 @@ describe('double accept joins the plan', () => {
 
   it('both people join exactly once, and Muse names the plan, the time and the walk', async () => {
     const store = createMemoryStore();
-    const { q, id } = await anchored(store, 'Comics open house');
+    const { q, id } = await anchored(store, SALE);
     const before = await seatsOf(store, q.id);
     await respondIntro(store, alex, id, true);
     expect(await membersOf(store, q.id)).not.toContain(alex);   // nothing happens on one yes
@@ -128,9 +132,11 @@ describe('double accept joins the plan', () => {
     expect(await seatsOf(store, q.id)).toBe(before - 2);
     const threadId = one.intro.threadId ?? two.intro.threadId!;
     const notes = (await store.messages(alex, threadId)).filter((m) => m.kind === 'muse');
-    expect(notes).toHaveLength(1);
+    // Muse's note, then the exact spot now that both are on the plan.
+    expect(notes).toHaveLength(2);
     expect(notes[0].text).toContain(`You're both going to ${q.emoji} ${q.title} at ${q.venueName}`);
     expect(notes[0].text).toMatch(/about a \d+ min walk for Alex and \d+ min for Jordan/);
+    expect(notes[1].text).toContain(`Exact spot: ${THRIFT_MEET_SPOT}`);
     const card = (await respondIntro(store, alex, id, true)).intro;
     expect(card.plan?.held).toBe(true);
     expect(card.step.href).toContain(q.id);
@@ -138,7 +144,7 @@ describe('double accept joins the plan', () => {
 
   it('a plan that filled up still connects, and Muse suggests the next one', async () => {
     const store = createMemoryStore();
-    const { q, id } = await anchored(store, 'Comics open house');
+    const { q, id } = await anchored(store, SALE);
     // Other people take the last seats before Jordan says yes.
     const { view } = await store.museContext();
     const members = view.questMemberIds(q.id);
@@ -153,7 +159,8 @@ describe('double accept joins the plan', () => {
     expect(after).not.toContain(jordan);
     const notes = (await store.messages(alex, done.threadId!)).filter((m) => m.kind === 'muse');
     expect(notes).toHaveLength(1);
-    expect(notes[0].text).toContain(`${q.emoji} ${q.title} at ${q.venueName} filled up before you both said yes.`);
+    // Neither of them got on, so the note names only the general area.
+    expect(notes[0].text).toContain(`${q.emoji} ${q.title} at ${THRIFT_AREA} filled up before you both said yes.`);
     expect(notes[0].text).toMatch(/Next one that fits you both|Want me to find another plan/);
   });
 
@@ -166,40 +173,51 @@ describe('double accept joins the plan', () => {
   });
 });
 
-// Scene 5 of docs/DEMO_FLOW.md: "find me someone who likes comics to go to THIS open house with".
-describe('scene 5: someone for the comics open house', () => {
-  async function comicsWithJordanFree() {
+/**
+ * Bea and Grace are also free for the closet sale and clear the bar (the scene 5 choices); for
+ * tests about one intro, they are already on the plan, so Jordan is the only candidate.
+ */
+async function onlyJordan(store: DataStore, questId: ID) {
+  for (const h of ['bea', 'grace']) await store.joinQuest(profileId(h), questId).catch(() => undefined);
+}
+
+// Scene 5 of docs/DEMO_FLOW.md: "find me someone into thrifting to go to THIS closet sale with".
+describe('scene 5: someone for the closet sale', () => {
+  async function saleWithOnlyJordan() {
     const store = createMemoryStore();
-    const q = await questByTitle(store, 'Comics open house');
-    await jordanFree(store, q);
+    const q = await questByTitle(store, SALE);
+    await onlyJordan(store, q.id);
     return { store, q };
   }
 
   it('the scripted line finds Jordan above the bar, and the first reason ties him to the plan', async () => {
     for (const kind of ['friendship', 'networking', null] as const) {
-      const { store, q } = await comicsWithJordanFree();
-      const r = await requestIntro(store, alex, kind, 'someone who likes comics', q.id);
+      const { store, q } = await saleWithOnlyJordan();
+      const r = await requestIntro(store, alex, kind, 'someone into thrifting', q.id);
       expect(r.intro?.other.handle).toBe('jordan');
       expect(r.intro!.score).toBeGreaterThanOrEqual(85);
-      expect(r.intro!.reasons[0]).toContain(`${q.emoji} ${q.title}`);
+      // The first reason is why Jordan fits a closet sale, quoting what he posted; the step is the sale.
+      expect(r.intro!.reasons[0]).toMatch(/^You both love .*thrifting/);
+      expect(r.intro!.step.label).toContain(`${q.emoji} ${q.title}`);
     }
   });
 
   it('with no kind, a plan request is a Friendship intro', async () => {
-    const { store, q } = await comicsWithJordanFree();
+    const { store, q } = await saleWithOnlyJordan();
     expect((await requestIntro(store, alex, null, '', q.id)).intro?.kind).toBe('friendship');
   });
 
   it('the typed ask adds a reason and keeps the saved looking-for', async () => {
-    const { store, q } = await comicsWithJordanFree();
-    const r = await requestIntro(store, alex, 'friendship', 'someone into local bands', q.id);
-    expect(r.intro?.reasons).toContain('You asked for someone into local bands, and Jordan is into local bands');
+    // A plan intro gives one reason of each kind (plan, Group, timing), so this is a plain ask.
+    const store = createMemoryStore();
+    const r = await requestIntro(store, alex, 'friendship', 'someone into vinyl');
+    expect(r.intro?.reasons).toContain('You asked for someone into vinyl, and Jordan is into vinyl');
     expect(r.intro!.score).toBeGreaterThanOrEqual(85);
   });
 
   it('Jordan never reads what Alex typed', async () => {
-    const { store, q } = await comicsWithJordanFree();
-    const r = await requestIntro(store, alex, 'friendship', 'someone into local bands', q.id);
+    const { store, q } = await saleWithOnlyJordan();
+    const r = await requestIntro(store, alex, 'friendship', 'someone into vinyl', q.id);
     await respondIntro(store, alex, r.intro!.id, true);
     const { listIntros } = await import('./service');
     const card = (await listIntros(store, jordan)).intros.find((i) => i.id === r.intro!.id)!;
@@ -216,20 +234,20 @@ describe('scene 5: someone for the comics open house', () => {
   });
 
   it('Jordan\'s card says that yes puts him on the plan, with the time and the walk', async () => {
-    const { store, q } = await comicsWithJordanFree();
+    const { store, q } = await saleWithOnlyJordan();
     const r = await requestIntro(store, alex, 'friendship', '', q.id);
-    expect(r.intro?.joinLine).toMatch(new RegExp(`^Saying yes adds you to ${q.emoji} ${q.title} · .+ · [0-9]+ min walk$`));
+    expect(r.intro?.joinLine).toMatch(new RegExp(`^Saying yes adds you to ${esc(`${q.emoji} ${q.title}`)} · .+ · [0-9]+ min walk$`));
     await respondIntro(store, alex, r.intro!.id, true);
     const { listIntros } = await import('./service');
     const card = (await listIntros(store, jordan)).intros.find((i) => i.id === r.intro!.id)!;
     expect(card.state).toBe('new');
-    expect(card.joinLine).toMatch(new RegExp(`^Saying yes adds you to ${q.emoji} ${q.title} · `));
+    expect(card.joinLine).toMatch(new RegExp(`^Saying yes adds you to ${esc(`${q.emoji} ${q.title}`)} · `));
     const done = (await respondIntro(store, jordan, r.intro!.id, true)).intro;
     expect(done.joinLine).toBeNull();
   });
 
   it('picking one choice asks only that person and removes the other choices', async () => {
-    const { store, q } = await comicsWithJordanFree();
+    const { store, q } = await saleWithOnlyJordan();
     const r = await requestIntro(store, alex, 'friendship', '', q.id);
     const { view } = await store.museContext();
     const first = view.db.intros.find((i) => i.id === r.intro!.id)!;

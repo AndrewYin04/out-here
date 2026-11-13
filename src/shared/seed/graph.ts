@@ -35,7 +35,7 @@ export const LOCAL_CIRCLES = [
 const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
 /**
- * Someone with no circles (for example Theo, the comics seller) knows nobody in the seed: they
+ * Someone with no circles (for example Leah, the closet sale seller) knows nobody in the seed: they
  * get no friendships, no bridges and no friend requests, and leave everyone else's graph as is.
  */
 export const inFriendGraph = (p: { circles?: readonly string[] | null }) => (p.circles?.length ?? 0) > 0;

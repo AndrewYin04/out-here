@@ -173,7 +173,7 @@
       "viewer": "alex",
       "text": "thrifting this afternoon",
       "expect": {
-        "topQuest": "thrift"
+        "topQuest": "closet-sale"
       }
     },
     {

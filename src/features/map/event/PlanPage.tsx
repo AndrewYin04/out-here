@@ -162,8 +162,9 @@ export function PlanPage({ id }: { id: string }) {
             </li>
             <li className="flex items-center gap-2">
               <MapPin size={18} className="text-fb-text-2" aria-hidden />
-              <span>{q.venueName}</span>
-              {!isMember && <span className="text-fb-text-2">· exact spot after you join</span>}
+              {/* Before joining, a plan with a named area shows only the area, like a Marketplace pickup. */}
+              <span data-testid="plan-place">{isMember ? d.meetSpot ?? q.venueName : d.areaLabel ?? q.venueName}</span>
+              {!isMember && <span className="text-fb-text-2">· ✨ Muse shares the exact spot after you join</span>}
             </li>
             <li className="flex items-center gap-2">
               <Wallet size={18} className="text-fb-text-2" aria-hidden />
@@ -187,7 +188,7 @@ export function PlanPage({ id }: { id: string }) {
                 {d.seatsLeft === 0 ? 'Full' : 'Join'}
               </Button>
             )}
-            {q.status !== 'done' && Date.parse(q.endsAt) > now.getTime() && (
+            {q.status !== 'done' && Date.parse(q.endsAt) > now.getTime() && d.seatsLeft > 0 && (
               <LinkButton href={`/intros?quest=${encodeURIComponent(q.id)}`} variant="tint" data-testid="plan-find-someone">Find someone to go with ✨</LinkButton>
             )}
             {isMember && checkinOpen && (

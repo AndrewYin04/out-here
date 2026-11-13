@@ -2,7 +2,7 @@
 // quality bar and the weekly cap. Pure functions over one store snapshot (View), so the unit
 // tests and the routes agree. The model never decides who is in reach or whether the bar is met.
 import {
-  freeSpotForPlan, haversineMeters, INTRO_KINDS, PLAN_WALK_MIN,
+  formatDemoTime, freeSpotForPlan, haversineMeters, INTRO_KINDS, PLAN_WALK_MIN,
   type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type LatLng, type Profile, type TrustPath,
 } from '@/shared';
 import { interestsMatchingQuest } from '@/features/muse';
@@ -211,7 +211,7 @@ export function distinctTopics(facts: SharedFact[]): number {
 /**
  * One reason per underlying fact, in the order one side reads them: what that side is looking
  * for first (the most specific), then shared interests backed by something the other person
- * posted, then other shared interests (rarer ones first: "comics" before "local bands"), then
+ * posted, then other shared interests (rarer ones first: "vintage" before "local bands"), then
  * what the other side is looking for. A fact whose
  * topic is already covered ("You both love local bands" after "You're looking for people to go
  * to local shows with, and Jordan is into local bands") is dropped.
@@ -235,7 +235,7 @@ export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
   return orderedFacts(facts, side).map((f) => (side === 'a' ? f.forA : f.forB) ?? '');
 }
 
-/** A case-insensitive match for an interest that also takes the plural: "comic" finds "comics". */
+/** A case-insensitive match for an interest that also takes the plural: "band tee" finds "band tees". */
 function phraseRe(phrase: string): RegExp | null {
   const ws = phrase.toLowerCase().split(/\s+/).filter(Boolean);
   if (!ws.length) return null;
@@ -337,8 +337,8 @@ export function sharedFacts(v: View, a: Profile, b: Profile, kind: IntroKind, aO
     const keys = keywords(looking);
     const e = evidence(y, keys, kind);
     if (!e) continue;
-    // "You're looking for ..., and Jordan is into comics" only repeats the want back when a shared
-    // interest already says it ("You both love comics. Jordan posted: ..."), so that fact covers it.
+    // "You're looking for ..., and Jordan is into thrifting" only repeats the want back when a shared
+    // interest already says it ("You both love thrifting. Jordan posted: ..."), so that fact covers it.
     if (out.some((f) => f.looker === null && sameTopic(f.topic, keywords(e.term)))) continue;
     const forX = `You're looking for ${looking}, and ${e.they(firstName(y))}`;
     out.push({
@@ -363,18 +363,20 @@ export function codeScore(distinctFacts: number): number {
 const TZ = 'America/Los_Angeles';
 const dayKey = (ms: number) => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ });
 
-/** "Starts in 25 min", "Today 5:45 PM", "Tomorrow 10:00 AM", "Sat 2:00 PM"; minutes rounded to 5. */
+/**
+ * "Today 10:47 AM", "Tomorrow 10:00 AM", "Sat 2:00 PM", "Happening now". The clock time is the
+ * plan's start to the minute, formatted like the plan page (formatDemoTime), so the intro card,
+ * Muse's chat notes and the plan page always name the same time. A "Starts in N min" string
+ * would be stale a minute after it was stored.
+ */
 export function relativeWhen(startsAt: string, nowMs: number): string {
   const ms = Date.parse(startsAt);
-  const mins = Math.round((ms - nowMs) / 60_000);
-  if (mins <= 0) return 'Happening now';
-  if (mins < 60) return `Starts in ${Math.max(5, Math.round(mins / 5) * 5)} min`;
-  const rounded = Math.round(ms / 300_000) * 300_000;
-  const time = new Date(rounded).toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' });
-  const day = dayKey(rounded);
+  if (ms <= nowMs) return 'Happening now';
+  const time = formatDemoTime(startsAt);
+  const day = dayKey(ms);
   if (day === dayKey(nowMs)) return `Today ${time}`;
   if (day === dayKey(nowMs + 86_400_000)) return `Tomorrow ${time}`;
-  return `${new Date(rounded).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })} ${time}`;
+  return `${new Date(ms).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' })} ${time}`;
 }
 type QuestRow = View['db']['quests'][number];
 /** The walk cap for a plan-anchored candidate, the same 25 min Muse plans use. */
@@ -406,11 +408,11 @@ export function walkToPlan(v: View, userId: ID, q: QuestRow, nowMs: number): num
 
 /**
  * Interests of b (as a may see them) that match the plan's tags, title or category. Each is a
- * concrete reason for this intro: Jordan likes comics and this is a comics open house. When a
- * likes it too it reads "You both love comics, and that's what 🦸 Comic open house is about";
- * otherwise A reads "Jordan is into comics, a fit for 🦸 Comic open house" and B reads that A
+ * concrete reason for this intro: Jordan likes thrifting and this is a closet sale. When a
+ * likes it too it reads "You both love thrifting, and that's what 🧥 Closet sale + try-ons is about";
+ * otherwise A reads "Jordan is into thrifting, a fit for 🧥 Closet sale + try-ons" and B reads that A
  * wants company for a plan about something B likes. The topic is the interest's keywords, so the
- * generic "You both love comics" fact is replaced, not repeated.
+ * generic "You both love thrifting" fact is replaced, not repeated.
  */
 export function planFacts(v: View, a: Profile, b: Profile, q: QuestRow): SharedFact[] {
   const plan = `${q.emoji} ${q.title}`;
@@ -455,9 +457,9 @@ export function questKeywords(q: Pick<QuestRow, 'title' | 'tags' | 'category'>):
 }
 
 /**
- * What the viewer typed when asking ("someone who likes comics") checked against b's profile as
+ * What the viewer typed when asking ("someone into thrifting") checked against b's profile as
  * the viewer may see it. The ask is an extra fact for the viewer only (b is never told what a
- * typed): "You asked for someone who likes comics, and Jordan is into comics". It never replaces
+ * typed): "You asked for someone into thrifting, and Jordan is into thrifting". It never replaces
  * the viewer's saved looking-for text.
  */
 export function askFacts(v: View, a: Profile, b: Profile, ask: string, kind: IntroKind): SharedFact[] {
@@ -555,7 +557,9 @@ export function candidatesFor(
   const myP = opts.viewerProfile ?? introProfileOf(v, viewerId);
   const reach = reachOf(v, viewerId);
   const recent = new Set(v.db.intros
-    .filter((i) => (i.aId === viewerId || i.bId === viewerId) && opts.nowMs - Date.parse(i.createdAt) < REINTRO_COOLDOWN_MS)
+    // Unpicked choices (FirstStep.choice) were never sent, so they do not start the cooldown.
+    .filter((i) => (i.aId === viewerId || i.bId === viewerId) && !(i.status === 'proposed' && i.firstStep.choice)
+      && opts.nowMs - Date.parse(i.createdAt) < REINTRO_COOLDOWN_MS)
     .map((i) => (i.aId === viewerId ? i.bId : i.aId)));
   const pendingFriend = (other: ID) => v.friendship(viewerId, other) !== null;
   // A plan-anchored request: only people who could go to it (see it, not already on it, free
@@ -581,8 +585,8 @@ export function candidatesFor(
     // Facts come from one kind only, so the intro is made for the kind with the most distinct
     // facts (ties keep the order of `kinds`): Alex and Jordan share more as a coffee chat than
     // as friends, and a friendship intro never borrows their coffee-chat wants.
-    // For a plan, the first kind (in `kinds` order) that clears the bar wins, so a comics open
-    // house stays a Friendship intro even when a coffee chat would share one more fact.
+    // For a plan, the first kind (in `kinds` order) that clears the bar wins, so the closet sale
+    // stays a Friendship intro even when a coffee chat would share one more fact.
     let best: { kind: IntroKind; facts: SharedFact[]; score: number } | null = null;
     const pf = q ? planFacts(v, me, p, q) : [];
     for (const kind of eligible) {

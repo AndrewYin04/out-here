@@ -2,7 +2,7 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, EARLY_PHOTO_MS, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  demoDate, EARLY_PHOTO_MS, formatDemoTime, fuzzLocation, SEED_MEET_SPOTS, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
   type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
@@ -51,7 +51,7 @@ export type QuestDetail = {
    * rule (walkToPlanMinutes), so the numbers agree. Null without a home or window.
    */
   walkMinutes: number | null;
-  /** The exact spot, for the host and members only ("Ivy Commons, side gate on Ivy Dr: ..."). */
+  /** The exact spot, for the host and members only ("Courtyard by the bike racks, Willow Court Apartments"). */
   meetSpot: string | null;
   /** The general area shown before joining, when the plan has one ("Belle Haven, near Ivy Dr"). */
   areaLabel: string | null;
@@ -645,7 +645,8 @@ export class CoreStore {
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map((q) => ({
         quest: v.questFor(viewerId, q), members: v.people(viewerId, v.questMemberIds(q.id)),
-        walkMinutes: walkingMinutes(viewer.home, q.location), crewId: crews.get(q.id) ?? null,
+        // The same walk the plan sheet and the intro card show (View.walkToPlan).
+        walkMinutes: v.walkToPlan(viewerId, q) ?? walkingMinutes(viewer.home, q.location), crewId: crews.get(q.id) ?? null,
       }));
   }
 
@@ -776,8 +777,29 @@ export class CoreStore {
       await publish(`user:${m}`, { type: 'quest', id: questId });
       await this.notify(after, q.hostId, 'quest_join', m, 'quest', questId,
         `${firstName(after.profileById.get(m))} joined ${q.title}.`);
+      await this.museSpotNote(m, q);
     }
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), seatsLeft };
+  }
+
+  /**
+   * Joining confirms you, so Muse sends the exact spot in a ✨ Muse note in your chat with the
+   * host, the way a Marketplace seller shares the address after accepting. Only plans with a
+   * seeded meeting spot (SEED_MEET_SPOTS: the closet sale) have a general area to hide behind;
+   * the note is sent once per person.
+   *   "✨ Muse: You're confirmed for Leah's closet sale + try-ons at 6:30 PM. Exact spot:
+   *    Courtyard by the bike racks, Willow Court Apartments. Text Leah when you're here."
+   */
+  private async museSpotNote(userId: ID, q: QuestRow): Promise<void> {
+    const spot = SEED_MEET_SPOTS.get(q.id)?.meetSpot;
+    if (!spot || userId === q.hostId) return;
+    const v = await this.view();
+    const host = firstName(v.profileById.get(q.hostId));
+    const what = q.title.charAt(0).toLowerCase() + q.title.slice(1);
+    const text = `✨ Muse: You're confirmed for ${host}'s ${what} at ${formatDemoTime(q.startsAt)}. Exact spot: ${spot}. Text ${host} when you're here.`;
+    const thread = await this.openThread(userId, [q.hostId]);
+    if (v.messages(thread.id).some((m) => m.kind === 'muse' && m.text === text)) return;
+    await this.sendMessage(userId, thread.id, text, 'muse');
   }
 
   async leaveQuest(viewerId: ID, questId: ID): Promise<{ quest: Quest; seatsLeft: number }> {
@@ -1244,8 +1266,11 @@ export class CoreStore {
     const q = v.db.quests
       .filter((x) => x.tags.includes(`listing:${l.id}`) && v.isActiveQuest(x) && v.canSeeQuest(viewerId, x))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+    // Before joining, the plan's general area only (like the map); the venue once you are on it.
     const plan = q ? {
-      questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt, endsAt: q.endsAt, seatsLeft: v.seatsLeft(q),
+      questId: q.id, title: q.title, emoji: q.emoji,
+      venueName: v.meetSpotFor(viewerId, q) ? q.venueName : v.areaLabelFor(q) ?? q.venueName,
+      startsAt: q.startsAt, endsAt: q.endsAt, seatsLeft: v.seatsLeft(q),
     } : null;
     return { listing: publicListing(v, viewerId, l), seller: v.person(viewerId, l.sellerId)!, plan };
   }

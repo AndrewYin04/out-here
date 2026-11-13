@@ -179,8 +179,10 @@ describe('P3: Muse is in the chat and its ask works', () => {
     expect(view.questMemberIds(questId)).toEqual(expect.arrayContaining([alex, jordan]));
     await planIntro(store, alex, id, { action: 'hold' });   // a repeat is a no-op
     const muse = (await store.messages(alex, threadId)).filter((m) => m.kind === 'muse');
-    expect(muse).toHaveLength(2);
+    // Muse's ask, the confirmation, then the exact spot now that both are on the plan.
+    expect(muse).toHaveLength(3);
     expect(muse[1].text).toMatch(/^✨ Muse: Done, Jordan asked me to hold it: Alex and Jordan are both going to /);
+    expect(muse[2].text).toMatch(/^✨ Muse: It's on. Exact spot: /);
     expect((await listIntros(store, alex)).intros.find((x) => x.id === id)!.plan?.held).toBe(true);
   });
 

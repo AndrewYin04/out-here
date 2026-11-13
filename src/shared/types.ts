@@ -335,7 +335,11 @@ export type AgentTurn = { agent: 'a' | 'b'; text: string; outcome?: string };
  * The first step of an intro. `anchored` is true when the person asked for someone to go to this
  * plan with (an intro request with a questId): on double accept both people join it.
  */
-export type FirstStep = { text: string; questId: ID | null; placeId: ID | null; anchored?: boolean };
+/**
+ * `choice` marks one of 2-3 people Muse offered for a plan request before the viewer picked one:
+ * only the viewer sees it, it is not in the inbox, and only picking it (pickIntro) moves it on.
+ */
+export type FirstStep = { text: string; questId: ID | null; placeId: ID | null; anchored?: boolean; choice?: boolean };
 export type IntroStatus = 'proposed' | 'a_accepted' | 'b_accepted' | 'accepted' | 'declined' | 'expired';
 export type IntroSource = 'auto' | 'request';
 /**

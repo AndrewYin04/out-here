@@ -309,7 +309,7 @@ export class View {
   }
   /**
    * The exact meeting spot, for the host and people on the plan only (null for everyone else):
-   * a seeded spot ("Ivy Commons, side gate on Ivy Dr: ..."), else the venue and its street.
+   * a seeded spot ("Courtyard by the bike racks, Willow Court Apartments"), else the venue and its street.
    */
   meetSpotFor(viewerId: ID, q: QuestRow): string | null {
     if (q.hostId !== viewerId && !this.questMemberIds(q.id).includes(viewerId)) return null;
@@ -318,9 +318,15 @@ export class View {
     const place = q.placeId ? this.db.places.find((x) => x.id === q.placeId) : undefined;
     return place?.address ? `${q.venueName}, ${place.address}` : q.venueName;
   }
-  /** Whole walking minutes to the plan for this person (one rule for every screen; see walkToPlanMinutes). */
+  /**
+   * Whole walking minutes to the plan for this person (one rule for every screen; see
+   * walkToPlanMinutes): to the exact point for members and the ~200 m area for everyone else. A
+   * plan with a named area (the closet sale) always measures to the area, so the number Alex saw
+   * before joining is the one his intro card, Go button and Muse's notes show after.
+   */
   walkToPlan(userId: ID, q: QuestRow, at: Date = now()): number | null {
-    const dest = q.hostId === userId || this.questMemberIds(q.id).includes(userId) ? q.location : q.approxLocation;
+    const confirmed = q.hostId === userId || this.questMemberIds(q.id).includes(userId);
+    const dest = confirmed && !SEED_MEET_SPOTS.get(q.id)?.areaLabel ? q.location : q.approxLocation;
     return walkToPlanMinutes(this.db.availability.filter((a) => a.userId === userId), this.profileById.get(userId)?.home, q, dest, at);
   }
   /** The general area shown before joining ("Belle Haven, near Ivy Dr"), when the plan has one. */

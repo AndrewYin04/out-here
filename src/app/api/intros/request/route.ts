@@ -1,6 +1,6 @@
 // POST /api/intros/request { kind?, lookingFor?, text?, questId? } -> RoundResult & { none?: true }
 // An on-request intro: skips the weekly cap but must still clear the quality bar. `text` is the
-// same as `lookingFor` ("someone who likes comics"). With `questId` ("find someone to go to THIS
+// same as `lookingFor` ("someone into thrifting"). With `questId` ("find someone to go to THIS
 // plan with") only people free for that plan, within a 25 min walk of it and not already on it
 // are considered; the plan is the first step, and on double accept both people join it. The
 // typed text is an extra fact and never replaces the saved looking-for. For a plan, `kind` is

@@ -42,7 +42,7 @@ The Up next card (Ally, feat/up-next) is that next-step bar. Every confirmation 
 ## Not on this branch (owners in DEMO_FLOW.md)
 
 - Compress the companion model: re-export from Blender with Draco on (Ally). The loader then needs `DRACOLoader`; about 32 MB should drop to a few MB.
-- "Someone who likes comics" must find Jordan: event-anchored intro (#44) and the comic seed (#49).
+- "Someone into thrifting" must find Jordan: event-anchored intro (#44) and the thrift story seed (`wt/thrift-story`).
 - The Muse conversation panel in 3D (#45).
 - A real Muse key on both demo laptops: "Offline suggestions" on stage costs the AI score.
 

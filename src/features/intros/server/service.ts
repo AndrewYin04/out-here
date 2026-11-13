@@ -24,6 +24,8 @@ export const MUSE_PREFIX = '✨ Muse: ';
 /** Whole-round budget for live Muse calls (3 pairs run in parallel, 5 calls each). */
 const ROUND_BUDGET_MS = 40_000;
 
+/** One of a plan request's unpicked choices (see FirstStep.choice). */
+export const isChoice = (i: Intro) => i.status === 'proposed' && i.firstStep.choice === true;
 const isOpen = (i: Intro) => i.status === 'proposed' || i.status === 'a_accepted' || i.status === 'b_accepted';
 const isExpired = (i: Intro, nowMs: number) => isOpen(i) && nowMs - Date.parse(i.createdAt) > INTRO_TTL_MS;
 
@@ -37,6 +39,17 @@ function visibleTo(i: Intro, viewerId: ID): boolean {
 }
 
 
+/**
+ * Where a plan is, as these people may see it: the venue once all of them are on it (or host
+ * it), else its general area ("Belle Haven, near Ivy Dr") when it has one, like a Marketplace
+ * pickup before the seller accepts.
+ */
+function placeFor(v: View, q: QuestRow, ids: ID[]): string {
+  const members = v.questMemberIds(q.id);
+  const confirmed = ids.every((id) => id === q.hostId || members.includes(id));
+  return confirmed ? q.venueName : v.areaLabelFor(q) ?? q.venueName;
+}
+
 function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   const q = i.firstStep.questId ? v.db.quests.find((x) => x.id === i.firstStep.questId) : undefined;
   const anchored = !!i.firstStep.anchored;
@@ -44,7 +57,7 @@ function stepView(v: View, i: Intro, nowMs: number): IntroStepView {
   // A full plan is still on (the pair may be the ones who filled it); only done or over ends it.
   const live = q.status !== 'done' && Date.parse(q.endsAt) > nowMs;
   return {
-    label: `${q.emoji} ${q.title} at ${q.venueName}`,
+    label: `${q.emoji} ${q.title} at ${placeFor(v, q, [i.aId, i.bId])}`,
     when: live ? relativeWhen(q.startsAt, nowMs) : 'This plan has ended',
     href: live ? `/out-here?quest=${encodeURIComponent(q.id)}` : null,
     seatsLeft: live ? v.seatsLeft(q) : null,
@@ -63,7 +76,7 @@ function notYetOn(v: View, i: Intro): ID[] {
 
 /**
  * Muse's concrete ask for a connected pair, tied to the first step: "Want me to hold 2 seats at
- * 📚 Comics open house at Inkwell Comics Café (Starts in 30 min, 5 seats left)? ..."
+ * 🧥 Closet sale + try-ons at Belle Haven, near Ivy Dr (Today 6:30 PM, 5 seats left)? ..."
  * With `viewerId` the ask is written to that person when only one of them still needs a seat
  * ("Jordan's already going to X. Want me to hold you a seat?" / "You're already going to X. Want
  * me to save Alex a seat?"); without it (the pair's shared chat) it names both in the third person.
@@ -111,7 +124,7 @@ export function anchoredNote(v: View, i: Intro, nowMs: number, result: PlanJoin)
     const walk = wa !== null && wb !== null ? ` It's about a ${wa} min walk for ${A} and ${wb} min for ${B}.` : '';
     return `${head} You're both going to ${s.label} (${s.when}).${walk} I saved both your seats, and it's on both your Out Here maps.`;
   }
-  const label = q ? `${q.emoji} ${q.title} at ${q.venueName}` : i.firstStep.text;
+  const label = q ? `${q.emoji} ${q.title} at ${placeFor(v, q, [i.aId, i.bId])}` : i.firstStep.text;
   const next = planOptions(v, i, nowMs)[0];
   const then = next
     ? `Next one that fits you both: ${next.label} (${next.when}, ${seatsText(next.seatsLeft)} left). Tap Pick another time on your intro.`
@@ -123,7 +136,7 @@ export function anchoredNote(v: View, i: Intro, nowMs: number, result: PlanJoin)
  * Muse's reveal once both people are on the plan, like a Marketplace seller sharing the address
  * after accepting: the exact spot (members only, View.meetSpotFor), each walk from the same rule
  * the plan sheet uses, and the start. Null until both are on it.
- *   for a viewer: "It's on. Exact spot: Ivy Commons, side gate on Ivy Dr: .... 9 min walk for you, starts in 30 min."
+ *   for a viewer: "It's on. Exact spot: Courtyard by the bike racks, Willow Court Apartments. 9 min walk for you, today 6:30 PM."
  *   for the chat: "It's on. Exact spot: .... Starts in 30 min."
  */
 export function revealText(v: View, i: Intro, nowMs: number, viewerId?: ID): string | null {
@@ -182,7 +195,7 @@ function planOptions(v: View, i: Intro, nowMs: number): IntroPlanOption[] {
       return v.seatsLeft(q) >= [i.aId, i.bId].filter((id) => !m.includes(id)).length;
     })
     .slice(0, 3)
-    .map((q) => ({ questId: q.id, label: `${q.emoji} ${q.title} at ${q.venueName}`, when: relativeWhen(q.startsAt, nowMs), seatsLeft: v.seatsLeft(q) }));
+    .map((q) => ({ questId: q.id, label: `${q.emoji} ${q.title} at ${placeFor(v, q, [i.aId, i.bId])}`, when: relativeWhen(q.startsAt, nowMs), seatsLeft: v.seatsLeft(q) }));
 }
 
 /** The plan step on a connected card: Muse's ask, whether seats are held, and other plans. */
@@ -199,6 +212,7 @@ export function planView(v: View, i: Intro, nowMs: number, viewerId?: ID): Intro
     canHold: live && need > 0 && (s.seatsLeft ?? 0) >= need,
     options: planOptions(v, i, nowMs),
     reveal: live && need === 0 ? revealText(v, i, nowMs, viewerId) : null,
+    walkMinutes: live && viewerId ? (() => { const q = v.questById.get(i.firstStep.questId!); return q ? walkToPlan(v, viewerId, q, nowMs) : null; })() : null,
   };
 }
 
@@ -315,15 +329,32 @@ export function joinLineFor(v: View, i: Intro, viewerId: ID, nowMs: number): str
     .filter(Boolean).join(' · ');
 }
 
-export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intros: IntroCardData[] }> {
+export async function listIntros(store: DataStore, viewerId: ID): Promise<{ intros: IntroCardData[]; choices: IntroChoice[] }> {
   const { view } = await store.museContext();
   const nowMs = now().getTime();
-  const intros = view.db.intros
-    .filter((i) => i.aId === viewerId || i.bId === viewerId)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const mine = view.db.intros.filter((i) => i.aId === viewerId || i.bId === viewerId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const intros = mine.filter((i) => !isChoice(i))
     .map((i) => cardFor(view, viewerId, i, nowMs))
     .filter((c): c is IntroCardData => !!c);
-  return { intros };
+  // Unpicked choices come back after a reload, best first, so the ask panel can show them again.
+  const choices = mine.filter((i) => i.aId === viewerId && isChoice(i) && !isExpired(i, nowMs))
+    .sort((a, b) => b.score - a.score)
+    .map((i) => choiceOf(view, viewerId, i, nowMs))
+    .filter((c): c is IntroChoice => !!c);
+  return { intros, choices };
+}
+
+/** A choice row as the ask panel shows it: who, the trust path and a one-line why. */
+function choiceOf(v: View, viewerId: ID, i: Intro, nowMs: number): IntroChoice | null {
+  const p = v.profileById.get(i.bId);
+  if (!p) return null;
+  return {
+    introId: i.id, kind: i.kind, score: i.score, questId: i.firstStep.questId,
+    other: { id: p.id, handle: p.handle, firstName: firstName(p), avatarUrl: p.avatarUrl },
+    trustPath: trustLabels(v, i.trustPath)[0] ?? '',
+    why: cardFor(v, viewerId, i, nowMs)?.reasons[0] ?? '',
+  };
 }
 
 export type RoundResult = {
@@ -350,10 +381,20 @@ async function round(
   store: DataStore, viewerId: ID,
   opts: { kinds: IntroKind[]; source: Intro['source']; profile: IntroProfile; quest?: QuestRow; ask?: string },
 ): Promise<RoundResult> {
-  const { view } = await store.museContext();
+  let { view } = await store.museContext();
   const me = view.profileById.get(viewerId);
   if (!me) throw notFound('person_not_found');
   const nowMs = now().getTime();
+  // Asking again for the same plan replaces the earlier ask's unpicked choices, so the same
+  // person never shows up twice and the cooldown does not hide them.
+  const planId = opts.quest?.id;
+  if (planId) {
+    const stale = view.db.intros.filter((i) => i.aId === viewerId && isChoice(i) && i.firstStep.questId === planId);
+    if (stale.length) {
+      await store.removeIntros(stale.map((i) => i.id), []);
+      view = (await store.museContext()).view;
+    }
+  }
   const empty = { intro: null, considered: 0, belowBar: 0, capped: false, paused: false };
   if (opts.source === 'auto' && opts.profile.paused) return { ...empty, paused: true, message: 'Intros are paused.' };
   if (opts.source === 'auto' && !underWeeklyCap(view.db.intros, viewerId, nowMs)) {
@@ -408,16 +449,12 @@ async function round(
   });
   if (opts.quest && passing.length >= 2) {
     // Scene 5: 2 or 3 people for the plan, each with a one-line why. Nobody hears anything yet.
-    const picks = passing.slice(0, 3).map((x) => ({ x, row: rowOf(x) }));
-    for (const { row: r } of picks) await store.insertIntro(r);
-    await publish(`user:${viewerId}`, { type: 'intro', id: picks[0].row.id });
+    // The rows are marked as choices, one per person (an earlier ask's were removed above).
+    const picks = passing.slice(0, 3).map((x) => { const r = rowOf(x); return { ...r, firstStep: { ...r.firstStep, choice: true } }; });
+    for (const r of picks) await store.insertIntro(r);
+    await publish(`user:${viewerId}`, { type: 'intro', id: picks[0].id });
     const after = (await store.museContext()).view;
-    const choices: IntroChoice[] = picks.map(({ x, row: r }) => ({
-      introId: r.id, kind: r.kind, score: r.score,
-      other: { id: x.c.profile.id, handle: x.c.profile.handle, firstName: firstName(x.c.profile), avatarUrl: x.c.profile.avatarUrl },
-      trustPath: trustLabels(after, r.trustPath)[0] ?? '',
-      why: cardFor(after, viewerId, r, nowMs)?.reasons[0] ?? '',
-    }));
+    const choices: IntroChoice[] = picks.flatMap((r) => { const c = choiceOf(after, viewerId, r, nowMs); return c ? [c] : []; });
     const others = considered - choices.length;
     return {
       intro: null, choices, considered, belowBar: others, capped: false, paused: false,
@@ -485,9 +522,11 @@ export async function pickIntro(store: DataStore, viewerId: ID, introId: ID, dro
   const i = view.db.intros.find((x) => x.id === introId);
   if (!i || i.aId !== viewerId) throw notFound('intro_not_found');
   if (i.status !== 'proposed') throw conflict('intro_already_answered');
-  const drop = view.db.intros.filter((x) => dropIds.includes(x.id) && x.id !== i.id && x.aId === viewerId && x.status === 'proposed'
-    && x.firstStep.anchored && x.firstStep.questId === i.firstStep.questId);
+  // Every other unpicked choice for the same plan goes (the client's list is only a hint).
+  const drop = view.db.intros.filter((x) => x.id !== i.id && x.aId === viewerId && x.status === 'proposed'
+    && (isChoice(x) || dropIds.includes(x.id)) && x.firstStep.anchored && x.firstStep.questId === i.firstStep.questId);
   if (drop.length) await store.removeIntros(drop.map((x) => x.id), []);
+  if (isChoice(i)) await store.updateIntro(i.id, { firstStep: { ...i.firstStep, choice: false } });
   return respondIntro(store, viewerId, i.id, true);
 }
 
@@ -502,6 +541,8 @@ export async function respondIntro(store: DataStore, viewerId: ID, introId: ID, 
   const nowMs = now().getTime();
   const i = view.db.intros.find((x) => x.id === introId);
   if (!i || !visibleTo(i, viewerId)) throw notFound('intro_not_found');
+  // An unpicked choice moves on only through pickIntro, which clears the flag first.
+  if (isChoice(i)) throw conflict('pick this person from the choices first');
   const current = async () => {
     const after = (await store.museContext()).view;
     const updated = after.db.intros.find((x) => x.id === i.id) ?? i;

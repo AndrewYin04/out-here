@@ -91,7 +91,7 @@ describe('mock Click round and double opt-in', () => {
   let store: DataStore;
   beforeAll(() => { store = createMemoryStore(); });
 
-  it('alex <-> jordan passes (97: local bands, comics, zines, product/design, design job) with a trust path; weak candidates stay hidden', async () => {
+  it('alex <-> jordan passes (97: band tees, vintage, thrifting, local bands) with a trust path; weak candidates stay hidden', async () => {
     const r = await runIntroRound(store, alex);
     expect(r.intro).not.toBeNull();
     const c = r.intro!;
@@ -99,9 +99,9 @@ describe('mock Click round and double opt-in', () => {
     expect(c.score).toBe(97);
     expect(c.trustPath[0]).toBe('You both know Maya');
     expect(c.reasons.length).toBeGreaterThanOrEqual(2);
-    // Rarer shared interests read first (comics before local bands), each with what Jordan posted.
-    expect(c.reasons.join(' ')).toMatch(/You both love comics\. Jordan posted: "/);
-    expect(c.reasons.join(' ')).toMatch(/design/);
+    // Rarer shared interests read first (band tees before local bands), each with what Jordan posted.
+    expect(c.reasons[0]).toMatch(/^You both love band tees\. Jordan posted: "/);
+    expect(c.reasons.join(' ')).toMatch(/You both love thrifting\. Jordan posted: "/);
     // Interleaved: your agent, their agent (outcome only), your agent, their verdict.
     expect(c.myAgentLog.map((t) => t.mine)).toEqual([true, false, true, false]);
     expect(c.myAgentLog[1].text).toBe('sees a real fit, asked about timing');
@@ -109,7 +109,7 @@ describe('mock Click round and double opt-in', () => {
     expect(c.judgeLine).toBe('Muse judge: 97/100, above the 85 bar');
     expect(c.mutuals.map((m) => m.firstName)).toEqual(['Maya']);
     expect(c.step.href).toMatch(/^\/out-here\?quest=/);
-    expect(c.step.when).toMatch(/^(Starts in \d+ min|Today|Tomorrow|Happening now)/);
+    expect(c.step.when).toMatch(/^(Today|Tomorrow|Happening now)/);
     expect(r.belowBar).toBeGreaterThanOrEqual(1);
     const { intros } = await listIntros(store, alex);
     expect(intros.map((i) => i.other.handle)).toEqual(['jordan']);
@@ -127,15 +127,15 @@ describe('mock Click round and double opt-in', () => {
     expect(ra).not.toMatch(/Alex/);
     expect(ra).not.toContain('gig nights');                     // jordan's private looking-for
     expect(ra).not.toContain('product people about design work');
-    // The seeded pair share more as a coffee chat, so that is the kind, and only coffee-chat wants are used.
-    expect(a.kind).toBe('networking');
-    expect(ra).toContain("You're looking for product/design coffee chats");
-    expect(ra).not.toContain('people to go to local shows, comic shops');   // alex's friendship want
+    // Friendship and a coffee chat both reach 97, so the first kind (Friendship) wins, and only
+    // friendship facts are used: no coffee-chat want.
+    expect(a.kind).toBe('friendship');
+    expect(ra).not.toContain('product/design coffee chats');
     expect(a.summary).toMatch(/^Your agents agree Jordan/);
     expect(a.summary).toMatch(/worth going to the .* together/);
     // One fact, one mention: the summary names the kind and step, and no two reasons share a topic.
     expect(a.summary).not.toMatch(/local bands|local shows|design/);
-    expect(a.reasons.filter((r) => /comics/.test(r))).toHaveLength(1);
+    expect(a.reasons.filter((r) => /thrifting/.test(r))).toHaveLength(1);
     expect(a.reasons.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -232,10 +232,11 @@ describe('re-run on the same pair', () => {
 
 describe('relativeWhen', () => {
   const t = Date.parse('2026-11-13T01:00:00Z'); // Thu 5:00 PM PT
-  it('reads like a person: soon, today, tomorrow; minutes rounded to 5', () => {
-    expect(relativeWhen('2026-11-13T01:23:00Z', t)).toBe('Starts in 25 min');
-    expect(relativeWhen('2026-11-13T02:41:00Z', t)).toBe('Today 6:40 PM');
-    expect(relativeWhen('2026-11-13T18:02:00Z', t)).toBe('Tomorrow 10:00 AM');
+  it('names the start to the minute, the way the plan page does (today, tomorrow, a weekday)', () => {
+    expect(relativeWhen('2026-11-13T01:23:00Z', t)).toBe('Today 5:23 PM');
+    expect(relativeWhen('2026-11-13T02:41:00Z', t)).toBe('Today 6:41 PM');
+    expect(relativeWhen('2026-11-13T18:02:00Z', t)).toBe('Tomorrow 10:02 AM');
+    expect(relativeWhen('2026-11-15T18:02:00Z', t)).toBe('Sun 10:02 AM');
     expect(relativeWhen('2026-11-13T00:50:00Z', t)).toBe('Happening now');
   });
 });
