@@ -137,12 +137,13 @@ export class WorldLayer implements CustomLayerInterface {
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
     const m=this.originMerc.meterInMercatorCoordinateUnits();
     this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
-    this.scene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    this.charScene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
-    const sun2 = new THREE.DirectionalLight('#FFF2D9', 2.4);
+    // Sunny afternoon: a blue sky fill from above, warm bounce from the grass, and a golden sun.
+    this.scene.add(new THREE.HemisphereLight('#CFE8FF', '#B9DC9A', 1.15));
+    this.charScene.add(new THREE.HemisphereLight('#CFE8FF', '#B9DC9A', 1.15));
+    const sun2 = new THREE.DirectionalLight('#FFE9C4', 2.6);
     sun2.position.set(-5,8,7);
     this.charScene.add(sun2);
-    const sun = new THREE.DirectionalLight('#FFF2D9', 2.4);
+    const sun = new THREE.DirectionalLight('#FFE9C4', 2.6);
     sun.position.set(-5,8,7);
     this.scene.add(sun);
   }
@@ -357,7 +358,8 @@ export class WorldLayer implements CustomLayerInterface {
     this.map = map;
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
-    this.renderer.toneMapping=THREE.AgXToneMapping;this.renderer.toneMappingExposure=1.15;
+    // Neutral keeps the palette saturated (AgX washed the city out); a touch over 1 reads as sunny.
+    this.renderer.toneMapping=THREE.NeutralToneMapping;this.renderer.toneMappingExposure=1.05;
     void loadSceneryAssets().then(assets=>{if(this.disposed)return;this.scenery=assets;if(this.treeSpots.length)this.setTrees(this.treeSpots);if(this.lamps.length)this.setStreetFurniture(this.lamps);});
   }
 

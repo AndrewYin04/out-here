@@ -12,27 +12,28 @@ type PaintProp = Parameters<MapLibreMap['setPaintProperty']>[1];
 type PaintValue = Parameters<MapLibreMap['setPaintProperty']>[2];
 /** Paint overrides on Positron's own layers: [layer id, property, value]. Missing layers are skipped. */
 const PAINT: [string, PaintProp, PaintValue][] = [
-  ['background', 'background-color', '#E5E5D8'],
-  ['park', 'fill-color', '#C4D4AD'],
-  ['landcover_wood', 'fill-color', '#A9C397'],
-  ['landuse_residential', 'fill-color', '#DDDCCD'],
-  ['water', 'fill-color', '#91BEC8'],
-  ['waterway', 'line-color', '#91BEC8'],
-  ['highway_path', 'line-color', '#F8F3E6'],
-  ['highway_minor', 'line-color', '#75828A'],
-  ['highway_major_casing', 'line-color', '#EEE9DD'],
-  ['highway_major_inner', 'line-color', '#75828A'],
-  ['highway_motorway_casing', 'line-color', '#D8D1BC'],
-  ['highway_motorway_inner', 'line-color', '#879095'],
+  // Sunny, saturated and clean: lawn greens, bay blue, dark asphalt with white curbs.
+  ['background', 'background-color', '#EEF3E1'],
+  ['park', 'fill-color', '#8FD16F'],
+  ['landcover_wood', 'fill-color', '#5FB653'],
+  ['landuse_residential', 'fill-color', '#F3EEDF'],
+  ['water', 'fill-color', '#3FB0EA'],
+  ['waterway', 'line-color', '#3FB0EA'],
+  ['highway_path', 'line-color', '#F7E4BE'],
+  ['highway_minor', 'line-color', '#55616B'],
+  ['highway_major_casing', 'line-color', '#FFFFFF'],
+  ['highway_major_inner', 'line-color', '#4A5560'],
+  ['highway_motorway_casing', 'line-color', '#FFFFFF'],
+  ['highway_motorway_inner', 'line-color', '#46515B'],
   // The flat footprints sit under the 3D walls; drop them where the walls are drawn.
   ['building', 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.5, 1, 16.5, 0]],
 ];
 
-const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF1D8', intensity: 0.48, position: [1.4, 215, 38] };
+const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF0D6', intensity: 0.42, position: [1.3, 210, 42] };
 const SKY: SkySpecification = {
-  'sky-color': '#BAD2DD',
-  'horizon-color': '#E5E8DD',
-  'fog-color': '#E5E8DD',
+  'sky-color': '#5FB8FF',
+  'horizon-color': '#D9F0FF',
+  'fog-color': '#E6F5FF',
   'sky-horizon-blend': 0.55,
   'horizon-fog-blend': 0.5,
   'fog-ground-blend': 0.55,
@@ -67,11 +68,11 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     const path=/path|track|pedestrian/.test(layer.id), casing=/casing/.test(layer.id), bridge=/bridge/.test(layer.id);
     const width=path?1.7:/motorway/.test(layer.id)?12:/major/.test(layer.id)?8:5.5;
     const beforeColor=map.getPaintProperty(layer.id,'line-color'),beforeWidth=map.getPaintProperty(layer.id,'line-width');
-    map.setPaintProperty(layer.id,'line-color',path?'#E8DFCB':casing?'#EEE9DD':bridge?'#8E969A':'#75828A');
+    map.setPaintProperty(layer.id,'line-color',path?'#F7E4BE':casing?'#FFFFFF':bridge?'#6B7780':'#505C66');
     map.setPaintProperty(layer.id,'line-width',['interpolate',['exponential',2],['zoom'],12,(width+(casing?2.2:0))*.0658,22,(width+(casing?2.2:0))*67.4]);
     undo.push(()=>{if(map.getLayer(layer.id)){map.setPaintProperty(layer.id,'line-color',beforeColor);map.setPaintProperty(layer.id,'line-width',beforeWidth);}});
     const hasCasing=style.layers.some(other=>other.id!==layer.id&&(other.id===`${layer.id}_casing`||other.id===layer.id.replace(/_inner$/,'_casing')));
-    if(!path&&!casing&&!hasCasing){const id=`oh-curb-${layer.id}`;map.addLayer({...layer,id,paint:{...layer.paint,'line-color':'#EEE9DD','line-opacity':1,'line-width':['interpolate',['exponential',2],['zoom'],12,(width+2.2)*.0658,22,(width+2.2)*67.4]}},layer.id);undo.push(()=>{if(map.getLayer(id))map.removeLayer(id);});}
+    if(!path&&!casing&&!hasCasing){const id=`oh-curb-${layer.id}`;map.addLayer({...layer,id,paint:{...layer.paint,'line-color':'#FFFFFF','line-opacity':1,'line-width':['interpolate',['exponential',2],['zoom'],12,(width+2.2)*.0658,22,(width+2.2)*67.4]}},layer.id);undo.push(()=>{if(map.getLayer(id))map.removeLayer(id);});}
 
   }
 
@@ -82,25 +83,30 @@ export function applyCityTheme(map: MapLibreMap): () => void {
   };
 
   if (source) {
-    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#DEDCCD','#D8D9CE'],'fill-opacity':.7}},firstRoad);
+    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#F4EEDD','#ECEADF'],'fill-opacity':.85}},firstRoad);
     // Grass and sports fields: in the tiles, not drawn by Positron.
     add({
       id: GRASS_ID, type: 'fill', source, 'source-layer': 'landcover',
       filter: ['match', ['get', 'class'], ['grass', 'wetland', 'farmland'], true, false],
-      paint: { 'fill-color': ['match',['get','class'],'wetland','#B7CEC1','farmland','#D0D5AB','#CBD8B4'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': ['match',['get','class'],'wetland','#7FCBB0','farmland','#C8DC8A','#9FDB7C'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',
       filter: ['match', ['get', 'class'], ['pitch', 'playground', 'stadium', 'track', 'park', 'cemetery'], true, false],
-      paint: { 'fill-color': '#B6CCA3', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': '#7DCB61', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     // Real buildings at their mapped heights, walls tinted by height and lit from the south-west.
     add({
       id: BUILDINGS_ID, type: 'fill-extrusion', source, 'source-layer': 'building', minzoom: 14.5,
       paint: {
+        // A friendly town: each building gets one of six sunny facade colors (stable per building),
+        // with taller towers leaning cool glass-blue.
         'fill-extrusion-color': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8],
-          0, '#E7DFC9', 10, '#DED7C7', 25, '#D4D5CC', 60, '#C9D4D1',
+          'case',
+          ['>', ['coalesce', ['get', 'render_height'], 8], 30], '#BFD9F2',
+          // Tiles without feature ids fall back to the height, so neighbours still differ.
+          ['match', ['%', ['round', ['to-number', ['coalesce', ['id'], ['*', ['coalesce', ['get', 'render_height'], 8], 13]], 0]], 6],
+            0, '#FFE2BF', 1, '#FFF1B8', 2, '#CFE6FF', 3, '#E6D9FF', 4, '#FFD6DE', '#D6F2DF'],
         ],
         'fill-extrusion-height': ['max', 3.5, ['coalesce', ['get', 'render_height'], 8]],
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
