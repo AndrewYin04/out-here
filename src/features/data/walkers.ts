@@ -9,8 +9,10 @@
 //   last WALK_FRESH_MIN minutes, so it stops showing soon after they stop walking.
 // - Someone who never shared a location gets a paused share: friends' Find My does not start
 //   showing them because they walked to a plan. Their own sharing settings are otherwise kept.
-// - Realtime: each step sends walk:<questId> {id: walkerId} (ids only; each member's walkers hook
-//   refetches), plus location:<friendId> to the owner's usual Find My audience via
+// - Realtime: each step sends walk:<questId> {} with no user id. The channel is public and keyed
+//   by a quest id non-members can see, so a walker id there would name guests the API hides as
+//   hidden:<n>; each member's walkers hook only refetches. The step also sends
+//   location:<friendId> to the owner's usual Find My audience via
 //   updateMyLocation. Never user:<id>: a step every 1.5 s must not refetch every user: hook.
 import { haversineMeters, now, walkingMinutes, type ID, type LatLng, type Quest } from '@/shared';
 import type { CoreStore } from './core';
@@ -72,6 +74,6 @@ export async function postWalkStep(store: CoreStore, viewerId: ID, questId: ID, 
   if (haversineMeters(location, q.location) > 5_000) throw forbidden('too far from the plan to walk there');
   const had = (v.db.locationShares ?? []).some((s) => s.userId === viewerId);
   await updateMyLocation(store, viewerId, { location, placeLabel: walkLabel(q), ...(had ? {} : { paused: true }) });
-  await publish(`walk:${q.id}`, { id: viewerId });
+  await publish(`walk:${q.id}`, {});
   return { ok: true };
 }

@@ -88,7 +88,8 @@ export function useApi<T>(
     setLoading(true);
     try {
       const key = `${currentPersona()}|${fresh ? 'fresh' : 'plain'}|${path}`;
-      const d = await coalescedFetch(key, () => apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {}), { since });
+      // A plain mount load joins a plain fetch already in flight (another hook on the same path).
+      const d = await coalescedFetch(key, () => apiFetch<T>(path, fresh ? { headers: { [FRESH_HEADER]: '1' } } : {}), { since, join: !fresh });
       if (n > applied.current) { applied.current = n; setData(d); setError(null); }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : String(e));

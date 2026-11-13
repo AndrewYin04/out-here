@@ -24,7 +24,7 @@ arrives.
 | `quests:new` | someone posts a new plan | `{ questId: string }` (every map refetches `/api/quests`, which applies `canSeeQuest`, so a Group or invite-only plan reaches only the people who may see it) |
 | `user:<userId>` | a notification, invite, message, friendship, availability, memory, quest or shared-plan change for that user | `{ type: "notification" \| "invite" \| "message" \| "friendship" \| "availability" \| "memory" \| "quest" \| "together", id: string }` |
 | `location:<userId>` | a friend whose Find My share reaches this user moved, edited their bubble or changed sharing (also the user's own share, for their other tabs) | `{ type: "location", id: ownerId }` |
-| `walk:<questId>` | a member of the plan took a walk step (every 1.5 s while walking there in 3D) | `{ id: walkerId }` |
+| `walk:<questId>` | a member of the plan took a walk step (every 1.5 s while walking there in 3D) | `{}` (no walker id: the channel is public and keyed by a quest id non-members can see, so an id would name guests the API shows as `hidden:<n>`; the walkers hook refetches) |
 | `thread:<threadId>` | a message is posted in the thread | `{ messageId: string }` |
 | `presence:online` | (Presence) a tab opens or closes | presence state: `{ userId: string }` per tab |
 | `together:<planId>` | a member votes "I'm in" (or takes it back), or the plan locks | `{ status: 'proposing' \| 'confirmed' \| 'expired', confirmedQuestId: string \| null }` |

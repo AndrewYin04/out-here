@@ -105,6 +105,15 @@ describe('coalescedFetch', () => {
     expect(a).toHaveBeenCalledTimes(1);
   });
 
+  it('plain mount loads join a plain fetch in flight instead of waiting for a trailing one (R1)', async () => {
+    const a = slowFetcher(50);
+    const first = coalescedFetch('alex|plain|/api/quests/mine', a, { join: true });
+    const second = coalescedFetch('alex|plain|/api/quests/mine', a, { join: true });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(a).toHaveBeenCalledTimes(1);
+    expect(await second).toBe(await first);
+  });
+
   it('shares one fetch across hooks that ask for the same key, not across keys', async () => {
     const a = slowFetcher(50);
     const b = slowFetcher(50);

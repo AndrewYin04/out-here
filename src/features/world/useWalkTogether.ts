@@ -45,7 +45,7 @@ export function useWalkTogether(quests: Quest[], viewerId: string, walkingTo: st
   }, []);
   const plan = useMemo(() => walkPlan(quests, viewerId, walkingTo, nowMs), [quests, viewerId, walkingTo, nowMs]);
   const [sharing, setSharing] = useState(true);
-  // walk:<planId> carries each member's step (ids only); nothing else refetches on a step.
+  // walk:<planId> says a member took a step (no user id); nothing else refetches on a step.
   const api = useApi<{ walkers: Walker[] }>(plan ? `/api/quests/${plan.id}/walk` : null, plan ? [`walk:${plan.id}`] : []);
   const walkers = useMemo(() => (plan && api.data ? api.data.walkers : []), [plan, api.data]);
 

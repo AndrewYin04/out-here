@@ -7,6 +7,8 @@
 // - a trigger that says when its message arrived (`since`, a mark from markArrival()) joins the
 //   fetch in flight if that fetch started after the message, so the hooks that one message wakes
 //   make one GET, not one GET plus a trailing one.
+// - a `join` trigger (a plain mount load, which may show cached data anyway) joins any fetch in
+//   flight for its key instead of waiting for a trailing one.
 // Any other trigger during a fetch gets the trailing result, never the in-flight one, so it
 // always sees data read after it was triggered.
 
@@ -35,8 +37,12 @@ export class Coalescer<T> {
   /** Number of fetches started (for tests and debugging). */
   started = 0;
 
-  /** `since`: the markArrival() of the message behind this trigger; omitted = now. */
-  trigger(since?: number): Promise<T> {
+  /**
+   * `since`: the markArrival() of the message behind this trigger; omitted = now.
+   * `join`: accept the fetch already in flight, whenever it started (plain mount loads).
+   */
+  trigger(since?: number, join = false): Promise<T> {
+    if (join && this.inFlight) return this.inFlight;
     if (this.trailing) return this.trailing.promise;
     if (this.inFlight && since !== undefined && this.inFlightMark > since) return this.inFlight;
     const elapsed = this.clock() - this.lastStart;
@@ -83,10 +89,10 @@ const registry = new Map<string, Coalescer<unknown>>();
  * Fetches through the tab-wide coalescer for `key`. `fetcher` is used when a fetch starts; every
  * caller with the same key must fetch the same thing (same persona, path and freshness).
  */
-export function coalescedFetch<T>(key: string, fetcher: () => Promise<T>, opts: { since?: number; windowMs?: number } = {}): Promise<T> {
+export function coalescedFetch<T>(key: string, fetcher: () => Promise<T>, opts: { since?: number; join?: boolean; windowMs?: number } = {}): Promise<T> {
   let c = registry.get(key) as Coalescer<T> | undefined;
   if (!c) { c = new Coalescer<T>(fetcher, opts.windowMs ?? COALESCE_MS); registry.set(key, c as Coalescer<unknown>); }
-  return c.trigger(opts.since);
+  return c.trigger(opts.since, opts.join);
 }
 
 /** Test helper: forget every coalescer. */

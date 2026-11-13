@@ -73,7 +73,14 @@ describe('walking there together (#46)', () => {
     expect(share.placeLabel).toBe(walkLabel(q));
     if (!before) expect(share.paused).toBe(true);
     else expect(share.paused).toBe(before.paused);
-    expect(got.some((m) => m.channel === `walk:${q.id}` && (m.payload as { id?: string }).id === id('jordan'))).toBe(true);
+    const walk = got.filter((m) => m.channel === `walk:${q.id}`);
+    expect(walk.length).toBeGreaterThan(0);
+    // walk:<questId> is public and keyed by a quest id non-members can see: no user id in it (R2).
+    const userIds = (await store.view()).db.profiles.map((p) => p.id);
+    for (const m of walk) {
+      const text = JSON.stringify(m.payload);
+      for (const u of userIds) expect(text.includes(u), `walk payload names ${u}`).toBe(false);
+    }
     // a walk step every 1.5 s must not refetch the user: hooks (issue #36)
     expect(got.some((m) => m.channel.startsWith('user:'))).toBe(false);
   });
