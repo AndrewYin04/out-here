@@ -4,7 +4,7 @@
 
 import { Check, Clock, Footprints, MapPin, RefreshCw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetch, apiPost, useQuest } from '@/features/data';
+import { apiFetch, apiPost } from '@/features/data';
 import { Avatar, burst, cn } from '@/features/ui';
 import { formatDemoTime, type PersonCard, type Quest } from '@/shared';
 import type { HangDraft } from '@/features/muse';
@@ -22,15 +22,6 @@ type State =
   | { kind: 'made'; draft: HangDraft; friend: PersonCard; questId: string };
 
 const first = (name: string) => name.split(' ')[0] ?? name;
-
-const DRAFT_TIMEOUT_MS = 12_000;
-class DraftTimeout extends Error {}
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = window.setTimeout(() => reject(new DraftTimeout('draft timed out')), ms);
-    p.then((v) => { window.clearTimeout(t); resolve(v); }, (e) => { window.clearTimeout(t); reject(e); });
-  });
-}
 
 /**
  * Renders nothing when no friend is free or no place fits (the caller's empty state stays).
@@ -181,7 +172,7 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
           </>
         ) : (
           <>
-            <MadeStatus questId={state.questId} friendId={state.friend.id} fname={fname} />
+            <p className="flex flex-1 items-center gap-1.5 text-[14px] font-semibold text-[#31A24C]"><Check size={18} aria-hidden />You’re in · waiting on {fname}</p>
             <button type="button" data-testid="draft-hang-go" onClick={() => { setPlanOpen(false); letsGo(state.questId); }}
               className="oh-press inline-flex h-10 items-center gap-1.5 rounded-btn bg-fb-blue px-4 text-[15px] font-semibold text-white hover:bg-fb-blue-hover">
               <Footprints size={18} aria-hidden />Let’s go
@@ -190,17 +181,5 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
         )}
       </div>
     </div>
-  );
-}
-
-/** "Waiting on Maya" until she accepts, then "Maya's in": the quest:<id> message refetches it live. */
-function MadeStatus({ questId, friendId, fname }: { questId: string; friendId: string; fname: string }) {
-  const q = useQuest(questId);
-  const joined = q.data?.quest.memberIds.includes(friendId) ?? false;
-  return (
-    <p data-testid="draft-hang-status" data-joined={joined ? 'true' : undefined}
-      className="flex flex-1 items-center gap-1.5 text-[14px] font-semibold text-[#31A24C]">
-      <Check size={18} aria-hidden />{joined ? `${fname}’s in · it’s a plan` : `You’re in · waiting on ${fname}`}
-    </p>
   );
 }

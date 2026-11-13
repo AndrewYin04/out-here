@@ -58,8 +58,7 @@ describe('placeTrees', () => {
   it('lines a street on both sides', () => {
     const a = moveMeters(HQ, 100, 270);
     const b = moveMeters(HQ, 100, 90);
-    // Viewed from 300 m away, so the clearing around the viewer doesn't touch this street.
-    const trees = placeTrees({ ...base, center: moveMeters(HQ, 300, 0), areas: [], streets: [{ coords: [[a.lng, a.lat], [b.lng, b.lat]], spacing: 20, offset: 8 }] });
+    const trees = placeTrees({ ...base, areas: [], streets: [{ coords: [[a.lng, a.lat], [b.lng, b.lat]], spacing: 20, offset: 8 }] });
     expect(trees.length).toBeGreaterThan(12);
     expect(trees.length).toBeLessThanOrEqual(20);
     const north = trees.filter((t) => t.lat > HQ.lat).length;

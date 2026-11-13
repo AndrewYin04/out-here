@@ -7,8 +7,7 @@
 import { MercatorCoordinate, type CustomLayerInterface, type CustomRenderMethodInput, type Map as MapLibreMap } from 'maplibre-gl';
 import * as THREE from 'three';
 import type { LatLng } from '@/shared';
-import { makeAvatar, makePet, PET_ROOT_SCALE, type Character, type ModelSet } from './characters';
-import { characterOpacityForZoom } from '@/features/map/view3d';
+import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
 import { MuseTrail, SparkleWake, type MuseTrailModeSetting } from './muse-trail';
 import { stadiumSeats } from './stadiums';
@@ -17,22 +16,6 @@ import {buildTreeBatch,type TreeBatch} from './vegetation';
 import {loadSceneryAssets,type SceneryAssets} from './scenery-assets';
 import type {StreetLamp} from './street-furniture';
 import {makeSightline,applySightlineCutaway,cameraFromProjection,blocksSightline} from './cutaway';
-
-/** Multiply each mesh material's authored opacity by `opacity` (remembers the base once). */
-function applyRootOpacity(root: THREE.Object3D, opacity: number) {
-  root.traverse((obj) => {
-    if (!(obj instanceof THREE.Mesh)) return;
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    for (const m of mats) {
-      if (!m || !('opacity' in m)) continue;
-      const mat = m as THREE.Material & { opacity: number; transparent: boolean; depthWrite: boolean; userData: Record<string, unknown> };
-      if (mat.userData.ohBaseOpacity == null) mat.userData.ohBaseOpacity = mat.opacity;
-      mat.transparent = true;
-      mat.opacity = (mat.userData.ohBaseOpacity as number) * opacity;
-      mat.depthWrite = opacity > 0.92;
-    }
-  });
-}
 
 export type ActorKind = 'avatar' | 'pet';
 type Actor = {
@@ -76,9 +59,9 @@ type Beacon = {
 };
 
 /** Arena size in meters (real size; it sits on the street, like the HQ buildings). */
-const ARENA_R = 10;
-const TIER_STEP = 3.4;
-const STAND_H = 2.6;
+const ARENA_R = 13;
+const TIER_STEP = 4.2;
+const STAND_H = 3.2;
 const SEAT_OPEN = new THREE.Color('#FFFFFF');
 const GOLD = '#F5B800';
 
@@ -103,33 +86,6 @@ function haloTexture(): THREE.Texture {
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-/** The arena floor: a pale court with the plan's color as a soft band at the rim and a center ring. */
-const floorTextures = new Map<string, THREE.CanvasTexture>();
-function arenaFloorTexture(color: string): THREE.CanvasTexture {
-  const hit = floorTextures.get(color);
-  if (hit) return hit;
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  const r = g.createRadialGradient(128, 128, 10, 128, 128, 128);
-  r.addColorStop(0, '#FFFFFF');
-  r.addColorStop(0.8, '#FBF8F2');
-  r.addColorStop(0.9, color);
-  r.addColorStop(1, color);
-  g.fillStyle = r;
-  g.fillRect(0, 0, 256, 256);
-  g.globalAlpha = 0.35;
-  g.strokeStyle = color;
-  g.lineWidth = 4;
-  g.beginPath(); g.arc(128, 128, 34, 0, Math.PI * 2); g.stroke();
-  g.lineWidth = 2;
-  g.beginPath(); g.moveTo(128, 30); g.lineTo(128, 226); g.stroke();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  floorTextures.set(color, t);
   return t;
 }
 
@@ -172,9 +128,8 @@ export class WorldLayer implements CustomLayerInterface {
   private ringGeo = new THREE.RingGeometry(0.75, 1, 32);
   private standGeo = new THREE.CylinderGeometry(ARENA_R + TIER_STEP * 2, ARENA_R - 0.5, 1, 32, 1, true);
   private floorGeo = new THREE.CircleGeometry(ARENA_R - 0.5, 32);
-  // Round stools read as seats; boxes read as crates.
-  private seatGeo = new THREE.CylinderGeometry(0.9, 1.0, 1.1, 14);
-  private standMat = new THREE.MeshStandardMaterial({ color: '#F4F6FA', roughness: 0.6, side: THREE.DoubleSide });
+  private seatGeo = new THREE.BoxGeometry(3, 1.8, 2.6);
+  private standMat = new THREE.MeshStandardMaterial({ color: '#E4E6EB', roughness: 0.8, side: THREE.DoubleSide });
   private seatMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.5, emissive: '#FFFFFF', emissiveIntensity: 0.25 });
   private origin: LatLng;
   private originMerc: MercatorCoordinate;
@@ -209,15 +164,8 @@ export class WorldLayer implements CustomLayerInterface {
   private lamps:StreetLamp[]=[];
   private statics = new Map<string, THREE.Object3D>();
   private anchors = new Map<string, { pos: LatLng; altitude: number; el: HTMLElement }>();
-  /** Measured label sizes (refreshed every 20 frames) for the overlap check. */
-  private labelSize = new WeakMap<HTMLElement, [number, number]>();
-  private frameCount = 0;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
-  private blueRing: THREE.Mesh | null = null;
-  private blueRingMat = new THREE.MeshBasicMaterial({
-    color: '#0866FF', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide,
-  });
 
   constructor(origin: LatLng) {
     this.origin = origin;
@@ -237,14 +185,6 @@ export class WorldLayer implements CustomLayerInterface {
     const sun = new THREE.DirectionalLight('#FFF7EC', 2.6);
     sun.position.set(-6,5,6);
     this.scene.add(sun);
-
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 48), this.blueRingMat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.05;
-    ring.renderOrder = 2;
-    ring.visible = false;
-    this.blueRing = ring;
-    this.scene.add(ring);
   }
 
   /** Swap in loaded models; existing placeholder characters are rebuilt from them. */
@@ -260,22 +200,17 @@ export class WorldLayer implements CustomLayerInterface {
     }
   }
 
-  /** Rebuild people and Pip (a look was customized, or a pronoun hint arrived). */
+  /** Rebuild people's characters after a My look change (Jolly keeps his own model). */
   refreshAvatars() {
     for (const a of this.actors.values()) {
+      if (a.kind === 'pet') continue;
       const previous = a.char;
-      const next = a.kind === 'pet' ? makePet(this.models, a.seed) : makeAvatar(this.models, a.seed);
+      const next = makeAvatar(this.models, a.seed);
       next.root.position.copy(previous.root.position); next.root.quaternion.copy(previous.root.quaternion); next.root.scale.copy(previous.root.scale);
+      next.root.traverse((o) => { o.frustumCulled = !(o as THREE.SkinnedMesh).isSkinnedMesh; });
       next.setState(a.state);
       this.charScene.remove(previous.root); previous.dispose(); a.char = next; this.charScene.add(next.root);
     }
-  }
-
-  /** Drive Pip's trail colors from the dresser glow swatch. */
-  setPetGlow(id: string, glow: string) {
-    const a = this.actors.get(id);
-    if (!a?.trail) return;
-    a.trail.setConfig({ color: glow, brightBlue: glow, cyanAccent: '#FFFFFF', paleBlue: '#FFFFFF' });
   }
 
   upsertActor(id: string, kind: ActorKind, seed: string) {
@@ -452,10 +387,7 @@ export class WorldLayer implements CustomLayerInterface {
       b.spec = spec;
       (b.beam.material as THREE.MeshBasicMaterial).color.set(spec.color);
       (b.ring.material as THREE.MeshBasicMaterial).color.set(spec.color);
-      const floorMat = (b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      floorMat.color.set('#FFFFFF');
-      const tex = arenaFloorTexture(spec.color);
-      if (floorMat.map !== tex) { floorMat.map = tex; floorMat.needsUpdate = true; }
+      ((b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.MeshStandardMaterial).color.set(spec.color);
       b.arena.visible = spec.capacity != null;
       b.gold.visible = !!spec.pick;
       this.setSeats(b);
@@ -508,8 +440,7 @@ export class WorldLayer implements CustomLayerInterface {
     this.map = map;
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
-    // Neutral keeps the palette saturated (AgX washed the city out); a touch over 1 reads as sunny.
-    this.renderer.toneMapping=THREE.NeutralToneMapping;this.renderer.toneMappingExposure=1.05;
+    this.renderer.toneMapping=THREE.AgXToneMapping;this.renderer.toneMappingExposure=1.15;
     void loadSceneryAssets().then(assets=>{if(this.disposed)return;this.scenery=assets;if(this.treeSpots.length)this.setTrees(this.treeSpots);if(this.lamps.length)this.setStreetFurniture(this.lamps);});
   }
 
@@ -519,8 +450,6 @@ export class WorldLayer implements CustomLayerInterface {
     this.setBeacons([]);
     this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
-    if (this.blueRing) { this.scene.remove(this.blueRing); this.blueRing.geometry.dispose(); this.blueRing = null; }
-    this.blueRingMat.dispose();
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
     this.haloMat.map?.dispose(); this.haloMat.dispose();
     this.beaconGeo.dispose();
@@ -543,9 +472,7 @@ export class WorldLayer implements CustomLayerInterface {
 
     const zoom = map.getZoom();
     const scale = characterScale(zoom);
-    // Crossfade with the flat-map pins: fully on at street zoom, gone before the 2D handoff.
-    const charOpacity = this.minZoom > 0 ? characterOpacityForZoom(zoom) : (zoom >= this.minZoom ? 1 : 0);
-    const showChars = charOpacity > 0.02;
+    const showChars = zoom >= this.minZoom;
     const markerMode=showChars?'true':'false',container=map.getContainer();if(container.dataset.worldCharacters!==markerMode)container.dataset.worldCharacters=markerMode;
     if(this.vegetation)this.vegetation.object.visible=zoom>=15.5;
     if(this.furniture)this.furniture.visible=zoom>=17;
@@ -557,14 +484,10 @@ export class WorldLayer implements CustomLayerInterface {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
 
-    const me = this.actors.get('me');
-
     for (const a of this.actors.values()) {
       const o = offsetMeters(this.origin, a.pos);
-      // Jolly at half the person's height beside them (PET_ROOT_SCALE); Ally's boost still applies.
-      const s = (a.kind === 'pet' ? scale * PET_ROOT_SCALE : scale) * a.boost;
+      const s = (a.kind === 'pet' ? scale * 0.9 : scale) * a.boost;
       a.char.root.visible = showChars && !a.hidden;
-      if (showChars) applyRootOpacity(a.char.root, charOpacity);
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
       const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
       const delta=Math.atan2(Math.sin(target-current),Math.cos(target-current));
@@ -577,17 +500,13 @@ export class WorldLayer implements CustomLayerInterface {
         a.shadow.visible = showChars && !a.hidden;
         a.shadow.position.set(o.east, 0.04, -o.north);
         // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
-        // People: sized from the character's height (the customizable person is drawn large).
-        const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : Math.max(1.05, a.char.height * 0.62);
+        const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;
         // Cast by the sun (south-west): stretched and pushed toward the north-east.
         const k = s * foot * (a.boost || 1);
         a.shadow.scale.set(k * 1.15, k * 1.5, 1);
         a.shadow.rotation.z = Math.PI / 4;
         // Just above the street surface (the city kit's road and kerb tiles stand ~0.2 m proud).
         a.shadow.position.set(o.east + .32 * k, 0.26, -o.north - .32 * k);
-        const shadowMat = a.shadow.material as THREE.MeshBasicMaterial;
-        if (shadowMat.userData.ohBaseOpacity == null) shadowMat.userData.ohBaseOpacity = shadowMat.opacity;
-        shadowMat.opacity = (shadowMat.userData.ohBaseOpacity as number) * charOpacity;
       }
       if (a.halo) {
         // Behind Jolly, centred on his body, scaled with him; it makes him read against grey streets.
@@ -595,14 +514,6 @@ export class WorldLayer implements CustomLayerInterface {
         if (a.char.getEffectCenter) { a.char.getEffectCenter(this.haloCenter); a.halo.position.copy(this.haloCenter); }
         const hs = s * 1.75 * (a.boost || 1);
         a.halo.scale.set(hs, hs, 1);
-      }
-      if (a.kind === 'avatar' && a === me && this.blueRing) {
-        this.blueRing.visible = showChars;
-        this.blueRing.position.set(o.east, 0.06, -o.north);
-        // RingGeometry radius ~0.6; scale so the ring sits under the feet (~1.2 m), never a screen-filling disc.
-        const r = Math.min(2.2, Math.max(1.1, a.char.height * 0.55)) * s;
-        this.blueRing.scale.setScalar(r);
-        this.blueRingMat.opacity = 0.55 * charOpacity;
       }
       if (a.trail) {
         if (showChars) {
@@ -655,9 +566,6 @@ export class WorldLayer implements CustomLayerInterface {
       }
     }
 
-    // Plan and place labels: nearest first; a label that would overlap a nearer one, or hang off the
-    // screen edge, waits hidden until there's room (no half-cut or stacked chips).
-    const onScreenLabels: { el: HTMLElement; x: number; y: number; d: number }[] = [];
     for (const a of this.anchors.values()) {
       const o = offsetMeters(this.origin, a.pos);
       this.tmp.set(o.east, a.altitude, -o.north, 1).applyMatrix4(this.full);
@@ -665,19 +573,7 @@ export class WorldLayer implements CustomLayerInterface {
       const x = ((this.tmp.x / this.tmp.w + 1) / 2) * w;
       const py = ((1 - this.tmp.y / this.tmp.w) / 2) * h;
       a.el.style.transform = `translate(${x.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -100%)`;
-      onScreenLabels.push({ el: a.el, x, y: py, d: this.tmp.w });
-    }
-    onScreenLabels.sort((p, q) => p.d - q.d);
-    if (this.frameCount++ % 20 === 0) for (const l of onScreenLabels) this.labelSize.set(l.el, [l.el.offsetWidth || 120, l.el.offsetHeight || 32]);
-    const shown: [number, number, number, number][] = [];
-    for (const l of onScreenLabels) {
-      const [sw, sh] = this.labelSize.get(l.el) ?? [120, 32];
-      const r: [number, number, number, number] = [l.x - sw / 2, l.y - sh, l.x + sw / 2, l.y];
-      const inside = r[0] >= 4 && r[2] <= w - 4 && r[1] >= 4 && r[3] <= h + 20;
-      const clash = shown.some((v) => r[0] < v[2] + 6 && r[2] + 6 > v[0] && r[1] < v[3] + 4 && r[3] + 4 > v[1]);
-      const ok = inside && !clash;
-      l.el.style.visibility = ok ? 'visible' : 'hidden';
-      if (ok) shown.push(r);
+      a.el.style.visibility = x > -100 && x < w + 100 && py > -50 && py < h + 50 ? 'visible' : 'hidden';
     }
 
     const focus=this.actors.get(this.focusActor);

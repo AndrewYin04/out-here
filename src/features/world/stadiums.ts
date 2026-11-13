@@ -64,13 +64,13 @@ export type StadiumLabel = {
 export function stadiumLabels(
   quests: Quest[],
   from: LatLng,
-  opts: { picks?: string[] | null; selectedId?: string | null; cap?: number; radiusM?: number; focusId?: string | null } = {},
+  opts: { picks?: string[] | null; selectedId?: string | null; cap?: number; radiusM?: number } = {},
 ): StadiumLabel[] {
   const picks = new Set(opts.picks ?? []);
   const cap = opts.cap ?? STADIUM_LABEL_CAP;
   const radius = opts.radiusM ?? STADIUM_RADIUS_M;
   const rows = quests
-    .filter((q) => q.id === opts.focusId || (q.status !== 'done' && q.capacity - q.memberIds.length > 0))
+    .filter((q) => q.status !== 'done' && q.capacity - q.memberIds.length > 0)
     .map((q) => {
       const meters = haversineMeters(from, q.location);
       return {
@@ -84,8 +84,6 @@ export function stadiumLabels(
     })
     .filter((r) => r.meters <= radius || r.pick || r.selected)
     .sort((a, b) => Number(b.selected) - Number(a.selected) || Number(b.pick) - Number(a.pick) || a.meters - b.meters);
-  // Walking or arriving: only that plan's label, so a nearby arena (Smash night) doesn't cover boba.
-  if (opts.focusId) return rows.filter((r) => r.id === opts.focusId).slice(0, 1);
   return rows.slice(0, Math.max(cap, rows.filter((r) => r.pick || r.selected).length));
 }
 

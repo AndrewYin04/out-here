@@ -2,7 +2,7 @@
 
 import { Check, ChevronDown, ChevronUp, Loader2, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { cn, sfx } from '@/features/ui';
+import { cn } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
 import { MuseLabel } from './SuggestionCard';
 

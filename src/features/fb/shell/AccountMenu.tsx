@@ -1,10 +1,10 @@
 'use client';
 
-import { Check, RotateCcw, UserRound, Volume2, VolumeX } from 'lucide-react';
+import { Check, RotateCcw, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { BRAND } from '@/config/brand';
 import { apiFetch, useChannel } from '@/features/data';
-import { Avatar, MenuItem, MenuLabel, MenuLink, MenuSeparator, Popover, Skeleton, useSfxMuted } from '@/features/ui';
+import { Avatar, MenuItem, MenuLabel, MenuLink, MenuSeparator, Popover, Skeleton } from '@/features/ui';
 import { ROUTES } from './nav';
 import { useShellData } from './ShellDataProvider';
 
@@ -64,7 +64,6 @@ function ResetDemoItem() {
 /** The avatar button at the top right. Its menu hosts the demo persona switcher. */
 export function AccountMenu() {
   const { viewer, personas, activeHandle, ready, switchPersona } = useShellData();
-  const [muted, setMuted] = useSfxMuted();
   // Someone reset the demo: every open tab reloads into the fresh story.
   useChannel(['demo:reset'], () => window.location.reload());
   return (
@@ -104,14 +103,6 @@ export function AccountMenu() {
               <MenuSeparator />
             </>
           )}
-          <MenuItem
-            icon={muted ? <VolumeX size={20} aria-hidden /> : <Volume2 size={20} aria-hidden />}
-            description={muted ? 'Out Here sounds are off' : 'Out Here sounds are on'}
-            onSelect={() => setMuted(!muted)}
-          >
-            <span data-testid="sfx-toggle">{muted ? 'Turn sounds on' : 'Turn sounds off'}</span>
-          </MenuItem>
-          <MenuSeparator />
           <MenuLabel>
             <span className="flex items-center gap-2">
               <UserRound size={18} aria-hidden /> Demo: switch persona

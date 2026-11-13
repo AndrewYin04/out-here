@@ -1,34 +1,15 @@
 'use client';
 
 import { Footprints, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, IconButton, celebrateJoin, sfx } from '@/features/ui';
+import { Avatar, Button, IconButton, celebrateJoin } from '@/features/ui';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
 
 /** Invites older than this are left to Notifications and Messenger. */
 const RECENT_MS = 3 * 60 * 60_000;
-
-/** Quest ids with an invite card on screen right now (UpNext stays quiet for those plans). */
-export const pendingInviteQuests = new Set<string>();
-
-/** Any invite card still on screen (pending or just accepted) hides Up next, so two Let's go buttons don't stack. */
-let inviteCards = 0;
-const inviteCardSubs = new Set<() => void>();
-function setInviteCards(n: number) {
-  if (n === inviteCards) return;
-  inviteCards = n;
-  inviteCardSubs.forEach((fn) => fn());
-}
-export function useInviteOnScreen(): boolean {
-  return useSyncExternalStore(
-    (cb) => { inviteCardSubs.add(cb); return () => { inviteCardSubs.delete(cb); }; },
-    () => inviteCards > 0,
-    () => false,
-  );
-}
 
 type Shown = InviteView & { result?: string; error?: string; busy?: boolean };
 
@@ -37,23 +18,10 @@ type Shown = InviteView & { result?: string; error?: string; busy?: boolean };
  * user:<id> for {type:"invite"}, refetches /api/invites, and shows pending ones with Accept
  * (joins the quest, with the inviter when both seats fit) and Decline.
  */
-/**
- * "Boba with Maya" sent to Maya reads "wants to get boba with you", not "boba with maya with you":
- * drop a leading emoji and a trailing "with <you>", then lowercase only the first letter.
- */
-function inviteWhat(title: string, viewerName: string): string {
-  const first = viewerName.split(' ')[0] ?? viewerName;
-  let t = title.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
-  t = t.replace(new RegExp(`\\s+(with|w/)\\s+${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b.*$`, 'i'), '');
-  return t ? t.charAt(0).toLowerCase() + t.slice(1) : 'hang out';
-}
-
 export function InviteInbox() {
   const { viewer } = useViewer();
   const [items, setItems] = useState<Shown[]>([]);
   const dismissed = useRef<Set<string>>(new Set());
-  // No chime for invites already waiting when the page opens; only for ones that arrive live.
-  const loadedOnce = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -62,12 +30,7 @@ export function InviteInbox() {
       setItems((prev) => {
         const kept = new Map(prev.filter((p) => p.result).map((p) => [p.id, p]));
         const pending = data.incoming.filter((i) => i.status === 'pending' && Date.parse(i.createdAt) > cutoff && !dismissed.current.has(i.id));
-        const fresh = pending.filter((p) => !kept.has(p.id) && !prev.some((x) => x.id === p.id));
-        if (fresh.length > 0 && prev.length + kept.size >= 0 && loadedOnce.current) sfx('invite_received');
         for (const p of pending) if (!kept.has(p.id)) kept.set(p.id, p);
-        pendingInviteQuests.clear();
-        for (const p of pending) if (p.quest?.id) pendingInviteQuests.add(p.quest.id);
-        loadedOnce.current = true;
         return [...kept.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
       });
     } catch {
@@ -99,7 +62,6 @@ export function InviteInbox() {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
         `/api/invites/${inv.id}/respond`, { status });
       if (status === 'accepted' && out.quest) celebrateJoin(from, out.quest.id, viewer.avatarUrl);
-      sfx(status === 'accepted' ? 'accept_stamp' : 'soft_no');
       const who = inv.from?.name.split(' ')[0] ?? 'your friend';
       const result = status === 'declined'
         ? 'Declined.'
@@ -113,11 +75,9 @@ export function InviteInbox() {
     }
   };
 
-  useEffect(() => { setInviteCards(items.length); return () => setInviteCards(0); }, [items.length]);
-
   if (items.length === 0) return null;
   return (
-    <div data-testid="invite-inbox" className="pointer-events-none fixed inset-x-2 bottom-[76px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:bottom-4 md:right-4 md:w-[380px]">
+    <div className="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">
       {items.map((inv) => (
         <InviteCard key={inv.id} inv={inv} onRespond={respond} onDismiss={dismiss} />
       ))}
@@ -129,7 +89,6 @@ function InviteCard({ inv, onRespond, onDismiss }: {
   inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined', from?: HTMLElement | null) => void; onDismiss: (id: string) => void;
 }) {
   const from = inv.from?.name.split(' ')[0] ?? 'A friend';
-  const { viewer } = useViewer();
   const letsGo = useLetsGo();
   // Live seats: the quest channel updates this card when someone else takes a seat.
   const live = useQuest(inv.quest?.id ?? null);
@@ -144,20 +103,22 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       aria-label={`Invite from ${from}`}
       className="pointer-events-auto animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover"
     >
-      <div className="flex items-start gap-2.5">
-        <span aria-hidden className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[16px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
-        <p className="min-w-0 flex-1 rounded-[18px] rounded-tl-md bg-fb-bg px-3 py-2 text-[15px] leading-5 text-fb-text">
-          <span className="font-semibold">{inv.from?.name ?? from} wants to get {inviteWhat(inv.suggestionTitle, viewer.name)} with you</span>
-          {q ? <> — {q.venueName}{seats !== null ? `, ${seats} spot${seats === 1 ? '' : 's'} left` : ''}. Say yes and you&apos;re both in.</> : '.'}
-          {inv.message && <span className="mt-1 block text-[13px] text-fb-text-2">“{inv.message}”</span>}
-        </p>
+      <div className="flex items-start gap-3">
+        <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] leading-5 text-fb-text">
+            <span className="font-semibold">{from} invited you:</span> {inv.suggestionTitle.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '')}
+          </p>
+          {inv.message && <p className="mt-1 line-clamp-3 text-[13px] text-fb-text-2">“{inv.message}”</p>}
+          {q && (
+            <p className="mt-1 flex items-center gap-2 text-[13px] text-fb-text-2">
+              {q.venueName}{seats !== null && <SeatsBadge seats={seats} />}
+            </p>
+          )}
+        </div>
         <IconButton label="Dismiss" size="sm" onClick={() => onDismiss(inv.id)}>
           <X size={16} aria-hidden />
         </IconButton>
-      </div>
-      <div className="mt-2.5 flex items-center gap-2 pl-11">
-        <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={28} />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-fb-text-2">{inv.from?.name ?? from}{seats !== null && <> · <SeatsBadge seats={seats} /></>}</span>
       </div>
       {alone && seats! > 0 && (
         <p data-testid="invite-one-seat" className="mt-2 text-[13px] text-fb-text-2">
@@ -181,9 +142,9 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       ) : (
         <div className="mt-3 flex gap-2">
           <Button block disabled={inv.busy || seats === 0} onClick={(e) => onRespond(inv, 'accepted', e.currentTarget)}>
-            {seats === 0 ? 'Full' : alone ? `Join without ${from}` : "I'm in"}
+            {seats === 0 ? 'Full' : alone ? `Join without ${from}` : 'Accept'}
           </Button>
-          <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Not now</Button>
+          <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Decline</Button>
         </div>
       )}
     </section>

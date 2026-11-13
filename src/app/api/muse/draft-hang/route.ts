@@ -46,10 +46,8 @@ export const POST = route(async ({ store, viewer, req }) => {
   const friendAt = locOf(item.friend.id) ?? DEMO_CENTER;
   const until = new Date(item.until);
   const excluded = new Set(b.excludePlaceIds);
-  // Rehearsals at night: OUTHERE_IGNORE_HOURS=1 locally, and every Vercel preview (dev data),
-  // skip opening hours. Production keeps them.
-  const ignoreHours = process.env.VERCEL_ENV === 'preview'
-    || (process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1');
+  // Local testing at night only: OUTHERE_IGNORE_HOURS=1 skips opening hours (never set on Vercel).
+  const ignoreHours = process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1';
   const places = hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, friendAt, at, until, b.budgetMax ?? null, { ignoreHours });
   if (places.length === 0) return { draft: null, friend: item.friend, others, reason: 'no_place_fits' };
 

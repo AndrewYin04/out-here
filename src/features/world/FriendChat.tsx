@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { apiFetch, apiPost, useApi } from '@/features/data';
 import type { HangSuggestion } from '@/features/data/locations';
-import { Avatar, burst, cn, useToast, sfx } from '@/features/ui';
+import { Avatar, burst, cn, useToast } from '@/features/ui';
 import type { Message } from '@/shared';
 import type { ThreadView } from '@/shared/api';
 
@@ -88,14 +88,12 @@ function Sheet({ friend, viewerId, incoming, onReply, onWalk, walking, onClose }
     if (!lastTheirs || lastTheirs.id === lastSeen.current) return;
     lastSeen.current = lastTheirs.id;
     onReply(friend.id, lastTheirs.text);
-    if (lastTheirs.fromId !== viewerId) sfx('chat_receive');
-  }, [lastTheirs, friend.id, onReply, viewerId]);
+  }, [lastTheirs, friend.id, onReply]);
 
   const send = async (text: string) => {
     if (!threadId || sending) return;
     setSending(true);
     try {
-      sfx('chat_send');
       await apiPost(`/api/threads/${threadId}/messages`, { text });
       await msgs.refetch();
     } catch {

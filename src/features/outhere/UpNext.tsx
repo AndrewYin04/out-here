@@ -7,7 +7,6 @@ import { requestSelfie } from '@/features/memories';
 import { Avatar, CategoryIcon, cn, useToast } from '@/features/ui';
 
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
-import { pendingInviteQuests } from './InviteInbox';
 
 const first = (name: string) => name.split(' ')[0] ?? name;
 
@@ -93,8 +92,6 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, cla
   const reminded = useRef<string | null>(null);
   useEffect(() => {
     if (phase !== 'go' || arrived || reminded.current === q.id) return;
-    // One voice at a time: while Maya's invite card is up for this plan, it owns the moment.
-    if (pendingInviteQuests.has(q.id)) { reminded.current = q.id; return; }
     reminded.current = q.id;
     toast.show(`Time to go: leave now for ${q.title} (${plan.walkMinutes} min walk)`);
     // toast is stable for the provider's lifetime
@@ -102,13 +99,10 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, cla
   }, [phase, arrived, q.id]);
 
   const withShort = others.length === 0 ? 'just you' : `with ${first(others[0]!.name)}${others.length > 1 ? ` +${others.length - 1}` : ''}`;
-  const when = arrived ? 'You’re here'
-    : phase === 'live' ? 'Happening now'
-      : minsToStart < 60 ? `Starts in ${minsToStart} min`
-        : `Starts ${formatDemoTime(q.startsAt)}`;
-  // One short line that fits on a phone: when it starts, then when to leave. Once you've arrived,
-  // the line is just "You're here" (not "Starts in 9 min · You're here").
-  const leave = arrived ? null
+  const when = phase === 'live' ? 'Happening now' : minsToStart < 60 ? `Starts in ${minsToStart} min` : `Starts ${formatDemoTime(q.startsAt)}`;
+  // One short line that fits on a phone: when it starts, then when to leave. Who's going is in the
+  // faces below; the walk time is on Let's go and the plan card.
+  const leave = arrived ? 'You’re here'
     : walking ? 'On your way'
       : phase === 'later' ? `Leave by ${formatDemoTime(new Date(leaveBy).toISOString())}`
         : phase === 'go' ? 'Time to go' : `${plan.walkMinutes} min walk`;
@@ -136,21 +130,16 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, cla
       )}
       <div className="flex items-center gap-3 p-2.5 pr-2">
         <CategoryIcon category={q.category} size={44} className={cn(phase === 'go' && !arrived && 'ring-2 ring-fb-blue')} />
-        {/* On a phone the text itself opens the plan, so the title keeps the room "See plan" would take. */}
-        <div className="min-w-0 flex-1 cursor-pointer" onClick={() => onSee(q.id)}>
-          <p className="whitespace-nowrap text-[11px] font-bold uppercase tracking-wide text-fb-blue">Up next</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-fb-blue">Up next</p>
           <p className="truncate text-[15px] font-bold leading-5 text-fb-text" data-testid="up-next-title">{q.title}</p>
           <p className={cn('truncate text-[13px] leading-[18px]', phase === 'go' && !arrived && !walking ? 'font-semibold text-fb-blue' : 'text-fb-text-2')} data-testid="up-next-when">
-            {leave ? `${when} · ${leave}` : when}
+            {when} · {leave}
           </p>
         </div>
-        <button type="button" data-testid="up-next-see" onClick={() => onSee(q.id)}
-          className="shrink-0 text-[13px] font-semibold text-fb-blue hover:underline max-[480px]:sr-only">
-          See plan
-        </button>
         {!arrived && (
           <button type="button" data-testid="up-next-go" disabled={walking} onClick={() => onGo(q.id)}
-            className="oh-press inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-fb-blue px-4 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-60 max-[480px]:px-3">
+            className="oh-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-fb-blue px-4 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-60">
             <Footprints size={16} aria-hidden />{walking ? 'Walking…' : 'Let’s go'}
           </button>
         )}

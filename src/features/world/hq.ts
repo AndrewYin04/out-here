@@ -65,30 +65,21 @@ function facadeTexture(style: FacadeStyle): THREE.CanvasTexture {
   c.width = 128; c.height = 160;
   const g = c.getContext('2d')!;
   if (style === 'classic') {
-    // The 1 Hacker Way buildings: warm cream stucco, a long window band with white frames,
-    // a sky reflection across the glass and a coral accent line under the sill.
-    g.fillStyle = '#FFF4E2'; g.fillRect(0, 0, 128, 160);
-    g.fillStyle = '#F6E6CC'; g.fillRect(0, 0, 128, 10); // floor slab line
+    // The 1 Hacker Way buildings: warm stucco with long window bands.
+    g.fillStyle = '#E8D7BF'; g.fillRect(0, 0, 128, 160);
     const glass = g.createLinearGradient(0, 40, 0, 118);
-    glass.addColorStop(0, '#BFE3FF'); glass.addColorStop(0.45, '#6FB3EE'); glass.addColorStop(1, '#2F6FB2');
-    g.fillStyle = '#FFFFFF'; g.fillRect(4, 37, 120, 84); // frame
-    g.fillStyle = glass; g.fillRect(7, 40, 114, 78);
-    g.fillStyle = 'rgba(255,255,255,0.35)'; // reflection streak
-    g.beginPath(); g.moveTo(14, 118); g.lineTo(44, 40); g.lineTo(58, 40); g.lineTo(28, 118); g.closePath(); g.fill();
-    g.fillStyle = '#FFFFFF'; g.fillRect(62, 40, 4, 78); g.fillRect(7, 76, 114, 3); // mullion + transom
-    g.fillStyle = '#FF8A65'; g.fillRect(0, 124, 128, 4); // accent
-    g.fillStyle = '#EED8B8'; g.fillRect(0, 128, 128, 6); // sill
+    glass.addColorStop(0, '#9FC0DA'); glass.addColorStop(1, '#4E6E8E');
+    g.fillStyle = glass; g.fillRect(6, 40, 116, 78);
+    g.fillStyle = '#D9C6AB'; g.fillRect(0, 118, 128, 8); // sill
+    g.fillStyle = '#C9B597'; g.fillRect(62, 40, 4, 78); // mullion
   } else {
     // MPK 20 / 21: white panels and tall glass.
-    g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, 128, 160);
+    g.fillStyle = '#F1F1EE'; g.fillRect(0, 0, 128, 160);
     const glass = g.createLinearGradient(0, 14, 0, 150);
-    glass.addColorStop(0, '#D4EEFF'); glass.addColorStop(0.5, '#7CC0F5'); glass.addColorStop(1, '#2C6DB5');
+    glass.addColorStop(0, '#B7D3EA'); glass.addColorStop(1, '#58799C');
     g.fillStyle = glass; g.fillRect(8, 14, 112, 136);
-    g.fillStyle = 'rgba(255,255,255,0.32)';
-    g.beginPath(); g.moveTo(18, 150); g.lineTo(60, 14); g.lineTo(76, 14); g.lineTo(34, 150); g.closePath(); g.fill();
-    g.fillStyle = '#F2F5F8'; for (const x of [42, 84]) g.fillRect(x, 14, 3, 136);
-    g.fillStyle = '#0866FF'; g.fillRect(0, 150, 128, 3); // Facebook-blue floor line
-    g.fillStyle = '#E8EDF2'; g.fillRect(0, 153, 128, 7);
+    g.fillStyle = '#E2E4E6'; for (const x of [42, 84]) g.fillRect(x, 14, 3, 136);
+    g.fillStyle = '#D9DBDD'; g.fillRect(0, 150, 128, 10);
   }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -221,9 +212,9 @@ export function buildHq(data: HqData, origin: LatLng, assets?:SceneryAssets): Hq
     if(g){const mesh=new THREE.Mesh(keep(g),s.mat);mesh.userData.worldOccluder=true;tall.add(mesh);}
   }
   const roofG = merge(roofs);
-  if(roofG){const mesh=new THREE.Mesh(keep(roofG),keep(new THREE.MeshStandardMaterial({color:'#E4EAEF',roughness:.85,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
+  if(roofG){const mesh=new THREE.Mesh(keep(roofG),keep(new THREE.MeshStandardMaterial({color:'#D6D4C7',roughness:.95,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
   const parG = merge(parapets);
-  if(parG){const mesh=new THREE.Mesh(keep(parG),keep(new THREE.MeshStandardMaterial({color:'#FFFFFF',roughness:.7,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
+  if(parG){const mesh=new THREE.Mesh(keep(parG),keep(new THREE.MeshStandardMaterial({color:'#E5DFCC',roughness:.9,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
 
   // Rooftop park(s): a planted surface on the roof they sit on.
   const roofTopAt = (p: LatLng) => tops.find((t) => inPolygon(p, t.rings))?.top ?? null;
@@ -235,11 +226,11 @@ export function buildHq(data: HqData, origin: LatLng, assets?:SceneryAssets): Hq
     const y = roofTop + 0.35;
     parkTops.push({ rings: park.rings, y });
     const g = flatGeometry(park.rings.map((r) => toLocal(origin, r)), y);
-    if (g) onRoof.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#6CCB4F', roughness: 1, side: THREE.DoubleSide }))));
+    if (g) onRoof.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#7FBF62', roughness: 1, side: THREE.DoubleSide }))));
   }
   for (const plaza of data.plazas) {
     const g = plaza.rings[0].length > 3 ? flatGeometry(plaza.rings.map((r) => toLocal(origin, r)), 0.06) : null;
-    if (g) group.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#ECEAE4', roughness: 1, side: THREE.DoubleSide }))));
+    if (g) group.add(new THREE.Mesh(keep(g), keep(new THREE.MeshStandardMaterial({ color: '#EFE8DC', roughness: 1, side: THREE.DoubleSide }))));
   }
 
   // The campus's mapped trees, on the rooftop park where they stand on it.

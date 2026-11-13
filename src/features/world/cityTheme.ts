@@ -42,7 +42,6 @@ const SKY: SkySpecification = {
 /** The vector source that holds OpenMapTiles layers (OpenFreeMap names it "openmaptiles"). */
 export function tileSourceId(map: MapLibreMap): string | null {
   const style = map.getStyle();
-  if (!style?.layers) return map.getSource('openmaptiles') ? 'openmaptiles' : null;
   const layer = style.layers.find((l) => 'source-layer' in l && l['source-layer'] === 'building');
   const id = layer && 'source' in layer ? String(layer.source) : 'openmaptiles';
   return map.getSource(id) ? id : null;
@@ -93,7 +92,7 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',
       filter: ['match', ['get', 'class'], ['pitch', 'playground', 'stadium', 'track', 'park', 'cemetery'], true, false],
-      paint: { 'fill-color': '#7DCB61', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': '#B6CCA3', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     // Real buildings at their mapped heights, walls tinted by height and lit from the south-west.
     add({

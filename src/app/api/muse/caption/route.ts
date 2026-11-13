@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { HttpError } from '@/features/data/server';
 import { museJSON } from '@/features/muse';
 import { body, IdZ, route } from '@/lib/api';
-import { EARLY_PHOTO_MS } from '@/shared';
 import {analyzeSavedPhoto,PhotoRequestZ} from '@/features/muse-vision/server';
 
 const Request = z.union([PhotoRequestZ,z.object({ questId: IdZ }).strict()]);
@@ -18,10 +17,7 @@ export const POST = route(async ({ store, viewer, req }) => {
   const {questId}=input;
   const { quest, viewerIsMember } = await store.quest(viewer.id, questId);
   if (!viewerIsMember) throw new HttpError(403, 'Only attendees can caption this hangout.');
-  // The memory is made during the hangout: allowed from EARLY_PHOTO_MS before the start, like photos.
-  if (quest.status !== 'done' && Date.parse(quest.startsAt) - Date.now() > EARLY_PHOTO_MS) {
-    throw new HttpError(409, 'This hangout hasn’t started yet.');
-  }
+  if (quest.status !== 'done' && new Date(quest.endsAt) > new Date()) throw new HttpError(409, 'This hangout is still active.');
   const result = await museJSON({
     schemaName: 'memory_caption', schema: Caption,
     jsonSchema: {

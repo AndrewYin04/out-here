@@ -8,15 +8,14 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { MuseMapLayer } from './MuseMapLayer';
 import { useFreeFriendNudge } from './useFreeFriendNudge';
-import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useInviteOnScreen, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
-import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast, sfx } from '@/features/ui';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
 import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
 import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
-import { SellerRequests } from './market/SellerRequests';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
@@ -30,13 +29,6 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 // The 3D street view (world area). Loaded only when someone opens it, so three.js and the
 // models stay out of the map's first load.
 const World3D = dynamic(() => import('@/features/world').then((m) => m.World3D), { ssr: false });
-/** Load the street view's code, models and campus data in the background, once. */
-let worldWarm = false;
-function warmWorld() {
-  if (worldWarm) return;
-  worldWarm = true;
-  void import('@/features/world').then((m) => m.preloadWorld()).catch(() => { worldWarm = false; });
-}
 
 // Remembered per tab, so a fresh visit always lands on the 3D view (#13) and moving around the
 // app and back keeps whichever view this tab was on.
@@ -98,10 +90,7 @@ export function OutHereView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
-  const [view, setViewState] = useState<MapView>(() => {
-    if (typeof window === 'undefined') return 'map';
-    return initialView(new URLSearchParams(window.location.search).get('view'), readSavedView(), navigator.webdriver === true);
-  });
+  const [view, setViewState] = useState<MapView>('map');
   const [viewNote, setViewNote] = useState<string | null>(null);
   const [walkTo, setWalkTo] = useState<{ questId: string } | null>(null);
   const setView = useCallback((v: MapView) => {
@@ -402,14 +391,6 @@ export function OutHereView() {
     return () => window.clearTimeout(t);
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
-  // The map is up: a soft open cue (dropped before the first tap; once a minute at most).
-  useEffect(() => { if (map) sfx('map_open'); }, [map]);
-  // Let's go should open the street at once: warm it a few seconds after the map is up.
-  useEffect(() => {
-    if (!map || unsupported) return;
-    const t = window.setTimeout(warmWorld, 2500);
-    return () => window.clearTimeout(t);
-  }, [map, unsupported]);
 
   // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();
@@ -424,9 +405,6 @@ export function OutHereView() {
     if (unsupported) { select(questId); return; }
     select(null);
     setArrivedId(null);
-    // The go beat, then the camera dives into the street.
-    sfx('lets_go');
-    window.setTimeout(() => sfx('zoom_whoosh'), 380);
     setView('3d');
     setWalkTo({ questId });
   }, [select, setView, unsupported]);
@@ -450,10 +428,8 @@ export function OutHereView() {
   }, [letsGo]);
   /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
   const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
-  const inviteOnScreen = useInviteOnScreen();
-  // Up next steps aside for an open plan, a sheet, the create and sell sheets, the walk, an invite
-  // card (it already has Let's go), and the arrival sheet.
-  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !inviteOnScreen && !arrivedId && !!upNext && !upNextClosed;
+  // Up next steps aside for an open plan, a sheet, the create and sell sheets, and the walk.
+  const upNextShown = !selectedId && !creating && !selling && !sheetOpen && !walkingNow && !!upNext && !upNextClosed;
   // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
   const recenter = useCallback(() => {
     if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }
@@ -656,11 +632,10 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {upNextShown && upNext && (
-        // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
-        // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
-        // at this height and covered Let's go.
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center max-md:right-[68px]',
+      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
+        // Below the Muse filter status and the Friends chip, so neither is ever covered. (Jolly, the
+        // Muse button, sits in the control row at the bottom, so the card can use the full width.)
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
           filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}
@@ -686,14 +661,6 @@ export function OutHereView() {
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
       {mode === 'explore' && !unsupported && (
         <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
-      )}
-
-      {/* A seller's pickup requests, with Accept, under the top bar (the pop-up seller's screen). */}
-      {!creating && !selling && !sheetOpen && !listingId && !selectedId && (
-        <div className="pointer-events-none absolute inset-x-3 top-[84px] z-30 flex justify-center empty:hidden">
-          <SellerRequests className="pointer-events-auto" viewerId={persona.id} listings={listingsApi.data?.listings ?? []} now={now}
-            onChanged={() => { void listingsApi.refetch(); }} />
-        </div>
       )}
 
       {/* Muse found something the viewer is looking for: a card above the dashboard. */}
