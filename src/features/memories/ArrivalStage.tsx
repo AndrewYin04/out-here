@@ -304,10 +304,11 @@ function PrintView({ quest, file, people, onDone }: { quest: Quest; file: File; 
     setError(null);
     setCaption('pending');
     try {
-      const [m, cap] = await Promise.all([
-        saveToAlbum(quest.id, file),
-        apiPost<{ caption: string }>('/api/muse/caption', { questId: quest.id }).then((r) => r.caption?.trim() ?? '').catch(() => ''),
-      ]);
+      // Save first, then caption the saved photo with Muse Vision. The by-plan caption answers 409
+      // while the plan is still active, which it is on arrival (the walk is shorter than the time to its start).
+      const m = await saveToAlbum(quest.id, file);
+      const cap = await apiPost<{ caption: string | null }>('/api/muse/caption', { memoryId: m.id, consent: true })
+        .then((r) => r.caption?.trim() ?? '').catch(() => '');
       if (cap) {
         await apiFetch<unknown>(`/api/memories/${m.id}`, {
           method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ caption: cap }),
