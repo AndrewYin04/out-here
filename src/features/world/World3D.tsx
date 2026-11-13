@@ -1138,6 +1138,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         }
         const h = map.getContainer().clientHeight;
         compose(pos.current.lng, pos.current.lat, z, camBearing.current, 0, Math.round(h * 0.2));
+        // Pinching or scrolling out while following moves the target zoom (not MapLibre's), so the
+        // native zoomend hand-over never fires: hand over to the 2D map here once it passes the line.
+        if (!entering.current && !touring.current && z < EXIT_3D_ZOOM) onZoomOutRef.current?.();
       } else if (!busy) {
         previousCamera = null;
         camBearing.current = map.getBearing();
