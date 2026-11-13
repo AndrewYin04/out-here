@@ -6,6 +6,7 @@
 //
 // ---- Kit (Out Here) ----
 // GET  /api/quests?lat&lng&radiusM&viewerId          -> { quests: Quest[] }     (approxLocation unless member)
+// GET  /api/quests/mine                                           -> { plans: YourPlan[] }
 // POST /api/quests                     body: CreateQuestBody -> { quest }   (429 after EVENTS_PER_DAY in 24 h; publishes quests:new {questId})
 // GET  /api/quests/:id                                                  -> QuestDetail   (members [] + canSeeGuests false for strangers)
 // POST /api/quests/:id/checkin         body: { location }               -> { hereCount }   (members, live, within 150 m)
@@ -14,8 +15,14 @@
 // POST /api/quests/:id/posts           body: { text, media? }           -> { post: PostView }
 // POST /api/quests/:id/join            body: { userId, withFriendId? }  -> { quest, seatsLeft }   (409 if full)
 // POST /api/quests/:id/leave           body: { userId }                 -> { quest, seatsLeft }
-// POST /api/quests/:id/complete        body: { userId }                 -> { quest, crew }        (host only; creates/updates crew)
+// POST /api/quests/:id/complete        body: { userId? }                -> { quest, crew }        (attendee, after the start)
 // POST /api/availability               body: { userId, text, startsAt, endsAt, location } -> { availability }
+// DELETE /api/availability                                              -> { ok: true }  ("Busy": ends the viewer's windows)
+// GET  /api/availability/free-with-me                                   -> FreeWithMeResponse (friends free when the viewer is, ranked)
+// POST /api/together                   body: { friendIds }              -> TogetherResponse  (opens the group's shared plan, or creates it with Muse)
+// GET  /api/together                                                    -> { plans: TogetherView[] }  (viewer's open + just-confirmed plans)
+// GET  /api/together/:id                                                -> TogetherResponse
+// POST /api/together/:id/vote          body: { questId, in }            -> TogetherResponse  (locks when every member is in on one option)
 // GET  /api/friends/:userId/availability                                -> { items: (Availability & { friend: Profile })[] }
 // GET  /api/locations/friends          (viewer from x-persona)          -> { pins: FriendPin[] }   (canSee on audience; fuzzed when approximate; paused/expired hidden)
 // GET  /api/locations/me                                                -> { share: LocationShare | null }
@@ -26,7 +33,8 @@
 // POST /api/invites                    body: { fromId, toId, questId, suggestionTitle, message } -> { invite }
 // POST /api/invites/:id/respond        body: { status: 'accepted'|'declined' } -> { invite, quest? } (accept auto-joins)
 // GET  /api/crews?userId                                                -> { crews: Crew[] }
-// POST /api/memories                   multipart: photo, crewId, questId, uploaderId -> { memory }
+// POST /api/memories                   multipart: photo, crewId, questId, uploaderId?, caption? -> { memory }
+// GET  /api/memories/:id/photo                                      -> image bytes (crew members only)
 // GET  /api/memories?crewId                                             -> { memories: Memory[] }
 // GET  /api/daily?date / POST /api/daily/entry                          -> DailyQuest / { entry }
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
@@ -83,6 +91,7 @@ import type {
   Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
   Notification, PlanSuggestion, Post, Profile, Quest, ReactionCounts, ReactionType, Reel,
   RsvpStatus, Story, Thread,
+  TogetherPlan,
 } from './types';
 
 export type ApiError = { error: string };
@@ -90,6 +99,8 @@ export type ApiError = { error: string };
 // ---- Kit ----
 export type QuestsQuery = { lat: number; lng: number; radiusM?: number; viewerId?: ID };
 export type QuestsResponse = { quests: Quest[] };
+export type YourPlan = { quest: Quest; members: PersonCard[]; walkMinutes: number; crewId: ID | null };
+export type YourPlansResponse = { plans: YourPlan[] };
 export type CreateQuestBody = Omit<Quest, 'id' | 'memberIds' | 'status' | 'createdAt' | 'approxLocation' | 'isPublic'> & {
   /** Friends to invite; required for visibility 'friends' (invite only). */
   inviteIds?: ID[];
@@ -109,6 +120,19 @@ export type CreateAvailabilityBody = {
   userId: ID; text: string; startsAt: string; endsAt: string; location: LatLng;
 };
 export type AvailabilityResponse = { availability: Availability };
+export type FreeWithMeItem = {
+  friend: PersonCard;
+  from: string; until: string;        // overlap with the viewer's window
+  text: string;                       // the friend's own note ("on a long lunch")
+  sharedInterests: string[];
+  knows: ID[];                        // other free friends this friend is friends with
+  freeNow: boolean;
+  score: number;
+};
+/** Empty when the viewer is busy. `group` is the suggested set of friend ids, best first. */
+export type FreeWithMeResponse = { items: FreeWithMeItem[]; group: ID[] };
+export type TogetherView = TogetherPlan & { members: PersonCard[] };
+export type TogetherResponse = { plan: TogetherView };
 export type FriendAvailabilityResponse = { items: (Availability & { friend: Profile })[] };
 export type UsersResponse = { users: Profile[] };
 export type CreateInviteBody = {

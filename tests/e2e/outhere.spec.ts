@@ -36,7 +36,8 @@ test.describe("Out Here plan sheet", () => {
 
     await ask(page, PLACEHOLDER);
     // the invite draft scrolls its Send button into view, also at 390 px
-    const inviteBtn = page.getByRole("button", { name: /^Invite [A-Z]/ }).first();
+    // "Go with <friend>" is the main action; "Edit invite first" opens Muse's draft
+    const inviteBtn = page.getByRole("button", { name: "Edit invite first" }).first();
     if (await inviteBtn.count()) {
       await inviteBtn.click();
       // only one draft is open, so the page-level Send button is that draft's
@@ -157,7 +158,8 @@ test.describe("Out Here plan sheet", () => {
     await maya.goto("/out-here?as=maya");
     await expect(maya.getByRole("button", { name: "I'm free" })).toBeVisible();
 
-    await top.getByRole("button", { name: "Invite Maya" }).click();
+    await expect(top.getByRole("button", { name: "Go with Maya" })).toBeVisible();
+    await top.getByRole("button", { name: "Edit invite first" }).click();
     const draft = top.getByTestId("invite-draft");
     await expect(draft).not.toHaveValue("");
     await draft.fill("Dumplings at Dumpling Den in 25? 2 seats left");
@@ -171,7 +173,8 @@ test.describe("Out Here plan sheet", () => {
 
     const card = maya.getByTestId("invite-card");
     await expect(card).toContainText(`Alex invited you: 🥟 ${DUMPLINGS}`, { timeout: 5_000 });
-    await expect(card.getByTestId("seats-left")).toHaveText("2 left");
+    // Alex took a seat when he sent it ("Go with" = join + invite), so one is left for Maya
+    await expect(card.getByTestId("seats-left")).toHaveText("1 left");
     await card.getByRole("button", { name: "Accept" }).click();
     await expect(card.getByTestId("invite-result")).toContainText("You're in with Alex");
     await expect(card.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });

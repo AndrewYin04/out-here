@@ -8,6 +8,7 @@ const listeners = new Set<() => void>();
 export function setPlanOpen(next: boolean): void {
   if (open === next) return;
   open = next;
+  if (next) togetherId = null;
   if (!next) { setPlanSuggestions(null); setPlanAsk(null); }
   for (const l of listeners) l();
 }
@@ -19,6 +20,40 @@ function subscribe(l: () => void) {
 
 export function usePlanOpen(): boolean {
   return useSyncExternalStore(subscribe, () => open, () => false);
+}
+
+// The shared "plan together" sheet on screen (one at a time, never with the composer).
+let togetherId: string | null = null;
+
+export function openTogether(id: string | null): void {
+  togetherId = id;
+  if (id) { open = false; setPlanSuggestions(null); }
+  for (const l of listeners) l();
+}
+
+export function useTogetherId(): string | null {
+  return useSyncExternalStore(subscribe, () => togetherId, () => null);
+}
+
+/** Window event: the viewer's own availability changed (status pill, "I'm free" plan). */
+export const AVAILABILITY_CHANGED = 'outhere:availability-changed';
+export function availabilityChanged(): void {
+  window.dispatchEvent(new Event(AVAILABILITY_CHANGED));
+}
+
+// Text to start the composer with (the "both free" nudge's "Make a plan"). Each call bumps the
+// id so the same text twice still refills the composer.
+let prefill: { id: number; text: string } | null = null;
+
+export function openPlanWith(text: string): void {
+  prefill = { id: (prefill?.id ?? 0) + 1, text };
+  open = true;
+  togetherId = null;
+  for (const l of listeners) l();
+}
+
+export function usePlanPrefill(): { id: number; text: string } | null {
+  return useSyncExternalStore(subscribe, () => prefill, () => null);
 }
 
 // The suggestions of the plan on screen, so the map can highlight their pins. PlanSheet sets

@@ -112,8 +112,30 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     if ((payload as { type?: string } | null)?.type === 'invite') void checkAnswers();
   });
 
+  /** Go with a friend: join (if not in yet) and send the invite in one step. */
+  const goWith = async (p: PersonCard, message: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy('invite');
+    setError(null);
+    try {
+      if (s.questId && !isMember) await apiPost(`/api/quests/${s.questId}/join`, {});
+      const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: p.id, questId: s.questId, suggestionTitle: s.title, message: message.trim() });
+      setSentTo((prev) => new Map(prev).set(p.id, out.invite.id));
+      setInviteFor(null);
+      await quest.refetch();
+      onJoined?.();
+    } catch (e) {
+      setError(errorText(e, "Couldn't send the invite. Try again."));
+    } finally {
+      inFlight.current = false;
+      setBusy(null);
+    }
+  };
+
   const sendInvite = async () => {
     if (!inviteFor || inFlight.current) return;
+    if (!isMember) return goWith(inviteFor, draft);
     inFlight.current = true;
     setBusy('invite');
     setError(null);
@@ -168,7 +190,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       </div>
 
       {/* The short bridge line shows; Muse's full reasoning opens on tap so the card stays light. */}
-      {s.bridge && <p className="mt-2 text-[13px] text-fb-text-2">{s.bridge}</p>}
+      {s.bridge && !(s.precheck && s.precheck.length > 0) && <p className="mt-2 text-[13px] text-fb-text-2">{s.bridge}</p>}
       {s.reason && (
         <div className="mt-1.5">
           <button
@@ -185,7 +207,21 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       )}
 
-      {people.length > 0 && (
+      {people.length > 0 && s.precheck && s.precheck.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-2" data-testid="precheck">
+          {s.precheck.flatMap((c) => {
+            const p = friends.get(c.friendId);
+            if (!p) return [];
+            return [(
+              <li key={c.friendId} title={c.because.join(' · ')}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F3E8] py-0.5 pl-0.5 pr-2.5 text-[13px] font-semibold text-fb-green">
+                <Avatar src={p.avatarUrl} name={p.name} size={24} decorative />
+                ✓ {p.name.split(' ')[0]}&apos;s likely down
+              </li>
+            )];
+          })}
+        </ul>
+      ) : people.length > 0 && (
         <div className="mt-2 flex items-center gap-2 text-[13px] text-fb-text-2">
           <Users size={14} aria-hidden />
           <div className="flex -space-x-1.5">
@@ -236,28 +272,32 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       )}
 
-      {!inviteFor && (
-        <div className="mt-3 flex gap-2">
-          {people.slice(0, 2).filter((p) => !outcomes.has(p.id)).map((p) => {
-            const sent = sentTo.has(p.id);
-            return (
-              <Button key={p.id} variant={sent ? 'secondary' : 'primary'} block disabled={sent} onClick={() => openInvite(p)}>
-                {sent ? `Invite sent to ${p.name.split(' ')[0]}` : `Invite ${p.name.split(' ')[0]}`}
-              </Button>
-            );
-          })}
-          {s.questId && (
-            <Button
-              variant={people.length > 0 ? 'secondary' : 'primary'}
-              block
-              disabled={isMember || seats === 0 || busy === 'join'}
-              onClick={() => void join()}
-            >
+      {!inviteFor && (() => {
+        const lead = people.find((p) => !outcomes.has(p.id));
+        const sent = lead ? sentTo.has(lead.id) : false;
+        // With a friend: one main action, "Go with Maya" (join + Muse's invite). Without: Join.
+        if (lead && s.questId) return (
+          <div className="mt-3">
+            <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null || (!isMember && seats === 0)}
+              onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
+              {sent ? `Invite sent to ${lead.name.split(' ')[0]}` : busy === 'invite' ? 'Sending…' : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
+            </Button>
+            {!sent && (
+              <div className="mt-1.5 flex justify-center gap-4 text-[13px] font-semibold text-fb-text-2">
+                <button type="button" className="hover:underline" onClick={() => openInvite(lead)}>Edit invite first</button>
+                {!isMember && (seats ?? 0) > 0 && <button type="button" className="hover:underline" disabled={busy !== null} onClick={() => void join()}>Just me</button>}
+              </div>
+            )}
+          </div>
+        );
+        return s.questId ? (
+          <div className="mt-3">
+            <Button block disabled={isMember || seats === 0 || busy === 'join'} onClick={() => void join()}>
               {isMember ? "You're going" : busy === 'join' ? 'Joining…' : seats === 0 ? 'Full' : 'Join'}
             </Button>
-          )}
-        </div>
-      )}
+          </div>
+        ) : null;
+      })()}
     </article>
   );
 }

@@ -2,11 +2,13 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { CalendarCheck } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { ImFreeButton, MuseLabel, PlanSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
 import { Plus } from 'lucide-react';
 import { Button, cn, EmptyState, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
@@ -188,6 +190,14 @@ export function OutHereView() {
     select(q.id);
     toast.show('Your plan is live on the map.');
   }, [questsApi, select, toast]);
+  const togetherId = useTogetherId();
+  const sheetOpen = planOpen || togetherId !== null;
+  // "See it on the map" from a confirmed shared plan opens that quest's panel here.
+  useEffect(() => {
+    const on = (e: Event) => select((e as CustomEvent<string>).detail);
+    window.addEventListener('outhere:select-quest', on);
+    return () => window.removeEventListener('outhere:select-quest', on);
+  }, [select]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
   const noSelect = useCallback(() => {}, []);
@@ -368,27 +378,39 @@ export function OutHereView() {
         </>
       )}
 
-      {/* ImFreeButton is an unpositioned pill; place it above the map canvas, bottom centre, with ＋ beside it. */}
-      {!creating && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex items-center justify-center gap-2 max-md:bottom-20">
-          <div className="pointer-events-auto">
+      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). */}
+      {!selectedId && (
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
+          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
+        </div>
+      )}
+
+      {/* One row at the bottom: "I'm free" (it also shows your status), ＋ Post a plan, and Your plans. */}
+      {!creating && !sheetOpen && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
+          <div className="pointer-events-auto flex items-center gap-2">
             <ImFreeButton />
+            {!unsupported && (
+              <button
+                type="button"
+                data-testid="create-plan-btn"
+                aria-label="Post a plan"
+                title="Post a plan (or long-press the map)"
+                onClick={() => startCreate()}
+                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
+              >
+                <Plus size={26} aria-hidden />
+              </button>
+            )}
+            <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
+              className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
+              <CalendarCheck size={22} aria-hidden />
+            </Link>
           </div>
-          {!planOpen && !unsupported && (
-            <button
-              type="button"
-              data-testid="create-plan-btn"
-              aria-label="Post a plan"
-              title="Post a plan (or long-press the map)"
-              onClick={() => startCreate()}
-              className="pointer-events-auto flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
-            >
-              <Plus size={26} aria-hidden />
-            </button>
-          )}
         </div>
       )}
       <PlanSheet />
+      <TogetherSheet />
       {creating && (
         <CreatePlanSheet
           at={creating.at}

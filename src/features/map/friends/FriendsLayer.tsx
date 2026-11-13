@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Avatar, cn } from '@/features/ui';
 import type { FriendPin, LatLng, Profile } from '@/shared/types';
+import { freeStatus, freeStatusLabel } from '@/shared/status';
 import { CHIP_WRAP_W, chipText, placeChipsSided, thoughtFor, type ChipMode, type ChipOptions, type ChipSide } from './chips';
 import { FriendCard } from './FriendCard';
 import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMyShare, PANEL_PX } from './useFindMy';
@@ -255,6 +256,8 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
   const b = pin.bubble;
   const text = chipText(pin);
   const shown = thoughtFor(b.thought, chip);
+  // Green only while the friend shared a free window that is open now.
+  const free = freeStatus(pin.availability ? [pin.availability] : []);
   return (
     <button
       type="button"
@@ -263,13 +266,13 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       data-handle={pin.friend.handle}
       data-chip={chip}
       data-chip-side={chip === 'none' ? undefined : side}
-      aria-label={`${pin.friend.name}${text ? `, ${text}` : ''}, updated ${updatedAgo(pin.updatedAt)}`}
+      aria-label={`${pin.friend.name}, ${freeStatusLabel(free)}${text ? `, ${text}` : ''}, updated ${updatedAgo(pin.updatedAt)}`}
       className="group relative flex flex-col items-center outline-none"
     >
       {chip !== 'none' && (
         <span
           className={cn(
-            'absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            'pointer-events-none absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
             side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
           style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}
@@ -289,9 +292,23 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
           )}
         </span>
       )}
-      <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-green transition-transform group-hover:scale-105">
+      <span className={cn(
+        'rounded-full bg-white p-[2px] shadow-card ring-[3px] transition-transform group-hover:scale-105',
+        free.kind === 'free' ? 'ring-fb-green' : 'ring-fb-divider',
+      )}>
         <Avatar src={pin.friend.avatarUrl} name={pin.friend.name} size={36} decorative />
       </span>
+      {free.kind !== 'busy' && (
+        <span
+          data-testid="friend-free"
+          className={cn(
+            '-mt-1.5 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold leading-4 shadow-card',
+            free.kind === 'free' ? 'bg-fb-green text-white' : 'bg-white text-fb-text-2',
+          )}
+        >
+          {freeStatusLabel(free).replace(/^Free/, 'free')}
+        </span>
+      )}
     </button>
   );
 }
