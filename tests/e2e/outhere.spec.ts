@@ -42,7 +42,10 @@ test.describe("Out Here plan sheet", () => {
     await ask(page, "hungry, 15 min");
     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
     const cards = page.getByTestId("suggestion");
-    if ((await cards.count()) === 0) await expect(page.getByTestId("plan-empty")).toContainText("No plan fits 15 minutes right now");
+    // nothing posted fits: the empty card, or (a friend is free too) Muse drafting a plan for you two
+    if ((await cards.count()) === 0) {
+      await expect(page.getByTestId("plan-empty").or(page.getByTestId("draft-hang")).or(page.getByTestId("draft-hang-loading")).first()).toBeVisible();
+    }
 
     await ask(page, PLACEHOLDER);
     // the invite draft scrolls its Send button into view, also at 390 px
