@@ -69,7 +69,17 @@ export type MuseJSONOptions<T> = {
    * holds live values (seats, walk minutes, start times) that must not change the key.
    */
   cacheKey?: unknown;
+  /**
+   * Extra facts logged with the output in muse_runs (as output.signals), so "why did Muse suggest
+   * this" can show what it used. Counts and labels only: never names, ids, or someone's answer.
+   */
+  logSignals?: Record<string, unknown>;
 };
+
+/** The output as logged to muse_runs: with output.signals when the caller gave logSignals. The cache stores the bare output. */
+function withSignals(data: unknown, signals: Record<string, unknown> | undefined): unknown {
+  return signals && data && typeof data === 'object' ? { ...(data as object), signals } : data;
+}
 
 /** Raw chat call, replaceable in tests. Returns the message text and usage. */
 export type MuseTransport = (req: {
@@ -346,12 +356,13 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     messages: opts.messages, cacheKey: opts.cacheKey,
   });
   const base: RunBase = { route, schemaName: opts.schemaName, model, userId, inputHash, mock };
+  const logged = (data: T): unknown => withSignals(data, opts.logSignals);
 
   if (mock) {
     const usage: MuseUsage = { promptTokens: null, completionTokens: null };
     const data = opts.schema.parse(opts.mock());
     const latencyMs = Date.now() - started;
-    emit({ ...base, latencyMs, output: data, ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
+    emit({ ...base, latencyMs, output: logged(data), ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
     return { data, model, latencyMs, usage, mock: true };
   }
 
@@ -368,7 +379,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     const usage: MuseUsage = { promptTokens: null, completionTokens: null };
     const latencyMs = Date.now() - started;
     emit({
-      ...base, latencyMs, output: data, ...usage, ok: true, error: null, cached: true, cacheReason: reason,
+      ...base, latencyMs, output: logged(data), ...usage, ok: true, error: null, cached: true, cacheReason: reason,
       createdAt: new Date().toISOString(),
     });
     return { data, model, latencyMs, usage, mock: false, cached: true, cacheReason: reason };
@@ -435,7 +446,7 @@ async function liveCall<T>(
           output: parsed.data, userId: base.userId, latencyMs, createdAt,
         }));
       }
-      emit({ ...base, latencyMs, output: parsed.data, ...usage, ok: true, error: null, cached: false, createdAt });
+      emit({ ...base, latencyMs, output: withSignals(parsed.data, opts.logSignals), ...usage, ok: true, error: null, cached: false, createdAt });
       return { data: parsed.data, model, latencyMs, usage, mock: false, cached: false };
     } catch (err) {
       lastError = err;
