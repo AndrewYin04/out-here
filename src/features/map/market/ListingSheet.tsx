@@ -25,6 +25,23 @@ export type ListingSheetProps = {
   museWatch?: string | null;
   onClose: () => void;
   onChanged: () => void;
+  /** On your way to a plan: what stopping here first costs, from real walking minutes. */
+  detour?: Detour | null;
+  /** "Stop on the way": the walk goes here first, then on to the plan. */
+  onStopOnTheWay?: (to: LatLng) => void;
+};
+
+export type Detour = {
+  /** Extra minutes the stop adds to the walk (pickup included). */
+  extraMin: number;
+  /** When you'd reach the plan with the stop (ISO). */
+  arriveAt: string;
+  /** The plan's place, "Bobalicious Corner". */
+  venue: string;
+  /** The plan's title, "Boba run". */
+  title: string;
+  /** True when the stop makes you later than the plan's start. */
+  late: boolean;
 };
 
 const ETAS = [15, 30, 45, 60] as const;
@@ -47,7 +64,7 @@ const ago = (iso: string, at: Date) => {
 
 const directionsUrl = (p: LatLng) => `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
 
-export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, museLine, museWatch = null, onClose, onChanged }: ListingSheetProps) {
+export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, museLine, museWatch = null, onClose, onChanged, detour = null, onStopOnTheWay }: ListingSheetProps) {
   const api = useMapListing(listingId);
   const m = api.data?.listing ?? null;
   const toast = useToast();
@@ -151,7 +168,7 @@ export function ListingSheet({ listingId, viewerId, driveMin, walkMin = null, mu
 
           {isSeller
             ? <SellerActions m={m} at={at} busy={busy} run={run} />
-            : <BuyerActions m={m} at={at} busy={busy} run={run} />}
+            : <BuyerActions m={m} at={at} busy={busy} run={run} detour={detour} onStopOnTheWay={onStopOnTheWay} onAfter={() => { toast.show(`Saved for after ${detour?.title ?? 'the plan'}. It’s held for you.`); onClose(); }} />}
 
           {!isSeller && (
             <button
@@ -183,7 +200,9 @@ function StatusLine({ m, at }: { m: MapListing; at: Date }) {
 
 type Run = (fn: () => Promise<MapListingResponse>, done?: string) => Promise<void>;
 
-function BuyerActions({ m, at, busy, run }: { m: MapListing; at: Date; busy: boolean; run: Run }) {
+function BuyerActions({ m, at, busy, run, detour, onStopOnTheWay, onAfter }: {
+  m: MapListing; at: Date; busy: boolean; run: Run; detour: Detour | null; onStopOnTheWay?: (to: LatLng) => void; onAfter: () => void;
+}) {
   const l = m.listing;
   const hold = m.myHold;
   const sellerFirst = m.seller.name.split(' ')[0];
@@ -202,6 +221,21 @@ function BuyerActions({ m, at, busy, run }: { m: MapListing; at: Date; busy: boo
         <p className="text-[13px] leading-[17px] text-fb-text-2">
           {sellerFirst} will meet you at {l.pickupSpot}. Bring {money(hold.offerUsd)}.
         </p>
+        {detour && onStopOnTheWay && (
+          <div data-testid="detour" className="rounded-[10px] bg-white/70 px-2.5 py-2">
+            <p className="text-[14px] leading-[18px] text-fb-text">
+              On your way to <span className="font-semibold">{detour.venue}</span>? Stopping here adds{' '}
+              <span data-testid="detour-extra" className="font-semibold">{detour.extraMin} min</span>
+              {detour.late ? ` · you’d get there at ${formatDemoTime(detour.arriveAt)}, a little after it starts.` : ` · still there by ${formatDemoTime(detour.arriveAt)}.`}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Button data-testid="detour-stop" className="flex-1" disabled={busy} onClick={() => onStopOnTheWay(l.location!)}>
+                <Footprints size={16} aria-hidden /> Stop on the way
+              </Button>
+              <Button data-testid="detour-after" variant="secondary" disabled={busy} onClick={onAfter}>After {detour.title.length > 14 ? 'the plan' : detour.title}</Button>
+            </div>
+          </div>
+        )}
         <div className="flex gap-2">
           <a
             href={directionsUrl(l.location)}
