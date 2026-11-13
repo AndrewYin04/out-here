@@ -3,7 +3,8 @@
 import { ChevronDown, ChevronUp, Coffee, Timer, CupSoda, Dumbbell, Footprints, Gamepad2, Hand, Music, Palette, SendHorizontal, Sparkles, Utensils, X, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
-import { useApi, useViewer } from '@/features/data';
+import { beginMuseActivity, finishMuseActivity } from '@/features/muse-companion';
+import { currentPersona, useApi, useViewer } from '@/features/data';
 import { CategoryIcon, categoryOf, cn, IconButton, Skeleton } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
@@ -216,7 +217,8 @@ export function PlanSheet({ className }: { className?: string }) {
     setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
     setStatus('idle');
   }, [viewer.id]);
-  useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
+  useEffect(() => () => { inFlight.current?.abort(); ++seq.current; setPlanSuggestions(null); }, []);
+  useEffect(() => { if(!open){inFlight.current?.abort();++seq.current;setStatus(s=>s==='loading'?'idle':s);setPlanStatus(null);} },[open]);
 
   const ask = composeAsk(moods, text, duration, budget);
   const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -238,8 +240,10 @@ export function PlanSheet({ className }: { className?: string }) {
     // A new ask replaces one still in flight: abort it, and seq drops any late answer.
     inFlight.current?.abort();
     const ctrl = new AbortController();
+    const owner=currentPersona();
     inFlight.current = ctrl;
     const mine = ++seq.current;
+    const activity=beginMuseActivity({owner:'plan-sheet',source:'plan',target:'plan-results',pending:'Finding plans that fit…',signal:ctrl.signal});
     setStatus('loading');
     setError(null);
     setWhyOpen(false);
@@ -248,7 +252,8 @@ export function PlanSheet({ className }: { className?: string }) {
     setPlanStatus({ state: 'loading', summary: null, topTitle: null, topReason: null, error: null, live: false });
     try {
       const r = await requestPlan(t, ctrl.signal);
-      if (mine !== seq.current) return;
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      finishMuseActivity(activity,{outcome:r.plan.suggestions.length?'success':'empty',message:r.plan.suggestions.length?'Your picks are ready.':'No plans fit yet. Try another time or activity.',live:r.museSource==='muse',cached:r.plan.meta?.cache?.rank===true});
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
       const top = r.plan.suggestions[0];
@@ -264,7 +269,8 @@ export function PlanSheet({ className }: { className?: string }) {
       // was picked, which already set it).
       if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
     } catch (err) {
-      if (mine !== seq.current || ctrl.signal.aborted) return;
+      if (mine !== seq.current || ctrl.signal.aborted || owner!==currentPersona()) return;
+      finishMuseActivity(activity,{outcome:'error',message:'The request did not finish. Try again.'});
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error'); setPlanSuggestions(null);
       setPlanStatus({ state: 'error', summary: null, topTitle: null, topReason: null, error: errorText(err, 'Muse could not make a plan right now.'), live: false });

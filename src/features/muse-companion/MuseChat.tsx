@@ -153,7 +153,7 @@ export function MuseChat() {
     closeChat();
   }, [pathname, router]);
 
-  if (!here) return null;
+  if (!here) return <MuseStyles />;
 
   const hasMessages = messages.length > 0;
   const chips = [
@@ -173,9 +173,9 @@ export function MuseChat() {
           data-testid="muse-launcher"
           aria-label="Ask Muse"
           onClick={openChat}
-          className="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0"
+          className="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[208px] max-md:size-12 max-md:justify-center max-md:p-0"
         >
-          <MuseOrb state="idle" size={32} />
+          <MuseOrb state={snap.state} size={32} />
           {/* Phones: just the orb, up by the map chips, so it never covers a sheet's buttons. */}
           <span className="max-md:sr-only">Ask Muse</span>
         </button>
@@ -197,7 +197,7 @@ export function MuseChat() {
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">
-            <MuseOrb state="idle" size={36} />
+            <MuseOrb state={snap.state} size={36} />
             <div className="min-w-0 flex-1">
               <h2 className="text-[16px] font-bold leading-5 text-fb-text">Muse <span aria-hidden>✨</span></h2>
               <p className="truncate text-[12px] leading-4 text-fb-text-2" data-testid="muse-state-label">{demo ? 'Simulation only · illustrative positions · no messages sent' : encounter?.source === 'simulation' ? 'Simulated coordination · offline' : STATE_LABEL[snap.state] ?? 'Ready when you are'}</p>

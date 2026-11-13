@@ -316,6 +316,8 @@ export type MarketplacePick = {
   isNew: boolean;
 };
 export type MarketplacePicksResponse = {
+  /** Reused generated results with no new inference. */
+  cached?: boolean;
   topics: TasteTopic[];
   picks: MarketplacePick[];
   /** Listings Muse checked and hid because they match nothing the viewer watches. */

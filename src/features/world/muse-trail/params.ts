@@ -171,7 +171,14 @@ export function modeForSpeed(speedPerScale: number, t: SpeedThresholds = DEFAULT
 /** Move `current` toward `target`; rising values react fast, falling values ease out. */
 export function easeParams(current: ModeParams, target: ModeParams, dt: number, rise = 0.18, fall = 0.55): ModeParams {
   const out = { ...current };
-  for (const k of Object.keys(target) as (keyof ModeParams)[]) {
+  return easeParamsInto(current, target, dt, out, rise, fall);
+}
+
+const PARAM_KEYS: (keyof ModeParams)[] = ['ribbon', 'filament', 'spread', 'particleRate', 'glow', 'halo', 'lifetime', 'diffuse'];
+
+/** The frame loop reuses its output instead of allocating a params object and key array. */
+export function easeParamsInto(current: ModeParams, target: ModeParams, dt: number, out: ModeParams, rise = 0.18, fall = 0.55): ModeParams {
+  for (const k of PARAM_KEYS) {
     const tau = target[k] > current[k] ? rise : fall;
     out[k] = current[k] + (target[k] - current[k]) * (1 - Math.exp(-dt / tau));
   }

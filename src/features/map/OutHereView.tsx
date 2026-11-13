@@ -573,7 +573,7 @@ export function OutHereView() {
       <PlanSheet />
       <TogetherSheet />
       {creating && (
-        <CreatePlanSheet
+        <CreatePlanSheet key={persona.id}
           at={creating.at}
           friends={ctx?.friends ?? []}
           onMove={moveDraft}

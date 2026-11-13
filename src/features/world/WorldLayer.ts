@@ -410,7 +410,7 @@ export class WorldLayer implements CustomLayerInterface {
       const reduced=this.motionQuery?.matches;
       a.char.root.rotation.set(0,a.posed&&!reduced?current+delta*(1-Math.exp(-dt*10)):target,0);a.posed=true;
       a.char.root.scale.setScalar(s);
-      if(showChars)a.char.update(dt, this.elapsed);
+      if(showChars)a.char.update(reduced?0:dt, reduced?0:this.elapsed);
       if (a.shadow) {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
         a.shadow.visible = showChars;

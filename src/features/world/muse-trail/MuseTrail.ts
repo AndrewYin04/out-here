@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { filamentOffset, makeFilaments, type FilamentSpec } from './filaments';
 import {
-  clamp, DEFAULT_THRESHOLDS, defaultConfig, easeParams, effectiveConfig, hexToRgb01, isJump, modeForSpeed,
+  clamp, DEFAULT_THRESHOLDS, defaultConfig, easeParamsInto, effectiveConfig, hexToRgb01, isJump, modeForSpeed,
   QUALITY_PRESETS, STYLES, styledParams, zeroParams, type ModeParams, type MuseTrailConfig, type MuseTrailMode, type MuseTrailModeSetting,
   type MuseTrailQuality, type MuseTrailStyle,
 } from './params';
@@ -77,10 +77,21 @@ export class MuseTrail {
   readonly object = new THREE.Group();
 
   private cfg: MuseTrailConfig;
+  // Preserve the requested quality while reduced-motion temporarily clamps the effective config.
+  private requested: MuseTrailConfig;
   private opts: { adaptive: boolean; reducedAuto: boolean };
   private modeSetting: MuseTrailModeSetting = 'auto';
   private mode: MuseTrailMode = 'idle';
   private params: ModeParams = zeroParams();
+  private readonly targetParams: Record<MuseTrailMode, ModeParams> = {
+    off: styledParams('off', 'full'), idle: styledParams('idle', 'full'), float: styledParams('float', 'full'),
+    fly: styledParams('fly', 'full'), dash: styledParams('dash', 'full'),
+  };
+  private readonly processingParams: ModeParams = {
+    ...styledParams('fly', 'full'), ribbon: .24, filament: .62, diffuse: .12, glow: .20, halo: .24, particleRate: 12, spread: .30,
+  };
+  private readonly reducedParams: ModeParams = zeroParams();
+  private readonly offset = { dx: 0, dy: 0 };
   private processing: 'off' | 'pending' | 'success' | 'fade' = 'off';
   private pulseAge = 10;
   private pulseFrom = new THREE.Vector3();
@@ -170,9 +181,11 @@ export class MuseTrail {
 
   constructor(options: MuseTrailOptions = {}) {
     const quality = options.quality ?? options.config?.quality ?? 'medium';
-    this.cfg = effectiveConfig(defaultConfig(quality, { ...(options.style ? { style: options.style } : {}), ...options.config }));
+    this.requested = defaultConfig(quality, { ...(options.style ? { style: options.style } : {}), ...options.config });
+    if (options.reducedMotion === true) this.requested.reducedMotion = true;
+    this.cfg = effectiveConfig(this.requested);
     this.opts = { adaptive: options.adaptiveQuality ?? true, reducedAuto: (options.reducedMotion ?? 'auto') === 'auto' };
-    if (options.reducedMotion === true) this.cfg = effectiveConfig({ ...this.cfg, reducedMotion: true });
+    this.refreshModeParams();
     this.history = new TrailHistory(QUALITY_PRESETS[this.cfg.quality].historyCap);
     this.object.name = 'Muse_EnergyTrail';
     this.object.frustumCulled = false;
@@ -215,10 +228,12 @@ export class MuseTrail {
   isReleasing(): boolean { return this.processing === 'success' && this.processingAge < .45; }
 
   setConfig(patch: Partial<MuseTrailConfig>): void {
-    const next = effectiveConfig({ ...this.cfg, ...patch });
+    this.requested = { ...this.requested, ...patch };
+    const next = effectiveConfig(this.requested);
     const rebuild = next.quality !== this.cfg.quality || next.style !== this.cfg.style || next.filamentCount !== this.cfg.filamentCount
       || next.particleBudget !== this.cfg.particleBudget || next.samples !== this.cfg.samples || next.seed !== this.cfg.seed;
     this.cfg = next;
+    this.refreshModeParams();
     this.applyColors();
     if (rebuild) this.build();
   }
@@ -239,6 +254,8 @@ export class MuseTrail {
     this.speed = 0;
     this.plife.fill(0);
     this.pAlive = 0;
+    this.spawnCarry = 0;
+    this.wake.count = 0;
   }
 
   stats(): MuseTrailStats {
@@ -309,10 +326,17 @@ export class MuseTrail {
     const setting = this.modeSetting;
     this.mode = setting === 'auto' ? modeForSpeed(speedRatio, DEFAULT_THRESHOLDS) : setting;
     const moving = speedRatio >= DEFAULT_THRESHOLDS.moving && this.mode !== 'off';
+    // Smoothed speed eases the remaining wake out, but actual displacement owns new emission.
+    const emitting = moved > scale * 1e-5 && moving;
 
     // ---- smooth every layer toward what this mode asks for
-    const target = processing || pulsing ? { ...styledParams('fly', 'full'), ribbon: .36, filament: .65, diffuse: .20, glow: .25, halo: .28, particleRate: 12, spread: .30 } : styledParams(this.mode, this.cfg.style);
-    this.params = easeParams(this.params, this.cfg.reducedMotion ? { ...target, ribbon: 0, filament: 0, diffuse: 0, particleRate: target.particleRate * 0.25 } : target, dt);
+    let target = processing || pulsing ? this.processingParams : this.targetParams[this.mode];
+    if (this.cfg.reducedMotion) {
+      Object.assign(this.reducedParams, target);
+      this.reducedParams.ribbon = this.reducedParams.filament = this.reducedParams.diffuse = this.reducedParams.particleRate = 0;
+      target = this.reducedParams;
+    }
+    easeParamsInto(this.params, target, dt, this.params);
     this.u.uFadePow.value = STYLES[this.cfg.style].fadePow;
     this.u.uTipFade.value = STYLES[this.cfg.style].tipFade;
 
@@ -326,7 +350,7 @@ export class MuseTrail {
 
     // ---- emit path points at a fixed spacing (interpolated, so fast moves leave no gaps)
     const longWake = !this.cfg.reducedMotion;
-    if (!processing && moving && longWake) this.emit(scale, speedRatio, dt);
+    if (!processing && emitting && longWake) this.emit(scale, speedRatio, dt);
     else if (!this.hasAnchor) { this.lastAnchor.copy(this.anchor); this.hasAnchor = true; }
     else this.lastAnchor.copy(this.anchor);
     const life = this.cfg.trailLifetime * Math.max(0.3, this.params.lifetime);
@@ -341,7 +365,7 @@ export class MuseTrail {
 
     // ---- layers
     const haveWake = this.buildRibbons(scale, life, processing, pulsing);
-    this.stepParticles(dt, scale, processing ? 1 : speedRatio, processing ? this.processing === 'pending' : moving, life);
+    this.stepParticles(dt, scale, processing ? 1 : speedRatio, processing ? this.processing === 'pending' : emitting, life);
     this.placeGlows(position, scale, speedRatio, I);
 
     const p = this.params;
@@ -383,9 +407,16 @@ export class MuseTrail {
 
   private applyReduced(on: boolean): void {
     if (this.cfg.reducedMotion === on) return;
-    this.cfg = effectiveConfig({ ...this.cfg, reducedMotion: on });
+    this.requested.reducedMotion = on;
+    this.cfg = effectiveConfig(this.requested);
     if (on) { this.history.clear(); this.hasAnchor = false; }
     this.build();
+  }
+
+  private refreshModeParams(): void {
+    for (const mode of ['off', 'idle', 'float', 'fly', 'dash'] as const) {
+      this.targetParams[mode] = styledParams(mode, this.cfg.style);
+    }
   }
 
   /** If the frame rate stays low for a while, drop one quality step (never raised again automatically). */
@@ -458,12 +489,16 @@ export class MuseTrail {
     } else if (processing && !this.cfg.reducedMotion) {
       const release = this.processing === 'success' && this.hasResult ? Math.min(1, this.processingAge / .45) : 0;
       for (let j = 0; j < m; j++) {
-        const u = j / (m - 1), a = this.time * 1.7 - u * Math.PI * 3.6;
-        const radius = scale * (.38 + .04 * Math.sin(a * 1.7 + this.time));
-        const drift = scale * .16 * Math.sin(a * .73 + this.time * .3);
-        w.px[j] = this.processingCenter.x + this.right.x * radius * Math.cos(a) + this.up.x * radius * Math.sin(a) + this.view.x * drift;
-        w.py[j] = this.processingCenter.y + this.right.y * radius * Math.cos(a) + this.up.y * radius * Math.sin(a) + this.view.y * drift;
-        w.pz[j] = this.processingCenter.z + this.right.z * radius * Math.cos(a) + this.up.z * radius * Math.sin(a) + this.view.z * drift;
+        // An open, uneven stream passes below/behind Muse. A flattened, changing radius and
+        // independent depth bend keep it from reading as concentric processing hoops.
+        const u = j / (m - 1), a = this.time * 1.35 - u * Math.PI * 1.55;
+        const radius = scale * (.24 + .07 * Math.sin(a * 1.37 + this.time * .31) + .19 * u);
+        const side = radius * Math.cos(a) + scale * .035 * Math.sin(a * 2.1);
+        const height = radius * .62 * Math.sin(a) - scale * .16;
+        const drift = scale * (.22 + .12 * Math.sin(a * .73 + this.time * .3));
+        w.px[j] = this.processingCenter.x + this.right.x * side + this.up.x * height + this.view.x * drift;
+        w.py[j] = this.processingCenter.y + this.right.y * side + this.up.y * height + this.view.y * drift;
+        w.pz[j] = this.processingCenter.z + this.right.z * side + this.up.z * height + this.view.z * drift;
         const t = release * release * (3 - 2 * release) * (1 - u * .5);
         w.px[j] += (this.resultTarget.x - w.px[j]) * t;
         w.py[j] += (this.resultTarget.y - w.py[j]) * t;
@@ -514,9 +549,9 @@ export class MuseTrail {
         if (kind === 2) half = scale * 0.42 * (0.4 + 0.6 * pr.diffuse) * (0.25 + 0.75 * taper);
         else if (kind === 0) half = scale * 0.115 * (0.35 + 0.65 * Math.min(1.3, pr.ribbon)) * taper;
         else {
-          const o = filamentOffset(spec!, u, ageN, this.time, spread, this.turn[jj]);
+          const o = filamentOffset(spec!, u, ageN, this.time, spread, this.turn[jj], this.offset);
           dx = o.dx * unit; dy = o.dy * unit;
-          half = scale * 0.07 * (0.4 + 0.6 * spec!.width) * (0.45 + 0.55 * Math.min(1.3, pr.filament)) * (0.25 + 0.75 * taper);
+          half = scale * 0.055 * (0.4 + 0.6 * spec!.width) * (0.45 + 0.55 * Math.min(1.3, pr.filament)) * taper;
         }
         const cx = w.px[jj] + this.sx[jj] * dx + this.lx[jj] * dy;
         const cy = w.py[jj] + this.sy[jj] * dx + this.ly[jj] * dy;

@@ -62,12 +62,12 @@ export function makeFilaments(seed: string, count: number): FilamentSpec[] {
  * 1 gone): sideways `dx` and toward-the-camera `dy`, in ribbon-width units. Strands start close
  * and disperse as they age; `turn` (0..1) fans them outward near tight turns.
  */
-export function filamentOffset(f: FilamentSpec, u: number, ageN: number, time: number, spread: number, turn: number): { dx: number; dy: number } {
+export function filamentOffset(f: FilamentSpec, u: number, ageN: number, time: number, spread: number, turn: number, out = { dx: 0, dy: 0 }): { dx: number; dy: number } {
   const s = f.freq * u * Math.PI * 2 + f.phase + time * f.drift;
   const grow = 0.3 + 1.4 * ageN;
   const fan = 1 + turn * 0.9 * f.fan;
-  return {
-    dx: (f.base * 0.55 + f.amp * Math.sin(s)) * grow * spread * fan,
-    dy: f.lift * Math.sin(s * 0.8 + 1.7) * grow * spread * 0.7,
-  };
+  // A second, slower bend breaks up the identical sine-wave rhythm without noise textures.
+  out.dx = (f.base * 0.55 + f.amp * (Math.sin(s) + .18 * Math.sin(s * .47 + f.phase))) * grow * spread * fan;
+  out.dy = f.lift * Math.sin(s * 0.8 + 1.7) * grow * spread * 0.7;
+  return out;
 }

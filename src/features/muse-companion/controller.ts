@@ -54,6 +54,7 @@ function ensureOwner() {
   const owner = currentPersona();
   if (owner === store.owner) return;
   cancelInFlight();
+  clearActivity();
   clearTimer();setPlanStatus(null);setPlanSuggestions(null);photoTarget=null;
   store = { encounter: null, snap: { ...INITIAL, selectionSeq: store.snap.selectionSeq }, messages: load(owner), error: null, owner };
 }
@@ -93,6 +94,7 @@ function cancelInFlight() {
 }
 
 export function openChat(): void {
+  clearActivity();
   const photoCancelled=!!photoAction;
   if (photoAction) { photoAction.controller.abort(); photoAction=null; photoTarget=null; store={...store,snap:{...store.snap,state:'idle',energy:'fade'}}; }
   // One surface at a time: the "I'm free" composer and the chat never stack.
@@ -101,6 +103,7 @@ export function openChat(): void {
 }
 
 export function closeChat(): void {
+  clearActivity();
   const hadPhoto=!!photoAction;
   cancelInFlight();
   photoTarget=null;
@@ -137,7 +140,7 @@ export function sendMessage(raw: string): boolean {
       save();
       setPlanSuggestions(plan.suggestions);
       setPlanStatus(null);
-      museDispatch({ type: 'MUSE_RESPONSE_RECEIVED', live: museSource === 'muse' });
+      museDispatch({ type: 'MUSE_RESPONSE_RECEIVED', live: museSource === 'muse' && plan.suggestions.length > 0 && plan.meta?.cache?.rank !== true });
       emit();
     },
     (err: unknown) => {
@@ -196,7 +199,7 @@ export function useChatError(): string | null {
 
 /** For tests. */
 export function resetCompanionForTests(): void {
-  clearTimer(); cancelInFlight();
+  clearTimer(); cancelInFlight(); clearActivity();
   store = { encounter: null, snap: INITIAL, messages: [], error: null, owner: '' };
   worldOwners=0;viewport=EMPTY_VIEWPORT;photoTarget=null;
 }
@@ -280,6 +283,8 @@ export function reportAgentRecipientError(): void { store={...store,error:"Name 
 /** Photo request lease in the existing controller; no second character state machine. */
 export function beginPhotoAnalysis(controller:AbortController):number|null {
   ensureOwner();
+  if(activity?.priority==='background')clearActivity();
+  if(activity)return null;
   if(photoAction?.controller.signal.aborted)endPhotoAnalysis(photoAction.id,'cancelled');
   if(controller.signal.aborted)return null;
   if (inFlight || photoAction || store.encounter || ['sending','receiving','thinking','evaluating'].includes(store.snap.state)) return null;
@@ -311,3 +316,62 @@ export function setPhotoAnalysisTarget(id:number,rect:{left:number;top:number;wi
   photoTarget=rect?{requestId:id,rect:{left:rect.left,top:rect.top,width:rect.width,height:rect.height}}:null;
 }
 export function photoTargetForRender(){return photoTarget;}
+
+
+export type MuseActivityOutcome = 'success' | 'empty' | 'error' | 'cancelled';
+export type MuseActivity = {
+  requestId: number; owner: string; source: string; target?: string;
+  pending: string; priority: 'foreground' | 'background';
+  message?: string; outcome: MuseActivityOutcome | null; cached?: boolean; live?: boolean;
+};
+let activity: MuseActivity | null = null;
+let activityTimer: ReturnType<typeof setTimeout> | null = null;
+let detachActivitySignal: (() => void) | null = null;
+/** Release presentation only. The surface still owns its fetch and result. */
+function clearActivity(): void {
+  if(activityTimer)clearTimeout(activityTimer);
+  activityTimer=null;
+  detachActivitySignal?.();detachActivitySignal=null;
+  if(!activity)return;
+  activity=null;
+  if(!inFlight&&!photoAction)store={...store,snap:{...store.snap,state:'idle',energy:'fade'}};
+}
+export function beginMuseActivity(options: {
+  owner:string; source:string; target?:string; pending:string;
+  priority?:'foreground'|'background'; signal?:AbortSignal;
+}):number|null {
+  ensureOwner();
+  if(options.signal?.aborted)return null;
+  const priority=options.priority??'foreground';
+  // An explicit conversation or encounter always owns its character. Quiet reads never steal it.
+  if(inFlight||photoAction||(store.encounter&&!store.encounter.outcome)||store.snap.open)return null;
+  if(activity&&!activity.outcome&&(priority==='background'||activity.priority==='foreground'))return null;
+  clearActivity();clearTimer();
+  const id=++runId;
+  activity={requestId:id,owner:options.owner,source:options.source,target:options.target,pending:options.pending,priority,outcome:null};
+  store={...store,snap:{...store.snap,state:'evaluating',energy:'pending'}};
+  if(options.signal){
+    const onAbort=()=>releaseMuseActivity(id);
+    options.signal.addEventListener('abort',onAbort,{once:true});
+    detachActivitySignal=()=>options.signal?.removeEventListener('abort',onAbort);
+  }
+  emit();return id;
+}
+export function finishMuseActivity(id:number|null,result:{outcome:MuseActivityOutcome;message?:string;cached?:boolean;live?:boolean}):void {
+  ensureOwner();
+  if(id===null||activity?.requestId!==id)return;
+  if(result.outcome==='cancelled'){releaseMuseActivity(id);return;}
+  activity={...activity,...result};
+  const success=result.outcome==='success';
+  store={...store,snap:{...store.snap,state:success?'delivering':result.outcome==='error'?'error':'idle',energy:success&&!result.cached&&result.live!==false?'success':'fade'}};
+  emit();
+  activityTimer=setTimeout(()=>{if(activity?.requestId!==id)return;clearActivity();emit();},result.cached?1400:3000);
+}
+export function releaseMuseActivity(id:number|null):void {
+  if(id===null||activity?.requestId!==id)return;
+  clearActivity();emit();
+}
+export function useMuseActivity():MuseActivity|null {
+  return useSyncExternalStore(subscribe,()=>{ensureOwner();return activity;},()=>null);
+}
+export const getMuseActivityForTests=()=>activity;

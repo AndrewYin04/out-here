@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { apiFetch, apiPost, currentPersona, useApi, useViewer, type QuestDetail } from '@/features/data';
 import { Avatar, burst, cn, flash, Skeleton, useToast } from '@/features/ui';
 import type { Crew, Memory } from '@/shared';
+import { beginMuseActivity, finishMuseActivity, releaseMuseActivity, MuseActivityStatus } from '@/features/muse-companion';
 import type { PersonCard, PostView } from '@/shared/api';
 import { MEMORY_SAVED, requestRating } from './arrival';
 import { SelfieCamera } from './SelfieCamera';
@@ -36,10 +37,12 @@ export function MemoryPage({ id }: { id: string }) {
 
   const [title, setTitle] = useState('');
   const [story, setStory] = useState('');
+  const [storyEdited, setStoryEdited] = useState(false);
   const [coverId, setCoverId] = useState<string | null>(null);
   const [camera, setCamera] = useState(false);
   const [shot, setShot] = useState<File | null>(null);
   const [museCaption, setMuseCaption] = useState('');
+  const [captionStatus, setCaptionStatus] = useState<'pending' | 'live' | 'mock' | 'error' | null>(null);
   const [busy, setBusy] = useState<'photo' | 'save' | null>(null);
   const [feeling, setFeeling] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -74,23 +77,40 @@ export function MemoryPage({ id }: { id: string }) {
     setTitle((t) => t || (crew.name.endsWith(' crew') ? '' : crew.name));
     if (cover?.caption) setStory((s) => s || cover.caption);
   }, [q, crew, cover?.caption]);
+  const questTitle = q?.title;
+  const questEmoji = q?.emoji;
   useEffect(() => {
-    if (!q) return;
-    let cancelled = false;
+    if (!questTitle || !questEmoji) return;
     const names = people.filter((p) => p.id !== viewer.id).map((p) => first(p.name)).slice(0, 2);
-    const base = [`${q.emoji} ${q.title}`, names.length ? `${names.join(' & ')} & me ${q.emoji}` : `${q.emoji} Out here`];
+    const base = [`${questEmoji} ${questTitle}`, names.length ? `${names.join(' & ')} & me ${questEmoji}` : `${questEmoji} Out here`];
     setSuggestions(base);
-    apiPost<{ caption: string }>('/api/muse/caption', { questId: q.id })
+  }, [questTitle, questEmoji, people, viewer.id]);
+
+  // This route writes from title and venue only. Photo analysis has its own consented flow.
+  const captionQuestId = q?.id === id ? q.id : undefined;
+  useEffect(() => {
+    if (!captionQuestId) return;
+    const controller = new AbortController();
+    const owner = `memory-caption:${captionQuestId}`;
+    const activity = beginMuseActivity({ owner, source: 'context-caption', target: 'memory-story', pending: 'is drafting from the hangout title and venue…', priority: 'background', signal: controller.signal });
+    setCaptionStatus('pending');
+    apiFetch<{ caption: string; mode: 'mock' | 'live'; cached?: boolean }>('/api/muse/caption', { method: 'POST', body: JSON.stringify({ questId: captionQuestId }), signal: controller.signal })
       .then((r) => {
-        if (cancelled) return;
-        setStory((s) => s || r.caption);
+        if (controller.signal.aborted) return;
+        setStory((current) => current || r.caption);
         setMuseCaption(r.caption);
+        setCaptionStatus(r.mode);
         const short = r.caption.split(/[,.!—–-]/)[0]?.trim();
-        if (short && short.length <= 40) setSuggestions([short, ...base]);
+        if (short && short.length <= 40) setSuggestions((current) => [short, ...current.filter((item) => item !== short)].slice(0, 3));
+        if (activity !== null) finishMuseActivity(activity, { outcome: 'success', live: r.mode === 'live', cached: r.cached, message: r.mode === 'mock' ? 'has an offline caption ready.' : 'has a caption ready to edit.' });
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [q, people, viewer.id]);
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setCaptionStatus('error');
+        if (activity !== null) finishMuseActivity(activity, { outcome: 'error', message: 'couldn’t draft a caption. You can write your own.' });
+      });
+    return () => { controller.abort(); if (activity !== null) releaseMuseActivity(activity); };
+  }, [captionQuestId, viewer.id]);
 
   const addPhoto = async (file: File | null | undefined, asCover = false, caption?: string) => {
     if (!file || !q) return;
@@ -213,14 +233,17 @@ export function MemoryPage({ id }: { id: string }) {
           </div>
         </div>
 
+        <MuseActivityStatus owner={`memory-caption:${q.id}`} />
         {/* Story */}
         <label className="block rounded-[16px] bg-fb-input px-3 py-2.5">
-          <span className="flex items-center gap-1 text-[12px] font-semibold text-[#6B4BFF]"><Sparkles size={13} aria-hidden />Story · Muse drafted it, make it yours</span>
-          <textarea data-testid="memory-story" value={story} maxLength={500} rows={3} onChange={(e) => setStory(e.target.value)}
+          <span className="flex items-center gap-1 text-[12px] font-semibold text-[#6B4BFF]"><Sparkles size={13} aria-hidden />{storyEdited ? 'Story · Your words' : captionStatus === 'pending' ? 'Story · Drafting from the title and venue…' : captionStatus === 'live' ? 'Story · Muse draft from title and venue' : captionStatus === 'mock' ? 'Story · Offline draft from title and venue' : 'Story · Write your memory'}</span>
+          <textarea data-testid="memory-story" value={story} maxLength={500} rows={3} onChange={(e) => { setStoryEdited(true); setStory(e.target.value); }}
             placeholder="What happened? The best moment?"
             className="mt-1 w-full resize-none bg-transparent text-[15px] leading-6 text-fb-text outline-none" />
         </label>
 
+        {storyEdited && museCaption && <p className="text-[12px] text-fb-text-2">Muse’s caption suggestion uses the hangout title and venue, not the photo.</p>}
+        {captionStatus === 'error' && <p role="status" className="text-[13px] text-fb-text-2">Muse couldn’t draft a caption. You can still write and save your story.</p>}
         {/* Who was there */}
         <div>
           <h2 className="text-[17px] font-bold text-fb-text">Who was there</h2>

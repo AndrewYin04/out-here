@@ -11,10 +11,10 @@ import { usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
 import { useApi } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
-import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender } from '@/features/muse-companion';
+import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
 import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
-import {museCameraArea} from './muse-layout';
+import {museCameraArea, museChatZoom, museStage} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
 import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
@@ -144,7 +144,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const selfieOpenRef=useRef(false);
   useEffect(()=>attachMuseWorld(),[viewer.id]);
   const viewport=useMuseViewport(),viewportRef=useRef(viewport);viewportRef.current=viewport;
-  const cameraRects=useRef<{bounds:DOMRect;panel:DOMRect|null}|null>(null);
+  const cameraRects=useRef<{bounds:DOMRect;panel:DOMRect|null;visible:{left:number;top:number;width:number;height:number}|null;area:ReturnType<typeof museCameraArea>}|null>(null);
+  const manualChatCamera=useRef(false);
   const arrived = useRef(new Set<string>());
   const requestedWalk = useRef<Quest | null>(null);
   const [source, setSourceState] = useState<Source>('demo');
@@ -179,20 +180,36 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const plan = usePlanStatus();
   // The Muse companion (chat): while it is open Jolly comes to the front and acts out its state.
   const companion = useMuseSnapshot();
+  const activity = useMuseActivity();
+  const [activityPresented,setActivityPresented]=useState(false);
+  useEffect(()=>{
+    if(!activity){setActivityPresented(false);return;}
+    const measure=()=>{
+      const nodes=document.querySelectorAll<HTMLElement>('[data-muse-activity-owner]');
+      const visible=Array.from(nodes).some(node=>{if(node.dataset.museActivityOwner!==activity.owner||node.closest('[data-muse-world-bubble]'))return false;const r=node.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>0&&r.top<window.innerHeight&&r.right>0&&r.left<window.innerWidth;});
+      setActivityPresented(visible);
+    };
+    measure();const frame=requestAnimationFrame(measure);
+    window.addEventListener('resize',measure,{passive:true});window.addEventListener('scroll',measure,{capture:true,passive:true});
+    return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);};
+  },[activity]);
   const pose = petPose(companion);
   const encounter = useAgentEncounter();
   const encounterRef = useRef(encounter); encounterRef.current = encounter;
   const processing = useRef(companion.energy);
   processing.current = companion.energy;
   useEffect(()=>{
-    const el=map.getContainer(),panel=document.querySelector<HTMLElement>('[data-testid="muse-chat"]');
-    const measure=()=>{cameraRects.current={bounds:el.getBoundingClientRect(),panel:panel?.getBoundingClientRect()??null};};
-    measure();const observer=new ResizeObserver(measure);observer.observe(el);if(panel)observer.observe(panel);
+    const el=map.getContainer();let observedPanel:HTMLElement|null=null;
+    const observer=new ResizeObserver(()=>measure());
+    const measure=()=>{const panel=document.querySelector<HTMLElement>('[data-testid="muse-chat"]');if(panel!==observedPanel){if(observedPanel)observer.unobserve(observedPanel);if(panel)observer.observe(panel);observedPanel=panel;}const vv=window.visualViewport,bounds=el.getBoundingClientRect(),panelRect=panel?.getBoundingClientRect()??null,visible=vv?{left:vv.offsetLeft,top:vv.offsetTop,width:vv.width,height:vv.height}:null;cameraRects.current={bounds,panel:panelRect,visible,area:museCameraArea(bounds,[panelRect,viewportRef.current.occlusion],visible)};};
+    observer.observe(el);measure();const frame=requestAnimationFrame(measure);
     window.addEventListener('resize',measure,{passive:true});window.addEventListener('scroll',measure,{capture:true,passive:true});
-    return()=>{observer.disconnect();window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);};
-  },[map,companion.open]);
+    window.visualViewport?.addEventListener('resize',measure);window.visualViewport?.addEventListener('scroll',measure);
+    return()=>{cancelAnimationFrame(frame);observer.disconnect();window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);window.visualViewport?.removeEventListener('resize',measure);window.visualViewport?.removeEventListener('scroll',measure);};
+  },[map,companion.open,viewport]);
   const chatOpen = useRef(companion.open);
   chatOpen.current = companion.open;
+  useEffect(()=>{if(!companion.open&&manualChatCamera.current)map.setMaxZoom(MAX_3D_ZOOM);manualChatCamera.current=false;},[map,companion.open]);
   const upNext = useUpNext();
   const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
@@ -217,14 +234,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
   const bubble: { text: string; tone: 'muse' | 'plain'; pending?: boolean } | null = companion.open
     ? null // the chat panel is talking; no second speech bubble
+    : activity && !activityPresented && activity.outcome!=='cancelled'
+      ? {text:clip(activity.message||activity.pending,100),tone:'muse',pending:!activity.outcome}
+    : activity && activityPresented
+      ? null
     : cheer
-
     ? { text: cheer, tone: 'plain' }
     : plan.state === 'loading'
       ? { text: 'Checking who’s free and what fits…', tone: 'plain', pending: true }
       : plan.state === 'done' && planOpen
         // The sheet below carries the summary and the reasons; Muse says each thing once.
-        ? { text: plan.topTitle ? 'Here’s what fits 👇' : 'Nothing fits that yet. Try a longer time 👇', tone: plan.live ? 'muse' : 'plain' }
+        ? { text: plan.topTitle ? 'Your options are below.' : 'Nothing fits yet. Try a longer window.', tone: plan.live ? 'muse' : 'plain' }
         : plan.state === 'error' && planOpen
           ? { text: plan.error ?? 'I couldn’t make a plan right now.', tone: 'plain' }
           : walkingLine
@@ -283,7 +303,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       layer.upsertActor('pet', 'pet', viewer.id);
       layerRef.current = layer;
       setReady(true);
-      void loadModels().then((models) => { if (!cancelled && (models.avatar || models.pet)) layer?.setModels(models); });
+      map.getContainer().dataset.worldModels='loading';
+      void loadModels().then((models) => {
+        if(cancelled)return;
+        if(models.avatar||models.pet)layer?.setModels(models);
+        map.getContainer().dataset.worldModels=models.pet?'ready':'fallback';
+      });
 
       // Follow the avatar and ease down to street level behind it (see `entering` in the loop).
       heading.current = normalizeDeg(map.getBearing());
@@ -297,9 +322,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.on('idle', add);
 
     // Dragging or rotating the map by hand looks around; "Back to me" follows again.
-    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { if (encounterRef.current) finishAgentEncounter(encounterRef.current.id); entering.current = false; stopTour(); setFollow(false); } };
+    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { if(chatOpen.current)manualChatCamera.current=true; if (encounterRef.current) finishAgentEncounter(encounterRef.current.id); entering.current = false; stopTour(); setFollow(false); } };
     // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
-    const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
+    const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { if(chatOpen.current)manualChatCamera.current=true; entering.current = false; stopTour(); } };
     // Zoomed out to city level hands over to the 2D map (one zoom, two views). Only the fly-in and
     // the HQ tour move the zoom on their own, and neither zooms out, so any other zoom that ends
     // out here was the viewer's. (The follow loop's own camera calls end zooms mid-gesture, so a
@@ -325,6 +350,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       undoTheme?.();
       layerRef.current = null;
       map.getContainer().removeAttribute('data-view3d');
+      delete map.getContainer().dataset.worldModels;
       map.setTransformCameraUpdate(null);
       map.dragRotate.disable();
       map.touchZoomRotate.enable();
@@ -674,13 +700,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       // The pet: at your shoulder, or in front of you facing the camera while it talks.
       const front = !photoFocus && petMode.current === 'front';
-      const offBearing = front ? normalizeDeg(camBearing.current+180) : heading.current + 125;
-      const offMeters = (front ? 1.6 : 1.1) * scale;
-      const target = moveMeters(pos.current, offMeters, offBearing);
+      const stage=museStage(front);
+      const beside=moveMeters(pos.current,stage.sideways*scale,camBearing.current+90);
+      const target=moveMeters(beside,stage.towardViewer*scale,camBearing.current+180);
       const gap = haversineMeters(petPos.current, target);
-      const kp = 1 - Math.exp(-dt * 5);
+      const kp = reducedMotion() ? 1 : 1 - Math.exp(-dt * 5);
       petPos.current = gap > 0.05 ? moveMeters(petPos.current, gap * kp, bearingDeg(petPos.current, target)) : target;
-      petAlt.current += ((front ? 1.0 : .8) - petAlt.current) * kp;
+      petAlt.current += (stage.altitude - petAlt.current) * kp;
       const flying = gap > 2.5 * scale;
       const pState = flying ? 'fly' : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
@@ -781,6 +807,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
       if (chatOpen.current) {
+        if(manualChatCamera.current){chatCamera=null;returnCamera=null;map.setCenterClampedToGround(true);camBearing.current=map.getBearing();return;}
         if (!chatCamera) {
           const c = map.getCenter();
           chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom: entering.current ? ENTER_ZOOM : zoom, bearing: map.getBearing(), elevation: map.getCenterElevation() };
@@ -789,14 +816,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           map.stop(); map.setMaxZoom(24.2); map.setCenterClampedToGround(false);
         }
         camBearing.current = map.getBearing();
-        const {bounds,panel}=cameraRects.current??{bounds:map.getContainer().getBoundingClientRect(),panel:null};
+        const measured=cameraRects.current;if(!measured)return;
+        const {bounds,area}=measured;
         const phone = bounds.width < 768;
-        const area=museCameraArea(bounds,[panel,viewportRef.current.occlusion]);
         if(!area)return;
         const targetX=area.x,targetY=area.y;
-        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone
-          ? 23 + Math.log2(Math.max(80, Math.min(125, area.height * .35)) / 80)
-          : 23.8;
+        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : museChatZoom(area,phone);
         const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 4);
         layer.actorScreenPoint('pet', screenPoint);
         map.setCenterElevation(map.getCenterElevation() + (screenPoint.elevation - map.getCenterElevation()) * easing);
@@ -1111,7 +1136,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       {/* Labels the world layer keeps above heads: the pet's speech, friends' names and status. */}
       <div className="absolute inset-0 overflow-hidden">
         {bubble ? (
-          <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
+          <div ref={bindLabel('pet', 0.15)} data-testid="pet-bubble" data-muse-world-bubble role="status" aria-live="polite" aria-atomic="true" style={{ visibility: 'hidden' }} className="absolute left-0 top-0 pb-2">
             <button
               type="button"
               aria-label={planOpen ? undefined : `Muse says: ${bubble.text}. Open Muse chat`}
@@ -1119,7 +1144,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               className="pointer-events-auto relative block max-w-[260px] rounded-[18px] bg-fb-surface px-3 py-2 text-left text-[14px] leading-[18px] text-fb-text shadow-popover"
             >
               {bubble.tone === 'muse' && <span className="mb-0.5 flex items-center gap-1 text-[12px] font-bold text-fb-blue"><Sparkles size={12} aria-hidden />Muse</span>}
-              <span className={cn(bubble.pending && 'animate-pulse')}>{bubble.text}</span>
+              <span>{bubble.text}</span>{bubble.pending&&<span aria-hidden className="ml-1 tracking-widest text-fb-blue">···</span>}
               <span aria-hidden className="absolute -bottom-[6px] left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
             </button>
           </div>
@@ -1130,7 +1155,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               type="button"
               aria-label="Talk to Muse"
               onClick={() => openMuseChat()}
-              className="pointer-events-auto block rounded-pill bg-fb-surface/90 px-2 py-0.5 text-[12px] font-bold text-fb-blue shadow-card hover:bg-fb-surface"
+              className="pointer-events-auto flex min-h-10 min-w-16 items-center justify-center rounded-pill bg-fb-surface/90 px-2 py-0.5 text-[12px] font-bold text-fb-blue shadow-card hover:bg-fb-surface"
             >
               ✨ Muse
             </button>

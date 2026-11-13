@@ -24,6 +24,7 @@ export type PicksInput = {
   /** Topic names the viewer switched off. */
   exclude: string[];
   userId: string | null;
+  signal?: AbortSignal;
 };
 
 /** A topic needs at least this much watching to count, unless it was watched just now. */
@@ -199,6 +200,7 @@ export function checkReason(text: string, t: TasteTopic, c: Cand): string | null
 const cache = new Map<string, MarketplacePicksResponse>();
 
 export async function marketplacePicks(input: PicksInput): Promise<MarketplacePicksResponse> {
+  input.signal?.throwIfAborted();
   const t0 = Date.now();
   const route = '/api/muse/marketplace-picks';
   const key = createHash('sha256').update(JSON.stringify([
@@ -206,8 +208,10 @@ export async function marketplacePicks(input: PicksInput): Promise<MarketplacePi
     [...input.exclude].sort(), Math.floor(input.at.getTime() / (NEW_WINDOW_MIN * 60_000)),
   ])).digest('hex');
   const hit = cache.get(key);
-  if (hit) return { ...hit, ms: Date.now() - t0 };
+  if (hit) return { ...hit, cached: true, ms: Date.now() - t0 };
 
+  let generatedStages = 0;
+  let cachedStages = 0;
   let source = 'muse' as MarketplacePicksResponse['source'];
   const degrade = (s: 'mock' | 'fallback') => { if (source === 'muse' || s === 'fallback') source = s; };
 
@@ -226,11 +230,13 @@ export async function marketplacePicks(input: PicksInput): Promise<MarketplacePi
           })),
           interests: input.interests,
         }),
-        mock: () => mockTaste(input.history), route, userId: input.userId, deadline: Date.now() + 8_000,
+        mock: () => mockTaste(input.history), route, userId: input.userId, signal: input.signal, deadline: Date.now() + 8_000,
       });
+      generatedStages++; if (res.cached) cachedStages++;
       rawTaste = res.data;
       if (res.mock) degrade('mock');
     } catch (err) {
+      input.signal?.throwIfAborted();
       reportFallback({ route, step: 'taste', error: String((err as Error)?.message ?? err).slice(0, 200), userId: input.userId });
       rawTaste = mockTaste(input.history);
       degrade('fallback');
@@ -262,11 +268,13 @@ export async function marketplacePicks(input: PicksInput): Promise<MarketplacePi
             openHouse: c.openHouse ? `${c.openHouse.title} at ${c.openHouse.venueName}, ${formatDemoTime(c.openHouse.startsAt)}` : null,
           })),
         }),
-        mock: () => mockPicks(active, cands), route, userId: input.userId, deadline: Date.now() + 12_000,
+        mock: () => mockPicks(active, cands), route, userId: input.userId, signal: input.signal, deadline: Date.now() + 12_000,
       });
+      generatedStages++; if (res.cached) cachedStages++;
       rawPicks = res.data;
       if (res.mock) degrade('mock');
     } catch (err) {
+      input.signal?.throwIfAborted();
       reportFallback({ route, step: 'marketplace_picks', error: String((err as Error)?.message ?? err).slice(0, 200), userId: input.userId });
       rawPicks = mockPicks(active, cands);
       degrade('fallback');
@@ -301,7 +309,7 @@ export async function marketplacePicks(input: PicksInput): Promise<MarketplacePi
   const out: MarketplacePicksResponse = {
     topics, picks,
     hidden: input.listings.filter((l) => !pickedIds.has(l.listing.id)).map(({ listing, seller }) => ({ listing, seller })),
-    checked: input.listings.length, videosRead: input.history.length, source, ms: Date.now() - t0,
+    checked: input.listings.length, videosRead: input.history.length, source, cached: generatedStages > 0 && cachedStages === generatedStages, ms: Date.now() - t0,
   };
   if (cache.size > 100) cache.clear();
   if (source !== 'fallback') cache.set(key, out);

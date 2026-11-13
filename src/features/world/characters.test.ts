@@ -12,6 +12,7 @@ it('anchors processing on the animated body, excluding hidden speech-bubble boun
   const pet=makePet({avatar:null,pet:{gltf:{scene,animations:[]} as unknown as GLTF,node:'Muse',scale:1.3,clips:{},timeScale:{},relativeRoot:true,hide:['Muse_SpeechBubble']}},'test');
   pet.root.position.set(4,5,6); pet.root.scale.setScalar(2);
   const center=new THREE.Vector3();pet.getEffectCenter!(center);
+  expect(pet.height).toBeLessThan(1);
   expect(center.x).toBeCloseTo(4);expect(center.y).toBeCloseTo(5+.3*1.3*2);expect(center.z).toBeCloseTo(6);
   const live=pet.root.getObjectByName('Muse_Body')!;live.position.y+=.1;
   pet.getEffectCenter!(center);expect(center.y).toBeCloseTo(5+.4*1.3*2);

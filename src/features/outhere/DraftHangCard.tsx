@@ -4,10 +4,11 @@
 
 import { Check, Clock, Footprints, MapPin, RefreshCw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiPost } from '@/features/data';
+import { apiFetch, apiPost } from '@/features/data';
 import { Avatar, burst, cn } from '@/features/ui';
 import { formatDemoTime, type PersonCard, type Quest } from '@/shared';
 import type { HangDraft } from '@/features/muse';
+import { beginMuseActivity, finishMuseActivity } from '@/features/muse-companion';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
@@ -31,16 +32,22 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tried = useRef<string[]>([]);
+  const request=useRef<AbortController|null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const letsGo = useLetsGo();
 
   /** `another`: a different place with the same friend. `friendId`: redraft with that friend. */
   const load = useCallback(async (another: boolean, friendId?: string) => {
+    request.current?.abort();
+    const ctrl=new AbortController();request.current=ctrl;
+    const activity=beginMuseActivity({owner:'draft-hang',source:'draft-hang',target:'draft-hang',pending:'Finding another idea…',signal:ctrl.signal});
     setError(null);
     if (friendId) tried.current = [];
     if (another) setBusy(true); else setState({ kind: 'loading' });
     try {
-      const res = await apiPost<DraftResponse>('/api/muse/draft-hang', { text: ask, budgetMax, excludePlaceIds: tried.current, friendId });
+      const res = await apiFetch<DraftResponse>('/api/muse/draft-hang', {method:'POST',body:JSON.stringify({ text: ask, budgetMax, excludePlaceIds: tried.current, friendId }),signal:ctrl.signal});
+      if(ctrl.signal.aborted)return;
+      finishMuseActivity(activity,{outcome:res.draft&&res.friend?'success':'empty',message:res.draft?'Your draft is ready to review.':'No other spots fit right now.',live:res.mode==='live'});
       const live = res.mode === 'live';
       if (res.draft && res.friend) {
         tried.current = [...tried.current, res.draft.placeId];
@@ -51,14 +58,16 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
         setState({ kind: 'none' }); onNone();
       }
     } catch {
+      if(ctrl.signal.aborted)return;
+      finishMuseActivity(activity,{outcome:'error',message:'The request did not finish. Try again.'});
       if (another) setError('Muse couldn’t find another one. Try again in a moment.');
       else { setState({ kind: 'none' }); onNone(); }
     } finally {
-      setBusy(false);
+      if(!ctrl.signal.aborted)setBusy(false);
     }
   }, [ask, budgetMax, onNone]);
 
-  useEffect(() => { tried.current = []; void load(false); }, [load]);
+  useEffect(() => { tried.current = []; void load(false);return()=>request.current?.abort(); }, [load]);
 
   const make = async () => {
     if (state.kind !== 'draft') return;

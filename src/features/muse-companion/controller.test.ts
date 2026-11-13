@@ -3,7 +3,7 @@ const request = vi.hoisted(() => vi.fn());
 vi.mock('@/features/data', () => ({ currentPersona: () => 'alex' }));
 vi.mock('@/features/outhere', () => ({ requestPlan: request, setPlanOpen: vi.fn(), setPlanStatus: vi.fn(), setPlanSuggestions: vi.fn(), errorText: () => 'Could not answer' }));
 import { openChat, closeChat, clearChat, sendMessage, getCompanionForTests, resetCompanionForTests } from './controller';
-const reply = { plan: { summary: 'A plan', suggestions: [] }, museSource: 'muse' };
+const reply = { plan: { summary: 'A plan', suggestions: [{title:'A useful plan'}] }, museSource: 'muse' };
 function deferred() {
   let resolve!: (v: typeof reply) => void, reject!: (e: Error) => void;
   const promise = new Promise<typeof reply>((a,b) => { resolve=a; reject=b; });
@@ -29,6 +29,12 @@ describe('request-bound processing energy', () => {
     expect(getCompanionForTests().messages.filter(m=>m.role==='muse')).toHaveLength(0);
     next.reject(new Error('network')); await Promise.resolve();
     expect(getCompanionForTests().snap).toMatchObject({ state:'error',energy:'fade' });
+  });
+  it('empty and cached answers never emit success energy', async()=>{
+    openChat();request.mockResolvedValueOnce({plan:{summary:'Nothing fits',suggestions:[]},museSource:'muse'});sendMessage('nothing');await Promise.resolve();
+    expect(getCompanionForTests().snap.energy).toBe('fade');
+    request.mockResolvedValueOnce({plan:{...reply.plan,meta:{cache:{rank:true}}},museSource:'muse'});sendMessage('cached');await Promise.resolve();
+    expect(getCompanionForTests().snap.energy).toBe('fade');
   });
   it('clearing cancels and restores idle; mock or fallback results do not celebrate', async () => {
     openChat(); request.mockReturnValueOnce(deferred().promise); sendMessage('one'); clearChat();

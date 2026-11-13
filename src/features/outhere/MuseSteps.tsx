@@ -6,7 +6,6 @@ import { cn } from '@/features/ui';
 import { LOADING_STEPS, type MuseStep } from './muse-steps';
 import { MuseLabel } from './SuggestionCard';
 
-const LOADING_STEP_MS = 600;
 const DONE_STAGGER_MS = 150;
 
 function prefersReducedMotion(): boolean {
@@ -14,34 +13,14 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * While a Muse request runs: generic step names appear one by one. No results are claimed.
+ * A single honest pending status: backend stages are only shown after actual results.
  * `steps` defaults to the plan's steps; other Muse helpers pass their own.
  */
 export function MuseStepsLoading({ steps = LOADING_STEPS, className }: { steps?: readonly string[]; className?: string } = {}) {
-  const [shown, setShown] = useState(1);
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setShown((n) => (n >= steps.length ? n : n + 1));
-    }, LOADING_STEP_MS);
-    return () => window.clearInterval(id);
-  }, [steps.length]);
-
   return (
-    <div data-testid="muse-steps-loading" className={cn('mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card', className)}>
-      <p className="mb-1.5 text-[15px] font-semibold text-fb-text">Muse is working…</p>
-      <ul className="flex flex-col gap-1">
-        {steps.slice(0, shown).map((label, i) => {
-          const current = i === shown - 1;
-          return (
-            <li key={label} className={cn('flex animate-step-in items-center gap-2 text-[13px]', current ? 'text-fb-text' : 'text-fb-text-2')}>
-              {current
-                ? <Loader2 size={14} className="shrink-0 animate-spin text-fb-blue" aria-hidden />
-                : <span className="mx-[5px] size-1 shrink-0 rounded-full bg-fb-text-2" aria-hidden />}
-              {label}
-            </li>
-          );
-        })}
-      </ul>
+    <div data-testid="muse-steps-loading" role="status" className={cn('mb-2 flex items-center gap-2 rounded-card bg-fb-surface p-3 shadow-card', className)}>
+      <Loader2 size={16} className="shrink-0 text-fb-blue motion-safe:animate-spin" aria-hidden />
+      <p className="text-[14px] text-fb-text">{steps===LOADING_STEPS?'Muse is finding plans that fit…':'Muse is working on your request…'}</p>
     </div>
   );
 }

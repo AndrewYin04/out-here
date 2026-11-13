@@ -365,8 +365,11 @@ class GltfCharacter implements Character {
     else this.effectBody = null;
     this.hop.add(model);
     this.root.add(this.hop);
-    const box = new THREE.Box3().setFromObject(model);
-    this.height = Math.max(0.3, box.max.y);
+    // Hidden authoring nodes (especially the 3D bubble) must not lift HTML labels.
+    model.updateWorldMatrix(true,true);
+    const box = new THREE.Box3(), part = new THREE.Box3();
+    model.traverseVisible((o)=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;mesh.geometry.computeBoundingBox();if(mesh.geometry.boundingBox)box.union(part.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld));});
+    this.height = Math.max(0.3, Number.isFinite(box.max.y)?box.max.y:0.3);
     this.mixer = new THREE.AnimationMixer(model);
     for (const clip of spec.gltf.animations) {
       const adapted = adaptClip(clip, keepNames, spec.node, spec.relativeRoot, hide);
@@ -465,7 +468,15 @@ export function loadModels(): Promise<ModelSet> {
     const files = new Map<string, Promise<GLTF | null>>();
     const load = (file?: string | null) => {
       if (!file || !/^[\w.-]+\.glb$/.test(file)) return Promise.resolve(null);
-      if (!files.has(file)) files.set(file, loader.loadAsync(`/models/${file}`).catch(() => null));
+      if (!files.has(file)) files.set(file, loader.loadAsync(`/models/${file}`).catch(async () => {
+        // A browser disk-cache write can fail for the large shared GLB. Retry once without
+        // cache storage; keep the normal cached path and the shared in-flight promise.
+        try {
+          const response=await fetch(`/models/${file}`,{cache:'no-store'});
+          if(!response.ok)return null;
+          return await loader.parseAsync(await response.arrayBuffer(),'/models/');
+        } catch { return null; }
+      }));
       return files.get(file)!;
     };
     const [avatar, pet] = await Promise.all([load(m.avatar), load(m.pet)]);

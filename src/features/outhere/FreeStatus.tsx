@@ -5,9 +5,10 @@
 // - StatusCard: that status at the top of the "I'm free" composer (+30 min, Busy), updated at once.
 // - BothFreeNudge: who's free when you are, the suggested group, and the shared plan once
 //   someone in the group started one.
+import { beginMuseActivity, finishMuseActivity } from '@/features/muse-companion';
 import { ChevronDown, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { apiFetch, apiPost, useApi, useViewer } from '@/features/data';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { apiFetch, apiPost, currentPersona, useApi, useViewer } from '@/features/data';
 import { Avatar, cn } from '@/features/ui';
 import {
   DEMO_CENTER, formatDemoTime, freeStatus, freeStatusLabel,
@@ -209,18 +210,28 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const togetherOpenId = useTogetherId();
   const shared = useApi<{ plans: TogetherView[] }>('/api/together', [`user:${viewer.id}`]);
   const [starting, setStarting] = useState(false);
+  const togetherRequest=useRef<AbortController|null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  useEffect(()=>{setStarting(false);setStartError(null);return()=>togetherRequest.current?.abort();},[viewer.id]);
   const start = async (friendIds: string[]) => {
+    if(starting)return;
+    togetherRequest.current?.abort();const ctrl=new AbortController();togetherRequest.current=ctrl;
+    const owner=currentPersona();
+    const activity=beginMuseActivity({owner:'together',source:'together',target:'together-sheet',pending:'Looking for a plan for your group…',signal:ctrl.signal});
     setStarting(true);
     setStartError(null);
     try {
-      const r = await apiPost<TogetherResponse>('/api/together', { friendIds });
+      const r = await apiFetch<TogetherResponse>('/api/together', {method:'POST',body:JSON.stringify({friendIds}),signal:ctrl.signal});
+      if(ctrl.signal.aborted||owner!==currentPersona())return;
+      finishMuseActivity(activity,{outcome:r.plan.options?.length?'success':'empty',message:r.plan.options?.length?'Options are ready for everyone to review.':'No shared options fit yet.',live:false});
       openTogether(r.plan.id);
       void shared.refetch();
     } catch {
+      if(ctrl.signal.aborted)return;
+      finishMuseActivity(activity,{outcome:'error',message:'The group request did not finish. Try again.'});
       setStartError('Muse couldn’t reach everyone just now. Try again.');
     } finally {
-      setStarting(false);
+      if(!ctrl.signal.aborted)setStarting(false);
     }
   };
 

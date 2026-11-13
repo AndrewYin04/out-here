@@ -10,3 +10,7 @@ export type { AgentEncounter, AgentTransport, AgentRecipient, AgentEvent } from 
 export {beginPhotoAnalysis,endPhotoAnalysis} from './controller';
 export {attachMuseWorld,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
 export type {MuseViewport} from './controller';
+
+export {beginMuseActivity,finishMuseActivity,releaseMuseActivity,useMuseActivity} from './controller';
+export {MuseActivityStatus} from './MuseActivityStatus';
+export type {MuseActivity, MuseActivityOutcome} from './controller';
