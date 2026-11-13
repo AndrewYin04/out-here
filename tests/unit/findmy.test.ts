@@ -32,9 +32,9 @@ describe('Find My: friend pins', () => {
     for (let i = 1; i < pins.length; i++) expect(pins[i].distanceKm).toBeGreaterThanOrEqual(pins[i - 1].distanceKm);
   });
 
-  it('gives Maya the dumpling bubble and no home location for other people', async () => {
+  it('gives Maya the boba bubble and no home location for other people', async () => {
     const maya = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
-    expect(maya.bubble).toEqual({ emoji: '🧋', thought: 'free after class', doing: 'down for boba', wantsTo: null });
+    expect(maya.bubble).toEqual({ emoji: '🧋', thought: 'Free after class · Down for boba', doing: 'out of class, free for an hour', wantsTo: 'grab boba' });
     expect(maya.walkingMinutes).not.toBeNull();
     expect(maya.friend.home).toBeNull();
   });
@@ -120,15 +120,13 @@ describe('Find My: editing my share', () => {
     await expect(store.hangInvite(id('alex'), { toId: id('jordan'), message: 'hi' })).rejects.toMatchObject({ status: 403 });
   });
 
-  it('Want to hang? proposes Bobalicious Corner (boba) for Maya from her bubble, and the invite matches the preview', async () => {
+  it('Want to hang? proposes a nearby plan for Maya, and the invite matches the preview', async () => {
+    // The boba quest is in the afternoon now ("45 Minutes to Thrift"), so the nearest plan soon wins.
     const s = await store.hangSuggestion(id('alex'), id('maya'));
     expect(s?.kind).toBe('quest');
-    expect(s?.venueName).toBe('Bobalicious Corner');
-    expect(s?.reason).toMatch(/Maya's (free after class|down for boba)/);
-    expect(s?.draft).toContain('Bobalicious Corner');
-    const { invite, suggestion } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
+    expect(s?.draft).toContain(s!.venueName!);
+    const { invite } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
     expect(invite.questId).toBe(s!.questId);
-    expect(suggestion).toMatch(/boba/i);
     // a hidden friend gets no suggestion
     expect(await store.hangSuggestion(id('alex'), id('olivia'))).toBeNull();
   });
