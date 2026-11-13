@@ -9,7 +9,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ID } from '@/shared';
 import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match, type TogetherVoteResult } from './backend';
 import { CoreStore } from './core';
-import { fromRow, OPTIONAL_TABLES, PRIMARY_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
+import { fromRow, OPTIONAL_TABLES, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
 import type { SupabaseEnv } from './env';
 import { badRequest, conflict, HttpError, notFound } from './errors';
 import { currentScope, type WorkingSnapshot } from './request-scope';
@@ -69,11 +69,17 @@ export class SupabaseBackend implements Backend {
   private client: SupabaseClient;
   private queryTimeoutMs: number;
   /**
-   * Write generation. It is bumped when a write starts and again when the write resolves, so a
-   * load that ran at any moment during a write carries an older generation and is never served
-   * from the shared cache afterwards.
+   * Write generation per table. A write bumps its table's generation when it starts and again
+   * when it resolves, so a load of that table that ran at any moment during the write carries an
+   * older generation and is never served from the shared cache afterwards. Other tables keep
+   * their cached rows: a walk step (locationShares) or a reaction no longer makes the next read
+   * reload quests and profiles. RPCs touch several tables and bump every table.
    */
-  private gen = 0;
+  private gens = new Map<TableKey, number>();
+  private gen(key: TableKey): number { return this.gens.get(key) ?? 0; }
+  private bump(keys: readonly TableKey[] = TABLE_KEYS): void {
+    for (const k of keys) this.gens.set(k, this.gen(k) + 1);
+  }
   /** One entry per table: the last load of that table on this instance. */
   private cache = new Map<TableKey, CacheEntry>();
 
@@ -115,7 +121,9 @@ export class SupabaseBackend implements Backend {
     };
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
-    const first = await page(0, true);
+    // One retry when the request never reached the database (a dropped connection).
+    let first = await page(0, true);
+    if (first.error && !signal.aborted && /fetch failed|network|ECONNRESET|ETIMEDOUT|socket/i.test(first.error.message ?? '')) first = await page(0, true);
     if (signal.aborted) throw new HttpError(503, SLOW_MESSAGE);
     // Tables added by a later migration read as empty until that migration is applied, so a
     // deploy that lands before `db:migrate` still serves every page (writes to them fail).
@@ -151,7 +159,7 @@ export class SupabaseBackend implements Backend {
     const scope = currentScope();
     if (scope) scope.tableLoads++;
     const e = this.entry(key);
-    const load: Load = { gen: this.gen, at: Date.now(), promise: this.loadTable(key) };
+    const load: Load = { gen: this.gen(key), at: Date.now(), promise: this.loadTable(key) };
     e.pending = load;
     load.promise.then((rows) => {
       if (e.pending === load) e.pending = null;
@@ -174,11 +182,12 @@ export class SupabaseBackend implements Backend {
   private sharedTable(key: TableKey, startedAfter = -Infinity): Promise<unknown[]> {
     const e = this.entry(key);
     const now = Date.now();
-    const rows = e.rows && e.rows.gen === this.gen && e.rows.at >= startedAfter ? e.rows : null;
-    const pending = e.pending && e.pending.gen === this.gen && e.pending.at >= startedAfter ? e.pending : null;
+    const gen = this.gen(key);
+    const rows = e.rows && e.rows.gen === gen && e.rows.at >= startedAfter ? e.rows : null;
+    const pending = e.pending && e.pending.gen === gen && e.pending.at >= startedAfter ? e.pending : null;
     if (rows && now - rows.at < SNAPSHOT_TTL_MS) return Promise.resolve(rows.rows);
     if (rows && startedAfter === -Infinity && now - rows.at < SNAPSHOT_STALE_MS) {
-      // Writes bump `gen`, which skips this branch, and realtime-triggered refetches are fresh,
+      // Writes bump the table's gen, which skips this branch, and realtime-triggered refetches are fresh,
       // so cross-tab updates stay exact.
       if (!pending && now >= e.retryAt) this.loadAndCache(key).catch(() => undefined);
       return Promise.resolve(rows.rows);
@@ -209,7 +218,8 @@ export class SupabaseBackend implements Backend {
       if (k in w.tables) return undefined;
       let p = w.pending.get(k);
       if (!p) {
-        p = this.sharedTable(k, scope.fresh ? scope.since : -Infinity).then((rows) => {
+        const fresh = scope.fresh || scope.refresh.includes(k);
+        p = this.sharedTable(k, fresh ? scope.since : -Infinity).then((rows) => {
           // a reload() that finished first holds newer rows
           if (!(k in w.tables)) (w.tables[k] as unknown) = rows;
           w.pending.delete(k);
@@ -243,13 +253,13 @@ export class SupabaseBackend implements Backend {
   /** Runs one database write, then applies it to the request's working snapshot. */
   private async write(table: TableKey, run: () => PromiseLike<{ error: DbError }>, apply: (db: Db) => void): Promise<void> {
     const scope = currentScope();
-    this.gen++;
+    this.bump([table]);
     try {
       if (scope) scope.queries++;
       const { error } = await run();
       fail(TABLE_NAMES[table], error);
     } finally {
-      this.gen++;
+      this.bump([table]);
     }
     await this.applyWorking(table, apply);
   }
@@ -308,7 +318,7 @@ export class SupabaseBackend implements Backend {
    */
   private async seatRpc(fn: 'join_quest' | 'leave_quest', args: Record<string, unknown>, questId: ID): Promise<number> {
     const scope = currentScope();
-    this.gen++;
+    this.bump();
     let seats: number;
     try {
       if (scope) scope.queries++;
@@ -316,7 +326,7 @@ export class SupabaseBackend implements Backend {
       if (error) this.rpcError(error);
       seats = Number(data);
     } finally {
-      this.gen++;
+      this.bump();
     }
     if (scope?.working) {
       scope.queries += 2;
@@ -354,7 +364,7 @@ export class SupabaseBackend implements Backend {
   /** public.vote_together (0006), then the plan and the quest it touched are read back into the working snapshot. */
   async voteTogether(planId: ID, userId: ID, questId: ID, isIn: boolean): Promise<TogetherVoteResult> {
     const scope = currentScope();
-    this.gen++;
+    this.bump();
     let result: TogetherVoteResult;
     try {
       if (scope) scope.queries++;
@@ -368,7 +378,7 @@ export class SupabaseBackend implements Backend {
       const row = (Array.isArray(data) ? data[0] : data) as { out_status: TogetherVoteResult['status']; out_quest: string | null; out_seats: number | null } | undefined;
       result = { status: row?.out_status ?? 'proposing', questId: row?.out_quest ?? null, seatsLeft: row?.out_seats ?? null };
     } finally {
-      this.gen++;
+      this.bump();
     }
     if (scope?.working) {
       scope.queries += result.questId ? 3 : 1;

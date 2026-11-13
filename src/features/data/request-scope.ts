@@ -1,6 +1,9 @@
 // Per-request state for route handlers (server-only), carried with AsyncLocalStorage.
 // - fresh: read the database instead of the shared snapshot cache (mutations, and refetches a
 //   realtime message triggered, so they see the write that caused the message).
+// - refresh: tables a non-fresh request still reads fresh (only a load that started after it
+//   arrived), so a route can reuse cached slow-changing tables and still see the latest seats and
+//   free windows.
 // - working: this request's own snapshot. SupabaseBackend loads each table it needs once, then
 //   applies the request's own writes to it, so a mutation reads a table once instead of after every write.
 // - outbox: Supabase Broadcast messages, sent in one REST call when the handler finishes.
@@ -15,6 +18,7 @@ export type WorkingSnapshot = { tables: Partial<Db>; pending: Map<TableKey, Prom
 
 export type RequestScope = {
   fresh: boolean;
+  refresh: TableKey[];
   /** When the request arrived (ms). A fresh request may reuse a load that started after this. */
   since: number;
   working: WorkingSnapshot | null;
@@ -33,8 +37,8 @@ export function currentScope(): RequestScope | undefined {
   return als.getStore();
 }
 
-export function newScope(fresh: boolean): RequestScope {
-  return { fresh, since: Date.now(), working: null, outbox: [], loads: 0, tableLoads: 0, queries: 0 };
+export function newScope(fresh: boolean, refresh: TableKey[] = []): RequestScope {
+  return { fresh, refresh, since: Date.now(), working: null, outbox: [], loads: 0, tableLoads: 0, queries: 0 };
 }
 
 export function runInScope<T>(scope: RequestScope, fn: () => Promise<T>): Promise<T> {
