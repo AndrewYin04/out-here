@@ -4,12 +4,31 @@
   "avatarNode": "Person",
   "pet": "muse-companion.glb",
   "petNode": "Muse",
-  "scale": { "avatar": 1, "pet": 1.3 },
-  "clips": {
-    "avatar": { "idle": "person_idle", "walk": "person_run", "talk": "person_idle" },
-    "pet": { "hover": "follow_back", "fly": "follow_back", "think": "thinking", "talk": "talk_front", "happy": "follow_back" }
+  "scale": {
+    "avatar": 1,
+    "pet": 1.9
   },
-  "timeScale": { "avatar": { "walk": 0.6 } },
+  "clips": {
+    "avatar": {
+      "idle": "person_idle",
+      "walk": "person_run",
+      "talk": "person_idle"
+    },
+    "pet": {
+      "hover": "follow_back",
+      "fly": "follow_back",
+      "think": "thinking",
+      "talk": "talk_front",
+      "happy": "follow_back"
+    }
+  },
+  "timeScale": {
+    "avatar": {
+      "walk": 0.6
+    }
+  },
   "petRelativeMotion": true,
-  "hide": ["Muse_SpeechBubble"]
+  "hide": [
+    "Muse_SpeechBubble"
+  ]
 }

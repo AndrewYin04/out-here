@@ -17,12 +17,14 @@ import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
-import { CategoryIcon, categoryOf, cn, sfx, useDemoTools } from '@/features/ui';
-import { Footprints, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
+import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
+import { Footprints, LocateFixed, MapPin, Shirt, Sparkles, X } from 'lucide-react';
 
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { EncounterMotion } from './encounter-motion';
 import { loadModels } from './characters';
+import { AvatarEditor } from './AvatarEditor';
+import { onLooksChanged, setAvatarHint } from './avatarLook';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import { buildHq, loadHq, type HqLabel } from './hq';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, streetHeading,type Area, type Street } from './trees';
@@ -142,6 +144,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const start = home ?? DEMO_CENTER;
   const pos = useRef<LatLng>(start);
   const heading = useRef(0);
+  const [editingLook, setEditingLook] = useState(false);
   /** Arrival cinematic: a slow orbit around you and the plan, pulled back, then home behind you. */
   const orbit = useRef<{ start: number; from: number } | null>(null);
   const camBearing = useRef(map.getBearing());
@@ -278,6 +281,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch(), fov:map.getVerticalFieldOfView() };
     let layer: WorldLayer | null = null;
     let undoTheme: (() => void) | null = null;
+    let unsubLooks: (() => void) | null = null;
     let cancelled = false;
     map.setMaxPitch(MAX_3D_PITCH);
     map.setVerticalFieldOfView(48);
@@ -309,6 +313,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       layer.minZoom = CHARACTER_MIN_ZOOM;
       map.addLayer(layer);
       layer.upsertActor('me', 'avatar', viewer.id);
+      // A customized look (or a pronoun hint) rebuilds the characters live.
+      unsubLooks = onLooksChanged(() => layer?.refreshAvatars());
       layer.upsertActor('pet', 'pet', viewer.id);
       layerRef.current = layer;
       setReady(true);
@@ -349,6 +355,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.on('zoomend', zoomEnd);
 
     return () => {
+      unsubLooks?.();
       cancelled = true;
       map.off('load', add);
       map.off('styledata', add);
@@ -713,12 +720,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // The pet: at your shoulder, or in front of you facing the camera while it talks.
       const front = !photoFocus && petMode.current === 'front';
       const offBearing = front ? normalizeDeg(camBearing.current+180) : heading.current + 125;
-      const offMeters = (front ? 1.6 : 1.1) * scale;
+      // Beside the (now bigger) character, a little out from its shoulder.
+      const offMeters = (front ? 2.4 : 1.7) * scale;
       const target = moveMeters(pos.current, offMeters, offBearing);
       const gap = haversineMeters(petPos.current, target);
       const kp = 1 - Math.exp(-dt * 5);
       petPos.current = gap > 0.05 ? moveMeters(petPos.current, gap * kp, bearingDeg(petPos.current, target)) : target;
-      petAlt.current += ((front ? 1.0 : .8) - petAlt.current) * kp;
+      petAlt.current += ((front ? 1.5 : 1.2) - petAlt.current) * kp;
       const flying = gap > 2.5 * scale;
       const pState = flying ? 'fly' : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
@@ -784,6 +792,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         for (const id of layer.actorIds()) if (id.startsWith('f:') && !ids.has(id)) layer.removeActor(id);
         for (const { p } of near) {
           const id = `f:${p.friend.id}`;
+          setAvatarHint(p.friend.id, p.friend.pronouns);
           layer.upsertActor(id, 'avatar', p.friend.id);
           layer.setPose(id, p.location, bearingDeg(p.location, pos.current), 0);
         }
@@ -1159,6 +1168,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         onClose={closeSelfie}
         onTakePhoto={() => setPhotoOpen(true)}
       />
+      {/* My character: dress your little 3D self (top-left, out of the way of the plan UI). */}
+      {!walk && !selfieQuest && !chatFriend && (
+        <button type="button" data-testid="edit-avatar" onClick={() => setEditingLook((v) => !v)} aria-pressed={editingLook}
+          className="pointer-events-auto absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-1.5 rounded-full bg-fb-surface/95 px-3 text-[13px] font-semibold text-fb-text shadow-popover backdrop-blur hover:bg-fb-hover">
+          <Shirt size={16} aria-hidden />My look
+        </button>
+      )}
+      {editingLook && <AvatarEditor userId={viewer.id} onClose={() => setEditingLook(false)} />}
       {chatFriend && !selfieQuest && (
         <FriendChat friend={chatFriend} viewerId={viewer.id} incoming={chat?.incoming ?? false} onReply={onReply}
           onWalk={walkToFriend} walking={walk?.questId === `f:${chatFriend.id}`} onClose={() => setChat(null)} />
