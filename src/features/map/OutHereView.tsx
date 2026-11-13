@@ -3,7 +3,7 @@
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { CalendarCheck } from 'lucide-react';
+import { CalendarCheck, Map as MapIcon } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
@@ -278,28 +278,6 @@ export function OutHereView() {
         />
       )}
 
-      {/* Map / 3D: one camera, two starting points. Bottom left, clear of the I'm free pill. */}
-      {!unsupported && (
-        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-20">
-          <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
-            {(['map', '3d'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={view === v}
-                data-testid={`view-${v}`}
-                onClick={() => setView(v)}
-                className={cn(
-                  'h-8 rounded-pill px-3 text-[14px] font-semibold transition-colors',
-                  view === v ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
-                )}
-              >
-                {v === 'map' ? 'Map' : '3D'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       {viewNote && (
         <p role="status" className="absolute inset-x-4 top-[60px] z-[16] mx-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
           {viewNote}
@@ -336,7 +314,7 @@ export function OutHereView() {
             filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
           )}
         >
-          <span aria-hidden>✨</span> Muse filter
+          Muse filter
         </button>
       </div>
 
@@ -469,10 +447,23 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* One row at the bottom: "I'm free" (it also shows your status), Your plans, and ＋ Post a plan. */}
+      {/* One row at the bottom: Map/3D, "I'm free" (it also shows your status), Your plans, and ＋ Post a plan. */}
       {!sheetOpen && !creating && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
           <div className="pointer-events-auto flex items-center gap-2">
+            {/* Map / 3D: one round button that names the view it switches to. */}
+            {!unsupported && (
+              <button
+                type="button"
+                data-testid={view === '3d' ? 'view-map' : 'view-3d'}
+                aria-label={view === '3d' ? 'Switch to the map view' : 'Switch to the 3D view'}
+                title={view === '3d' ? 'Map view' : '3D view'}
+                onClick={() => setView(view === '3d' ? 'map' : '3d')}
+                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-[15px] font-bold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue"
+              >
+                {view === '3d' ? <MapIcon size={22} aria-hidden /> : '3D'}
+              </button>
+            )}
             <ImFreeButton />
             <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
               className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
