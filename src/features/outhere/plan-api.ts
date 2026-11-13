@@ -11,7 +11,7 @@ export type PlanResponse = MusePlan & {
     dropped: DroppedView[]; origin?: LatLng; friendsChecked?: number;
     // What Muse did, for the "Muse's work" steps. Optional so an older response still renders.
     understood?: boolean; candidateCount?: number;
-    friendsFree?: { firstName: string; freeUntil: string }[];
+    friendsFree?: { id?: string; name?: string; avatarUrl?: string; firstName: string; freeUntil: string }[];
     models?: { parse: string; rank: string }; rankFallback?: boolean;
     timings?: { totalMs: number };
     /** Agent coordination checks availability, never attendance or consent. */
