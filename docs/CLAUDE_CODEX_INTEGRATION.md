@@ -81,3 +81,11 @@ Next (Claude): the "I'm free" flow becomes a Muse-led view (Muse front and centr
 - `plan-run.ts` in muse-companion carries the sheet's run; `useMuseCommentary` plays it on the 2D map when the chat is closed (`source: 'plan'`), so Jolly follows each stage live, then narrates the result.
 
 Checks: typecheck, lint 0 errors, 575/575 unit tests (new: stage order and counts match the result, a throwing listener is harmless, stage thoughts), production build; browser at 1440 and 390 on a production server (mock + MemoryStore) with no page or console errors. Not run: Playwright e2e, live Muse, Supabase.
+
+## San Francisco demo city (Claude finishing Codex's start, 08:40 Fri)
+
+Codex's `feature/sf-city-demo` (5e61742 Kenney assets + `sf-city.ts`, plus its uncommitted SF center, seed places, map frame and bright theme) is committed as 73be126 and merged into `integration/claude-camera-muse` (6968b38). Fix on top: real OSM towers inside the three Kenney districts are hidden by feature id on every `idle` (MapLibre's `within` filter does not filter polygons, so the towers swallowed the blocks and the spawn camera). Brighter tints. The Find My "You" pin is hidden in 3D like the location dot.
+
+Also since the last sync: one Muse button (Jolly) in the map's control row (`MuseDockButton`), Jolly grounded except flying and agent encounters, phones keep him on screen, Up next dismiss merged (`fix/up-next-dismiss`), envelope lines (`EventZ.note`) for the Muse-to-Muse scene.
+
+Checks: typecheck, lint 0 errors, 578/578 unit tests; browser at 1280 and 390 (Alex, Maya, Leo spawn in their districts, no page errors). Not run: Playwright e2e, live Muse, Supabase re-seed (the demo project still has Menlo Park rows until `npm run seed:demo`).
