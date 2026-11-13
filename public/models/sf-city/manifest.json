@@ -1,0 +1,116 @@
+{
+  "license": "CC0-1.0",
+  "author": "Kenney",
+  "assets": [
+    {
+      "path": "commercial/building-a.glb",
+      "bytes": 108936,
+      "sha256": "5cf220f90ee3f21e7abe38055ca409a48aa8ef1d5ffab6e2deb99e5a5e1ed5e0"
+    },
+    {
+      "path": "commercial/building-c.glb",
+      "bytes": 102788,
+      "sha256": "f6887608a95a165503561730252c30506938803731c6546efca12bd47b1666bd"
+    },
+    {
+      "path": "commercial/building-f.glb",
+      "bytes": 148952,
+      "sha256": "633a25f7fb3ccf98e304a885a36ed900aecee5bde7ecd554729dec753cceea78"
+    },
+    {
+      "path": "commercial/building-h.glb",
+      "bytes": 127384,
+      "sha256": "6881613ce218bb33a0f56137d4d33b00d307c47e518fbb21ccba1083efbea896"
+    },
+    {
+      "path": "commercial/building-k.glb",
+      "bytes": 246976,
+      "sha256": "afd36f573b9d6a6a890675aa0fbe762b29efb6258f322990752d79d9f0da42c6"
+    },
+    {
+      "path": "commercial/building-m.glb",
+      "bytes": 301004,
+      "sha256": "1cdc717ac86a0479043ff0d0146142f5dfc2622c0e3aaac484fad5807f94d580"
+    },
+    {
+      "path": "commercial/building-skyscraper-a.glb",
+      "bytes": 111336,
+      "sha256": "d8339bbb75944ff91d1ec9a70ec6dead71bd98b94a42d3dd0fc1f3b107ddbe85"
+    },
+    {
+      "path": "commercial/building-skyscraper-b.glb",
+      "bytes": 138480,
+      "sha256": "3a383e8a0a8819023d30b2aee1c6f40fa6bc28990227a306a86e531f36c6b8d5"
+    },
+    {
+      "path": "commercial/building-skyscraper-d.glb",
+      "bytes": 167148,
+      "sha256": "5c524ec13be53fff85ace8b328bc2587cba4e93962230e4a0ba98998e53d30b5"
+    },
+    {
+      "path": "commercial/detail-awning.glb",
+      "bytes": 5528,
+      "sha256": "386978daf81dc11ac601638f19a41918a391ff882a8c518ae5a3215a1bed4d8a"
+    },
+    {
+      "path": "suburban/building-type-b.glb",
+      "bytes": 146720,
+      "sha256": "a964a10c51bb334be677657fd8fa483531974dd15b4243575990192818e2300e"
+    },
+    {
+      "path": "suburban/building-type-f.glb",
+      "bytes": 138536,
+      "sha256": "6f778f50d7f03c86f9a018e428cf8ffdd9e918df09954c0651d1c9559584a22b"
+    },
+    {
+      "path": "suburban/building-type-j.glb",
+      "bytes": 99512,
+      "sha256": "fbdce9cb6bb6cf60a861bab36a896403aff604afbf2cb2b86676ae6f49fa2de3"
+    },
+    {
+      "path": "suburban/tree-large.glb",
+      "bytes": 5812,
+      "sha256": "16d1f95c149bc727a953a473cf20bf21de9bf1a88747c4f9d2eeb4ac7d43e291"
+    },
+    {
+      "path": "suburban/tree-small.glb",
+      "bytes": 5812,
+      "sha256": "5f63359e5f392609d7617cc98070855ca1ffd4f4b4bc3978a5ff56ece88a58d6"
+    },
+    {
+      "path": "suburban/planter.glb",
+      "bytes": 20368,
+      "sha256": "a876e87d908f0397dcaf94b7705835447825c4c5b39195319535415386542c17"
+    },
+    {
+      "path": "roads/road-straight.glb",
+      "bytes": 5248,
+      "sha256": "f8f744fb6fc96dedd5ad1f763b550166f2624a3757bf36b4b39969d2e7cacac5"
+    },
+    {
+      "path": "roads/road-crossroad.glb",
+      "bytes": 10084,
+      "sha256": "2dc52a28cf89ec88025a047c0f6fff4c643f16b0f50f0e9a1140f16230c28b12"
+    },
+    {
+      "path": "roads/road-crossing.glb",
+      "bytes": 8700,
+      "sha256": "eb8575335f77da513add4a5277a7b60cad4886c07966f024b15cf55e5966cde3"
+    },
+    {
+      "path": "roads/light-curved.glb",
+      "bytes": 9492,
+      "sha256": "154dcce9d58ec2cd165e26c91a89c97bdd2838cf06d255099b3570df84f82ec6"
+    },
+    {
+      "path": "roads/traffic-light.glb",
+      "bytes": 20344,
+      "sha256": "6c9ee253b7370e1043168493b2e662b349484a0cdd02100cff04d9d8d1bd9abb"
+    },
+    {
+      "path": "roads/road-sign-stop.glb",
+      "bytes": 10720,
+      "sha256": "0991181f37171daf8d2501e436a688e46ea2bcebb5e27aa451640fcbaab107ef"
+    }
+  ]
+}
