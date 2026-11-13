@@ -32,7 +32,9 @@ test.describe("Out Here plan sheet", () => {
   test("composer, chips, 15-minute time-fit and why-not-others", async ({ page }) => {
     await openSheet(page, "alex");
     const box = page.locator("#imfree-text");
-    await expect(box).toBeFocused();
+    // No autofocus: on a phone the keyboard would cover the chips, which are the main way in.
+    await expect(box).toBeVisible();
+    await expect(box).not.toBeFocused();
     // picking a time selects it (no text typed, nothing sent yet)
     const fifteen = page.getByTestId("free-composer").getByRole("button", { name: "15 min", exact: true });
     await fifteen.click();
