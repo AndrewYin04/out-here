@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { apiPost } from '@/features/data';
 import { Modal, cn, useToast } from '@/features/ui';
 import type { Quest } from '@/shared';
-import { visibilityChip } from '../visibility';
+import { visibilityChip, visibilityMeta } from '../visibility';
 
 /** The plan's poster; tapping it opens the full image. Falls back to the emoji on a gradient. */
 export function Poster({ quest, className, fallback = false }: { quest: Pick<Quest, 'posterUrl' | 'emoji' | 'title'>; className?: string; fallback?: boolean }) {
@@ -50,8 +50,10 @@ export function Bubble({ text, className }: { text: string | null; className?: s
 }
 
 export function VisibilityChip({ quest, groupName, className }: { quest: Pick<Quest, 'visibility'>; groupName?: string | null; className?: string }) {
+  const Icon = visibilityMeta(quest.visibility).icon;
   return (
-    <span data-testid="quest-visibility" className={cn('inline-flex items-center rounded-pill bg-fb-input px-2 py-0.5 text-fb-meta font-semibold text-fb-text-2', className)}>
+    <span data-testid="quest-visibility" className={cn('inline-flex items-center gap-1 rounded-pill bg-fb-input px-2 py-0.5 text-fb-meta font-semibold text-fb-text-2', className)}>
+      <Icon size={12} aria-hidden />
       {visibilityChip(quest.visibility, groupName)}
     </span>
   );
