@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { walkingMinutes } from '@/shared';
 import { UnknownUserError, getPlanContextProvider, plan, setPlanContextProvider } from '@/features/muse';
-import { route } from '@/lib/api';
+import { LIVE_TABLES, route } from '@/lib/api';
 import { dropText, type DroppedView } from '@/features/outhere/dropped';
 import {
   PlanContextNotRegisteredError, planContextSource, storePlanContextProvider,
@@ -80,4 +80,4 @@ export const POST = route(async ({ req, viewer }) => {
     console.error('[muse/plan] failed:', String((err as Error)?.message ?? err).slice(0, 200));
     return NextResponse.json({ error: 'Muse could not make a plan right now' }, { status: 502 });
   }
-});
+}, { refresh: LIVE_TABLES });

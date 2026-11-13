@@ -16,6 +16,8 @@ const PAGE = 1000;
 export const SNAPSHOT_TTL_MS = 10_000;
 /** Ordinary reads may serve a snapshot up to this old while one background reload runs. */
 export const SNAPSHOT_STALE_MS = 60_000;
+/** Writes to these tables patch the shared snapshot instead of dropping it (see write()). */
+const PATCH_IN_PLACE: ReadonlySet<TableKey> = new Set<TableKey>(['locationShares']);
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 type DbError = { message: string; code?: string } | null;
@@ -63,7 +65,9 @@ export class SupabaseBackend implements Backend {
     };
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
-    const first = await page(0, true);
+    // One retry when the request never reached the database (a dropped connection).
+    let first = await page(0, true);
+    if (first.error && /fetch failed|network|ECONNRESET|ETIMEDOUT|socket/i.test(first.error.message ?? '')) first = await page(0, true);
     // Tables added by a later migration read as empty until that migration is applied, so a
     // deploy that lands before `db:migrate` still serves every page (writes to them fail).
     if (first.error && OPTIONAL_TABLES.has(key) && /Could not find the table|does not exist|PGRST205|42P01/.test(`${first.error.code ?? ''} ${first.error.message ?? ''}`)) {
@@ -112,9 +116,7 @@ export class SupabaseBackend implements Backend {
       // take the last snapshot and trigger one background reload. Writes bump `gen`, which skips
       // this branch, and realtime-triggered refetches are fresh, so cross-tab updates stay exact.
       if (startedAfter === -Infinity && age < SNAPSHOT_STALE_MS) {
-        if (!this.refreshing) {
-          this.refreshing = this.loadAndCache().catch(() => undefined).finally(() => { this.refreshing = null; });
-        }
+        if (!this.refreshing) this.revalidate();
         return c.db;
       }
     }
@@ -124,30 +126,69 @@ export class SupabaseBackend implements Backend {
   private refreshing: Promise<unknown> | null = null;
 
   /**
+   * The background reload behind stale-while-revalidate. The finished snapshot replaces the
+   * cache only once it has loaded (and only if no write happened meanwhile), so readers keep
+   * getting the previous snapshot at once instead of waiting on the reload in flight.
+   */
+  private revalidate(): void {
+    const gen = this.gen;
+    const at = Date.now();
+    this.refreshing = this.load()
+      .then((db) => {
+        if (this.gen === gen && (!this.cache || this.cache.at < at)) this.cache = { gen, at, db: Promise.resolve(db) };
+      })
+      .catch(() => undefined)
+      .finally(() => { this.refreshing = null; });
+  }
+
+  /**
    * In a route: the request's working snapshot. It is loaded once and then kept current with the
    * request's own writes. A fresh request only takes a load that began after it arrived (so it
-   * sees every write committed before it was sent); other requests may take any cached load.
+   * sees every write committed before it was sent); other requests may take any cached load,
+   * then re-read the tables in scope.refresh.
    * Outside a route: the shared cache.
    */
   async snapshot(): Promise<Db> {
     const scope = currentScope();
     if (!scope) return { ...(await this.shared()) };
-    scope.working ??= this.shared(scope.fresh ? scope.since : -Infinity).then((db) => ({ ...db }));
+    if (!scope.working) {
+      const base = this.shared(scope.fresh ? scope.since : -Infinity);
+      // A load this request started itself is already current (a stale-while-revalidate
+      // background reload does not count: `base` is then the older snapshot).
+      const ownLoad = this.cache?.db === base && this.cache.at >= scope.since;
+      scope.working = base.then(async (cached) => {
+        const db = { ...cached };
+        if (!scope.fresh && !ownLoad && scope.refresh.length > 0) {
+          const rows = await Promise.all(scope.refresh.map((k) => this.loadTable(k)));
+          scope.refresh.forEach((k, i) => { (db[k] as unknown[]) = rows[i]; });
+        }
+        return db;
+      });
+    }
     return { ...(await scope.working) };
   }
 
-  /** Runs one database write, then applies it to the request's working snapshot. */
+  /**
+   * Runs one database write, then applies it to the request's working snapshot. A write normally
+   * bumps `gen`, which drops the shared cache. Tables in PATCH_IN_PLACE (live locations, sent
+   * every few seconds during a walk) patch the shared cache instead, so a walk does not make
+   * every other read reload all the tables.
+   */
   private async write(table: TableKey, run: () => PromiseLike<{ error: DbError }>, apply: (db: Db) => void): Promise<void> {
     const scope = currentScope();
-    this.gen++;
+    const patch = PATCH_IN_PLACE.has(table);
+    if (!patch) this.gen++;
     try {
       if (scope) scope.queries++;
       const { error } = await run();
       fail(TABLE_NAMES[table], error);
     } finally {
-      this.gen++;
+      if (!patch) this.gen++;
     }
     if (scope?.working) apply(await scope.working);
+    // The apply helpers replace the table's array, so readers holding the old snapshot are
+    // unaffected. A load still in flight is patched when it lands (re-applying is harmless).
+    if (patch && this.cache) void this.cache.db.then(apply, () => undefined);
   }
 
   private applyMatch<Q extends { eq: (c: string, v: unknown) => Q; in: (c: string, v: unknown[]) => Q }>(
