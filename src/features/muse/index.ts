@@ -3,8 +3,12 @@
 export {
   MIN_ATTEMPT_MS, MuseError, MuseTimeoutError, MUSE_TIMEOUT_MS, extractJSON, reportFallback, hashInput, isMockMode, modelFor, museJSON, onRun, setMuseTransport,
 } from './client';
+export { clearPrebakedMemo, prebakedOn, stageTimeoutMs, STAGE_TIMEOUT_MS } from './client';
+export { CACHE_KEY_VERSION, canonicalJSON, museCacheKey, normalizeText, normalizeVolatile, seedVersion } from './cache-key';
+export { createMemoryRunStore, createSupabaseRunStore, getRunStore, setRunStore } from './run-store';
+export type { CacheEntry, MuseRunStore, RunCounts } from './run-store';
 export type {
-  MuseEffort, MuseJSONOptions, MuseMessage, MuseModelRole, MuseResult, MuseRunRecord, MuseTransport, MuseUsage,
+  CacheReason, MuseEffort, MuseJSONOptions, MuseMessage, MuseModelRole, MuseResult, MuseRunRecord, MuseTransport, MuseUsage,
 } from './client';
 export {
   UnknownUserError, firstName, getPlanContextProvider, setPlanContextProvider, sharedInterests,
@@ -29,7 +33,7 @@ export type { PlanInput, PlanMeta, PlanOutput, PlanSource, PlanTimings } from '.
 export { resolveWindow, wallClock, fromWallClock, nextClock } from './time';
 export type { TimeExpression } from './time';
 export {
-  QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftMessages, mockDraft, nearbyPlaces, validateDraft,
+  QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftCacheKey, draftMessages, mockDraft, nearbyPlaces, validateDraft,
 } from './create-quest';
 export type { CreateQuestContext, DraftPlace, RawDraft } from './create-quest';
 export {
