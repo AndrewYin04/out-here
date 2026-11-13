@@ -28,7 +28,8 @@
 // GET  /api/quests/:id/rating          (viewer from x-persona)          -> HangoutRatingState      (viewer's own rating only)
 // PUT  /api/quests/:id/rating          body: RateHangoutBody            -> { rating: HangoutRating } (attendee, after start; upsert)
 // GET  /api/quests/:id/recap           (viewer from x-persona)          -> HangoutRecap            (members only; no hang-again, no notes)
-// GET  /api/me/ratings                 (viewer from x-persona)          -> { ratings: (HangoutRating & { quest: Quest })[] } (own history, score desc)
+// POST /api/muse/rating-takeaway      body: { questId }                -> { takeaway: string, byMuse: boolean } (done-screen line; byMuse false = code template)
+// GET  /api/me/ratings                 (viewer from x-persona)          -> { ratings: MyRating[] } (own history, score desc; photos resolved)
 // GET  /api/daily?date / POST /api/daily/entry                          -> DailyQuest / { entry }
 // GET  /api/me/:userId/streak                                           -> { weeks: number, thisWeekDone: boolean }
 // POST /api/muse/plan                  body: { userId, text, location, now? } -> MusePlan
@@ -212,10 +213,13 @@ export type RateHangoutBody = {
 };
 export type HangoutRatingState = {
   rating: HangoutRating | null;
+  photos: Memory[];                              // rating.photoIds resolved to memories, same order (render photoUrl as stored)
   again: { subjectId: ID; again: boolean }[];   // the viewer's own answers
   attendees: PersonCard[];                       // other members, for the "hang again?" rows
   compareWith: { questId: ID; title: string; emoji: string; score: number; verdict: HangoutVerdict }[]; // viewer's past rated hangouts, for placement
 };
+/** One row of GET /api/me/ratings. photos are rating.photoIds resolved to memories. */
+export type MyRating = HangoutRating & { quest: Quest; photos: Memory[] };
 export type HangoutRecap = {
   quest: Quest; members: PersonCard[]; photos: Memory[];
   ratedCount: number;

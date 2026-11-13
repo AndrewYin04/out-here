@@ -7,6 +7,7 @@ import type { Crew, HangoutRating, Memory, PersonCard, Quest } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, LinkButton, Skeleton } from '@/features/ui';
+import { memoryImgSrc } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
@@ -22,6 +23,12 @@ const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angele
 export function MemoriesPage() {
   const handle = usePersonaHandle();
   return <MemoriesView key={handle ?? 'loading'} handle={handle} />;
+}
+
+/** Album grid like a Facebook post: one photo spans the card, 2 and 4 go two across, the rest three. */
+function albumGrid(count: number): string {
+  if (count === 1) return 'grid grid-cols-1';
+  return count % 3 === 0 || count > 4 ? 'grid grid-cols-3 gap-0.5' : 'grid grid-cols-2 gap-0.5';
 }
 
 function MemoriesView({ handle }: { handle: string | null }) {
@@ -207,11 +214,11 @@ function CrewCard({ crew, handle, rating, onRate }: {
       </div>
 
       {crew.memories.length > 0 ? (
-        <ul className={crew.memories.length % 3 === 0 || crew.memories.length > 4 ? "grid grid-cols-3 gap-0.5" : "grid grid-cols-2 gap-0.5"} aria-label={`${crew.name} album`}>
+        <ul className={albumGrid(crew.memories.length)} aria-label={`${crew.name} album`}>
           {crew.memories.map((m) => (
-            <li key={m.id} className="relative aspect-square bg-fb-bg">
+            <li key={m.id} className={crew.memories.length === 1 ? 'relative aspect-[4/3] bg-fb-bg' : 'relative aspect-square bg-fb-bg'}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.photoUrl === `/api/memories/${m.id}/photo` ? `${m.photoUrl}?as=${encodeURIComponent(handle)}` : m.photoUrl}
+              <img src={memoryImgSrc(m, handle)}
                 alt={m.caption || `${crew.name} photo`} className="h-full w-full object-cover" loading="lazy" />
             </li>
           ))}

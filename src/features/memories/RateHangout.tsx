@@ -11,7 +11,8 @@ import {
   HANGOUT_HIGHLIGHTS, type HangoutRating, type HangoutRatingState, type HangoutVerdict, type ID, type Memory, type Quest,
 } from '@/shared';
 import { AddPhotoTile } from './MemoryCapture';
-import { museTakeaway } from './takeaway';
+import { MemoryThumb } from './MemoryThumb';
+import { fallbackTakeaway } from './takeaway';
 import {
   answerComparison, bucketMidpoint, nextComparison, placementIndex, rankOf, scoreAt, startPlacement, type Placement,
 } from './placement';
@@ -55,11 +56,13 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
   const [score, setScore] = useState<number | null>(null);
   const [highlights, setHighlights] = useState<string[]>([]);
   const [note, setNote] = useState('');
-  const [photoIds, setPhotoIds] = useState<ID[]>([]);
+  const [photos, setPhotos] = useState<Memory[]>([]);
   const [again, setAgain] = useState<Record<ID, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ score: number; rank: number; total: number; takeaway: string } | null>(null);
+  const [result, setResult] = useState<{ score: number; rank: number; total: number } | null>(null);
+  // null while Muse writes it; byMuse false means the code template is shown, without the label.
+  const [takeaway, setTakeaway] = useState<{ text: string; byMuse: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -71,9 +74,13 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
       setState(s);
       setQuest(d.quest);
       if (s.rating) {
+        // Editing keeps the saved placement: the verdict and score start as saved, and placement
+        // runs again only for a different verdict or "Re-rank".
+        setVerdict(s.rating.verdict);
+        setScore(s.rating.score);
         setHighlights(s.rating.highlights);
         setNote(s.rating.note);
-        setPhotoIds(s.rating.photoIds);
+        setPhotos(s.photos ?? []);
       }
       setAgain(Object.fromEntries(s.again.map((a) => [a.subjectId, a.again])));
     }).catch((e) => { if (alive) setLoadError(e instanceof Error ? e.message : 'Couldn’t load this hangout.'); });
@@ -95,10 +102,27 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
   );
 
   function chooseVerdict(v: HangoutVerdict) {
+    if (state!.rating?.verdict === v) {
+      keepSavedScore();
+      return;
+    }
+    place(v);
+  }
+
+  /** Edit without re-placing: the saved verdict and score, straight to the details step. */
+  function keepSavedScore() {
+    const saved = state!.rating!;
+    setVerdict(saved.verdict);
+    setScore(saved.score);
+    setPlacement(null);
+    setStep('details');
+  }
+
+  function place(v: HangoutVerdict) {
     setVerdict(v);
     const list = state!.compareWith.filter((c) => c.verdict === v);
     if (list.length === 0) {
-      setScore(bucketMidpoint(v));
+      setScore(state!.rating?.verdict === v ? state!.rating.score : bucketMidpoint(v));
       setPlacement(null);
       setStep('details');
       return;
@@ -110,7 +134,9 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
 
   function finishPlacement(p: Placement | null) {
     if (!verdict) return;
-    setScore(p ? scoreAt(verdict, bucket.map((b) => b.score), placementIndex(p)) : bucketMidpoint(verdict));
+    // Skip on an edit with the saved verdict keeps the saved score instead of the bucket midpoint.
+    const saved = state!.rating?.verdict === verdict ? state!.rating.score : null;
+    setScore(p ? scoreAt(verdict, bucket.map((b) => b.score), placementIndex(p)) : saved ?? bucketMidpoint(verdict));
     setStep('details');
   }
 
@@ -127,18 +153,21 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
     setSaveError(null);
     try {
       const { rating } = await apiPost<{ rating: HangoutRating }>(`/api/quests/${questId}/rating`, {
-        verdict, score, highlights, note, photoIds,
+        verdict, score, highlights, note, photoIds: photos.map((m) => m.id),
         again: Object.entries(again).map(([subjectId, a]) => ({ subjectId, again: a })),
       }, 'PUT');
       const { ratings } = await apiFetch<MyRatings>('/api/me/ratings', FRESH).catch(() => ({ ratings: [rating] as MyRatings['ratings'] }));
-      // Built from the answers just saved; names only people marked yes.
-      const yes = attendees.filter((p) => again[p.id] === true).map((p) => p.name.split(' ')[0]);
-      setResult({
-        score: rating.score, rank: rankOf(rating.score, ratings.map((r) => r.score)), total: ratings.length,
-        takeaway: museTakeaway(verdict, highlights, yes),
-      });
+      setResult({ score: rating.score, rank: rankOf(rating.score, ratings.map((r) => r.score)), total: ratings.length });
+      setTakeaway(null);
       setStep('done');
       onSaved?.(rating);
+      // Muse writes the line from the saved answers. The template (names only people marked yes)
+      // stands in, unlabeled, when the call fails.
+      const yes = attendees.filter((p) => again[p.id] === true).map((p) => p.name.split(' ')[0]);
+      const fallback = { text: fallbackTakeaway(verdict, highlights, yes), byMuse: false };
+      apiPost<{ takeaway: string; byMuse: boolean }>('/api/muse/rating-takeaway', { questId })
+        .then((t) => setTakeaway({ text: t.takeaway, byMuse: t.byMuse }))
+        .catch(() => setTakeaway(fallback));
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Couldn’t save your rating.');
     } finally {
@@ -164,7 +193,11 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
       {step === 'verdict' && (
         <section aria-labelledby="rate-verdict">
           <h3 id="rate-verdict" className="text-[20px] font-bold text-fb-text">How was it?</h3>
-          {state.rating && <p className="mt-1 text-[13px] text-fb-text-2">You rated this {state.rating.score.toFixed(1)}. Pick again to update it.</p>}
+          {state.rating && (
+            <p className="mt-1 text-[13px] text-fb-text-2" data-testid="rating-saved">
+              You rated this {state.rating.score.toFixed(1)}. Press Next to keep that score, or pick a different answer.
+            </p>
+          )}
           <div className="mt-3 grid grid-cols-3 gap-2">
             {VERDICT_OPTIONS.map((o) => (
               <button key={o.verdict} type="button" onClick={() => chooseVerdict(o.verdict)}
@@ -180,6 +213,12 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
               </button>
             ))}
           </div>
+          {state.rating && (
+            <StepFooter>
+              <Button variant="ghost" onClick={() => place(state.rating!.verdict)}>Re-rank</Button>
+              <Button onClick={keepSavedScore}>Next</Button>
+            </StepFooter>
+          )}
         </section>
       )}
 
@@ -226,17 +265,14 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
           </label>
           <div>
             <p className="mb-2 text-[15px] font-semibold text-fb-text">Photos</p>
-            {photoIds.length > 0 && (
+            {photos.length > 0 && (
               <ul className="mb-2 flex flex-wrap gap-2" aria-label="Photos you added">
-                {photoIds.map((id) => (
-                  <li key={id} className="size-16 overflow-hidden rounded-btn bg-fb-bg">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/api/memories/${id}/photo?as=${encodeURIComponent(currentPersona())}`} alt="Hangout photo" className="h-full w-full object-cover" />
-                  </li>
+                {photos.map((m) => (
+                  <MemoryThumb key={m.id} memory={m} handle={currentPersona()} className="size-16 overflow-hidden rounded-btn bg-fb-bg" />
                 ))}
               </ul>
             )}
-            <AddPhotoTile questId={questId} crewId={crewId} onMemory={(m: Memory) => setPhotoIds((cur) => [...cur, m.id])} />
+            <AddPhotoTile questId={questId} crewId={crewId} onMemory={(m: Memory) => setPhotos((cur) => (cur.some((x) => x.id === m.id) ? cur : [...cur, m]))} />
           </div>
           <StepFooter error={attendees.length === 0 ? saveError : null}>
             <Button variant="ghost" onClick={() => setStep('verdict')}>Back</Button>
@@ -298,9 +334,18 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
             {result.score.toFixed(1)}, your #{result.rank} hangout{result.total > 1 ? ` of ${result.total}` : ''}
           </p>
           <p className="mt-1 text-[13px] text-fb-text-2">{quest.emoji} {quest.title}</p>
-          <div className="mt-4 w-full rounded-card bg-fb-bg p-3 text-left" data-testid="rating-takeaway">
-            <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>
-            <p className="mt-1 text-[15px] text-fb-text">{result.takeaway}</p>
+          <div className="mt-4 w-full rounded-card bg-fb-bg p-3 text-left" data-testid="rating-takeaway" aria-busy={!takeaway}>
+            {!takeaway ? (
+              <>
+                <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>
+                <p className="mt-1 text-[15px] text-fb-text-2">Muse is noting what to look for next time…</p>
+              </>
+            ) : (
+              <>
+                {takeaway.byMuse && <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>}
+                <p className={cn('text-[15px] text-fb-text', takeaway.byMuse && 'mt-1')}>{takeaway.text}</p>
+              </>
+            )}
           </div>
           <Button className="mt-4" onClick={onClose}>Done</Button>
         </section>

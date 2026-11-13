@@ -43,7 +43,14 @@ alter table public.hangout_ratings enable row level security;
 alter table public.hang_again      enable row level security;
 
 -- "How was Dumpling Den?" notifications after a hangout ends.
+-- Both lists are the union of every migration that sets them: 0001_init plus 'intro' from
+-- 0003_intros (on overnight). This file sorts after 0003_intros, so a list without 'intro' here
+-- would reject every Muse Intro notification. A later migration that edits these checks must keep
+-- every value already listed.
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check check (type in (
   'friend_request', 'friend_accept', 'comment', 'reply', 'reaction', 'group_post', 'event_invite',
-  'quest_invite', 'quest_join', 'message', 'hangout_rate'));
+  'quest_invite', 'quest_join', 'message', 'intro', 'hangout_rate'));
+alter table public.notifications drop constraint if exists notifications_object_type_check;
+alter table public.notifications add constraint notifications_object_type_check check (object_type in
+  ('post', 'comment', 'profile', 'group', 'event', 'quest', 'invite', 'thread', 'intro'));

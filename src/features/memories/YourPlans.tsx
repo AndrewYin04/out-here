@@ -5,8 +5,9 @@ import { CalendarDays, Camera, Clock, Footprints, MapPin, Star } from 'lucide-re
 import { useEffect, useState } from 'react';
 import { apiFetch, apiPost, currentPersona, useApi, useViewer } from '@/features/data';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
-import { formatDemoTime, type CompleteQuestResponse, type HangoutRating, type YourPlan, type YourPlansResponse } from '@/shared';
+import { formatDemoTime, type CompleteQuestResponse, type MyRating, type YourPlan, type YourPlansResponse } from '@/shared';
 import { MemoryCapture } from './MemoryCapture';
+import { MemoryThumb } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
 
 type RateTarget = { questId: string; crewId: string | null };
@@ -27,11 +28,11 @@ function PlansList({ viewerId }: { viewerId: string }) {
   const [time, setTime] = useState(Date.now);
   const [captureQuest, setCaptureQuest] = useState<string | null>(null);
   const [rateTarget, setRateTarget] = useState<RateTarget | null>(null);
-  const [ratings, setRatings] = useState<Map<string, HangoutRating>>(new Map());
+  const [ratings, setRatings] = useState<Map<string, MyRating>>(new Map());
   const [ratingsVersion, setRatingsVersion] = useState(0);
   useEffect(() => {
     let alive = true;
-    apiFetch<{ ratings: HangoutRating[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
+    apiFetch<{ ratings: MyRating[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
       .then((r) => { if (alive) setRatings(new Map(r.ratings.map((x) => [x.questId, x]))); })
       .catch(() => undefined);
     return () => { alive = false; };
@@ -77,7 +78,7 @@ function PlansList({ viewerId }: { viewerId: string }) {
 function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCaptureQuest, ratings, onRate }: {
   plan: YourPlan; time: number; viewerId: string; refetch: () => Promise<void>; finished: boolean;
   captureQuest: string | null; setCaptureQuest: (id: string | null) => void;
-  ratings: Map<string, HangoutRating>; onRate: (target: RateTarget) => void;
+  ratings: Map<string, MyRating>; onRate: (target: RateTarget) => void;
 }) {
   const rating = ratings.get(plan.quest.id) ?? null;
   const { quest, members, walkMinutes } = plan;
@@ -157,13 +158,10 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
             <Star size={15} aria-hidden className="text-[#F7B928]" fill="currentColor" />
             You rated it <strong className="font-semibold">{rating.score.toFixed(1)}</strong>
           </p>
-          {rating.photoIds.length > 0 && (
+          {(rating.photos ?? []).length > 0 && (
             <ul className="flex gap-1" aria-label="Photos from your rating">
-              {rating.photoIds.slice(0, 4).map((id) => (
-                <li key={id} className="size-10 overflow-hidden rounded-btn bg-fb-bg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/memories/${id}/photo?as=${encodeURIComponent(currentPersona())}`} alt="Hangout photo" className="h-full w-full object-cover" />
-                </li>
+              {(rating.photos ?? []).slice(0, 4).map((m) => (
+                <MemoryThumb key={m.id} memory={m} handle={currentPersona()} className="size-10 overflow-hidden rounded-btn bg-fb-bg" />
               ))}
             </ul>
           )}

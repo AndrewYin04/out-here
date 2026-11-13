@@ -10,9 +10,9 @@
 //   hangoutRatings are for route handlers and Muse server code, never for a client.
 import {
   HANGOUT_HIGHLIGHTS, NEGATIVE_HIGHLIGHTS, now, RECAP_MIN_OTHER_RATERS, seedId, VERDICT_RANGES,
-  type HangAgain, type HangoutRating, type HangoutVerdict, type ID, type Quest,
+  type HangAgain, type HangoutRating, type HangoutVerdict, type ID, type Memory,
 } from '@/shared';
-import type { HangoutRatingState, HangoutRecap, RateHangoutBody } from '@/shared/api';
+import type { HangoutRatingState, HangoutRecap, MyRating, RateHangoutBody } from '@/shared/api';
 import type { CoreStore } from './core';
 import type { QuestRow } from './db';
 import { badRequest, conflict, forbidden, notFound } from './errors';
@@ -80,6 +80,12 @@ export async function promptEndedHangouts(store: CoreStore, v: View, viewerId: I
   return due.length > 0;
 }
 
+/** The rating's photos as Memory rows, in photoIds order, so clients render each photoUrl as stored. */
+function ratingPhotos(v: View, rating: HangoutRating): Memory[] {
+  const byId = new Map(v.db.memories.filter((m) => m.questId === rating.questId).map((m) => [m.id, m]));
+  return rating.photoIds.map((id) => byId.get(id)).filter((m): m is Memory => !!m).map((m) => ({ ...m }));
+}
+
 export async function ratingState(store: CoreStore, viewerId: ID, questId: ID): Promise<HangoutRatingState> {
   const v = await store.view();
   ratableQuest(v, viewerId, questId);
@@ -91,6 +97,7 @@ export async function ratingState(store: CoreStore, viewerId: ID, questId: ID): 
     .map(({ r, q }) => ({ questId: q.id, title: q.title, emoji: q.emoji, score: r.score, verdict: r.verdict }));
   return {
     rating: rating ? { ...rating } : null,
+    photos: rating ? ratingPhotos(v, rating) : [],
     again: ownAgain(v, viewerId, questId),
     attendees: v.people(viewerId, v.questMemberIds(questId).filter((m) => m !== viewerId)),
     compareWith,
@@ -181,13 +188,13 @@ export async function hangoutRecap(store: CoreStore, viewerId: ID, questId: ID):
   };
 }
 
-export async function myRatings(store: CoreStore, viewerId: ID): Promise<(HangoutRating & { quest: Quest })[]> {
+export async function myRatings(store: CoreStore, viewerId: ID): Promise<MyRating[]> {
   const v = await store.view();
   return v.db.hangoutRatings.filter((r) => r.raterId === viewerId)
     .map((r) => ({ r, q: v.questById.get(r.questId) }))
     .filter((x): x is { r: HangoutRating; q: QuestRow } => !!x.q)
     .sort((a, b) => b.r.score - a.r.score || b.r.updatedAt.localeCompare(a.r.updatedAt))
-    .map(({ r, q }) => ({ ...r, quest: v.questFor(viewerId, q) }));
+    .map(({ r, q }) => ({ ...r, quest: v.questFor(viewerId, q), photos: ratingPhotos(v, r) }));
 }
 
 // ---------- server-only reads for Muse matching ----------

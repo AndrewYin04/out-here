@@ -113,8 +113,13 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
     await crewCard.getByRole('button', { name: 'Edit rating' }).click();
     await expect(maya.getByRole('dialog', { name: 'Rate your hangout' })).toContainText('You rated this 5.0');
     await shot(maya, '6-edit-from-memories');
-    // Changing to "Not for me" demotes the regroup button on the crew card.
     const ed = maya.getByRole('dialog', { name: 'Rate your hangout' });
+    // Editing keeps the saved placement: Next goes straight to the details step without re-ranking.
+    await expect(ed.getByRole('button', { name: 'It was fine' })).toHaveAttribute('aria-pressed', 'true');
+    await ed.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(ed.getByRole('heading', { name: 'What stood out?' })).toBeVisible();
+    await ed.getByRole('button', { name: 'Back', exact: true }).click();
+    // Changing to "Not for me" demotes the regroup button on the crew card.
     await ed.getByRole('button', { name: 'Not for me' }).click();
     if (await ed.getByRole('heading', { name: 'Which was better?' }).isVisible()) await ed.getByRole('button', { name: 'Skip' }).click();
     await ed.getByRole('button', { name: 'Next' }).click();
