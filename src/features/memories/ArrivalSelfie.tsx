@@ -4,10 +4,10 @@
 // once the hangout has started. After the photo saves: rate the hangout (#18) with the selfie
 // attached, or see it on the memory board (#19). See arrival.ts for the events.
 import Link from 'next/link';
-import { Camera, Clock, Star } from 'lucide-react';
+import { Clock, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { currentPersona } from '@/features/data';
-import { Button, LinkButton, Modal, burst } from '@/features/ui';
+import { Button, LinkButton, Modal } from '@/features/ui';
 import { formatDemoTime, type Memory, type Quest } from '@/shared';
 import { arrivalWait, emitMemorySaved, requestRating } from './arrival';
 import { MemoryCapture } from './MemoryCapture';
@@ -17,7 +17,7 @@ const photoSrc = (m: Memory) => m.photoUrl === `/api/memories/${m.id}/photo` ? `
 
 export function ArrivalSelfie({ quest, onClose }: { quest: Quest | null; onClose: () => void }) {
   return (
-    <Modal open={!!quest} onClose={onClose} title={quest ? `You made it to ${quest.emoji} ${quest.title}` : ''} size="md">
+    <Modal open={!!quest} onClose={onClose} title={quest ? 'You made it' : ''} size="md">
       {quest && <ArrivalBody key={quest.id} quest={quest} onClose={onClose} />}
     </Modal>
   );
@@ -27,7 +27,6 @@ function ArrivalBody({ quest, onClose }: { quest: Quest; onClose: () => void }) 
   const [now, setNow] = useState(Date.now);
   const [crewId, setCrewId] = useState<string | null>(null);
   const [saved, setSaved] = useState<Memory | null>(null);
-  const [savedEl, setSavedEl] = useState<HTMLDivElement | null>(null);
   const [rateMissing, setRateMissing] = useState(false);
   const wait = arrivalWait(quest.startsAt, now);
   useEffect(() => {
@@ -35,7 +34,6 @@ function ArrivalBody({ quest, onClose }: { quest: Quest; onClose: () => void }) 
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, [wait.early]);
-  useEffect(() => { if (saved && savedEl) burst(savedEl, ['📸', '✨', '💛'], 10); }, [saved, savedEl]);
 
   const onMemory = (memory: Memory) => {
     setSaved(memory);
@@ -49,17 +47,18 @@ function ArrivalBody({ quest, onClose }: { quest: Quest; onClose: () => void }) 
 
   if (saved) {
     return (
-      <div ref={setSavedEl} data-testid="arrival-saved" className="space-y-3">
+      <div data-testid="arrival-saved" className="space-y-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photoSrc(saved)} alt={saved.caption || 'Your selfie from the hangout'} className="max-h-64 w-full animate-polaroid rounded-btn bg-fb-bg object-contain p-1.5 shadow-card" />
         <p role="status" className="text-[15px] text-fb-text">Saved to your memories. Only the people from this hangout can see it.</p>
         <div className="flex flex-wrap gap-2">
           <Button data-testid="arrival-rate" icon={<Star size={16} />} onClick={rate}>Rate the hangout</Button>
-          <LinkButton href={`/memories#crew-${saved.crewId}`} variant="secondary" data-testid="arrival-board">See it on your memories</LinkButton>
+          <LinkButton href={`/memories#crew-${saved.crewId}`} variant="secondary" data-testid="arrival-board">See memories</LinkButton>
+          <Button variant="ghost" data-testid="arrival-back" onClick={onClose}>Back to the map</Button>
         </div>
         {rateMissing && (
           <p className="text-sm text-fb-text-2">
-            You can rate it from <Link href="/memories" className="font-semibold text-fb-blue hover:underline">Your Plans</Link> once the hangout ends.
+            You can rate it from <Link href="/memories" className="font-semibold text-fb-blue hover:underline">Memories</Link> once the hangout ends.
           </p>
         )}
       </div>
@@ -81,10 +80,8 @@ function ArrivalBody({ quest, onClose }: { quest: Quest; onClose: () => void }) 
 
   return (
     <div data-testid="arrival-selfie" className="space-y-2">
-      <p className="flex items-center gap-2 text-[15px] text-fb-text">
-        <Camera size={18} aria-hidden className="shrink-0 text-fb-blue" />
-        <span>Take a photo together. It goes to your memories, and you can rate the hangout next.</span>
-      </p>
+      <p className="text-[17px] font-semibold leading-snug text-fb-text"><span aria-hidden>{quest.emoji}</span> {quest.title}</p>
+      <p className="text-[15px] text-fb-text-2">Take a photo together. It saves to your memories.</p>
       <MemoryCapture questId={quest.id} crewId={crewId} onSaved={setCrewId} onMemory={onMemory} />
     </div>
   );

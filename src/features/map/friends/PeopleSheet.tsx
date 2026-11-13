@@ -17,15 +17,27 @@ export function flyToPin(_map: MapLibreMap | null | undefined, pin: FriendPin) {
 }
 
 export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: () => void; map?: MapLibreMap | null }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <>
+      <Sheet open={open && !editing} onClose={() => { onClose(); map?.easeTo({ padding: panelPadding(null), duration: 300 }); }} title="People" side="left" className={floatingPanel('left')}>
+        <PeopleList onPick={(p) => { onClose(); flyToPin(map, p); }} onEdit={() => setEditing(true)} />
+      </Sheet>
+      <SharingSheet open={open && editing} onClose={() => setEditing(false)} />
+    </>
+  );
+}
+
+/** The People list: your own sharing row (Edit), then friends sharing with you, nearest first.
+ *  The People sheet and the Out Here dashboard's Friends tab both show it. */
+export function PeopleList({ onPick, onEdit }: { onPick: (pin: FriendPin) => void; onEdit: () => void }) {
   const { data, loading, error } = useFriendPins();
   const { data: mine } = useMyShare();
   const { viewer } = useViewer();
-  const [editing, setEditing] = useState(false);
   const pins = data?.pins ?? [];
   const share = mine?.share ?? null;
   return (
     <>
-      <Sheet open={open && !editing} onClose={() => { onClose(); map?.easeTo({ padding: panelPadding(null), duration: 300 }); }} title="People" side="left" className={floatingPanel('left')}>
         <div className="flex items-center gap-3 rounded-card py-2" data-testid="my-sharing-row">
           <Avatar src={viewer.avatarUrl} name={viewer.name} size={48} decorative />
           <div className="min-w-0 flex-1">
@@ -39,7 +51,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
               <p className="truncate text-[13px] text-fb-text">{share.bubble.emoji && <span className="mr-1 text-[15px] leading-none" aria-hidden>{share.bubble.emoji}</span>}{share.bubble.thought}</p>
             )}
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>Edit</Button>
+          <Button size="sm" variant="secondary" onClick={onEdit}>Edit</Button>
         </div>
         <div className="my-2 h-px bg-fb-divider-soft" />
         <h3 className="py-1 text-[17px] font-semibold">Friends sharing with you</h3>
@@ -61,7 +73,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
                 type="button"
                 data-testid="people-row"
                 data-handle={p.friend.handle}
-                onClick={() => { onClose(); flyToPin(map, p); }}
+                onClick={() => onPick(p)}
                 className="flex w-full items-center gap-3 rounded-btn px-1 py-2 text-left hover:bg-fb-hover"
               >
                 <span className="rounded-full ring-2 ring-fb-green"><Avatar src={p.friend.avatarUrl} name={p.friend.name} size={48} decorative /></span>
@@ -77,8 +89,6 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
             </li>
           ))}
         </ul>
-      </Sheet>
-      <SharingSheet open={open && editing} onClose={() => setEditing(false)} />
     </>
   );
 }

@@ -95,6 +95,15 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
   }, [visibility, groupId, myGroups]);
 
   useEffect(() => { lineRef.current?.focus(); }, []);
+  // Escape closes the sheet while it is still empty; once you've typed or added a poster it stays,
+  // so a stray key never throws a draft away (the X still closes it).
+  const pristine = !line.trim() && !title.trim() && !poster && !bubble.trim() && !description.trim();
+  useEffect(() => {
+    if (!pristine) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pristine, onClose]);
   useEffect(() => () => inFlight.current?.abort(), []);
   useEffect(() => { onEmoji(emoji); }, [emoji, onEmoji]);
   // The host dragged the pin away from Muse's place: the plan is at the pin now.

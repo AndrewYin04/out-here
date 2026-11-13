@@ -141,7 +141,10 @@ test.describe('phone 390', () => {
     const friendsCount = await page.locator('[data-map-marker="quest"]').count();
     expect(friendsCount).toBeLessThanOrEqual(all);
     // The filter says what it shows, and each pin names the friends going.
+    // The Friends tab's list says what the map shows.
+    await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('friends-filter-chip')).toHaveText(`Plans your friends joined · ${friendsCount}`);
+    await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai going/);
     await page.getByTestId('quest-pin-dumplings').click();
     await expect(page.getByTestId('quest-sheet').getByTestId('quest-friends-going')).toHaveText(/Kai Nakamura (is|and .+ are) going/);

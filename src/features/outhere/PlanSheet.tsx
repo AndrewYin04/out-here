@@ -250,6 +250,18 @@ export function PlanSheet({ className }: { className?: string }) {
     return () => window.clearTimeout(t);
   }, [open, autoKey]);
 
+  // Escape closes the sheet (like its X), and focus returns to I'm free.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      setPlanOpen(false);
+      window.setTimeout(() => document.querySelector<HTMLElement>('[data-testid="im-free"]')?.focus(), 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';

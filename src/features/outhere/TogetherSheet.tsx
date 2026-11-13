@@ -2,8 +2,7 @@
 // Plan together: one shared sheet for everyone in the group. Muse's options are the same on
 // every phone; each person taps "I'm in" on the ones they like, and it locks when everyone is in
 // on one. Nobody sees a "no": an unanswered plan expires quietly when the shared time ends.
-import Link from 'next/link';
-import { CalendarCheck, Check, Footprints, MapPin, X } from 'lucide-react';
+import { Check, Footprints, MapPin, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { apiPost, useApi, useViewer } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, burst, cn } from '@/features/ui';
@@ -210,9 +209,6 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
           className="oh-press h-9 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
           Show on map
         </button>
-        <Link href="/events?tab=going" className="oh-press inline-flex h-9 items-center justify-center gap-1.5 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
-          <CalendarCheck size={16} aria-hidden />Your plans
-        </Link>
       </div>
     </section>
   );

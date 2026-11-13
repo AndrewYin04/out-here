@@ -2,18 +2,16 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { CalendarCheck, LocateFixed, Map as MapIcon } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
-import { Plus } from 'lucide-react';
+import { FriendsLayer, useFriendPins } from '@/features/map/friends';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
+import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
@@ -47,11 +45,21 @@ function useNow(intervalMs = 30_000): Date {
   return now;
 }
 
+/**
+ * Keeps ?quest=<id> in the URL. Opening a plan from the map adds a history entry, so the browser's
+ * Back closes the plan instead of leaving Out Here; closing it with X goes back over that entry.
+ * Switching from one plan to another replaces the entry (Back returns to the map, not plan A).
+ */
+const QUEST_ENTRY = 'ohQuest';
 function setQuestParam(id: string | null) {
   const url = new URL(window.location.href);
+  const had = url.searchParams.has('quest');
   if (id) url.searchParams.set('quest', id);
   else url.searchParams.delete('quest');
-  window.history.replaceState(window.history.state, '', url.toString());
+  const state = window.history.state as Record<string, unknown> | null;
+  if (!id && state?.[QUEST_ENTRY]) { window.history.back(); return; }
+  if (id && !had) window.history.pushState({ ...(state ?? {}), [QUEST_ENTRY]: true }, '', url.toString());
+  else window.history.replaceState(state, '', url.toString());
 }
 
 export function OutHereView() {
@@ -198,6 +206,12 @@ export function OutHereView() {
   }, [planPicks, mode, friendPins.data]);
 
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  // Back and Forward: the plan in the URL is the plan on screen.
+  useEffect(() => {
+    const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const togetherId = useTogetherId();
   const sheetOpen = planOpen || togetherId !== null;
   // "See it on the map" from a confirmed shared plan opens that quest's panel here.
@@ -366,40 +380,24 @@ export function OutHereView() {
         </p>
       )}
 
-      {/* Explore / Friends, and the Muse filter chip beside them: the flat map only. The 3D street
-          view keeps just your avatar, Muse and one button (docs/UX_PLAN.md). */}
-      <div className={cn('absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2', show3d && 'hidden')}>
-        <div role="group" aria-label="Map view" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
-          {(['explore', 'friends'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              data-testid={`map-mode-${m}`}
-              onClick={() => setMode(m)}
-              className={cn(
-                'h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors',
-                mode === m ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
-              )}
-            >
-              {m === 'explore' ? 'Explore' : 'Friends'}
-            </button>
-          ))}
+      {/* Rehearsal tool (?tools=1): the Muse filter. Explore / Friends live in the dashboard below. */}
+      {tools && !show3d && (
+        <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
+          <button
+            type="button"
+            aria-pressed={filter.on}
+            data-testid="muse-filter-toggle"
+            title="Muse shows only what matches what you're looking for"
+            onClick={() => filter.setOn(!filter.on)}
+            className={cn(
+              'h-10 whitespace-nowrap rounded-pill px-3 text-[15px] font-semibold shadow-card transition-colors',
+              filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
+            )}
+          >
+            Muse filter
+          </button>
         </div>
-        {tools && <button
-          type="button"
-          aria-pressed={filter.on}
-          data-testid="muse-filter-toggle"
-          title="Muse shows only what matches what you're looking for"
-          onClick={() => filter.setOn(!filter.on)}
-          className={cn(
-            'h-10 whitespace-nowrap rounded-pill px-3 text-[15px] font-semibold shadow-card transition-colors',
-            filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
-          )}
-        >
-          <span aria-hidden>✨</span> Muse filter
-        </button>}
-      </div>
+      )}
 
       {filter.on && (
         <div className="pointer-events-none absolute inset-x-4 top-[60px] z-[15] flex flex-col items-center gap-1">
@@ -495,12 +493,6 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
-          <PeopleButton map={map} />
-          {visible.length > 0 && (
-            <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
-              Plans your friends joined · {visible.length}
-            </p>
-          )}
           {!unsupported && ctx && questsApi.data && visible.length === 0 && (
             <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
               <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">
@@ -521,7 +513,7 @@ export function OutHereView() {
       {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered.
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
-          mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
+          filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}
             plan={upNext}
@@ -534,49 +526,30 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* Dock the availability card at the edge to leave room for the map and avatar. */}
+      {/* "You're both free": the same top slot as Up next (only one shows), clear of the dashboard. */}
       {!selectedId && !creating && !sheetOpen && !upNext && !show3d && (
-        <div className={cn(
-          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
-          show3d
-            ? mode === 'friends' && visible.length > 0
-              ? filter.on ? 'top-32' : 'top-24'
-              : filter.on ? 'top-24' : 'top-[60px]'
-            : 'bottom-[136px] md:bottom-auto',
-        )}>
-          <BothFreeNudge className="pointer-events-auto w-full" />
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center md:inset-x-auto md:left-4 md:max-w-[380px]', filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
+          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
         </div>
       )}
 
-      {/* One button at the bottom: I'm free (it also shows your status). Hidden while you walk. */}
-      {!sheetOpen && !creating && !walkingNow && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
-          <ImFreeButton className="pointer-events-auto" />
-        </div>
-      )}
-
-      {/* Right-side stack: 3D / Map, back to you, your plans, post a plan. */}
-      {!unsupported && !creating && !walkingNow && (
-        <div role="group" aria-label="Map controls"
-          className={cn('absolute right-3 z-20 flex flex-col overflow-hidden rounded-[22px] bg-fb-surface shadow-popover', sheetOpen ? 'max-md:hidden md:bottom-6' : 'bottom-24 max-md:bottom-[150px]', selectedId && 'max-md:hidden')}>
-          <button type="button" data-testid={view === '3d' ? 'view-map' : 'view-3d'} aria-label={view === '3d' ? 'Flat map' : '3D street view'} title={view === '3d' ? 'Flat map' : '3D street view'}
-            onClick={() => setView(view === '3d' ? 'map' : '3d')}
-            className="flex size-12 items-center justify-center text-[15px] font-bold text-fb-text hover:bg-fb-hover">
-            {view === '3d' ? <MapIcon size={22} aria-hidden /> : '3D'}
-          </button>
-          <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={recenter}
-            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-text hover:bg-fb-hover">
-            <LocateFixed size={22} aria-hidden />
-          </button>
-          <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
-            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-text hover:bg-fb-hover">
-            <CalendarCheck size={21} aria-hidden />
-          </Link>
-          <button type="button" data-testid="create-plan-btn" aria-label="Post a plan" title="Post a plan (or long-press the map)"
-            onClick={() => startCreate()}
-            className="flex size-12 items-center justify-center border-t border-fb-divider-soft text-fb-blue hover:bg-fb-hover">
-            <Plus size={24} aria-hidden />
-          </button>
+      {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
+          for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
+      {!unsupported && !creating && !sheetOpen && (
+        <div className={cn(selectedId && 'max-md:hidden')}>
+          <OutHereDock
+            mode={mode}
+            onMode={setMode}
+            view={view}
+            onToggleView={() => setView(view === '3d' ? 'map' : '3d')}
+            onRecenter={recenter}
+            onCreate={() => startCreate()}
+            quests={shown}
+            walkMinutes={ctx?.walkMinutes ?? {}}
+            now={now}
+            onSelect={select}
+            showActions={!walkingNow}
+          />
         </div>
       )}
 
@@ -601,7 +574,7 @@ export function OutHereView() {
       )}
 
       {!unsupported && (
-        <MapAttribution className={cn('absolute bottom-0 right-0', selectedId && 'max-md:hidden')} />
+        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', selectedId && 'max-md:hidden')} />
       )}
 
       {selectedId && !creating && (

@@ -116,7 +116,7 @@ export function PlanPage({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-[680px] px-0 pb-10 md:px-4 md:pt-4" data-testid="plan-page">
-      <Link href={`/out-here?quest=${q.id}`} className="mb-2 hidden items-center gap-1 text-fb-meta font-semibold text-fb-text-2 hover:underline md:inline-flex">
+      <Link href={`/out-here?quest=${q.id}`} data-testid="plan-page-back" className="mb-2 inline-flex min-h-10 items-center gap-1 px-4 text-fb-meta font-semibold text-fb-text-2 hover:underline md:min-h-0 md:px-0">
         <ArrowLeft size={14} aria-hidden /> Back to the map
       </Link>
 
