@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
@@ -14,6 +14,7 @@ import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen
 import { StatusDot, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
+import { DraftHangCard } from './DraftHangCard';
 
 export const COMPOSER_PLACEHOLDER = 'Or tell Muse… e.g. with someone who likes comics';
 
@@ -131,6 +132,27 @@ export function ImFreeButton({ className }: { className?: string }) {
   );
 }
 
+/**
+ * "Checked with 6 friends · Maya's likely down". Names only friends who came back likely down;
+ * everyone else stays unnamed, so nobody's no is shown.
+ */
+function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Map<string, PersonCard> }) {
+  const checked = plan.meta?.friendsChecked ?? 0;
+  if (checked === 0) return null;
+  const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
+    .flatMap((id) => { const p = friends.get(id); return p ? [p.name.split(' ')[0]] : []; });
+  // Nothing fit: say who is free (Muse drafts a plan with them below) instead of "no one".
+  const free = plan.suggestions.length === 0 ? (plan.meta?.friendsFree ?? []).map((f) => f.firstName) : [];
+  const who = down.length === 0 && free.length > 0 ? `${free.slice(0, 2).join(' and ')} ${free.length === 1 ? 'is' : 'are'} free too`
+    : down.length === 0 ? 'no one free for this yet'
+    : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
+  return (
+    <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
+      ✨ Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
+    </p>
+  );
+}
+
 function windowLabel(text: string): string {
   const m = text.match(/(\d+)\s*(min|minutes|m)\b/i);
   return m ? `${m[1]} minutes` : 'that time';
@@ -146,6 +168,9 @@ export function PlanSheet({ className }: { className?: string }) {
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [whyOpen, setWhyOpen] = useState(false);
+  /** The Muse draft found nothing (no friend free, or nothing open nearby): show the empty card. */
+  const [draftNone, setDraftNone] = useState(false);
+  const onDraftNone = useCallback(() => setDraftNone(true), []);
   const [duration, setDuration] = useState<DurationId | null>(null);
   const [budget, setBudget] = useState<BudgetId | null>(null);
   /** Muse's top pick leads; the rest wait behind "Other ideas". */
@@ -218,7 +243,7 @@ export function PlanSheet({ className }: { className?: string }) {
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
-      setResult(r); setPlanSuggestions(r.plan.suggestions);
+      setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
       const top = r.plan.suggestions[0];
       setPlanStatus({
@@ -254,6 +279,8 @@ export function PlanSheet({ className }: { className?: string }) {
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
+  // Nothing posted fits but a friend is free: Muse drafts a plan for you two (DraftHangCard).
+  const drafting = !!result && result.plan.suggestions.length === 0 && (result.plan.meta?.friendsFree?.length ?? 0) > 0 && !draftNone;
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
   const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
 
@@ -363,7 +390,10 @@ export function PlanSheet({ className }: { className?: string }) {
                       <p className="line-clamp-2 text-[14px] leading-5 text-fb-text-2">{summary}</p>
                     </div>
                   )}
-                  {picks.length === 0 ? (
+                  {!drafting && <PrecheckLine plan={result.plan} friends={friendMap} />}
+                  {drafting ? (
+                    <DraftHangCard ask={asked} budgetMax={result.plan.intent.budgetMax ?? null} onNone={onDraftNone} />
+                  ) : picks.length === 0 ? (
                     <div data-testid="plan-empty" className="animate-rise rounded-card bg-fb-surface p-4 text-center shadow-card">
                       <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
                       <p className="mt-1 text-[13px] text-fb-text-2">Try a longer time, like 1 hr.</p>
