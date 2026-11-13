@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
+import { stadiumSeats } from './stadiums';
 import type { TreeSpot } from './trees';
 
 export type ActorKind = 'avatar' | 'pet';
@@ -24,8 +25,25 @@ type Actor = {
   label: HTMLElement | null;
   labelLift: number;
 };
-export type BeaconSpec = { id: string; pos: LatLng; color: string; height: number; strong: boolean };
-type Beacon = { spec: BeaconSpec; group: THREE.Group; beam: THREE.Mesh; ring: THREE.Mesh };
+export type BeaconSpec = {
+  id: string; pos: LatLng; color: string; height: number; strong: boolean;
+  /** Stadium seats (#23): one per spot, the taken ones filled. Omitted = beam only. */
+  capacity?: number; taken?: number;
+  /** A Muse pick: the arena gets a gold ring. */
+  pick?: boolean;
+};
+type Beacon = {
+  spec: BeaconSpec; group: THREE.Group; beam: THREE.Mesh; ring: THREE.Mesh;
+  /** The arena: stands, a gold ring for picks, and the seats (rebuilt when the counts change). */
+  arena: THREE.Group; gold: THREE.Mesh; seats: THREE.InstancedMesh | null; seatKey: string;
+};
+
+/** Arena size in meters (real size; it sits on the street, like the HQ buildings). */
+const ARENA_R = 13;
+const TIER_STEP = 4.2;
+const STAND_H = 3.2;
+const SEAT_OPEN = new THREE.Color('#FFFFFF');
+const GOLD = '#F5B800';
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
@@ -45,6 +63,11 @@ export class WorldLayer implements CustomLayerInterface {
   private beacons = new Map<string, Beacon>();
   private beaconGeo = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true);
   private ringGeo = new THREE.RingGeometry(0.75, 1, 32);
+  private standGeo = new THREE.CylinderGeometry(ARENA_R + TIER_STEP * 2, ARENA_R - 0.5, 1, 32, 1, true);
+  private floorGeo = new THREE.CircleGeometry(ARENA_R - 0.5, 32);
+  private seatGeo = new THREE.BoxGeometry(3, 1.8, 2.6);
+  private standMat = new THREE.MeshStandardMaterial({ color: '#E4E6EB', roughness: 0.8, side: THREE.DoubleSide });
+  private seatMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.5, emissive: '#FFFFFF', emissiveIntensity: 0.25 });
   private origin: LatLng;
   private originMerc: MercatorCoordinate;
   private models: ModelSet | null = null;
@@ -182,24 +205,76 @@ export class WorldLayer implements CustomLayerInterface {
         const beam = new THREE.Mesh(this.beaconGeo, beamMat);
         const ring = new THREE.Mesh(this.ringGeo, ringMat);
         ring.rotation.x = -Math.PI / 2;
+        const arena = new THREE.Group();
+        const stands = new THREE.Mesh(this.standGeo, this.standMat);
+        stands.scale.y = STAND_H;
+        stands.position.y = STAND_H / 2;
+        const floor = new THREE.Mesh(this.floorGeo, new THREE.MeshStandardMaterial({ roughness: 0.9 }));
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = 0.15;
+        floor.name = 'floor';
+        const gold = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+        gold.rotation.x = -Math.PI / 2;
+        gold.position.y = 0.4;
+        gold.scale.setScalar(ARENA_R + TIER_STEP * 2 + 2.5);
+        arena.add(stands, floor, gold);
         const group = new THREE.Group();
-        group.add(beam, ring);
+        group.add(beam, ring, arena);
         group.traverse((o) => { o.frustumCulled = false; });
         this.scene.add(group);
-        b = { spec, group, beam, ring };
+        b = { spec, group, beam, ring, arena, gold, seats: null, seatKey: '' };
         this.beacons.set(spec.id, b);
       }
       b.spec = spec;
       (b.beam.material as THREE.MeshBasicMaterial).color.set(spec.color);
       (b.ring.material as THREE.MeshBasicMaterial).color.set(spec.color);
+      ((b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.MeshStandardMaterial).color.set(spec.color);
+      b.arena.visible = spec.capacity != null;
+      b.gold.visible = !!spec.pick;
+      this.setSeats(b);
     }
     for (const [id, b] of this.beacons) {
       if (seen.has(id)) continue;
       this.scene.remove(b.group);
       (b.beam.material as THREE.Material).dispose();
       (b.ring.material as THREE.Material).dispose();
+      (b.gold.material as THREE.Material).dispose();
+      ((b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.Material).dispose();
+      b.seats?.dispose();
       this.beacons.delete(id);
     }
+  }
+
+  /** One seat per spot around the arena: open seats white and lit, taken seats in the plan's color. */
+  private setSeats(b: Beacon) {
+    const { capacity, taken = 0, color } = b.spec;
+    const key = `${capacity ?? ''}:${taken}:${color}`;
+    if (key === b.seatKey) return;
+    b.seatKey = key;
+    if (b.seats) { b.arena.remove(b.seats); b.seats.dispose(); b.seats = null; }
+    const seats = capacity != null ? stadiumSeats(capacity, taken) : [];
+    if (seats.length === 0) return;
+    const mesh = new THREE.InstancedMesh(this.seatGeo, this.seatMat, seats.length);
+    const m = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const takenColor = new THREE.Color(color).multiplyScalar(0.75);
+    seats.forEach((s, i) => {
+      const a = toRad(s.angle);
+      const r = ARENA_R + 0.8 + s.tier * TIER_STEP;
+      // Local frame: x = east, z = south. Seats face the middle of the arena.
+      q.setFromEuler(new THREE.Euler(0, -a, 0));
+      // On the sloped stands: the bowl rises STAND_H from ARENA_R - 0.5 to its outer rim.
+      const y = ((r - (ARENA_R - 0.5)) / (TIER_STEP * 2 + 0.5)) * STAND_H + 0.9;
+      m.compose(new THREE.Vector3(Math.sin(a) * r, y, -Math.cos(a) * r), q, new THREE.Vector3(1, 1, 1));
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, s.taken ? takenColor : SEAT_OPEN);
+    });
+    mesh.frustumCulled = false;
+    mesh.name = `seats:${seats.filter((s) => !s.taken).length}`;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    b.arena.add(mesh);
+    b.seats = mesh;
   }
 
   onAdd(map: MapLibreMap, gl: WebGL2RenderingContext) {
@@ -216,6 +291,7 @@ export class WorldLayer implements CustomLayerInterface {
     this.trunkGeo.dispose(); this.canopyGeo.dispose(); this.trunkMat.dispose(); this.canopyMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
+    this.standGeo.dispose(); this.floorGeo.dispose(); this.seatGeo.dispose(); this.standMat.dispose(); this.seatMat.dispose();
     // The renderer shares MapLibre's context; dispose only three's own resources.
     this.renderer?.dispose();
     this.renderer = null;
@@ -296,6 +372,9 @@ export class WorldLayer implements CustomLayerInterface {
       b.ring.position.y = 0.3;
       (b.beam.material as THREE.MeshBasicMaterial).opacity = b.spec.strong ? 0.3 + pulse * 0.2 : 0.22;
       (b.ring.material as THREE.MeshBasicMaterial).opacity = b.spec.strong ? 0.55 - pulse * 0.3 : 0.35;
+      // Arenas read at street level; from the city view the beams carry it.
+      b.arena.visible = b.spec.capacity != null && zoom >= 15.5;
+      if (b.gold.visible) (b.gold.material as THREE.MeshBasicMaterial).opacity = 0.55 + pulse * 0.4;
     }
 
     renderer.resetState();
