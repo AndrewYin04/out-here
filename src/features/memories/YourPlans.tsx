@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { CalendarDays, Camera, Clock, Footprints, MapPin, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { apiFetch, apiPost, useApi, useViewer } from '@/features/data';
+import { apiFetch, apiPost, currentPersona, useApi, useViewer } from '@/features/data';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
 import { formatDemoTime, type CompleteQuestResponse, type HangoutRating, type YourPlan, type YourPlansResponse } from '@/shared';
 import { MemoryCapture } from './MemoryCapture';
@@ -98,8 +98,8 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
       const result = await apiPost<CompleteQuestResponse>(`/api/quests/${quest.id}/${action}`, {});
       if (action === 'complete') {
         setCompletedCrew(result.crew.id);
-        setCaptureQuest(quest.id);
-        // Right after "We're done": the questionnaire, which includes adding photos.
+        // Right after "We're done": only the questionnaire, which has its own photo step. The
+        // card's own photo form stays closed, so there is one uploader on screen.
         onRate({ questId: quest.id, crewId: result.crew.id });
       }
       await refetch();
@@ -151,6 +151,24 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
           {crewId && <Link href={`/memories#crew-${crewId}`} className="px-2 text-sm font-semibold text-fb-blue hover:underline">Open crew album</Link>}
         </>}
       </div>
+      {finished && rating && (
+        <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="plan-rating">
+          <p className="flex items-center gap-1.5 text-sm text-fb-text">
+            <Star size={15} aria-hidden className="text-[#F7B928]" fill="currentColor" />
+            You rated it <strong className="font-semibold">{rating.score.toFixed(1)}</strong>
+          </p>
+          {rating.photoIds.length > 0 && (
+            <ul className="flex gap-1" aria-label="Photos from your rating">
+              {rating.photoIds.slice(0, 4).map((id) => (
+                <li key={id} className="size-10 overflow-hidden rounded-btn bg-fb-bg">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/api/memories/${id}/photo?as=${encodeURIComponent(currentPersona())}`} alt="Hangout photo" className="h-full w-full object-cover" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {error && <p className="mt-2 text-sm text-fb-red" role="alert">{error}</p>}
       {finished && showCapture && <MemoryCapture questId={quest.id} crewId={crewId} onSaved={setCompletedCrew} />}
     </Card>

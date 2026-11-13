@@ -34,6 +34,8 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
   await card.getByRole('button', { name: 'We’re done' }).click();
   const dialog = page.getByRole('dialog', { name: 'Rate your hangout' });
   await expect(dialog.getByRole('heading', { name: 'How was it?' })).toBeVisible();
+  // One photo uploader on screen: the card's own photo form stays closed behind the dialog.
+  await expect(page.getByRole('button', { name: 'Close photo form' })).toHaveCount(0);
   await shot(page, '1-verdict');
   await dialog.getByRole('button', { name: 'Loved it' }).click();
 
@@ -53,9 +55,10 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
   await dialog.getByRole('button', { name: 'Good food' }).click();
   await dialog.getByRole('button', { name: 'Great conversation' }).click();
   await dialog.getByLabel('Private note (optional)').fill('Try the chili oil next time.');
-  await dialog.getByRole('button', { name: 'Add photos' }).click();
+  // The photo step is a dashed tile over a hidden input: a pick uploads at once, no caption form.
+  await expect(dialog.getByTestId('add-photos-tile')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save to crew album' })).toHaveCount(0);
   await dialog.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');
-  await dialog.getByRole('button', { name: 'Save to crew album' }).click();
   await expect(dialog.getByRole('list', { name: 'Photos you added' }).getByRole('img')).toHaveCount(1);
   const thumb = dialog.getByRole('list', { name: 'Photos you added' }).getByRole('img');
   await expect.poll(() => thumb.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
@@ -73,9 +76,16 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
   expect(alexScore).toBeGreaterThanOrEqual(6.7);
   expect(alexScore).toBeLessThanOrEqual(10);
   await expect(dialog.getByTestId('rating-rank')).toHaveText(/^\d\.\d, your #\d+ hangout/);
+  // The Muse line comes from the answers: the chips picked and the person marked yes.
+  await expect(dialog.getByTestId('rating-takeaway')).toContainText("Next time I'll look for good food and great conversation like this, with Maya.");
   await shot(page, '5-done');
   await dialog.getByRole('button', { name: 'Done' }).click();
   await expect(card.getByRole('button', { name: `Edit rating (${alexScore.toFixed(1)})` })).toBeVisible();
+  // Finished state: the score and the photo from the dialog, no open photo form.
+  await expect(card.getByTestId('plan-rating')).toContainText(`You rated it ${alexScore.toFixed(1)}`);
+  await expect(card.getByRole('list', { name: 'Photos from your rating' }).getByRole('img')).toHaveCount(1);
+  await expect(card.getByRole('button', { name: 'Close photo form' })).toHaveCount(0);
+  await shot(page, '5b-card-after');
 
   // ---- Maya: the "How was it?" notification opens the questionnaire ----
   const mayaContext = await browser.newContext({ viewport });
@@ -103,6 +113,18 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
     await crewCard.getByRole('button', { name: 'Edit rating' }).click();
     await expect(maya.getByRole('dialog', { name: 'Rate your hangout' })).toContainText('You rated this 5.0');
     await shot(maya, '6-edit-from-memories');
+    // Changing to "Not for me" demotes the regroup button on the crew card.
+    const ed = maya.getByRole('dialog', { name: 'Rate your hangout' });
+    await ed.getByRole('button', { name: 'Not for me' }).click();
+    if (await ed.getByRole('heading', { name: 'Which was better?' }).isVisible()) await ed.getByRole('button', { name: 'Skip' }).click();
+    await ed.getByRole('button', { name: 'Next' }).click();
+    await ed.getByRole('button', { name: 'Save rating' }).click();
+    await expect(ed.getByTestId('rating-takeaway')).toContainText('Got it.');
+    await ed.getByRole('button', { name: 'Done' }).click();
+    await expect(crewCard.getByTestId('regroup-demoted')).toBeVisible();
+    await expect(crewCard.getByRole('link', { name: 'Find a different plan' })).toBeVisible();
+    await expect(crewCard.getByRole('button', { name: 'Get this group together again' })).toHaveCount(0);
+    await shot(maya, '7-memories-after-meh');
   } finally {
     await mayaContext.close();
   }
@@ -112,9 +134,14 @@ test('two attendees complete a hangout and rate it', async ({ page, browser, req
   expect(recapRes.ok()).toBeTruthy();
   const recap = await recapRes.json();
   expect(recap.ratedCount).toBe(2);
-  expect(recap.verdicts).toEqual({ loved: 1, fine: 1, meh: 0 });
-  expect(recap.highlights[0]).toEqual({ label: 'good food', count: 2 });
+  // k-anonymity: with fewer than 3 other raters, no verdict counts; only chips everyone picked.
+  expect(recap.countsHidden).toBe(true);
+  expect(recap.verdicts).toBeNull();
+  expect(recap.highlights).toEqual([{ label: 'good food', count: 2 }]);
   expect(recap.photos).toHaveLength(1);
+  const alexRecap = await (await request.get(`/api/quests/${quest.id}/recap`, { headers: as('alex') })).json();
+  expect(alexRecap.verdicts).toBeNull();
+  expect(alexRecap.highlights.map((h: { label: string }) => h.label)).toEqual(['good food']);
   const text = JSON.stringify(recap);
   expect(text).not.toContain('chili oil');
   expect(text).not.toMatch(/subjectId|"again"/);

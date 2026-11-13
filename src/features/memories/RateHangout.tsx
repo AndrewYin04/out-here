@@ -3,14 +3,15 @@
 // The post-hangout questionnaire (docs/HANGOUT_RATINGS.md), modeled on Beli:
 // 1 verdict, 2 "Which was better?" placement, 3 highlights + private note + photos,
 // 4 "Hang out with them again?" per attendee, then a done screen with the score and rank.
-import { Camera, Check, Lock, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, Lock, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { apiFetch, apiPost, currentPersona } from '@/features/data';
 import { Avatar, Button, Chip, Modal, Skeleton, cn } from '@/features/ui';
 import {
   HANGOUT_HIGHLIGHTS, type HangoutRating, type HangoutRatingState, type HangoutVerdict, type ID, type Memory, type Quest,
 } from '@/shared';
-import { MemoryCapture } from './MemoryCapture';
+import { AddPhotoTile } from './MemoryCapture';
+import { museTakeaway } from './takeaway';
 import {
   answerComparison, bucketMidpoint, nextComparison, placementIndex, rankOf, scoreAt, startPlacement, type Placement,
 } from './placement';
@@ -55,11 +56,10 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
   const [highlights, setHighlights] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [photoIds, setPhotoIds] = useState<ID[]>([]);
-  const [showCapture, setShowCapture] = useState(false);
   const [again, setAgain] = useState<Record<ID, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ score: number; rank: number; total: number } | null>(null);
+  const [result, setResult] = useState<{ score: number; rank: number; total: number; takeaway: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -131,7 +131,12 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
         again: Object.entries(again).map(([subjectId, a]) => ({ subjectId, again: a })),
       }, 'PUT');
       const { ratings } = await apiFetch<MyRatings>('/api/me/ratings', FRESH).catch(() => ({ ratings: [rating] as MyRatings['ratings'] }));
-      setResult({ score: rating.score, rank: rankOf(rating.score, ratings.map((r) => r.score)), total: ratings.length });
+      // Built from the answers just saved; names only people marked yes.
+      const yes = attendees.filter((p) => again[p.id] === true).map((p) => p.name.split(' ')[0]);
+      setResult({
+        score: rating.score, rank: rankOf(rating.score, ratings.map((r) => r.score)), total: ratings.length,
+        takeaway: museTakeaway(verdict, highlights, yes),
+      });
       setStep('done');
       onSaved?.(rating);
     } catch (e) {
@@ -142,7 +147,7 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
   }
 
   const header = step !== 'done' && (
-    <div className="mb-4 flex items-center gap-3">
+    <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center gap-3 bg-fb-surface px-4 pb-3 pt-3">
       <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-full bg-fb-blue-tint text-2xl">{quest.emoji}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[17px] font-bold text-fb-text">{quest.title}</p>
@@ -190,10 +195,10 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
               <CompareButton emoji={quest.emoji} title={quest.title} sub="This hangout" onClick={() => answer(true)} />
               <CompareButton emoji={other.emoji} title={other.title} sub={`You gave it ${other.score.toFixed(1)}`} onClick={() => answer(false)} />
             </div>
-            <div className="mt-3 flex flex-wrap justify-between gap-2">
+            <StepFooter>
               <Button variant="ghost" onClick={() => finishPlacement(placement)}>Too close to call</Button>
               <Button variant="ghost" onClick={() => finishPlacement(null)}>Skip</Button>
-            </div>
+            </StepFooter>
           </section>
         );
       })()}
@@ -220,6 +225,7 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
             <span className="flex items-center gap-1 text-[13px] text-fb-text-2"><Lock size={12} aria-hidden />Only you and Muse see this.</span>
           </label>
           <div>
+            <p className="mb-2 text-[15px] font-semibold text-fb-text">Photos</p>
             {photoIds.length > 0 && (
               <ul className="mb-2 flex flex-wrap gap-2" aria-label="Photos you added">
                 {photoIds.map((id) => (
@@ -230,20 +236,14 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
                 ))}
               </ul>
             )}
-            <Button variant="secondary" icon={<Camera size={16} />} aria-expanded={showCapture} onClick={() => setShowCapture((s) => !s)}>
-              {showCapture ? 'Close photos' : 'Add photos'}
-            </Button>
-            {showCapture && (
-              <MemoryCapture questId={questId} crewId={crewId} onSaved={() => undefined}
-                onMemory={(m: Memory) => setPhotoIds((cur) => [...cur, m.id])} />
-            )}
+            <AddPhotoTile questId={questId} crewId={crewId} onMemory={(m: Memory) => setPhotoIds((cur) => [...cur, m.id])} />
           </div>
-          <div className="flex justify-end gap-2">
+          <StepFooter error={attendees.length === 0 ? saveError : null}>
+            <Button variant="ghost" onClick={() => setStep('verdict')}>Back</Button>
             {attendees.length > 0
               ? <Button onClick={() => setStep('again')}>Next</Button>
               : <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save rating'}</Button>}
-          </div>
-          {saveError && attendees.length === 0 && <p role="alert" className="text-[13px] text-fb-red">{saveError}</p>}
+          </StepFooter>
         </section>
       )}
 
@@ -282,11 +282,10 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
               );
             })}
           </ul>
-          <div className="mt-4 flex justify-between gap-2">
+          <StepFooter error={saveError}>
             <Button variant="ghost" onClick={() => setStep('details')}>Back</Button>
             <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save rating'}</Button>
-          </div>
-          {saveError && <p role="alert" className="mt-2 text-[13px] text-fb-red">{saveError}</p>}
+          </StepFooter>
         </section>
       )}
 
@@ -299,9 +298,23 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
             {result.score.toFixed(1)}, your #{result.rank} hangout{result.total > 1 ? ` of ${result.total}` : ''}
           </p>
           <p className="mt-1 text-[13px] text-fb-text-2">{quest.emoji} {quest.title}</p>
+          <div className="mt-4 w-full rounded-card bg-fb-bg p-3 text-left" data-testid="rating-takeaway">
+            <p className="text-[12px] font-semibold text-fb-blue">✨ Muse</p>
+            <p className="mt-1 text-[15px] text-fb-text">{result.takeaway}</p>
+          </div>
           <Button className="mt-4" onClick={onClose}>Done</Button>
         </section>
       )}
+    </div>
+  );
+}
+
+/** Step actions pinned to the bottom of the dialog, as in Facebook dialogs, so they stay on screen at 390 px. */
+function StepFooter({ children, error }: { children: ReactNode; error?: string | null }) {
+  return (
+    <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-4 border-t border-fb-divider bg-fb-surface px-4 py-3">
+      {error && <p role="alert" className="mb-2 text-[13px] text-fb-red">{error}</p>}
+      <div className="flex items-center justify-between gap-2">{children}</div>
     </div>
   );
 }

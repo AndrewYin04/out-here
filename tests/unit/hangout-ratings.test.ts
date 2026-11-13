@@ -140,7 +140,8 @@ describe('ratings store: server rules', () => {
   it('the recap has counts and chips only: no hang-again data and no other rater\'s note', async () => {
     const recap = await store.hangoutRecap(maya, pastDumplings);
     expect(recap.ratedCount).toBeGreaterThanOrEqual(2);
-    expect(recap.verdicts.loved).toBe(recap.ratedCount);
+    if (recap.countsHidden) expect(recap.verdicts).toBeNull();
+    else expect(recap.verdicts!.loved).toBe(recap.ratedCount);
     expect(recap.highlights[0]).toEqual({ label: 'good food', count: recap.ratedCount });
     expect(recap.photos.every((p) => p.questId === pastDumplings)).toBe(true);
     expect(recap.myRating?.raterId).toBe(maya);
@@ -150,6 +151,32 @@ describe('ratings store: server rules', () => {
     const v = await store.view();
     const outsider = v.db.profiles.find((p) => !v.questMemberIds(pastSunset).includes(p.id))!;
     await expect(store.hangoutRecap(outsider.id, pastSunset)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('the recap hides verdict and complaint counts until 3 other members have rated (k-anonymity)', async () => {
+    const v = await store.view();
+    const q = v.db.quests.find((x) => v.questMemberIds(x.id).length >= 4 && new Date(x.startsAt) < NOW)!;
+    const members = v.questMemberIds(q.id);
+    const t = NOW.toISOString();
+    const row = (raterId: string, verdict: 'loved' | 'meh', highlights: string[]) => ({
+      id: crypto.randomUUID(), questId: q.id, raterId, verdict, score: verdict === 'loved' ? 9 : 1, highlights,
+      note: '', photoIds: [], createdAt: t, updatedAt: t,
+    });
+    await store.backend.remove('hangoutRatings', { questId: q.id });
+    // Two raters: the viewer knows their own answer, so counts would reveal the other one's.
+    await store.backend.upsert('hangoutRatings', [
+      row(members[0], 'loved', ['good food', 'too loud']), row(members[1], 'meh', ['good food', 'too loud']),
+    ]);
+    const small = await store.hangoutRecap(members[0], q.id);
+    expect(small.countsHidden).toBe(true);
+    expect(small.verdicts).toBeNull();
+    expect(small.highlights).toEqual([{ label: 'good food', count: 2 }]);   // unanimous and positive only
+    // Four raters: every viewer sees at least 3 others, so the counts appear.
+    await store.backend.upsert('hangoutRatings', [row(members[2], 'loved', []), row(members[3], 'loved', [])]);
+    const big = await store.hangoutRecap(members[0], q.id);
+    expect(big.countsHidden).toBe(false);
+    expect(big.verdicts).toEqual({ loved: 3, fine: 0, meh: 1 });
+    expect(big.highlights).toContainEqual({ label: 'too loud', count: 2 });
   });
 
   it('own history is sorted by score with the quest attached', async () => {

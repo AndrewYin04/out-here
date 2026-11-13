@@ -2,15 +2,19 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Images, Sparkles, Star } from 'lucide-react';
+import { Images, Search, Sparkles, Star } from 'lucide-react';
 import type { Crew, HangoutRating, Memory, PersonCard, Quest } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
-import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
+import { AvatarStack, Button, Card, EmptyState, LinkButton, Skeleton } from '@/features/ui';
 import { RateHangoutDialog } from './RateHangout';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
-type CrewMeta = { crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null };
+type CrewMeta = {
+  crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null;
+  /** Crew members the viewer said no to. The viewer's own answers; never sent an invite. */
+  notAgainIds?: string[];
+};
 type CrewRow = Crew & { meta: CrewMeta | null; memories: Memory[]; viewerId: string };
 
 const dateFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric' });
@@ -130,6 +134,11 @@ function CrewCard({ crew, handle, rating, onRate }: {
   const [result, setResult] = useState<(RegroupResult & { mock: boolean }) | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [send, setSend] = useState<SendState>({ kind: 'idle' });
+  const notAgain = useMemo(() => new Set(crew.meta?.notAgainIds ?? []), [crew.meta]);
+  const others = members.filter((m) => m.id !== crew.viewerId);
+  // After "Not for me", or a no to everyone else, the card offers a different plan instead of a regroup.
+  const regroupDemoted = rating?.verdict === 'meh' || (others.length > 0 && others.every((m) => notAgain.has(m.id)));
+  const [showRegroup, setShowRegroup] = useState(false);
 
   const regroup = useCallback(async () => {
     setBusy(true);
@@ -150,12 +159,13 @@ function CrewCard({ crew, handle, rating, onRate }: {
     if (!result) return;
     setSend({ kind: 'sending' });
     try {
-      if (crew.meta?.threadId) {
+      // The crew chat would reach someone the viewer said no to, so then invites go one by one.
+      if (crew.meta?.threadId && notAgain.size === 0) {
         await apiPost(`/api/threads/${crew.meta.threadId}/messages`, { text: result.message });
         setSend({ kind: 'sent', text: 'Sent to the crew chat.', href: `/messages/${crew.meta.threadId}` });
         return;
       }
-      const targets = members.filter((m) => m.id !== crew.viewerId);
+      const targets = members.filter((m) => m.id !== crew.viewerId && !notAgain.has(m.id));
       const friends = targets.filter((m) => m.isFriend);
       const sent: string[] = [];
       for (const m of friends) {
@@ -179,7 +189,7 @@ function CrewCard({ crew, handle, rating, onRate }: {
     } catch {
       setSend({ kind: 'error', text: 'Could not send. Try again.' });
     }
-  }, [crew.meta?.threadId, crew.viewerId, members, result]);
+  }, [crew.meta?.threadId, crew.viewerId, members, notAgain, result]);
 
   return (
     <Card as="section" id={`crew-${crew.id}`} className="scroll-mt-16 overflow-hidden" aria-label={crew.name} data-testid="crew-card">
@@ -222,9 +232,18 @@ function CrewCard({ crew, handle, rating, onRate }: {
       </div>
 
       <div className="p-4">
-        <Button variant="tint" block onClick={regroup} disabled={busy} icon={<Sparkles size={16} />}>
-          {busy ? 'Muse is checking who’s free…' : result || failed ? 'Ask Muse again' : 'Get this group together again'}
-        </Button>
+        {regroupDemoted && !showRegroup && !result ? (
+          <div className="flex flex-wrap items-center gap-2" data-testid="regroup-demoted">
+            <LinkButton href="/out-here" variant="tint" icon={<Search size={16} />} className="flex-1">Find a different plan</LinkButton>
+            {others.some((m) => !notAgain.has(m.id)) && (
+              <Button variant="ghost" size="sm" onClick={() => setShowRegroup(true)}>Regroup anyway</Button>
+            )}
+          </div>
+        ) : (
+          <Button variant="tint" block onClick={regroup} disabled={busy} icon={<Sparkles size={16} />}>
+            {busy ? 'Muse is checking who’s free…' : result || failed ? 'Ask Muse again' : 'Get this group together again'}
+          </Button>
+        )}
 
         {failed && <p className="mt-3 text-[15px] text-fb-text-2" role="status">{failed}</p>}
 

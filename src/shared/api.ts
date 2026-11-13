@@ -218,7 +218,12 @@ export type HangoutRatingState = {
 };
 export type HangoutRecap = {
   quest: Quest; members: PersonCard[]; photos: Memory[];
-  ratedCount: number; verdicts: Record<HangoutVerdict, number>;
+  ratedCount: number;
+  // k-anonymity: until RECAP_MIN_OTHER_RATERS members other than the viewer have rated,
+  // countsHidden is true, verdicts is null, and highlights holds only positive chips every rater
+  // picked (count = ratedCount). Never a "Not for me" or negative-chip count below that.
+  countsHidden: boolean;
+  verdicts: Record<HangoutVerdict, number> | null;
   highlights: { label: string; count: number }[];   // counted across raters, most first
   myRating: HangoutRating | null;
 };

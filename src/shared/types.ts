@@ -267,5 +267,9 @@ export const HANGOUT_HIGHLIGHTS = [
   'great conversation', 'good food', 'easy to find', 'met someone new', 'good vibe',
   'want to go back', 'too loud', 'too crowded', 'ran late', 'too pricey',
 ] as const;
+/** The complaint chips. The recap never counts these below RECAP_MIN_OTHER_RATERS. */
+export const NEGATIVE_HIGHLIGHTS: ReadonlySet<string> = new Set(['too loud', 'too crowded', 'ran late', 'too pricey']);
+/** The recap shows verdict and chip counts only once this many members besides the viewer rated. */
+export const RECAP_MIN_OTHER_RATERS = 3;
 /** One rater's private answer about one other attendee of one hangout. */
 export type HangAgain = { questId: ID; raterId: ID; subjectId: ID; again: boolean; createdAt: string };

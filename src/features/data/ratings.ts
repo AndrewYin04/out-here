@@ -9,7 +9,7 @@
 //   has counts and chips only. hangAgainSignals / hangAgainAbout / mutualHangAgain /
 //   hangoutRatings are for route handlers and Muse server code, never for a client.
 import {
-  HANGOUT_HIGHLIGHTS, now, seedId, VERDICT_RANGES,
+  HANGOUT_HIGHLIGHTS, NEGATIVE_HIGHLIGHTS, now, RECAP_MIN_OTHER_RATERS, seedId, VERDICT_RANGES,
   type HangAgain, type HangoutRating, type HangoutVerdict, type ID, type Quest,
 } from '@/shared';
 import type { HangoutRatingState, HangoutRecap, RateHangoutBody } from '@/shared/api';
@@ -157,14 +157,27 @@ export async function hangoutRecap(store: CoreStore, viewerId: ID, questId: ID):
     for (const h of r.highlights) chips.set(h, (chips.get(h) ?? 0) + 1);
   }
   const mine = ratings.find((r) => r.raterId === viewerId);
-  return {
+  const base = {
     quest: v.questFor(viewerId, q),
     members: v.people(viewerId, memberIds),
     photos: v.db.memories.filter((m) => m.questId === questId).sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     ratedCount: ratings.length,
+    myRating: mine ? { ...mine } : null,
+  };
+  // k-anonymity: the viewer knows their own answer, so on a small hangout the counts would reveal
+  // what the others said. Below RECAP_MIN_OTHER_RATERS other raters, no verdict counts, and only
+  // positive chips every rater picked ("Everyone who rated it said good food").
+  if (ratings.filter((r) => r.raterId !== viewerId).length < RECAP_MIN_OTHER_RATERS) {
+    const unanimous = ratings.length >= 2
+      ? [...chips].filter(([label, n]) => n === ratings.length && !NEGATIVE_HIGHLIGHTS.has(label)).map(([label]) => label).sort()
+      : [];
+    return { ...base, countsHidden: true, verdicts: null, highlights: unanimous.map((label) => ({ label, count: ratings.length })) };
+  }
+  return {
+    ...base,
+    countsHidden: false,
     verdicts,
     highlights: [...chips].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([label, count]) => ({ label, count })),
-    myRating: mine ? { ...mine } : null,
   };
 }
 

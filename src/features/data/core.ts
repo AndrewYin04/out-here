@@ -704,7 +704,12 @@ export class CoreStore {
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
     for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
     // "How was <venue>?" for every member, once per member (stable ids, so a second complete is a no-op).
-    await promptRatings(this, after, after.questById.get(questId)!, memberIds);
+    // The quest is already done here, so a failed prompt (for example a database without
+    // 0004_hangout_ratings.sql, whose notifications check rejects 'hangout_rate') must not turn
+    // "We're done" into a 500. promptEndedHangouts retries it on the next notifications read.
+    await promptRatings(this, after, after.questById.get(questId)!, memberIds).catch((err: unknown) => {
+      console.warn('[ratings] rating prompt failed:', String((err as Error)?.message ?? err).slice(0, 200));
+    });
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(crew) };
   }
 

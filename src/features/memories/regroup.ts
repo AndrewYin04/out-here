@@ -38,6 +38,8 @@ export type RegroupContext = {
   sharedInterests: string[];
   members: RegroupMember[];
   candidates: RegroupCandidate[];
+  /** Positive chips from hangouts the viewer rated "Loved it", most picked first. */
+  likedBefore?: string[];
 };
 
 export type RegroupSuggestion = { questId: string | null; title: string; whenText: string; reason: string };
@@ -108,11 +110,13 @@ export function regroupMessages(ctx: RegroupContext): { role: 'system' | 'user';
     '- reason: 1-2 sentences that cite concrete shared facts from the data: a shared pref or interest, and someone\'s free window or status bubble when present. Use first names only.',
     '- whenText: short, like "today 5:30 PM" or "this weekend", taken from the candidate whenText or a member\'s free window.',
     '- message: a casual 1-2 sentence text from the viewer to the crew, inviting them. No hashtags.',
+    '- likedBefore lists what the viewer enjoyed at past hangouts they loved. Prefer a candidate that fits it, and you may say so ("you liked the food last time").',
   ].join('\n');
   return [
     { role: 'system', content: system },
     { role: 'user', content: JSON.stringify({
       viewer: ctx.viewerFirstName,
+      likedBefore: ctx.likedBefore ?? [],
       crew: { name: ctx.crewName, lastHangout: ctx.originTitle, lastHangoutWhen: ctx.lastHangoutText, sharedPrefs: ctx.sharedPrefs, sharedInterests: ctx.sharedInterests },
       members: ctx.members.map((m) => ({ firstName: m.firstName, interests: m.interests.slice(0, 6), free: m.free?.text ?? null, bubble: m.bubble })),
       candidates: ctx.candidates.map((c) => ({
