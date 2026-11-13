@@ -1,10 +1,11 @@
 // Barrel for the memories area: the Memories page (client) and the pure regroup logic the
 // /api/muse/regroup route uses (no node-only imports, safe on both sides).
+export { ArrivalSelfie } from './ArrivalSelfie';
+export { MEMORY_SAVED, OPEN_SELFIE, RATE_HANGOUT, requestSelfie, type MemorySavedDetail, type RateHangoutDetail } from './arrival';
 export { MemoriesPage } from './MemoriesPage';
 export { YourPlans } from './YourPlans';
-export {ArrivalSelfie} from './ArrivalSelfie';
-export {MemoryCapture} from './MemoryCapture';
-export {SavedPhotoReview} from './SavedPhotoReview';
+export { MemoryCapture } from './MemoryCapture';
+export { SavedPhotoReview } from './SavedPhotoReview';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';

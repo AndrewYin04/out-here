@@ -172,7 +172,7 @@ function whenText(from: string, until: string): string {
 }
 
 /**
- * Who's free when you are. Collapsed: the suggested group ("You, Maya and Liam are all free till
+ * Who's free when you are. The card shows the suggested group ("You, Maya and Liam are all free till
  * 2:31") with Make a plan. "See all" opens the ranked list to pick anyone. The server ranks and
  * picks the group (shared interests, knowing each other, private hang-again signals); nothing
  * private is shown here, only shared interests, who knows whom, and each friend's own note.
@@ -195,6 +195,13 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
+  const dismissalKey = `outhere:free-nudge-hidden:${viewer.id}`;
+  const [sessionDismissed, setSessionDismissed] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setSessionDismissed(window.sessionStorage.getItem(dismissalKey) ? dismissalKey : null);
+    } catch { /* Dismissal still works for the mounted card. */ }
+  }, [dismissalKey]);
   // A new suggestion from the server resets the selection to it.
   useEffect(() => { setPicked(new Set(groupKey ? groupKey.split(',') : [])); }, [groupKey]);
 
@@ -217,13 +224,14 @@ export function BothFreeNudge({ className }: { className?: string }) {
     }
   };
 
-  if (planOpen || togetherOpenId) return null;
   const live = shared.data?.plans ?? [];
   const pending = live.find((p) => p.status === 'proposing');
   const done = live.find((p) => p.status === 'confirmed');
+
+  if (planOpen || togetherOpenId) return null;
   if (pending) return <SharedBanner key={`${pending.id}:${(pending.votes[viewer.id] ?? []).length > 0}`} plan={pending} viewerId={viewer.id} className={className} />;
   if (done && hidden !== done.id) return <SharedBanner key={`${done.id}:confirmed`} plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
-  if (items.length === 0 || hidden === groupKey) return null;
+  if (items.length === 0 || sessionDismissed === dismissalKey) return null;
   const byId = new Map(items.map((i) => [i.friend.id, i]));
   const group = (api.data?.group ?? []).flatMap((id) => byId.get(id) ?? []);
   const lead = group.length > 0 ? group : [items[0]];
@@ -240,9 +248,16 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const chosen = items.filter((i) => picked.has(i.friend.id));
   const plan = (people: typeof items) => { if (!starting) void start(people.map((p) => p.friend.id)); };
   const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const dismiss = () => {
+    setSessionDismissed(dismissalKey);
+    try {
+      window.sessionStorage.setItem(dismissalKey, '1');
+    } catch { /* The card still hides when browser storage is unavailable. */ }
+  };
 
   return (
-    <div role="region" aria-label="Friends free when you are" data-testid="both-free" className={cn('animate-drop-in rounded-card bg-fb-surface shadow-popover', className)}>
+    <div role="region" aria-label="Friends free when you are" data-testid="both-free"
+      className={cn('rounded-card bg-fb-surface shadow-popover motion-safe:animate-drop-in', className)}>
       <div className="flex items-center gap-3 p-2.5 pr-2">
         <span className="flex shrink-0 -space-x-3">
           {lead.slice(0, 3).map((g) => (
@@ -258,10 +273,10 @@ export function BothFreeNudge({ className }: { className?: string }) {
         {!expanded && (
           <button type="button" onClick={() => plan(lead)} disabled={starting} data-testid="free-see-plans"
             className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
-            {starting ? '✨ Asking…' : 'See plans'}
+            {starting ? 'Asking…' : 'See plans'}
           </button>
         )}
-        <button type="button" aria-label="Hide" onClick={() => setHidden(groupKey)}
+        <button type="button" aria-label="Hide" onClick={dismiss}
           className="flex size-8 shrink-0 items-center justify-center rounded-full text-fb-text-2 hover:bg-fb-hover">
           <X size={18} aria-hidden />
         </button>
@@ -308,7 +323,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
           <div className="border-t border-fb-divider-soft p-2.5">
             <button type="button" disabled={chosen.length === 0 || starting} onClick={() => plan(chosen)} data-testid="free-make-plan"
               className="h-10 w-full rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-50">
-              {starting ? '✨ Muse is asking everyone…' : chosen.length === 0 ? 'Pick who to plan with' : `See plans with ${names(chosen.map((c) => first(c.friend.name)))}`}
+              {starting ? 'Muse is asking everyone…' : chosen.length === 0 ? 'Pick who to plan with' : `See plans with ${names(chosen.map((c) => first(c.friend.name)))}`}
             </button>
           </div>
         </div>
@@ -329,13 +344,13 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
   const starter = plan.members.find((m) => m.id === plan.startedBy);
   const confirmed = plan.status === 'confirmed' ? plan.options.find((o) => o.questId === plan.confirmedQuestId) : null;
   const title = confirmed
-    ? `It’s a plan: ${confirmed.emoji} ${confirmed.title}`
+    ? `It’s a plan: ${confirmed.title}`
     : plan.startedBy !== viewerId && !iVoted && starter
       ? `${first(starter.name)} started a plan for you ${others.length === 1 ? 'two' : 'all'}`
       : iVoted ? `Waiting on ${who}…` : `Your plan with ${who}`;
   const sub = confirmed
     ? `With ${who} · ${confirmed.venueName} · ${formatDemoTime(confirmed.startsAt)}`
-    : `✨ Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
+    : `Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
   return (
     <div role="region" aria-label="Your shared plan" data-testid="shared-banner"
       className={cn('flex animate-drop-in items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>

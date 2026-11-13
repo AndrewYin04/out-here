@@ -1,22 +1,23 @@
 'use client';
 
-import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
+import { Check, CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Sparkles, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
+import { Avatar, Button, CategoryIcon, categoryOf, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
+import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 
 export function MuseLabel({ className }: { className?: string }) {
   return (
     <span data-testid="muse-label" className={cn('inline-flex items-center gap-1 rounded-full bg-fb-blue-tint px-2 py-0.5 text-[12px] font-semibold text-fb-blue', className)}>
-      ✨ Muse
+      <Sparkles size={12} aria-hidden />Muse
     </span>
   );
 }
 
-/** Shown in place of the ✨ Muse label when the text came from the offline heuristic (MUSE_MOCK). */
+/** Shown in place of the Muse label when the text came from the offline heuristic (MUSE_MOCK). */
 export function OfflineLabel({ className }: { className?: string }) {
   return (
     <span data-testid="offline-label" className={cn('inline-flex items-center rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[12px] font-semibold text-fb-text-2', className)}>
@@ -64,6 +65,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
   const price = quest.data?.quest.priceMax;
   const isMember = quest.data?.viewerIsMember ?? false;
+  const letsGo = useLetsGo();
+  const go = (id: string) => { setPlanOpen(false); letsGo(id); };
   const people = s.friendIds.map((id) => friends.get(id)).filter((p): p is PersonCard => !!p);
 
   const { viewer } = useViewer();
@@ -80,9 +83,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
   const inFlight = useRef(false);
   /** The button the viewer last tapped in this card: joins fly from it to the pin. */
   const tapped = useRef<HTMLElement | null>(null);
+  // Joining flies your avatar to the pin. An invite needs no confetti: the card says it was sent.
   const celebrate = (joined: boolean) => {
-    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl, s.emoji);
-    else burst(tapped.current, ['💌', '✨'], 6);
+    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl);
   };
 
   const openInvite = (p: PersonCard) => {
@@ -186,7 +189,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
     <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"
       onClickCapture={(e) => { tapped.current = (e.target as HTMLElement).closest('button'); }}>
       <div className="flex items-start gap-3">
-        <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px]">{s.emoji}</span>
+        <CategoryIcon category={categoryOf(s.questId, s.emoji)} size={40} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-[15px] font-semibold leading-5 text-fb-text">{s.title}</h3>
@@ -211,7 +214,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
             data-testid="suggestion-why"
             className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
           >
-            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
+            {showMuse ? 'Why Muse picked this' : 'Why this plan'}
             {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
           </button>
           {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}
@@ -227,7 +230,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
               <li key={c.friendId} title={c.because.join(' · ')}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F3E8] py-0.5 pl-0.5 pr-2.5 text-[13px] font-semibold text-fb-green">
                 <Avatar src={p.avatarUrl} name={p.name} size={24} decorative />
-                ✓ {p.name.split(' ')[0]}&apos;s likely down
+                <Check size={14} aria-hidden />{p.name.split(' ')[0]}&apos;s likely down
               </li>
             )];
           })}
@@ -275,9 +278,10 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
               <span>{outcomeText(p.name.split(' ')[0] ?? p.name, o, venue, s)}</span>
             </p>
           ))}
-          {answered.some(({ o }) => o.together) && (
+          {answered.some(({ o }) => o.together) && s.questId && (
             <div className="mt-2 flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
+              <Button block icon={<Footprints size={18} />} data-testid="suggestion-lets-go" onClick={() => go(s.questId!)}>Let&rsquo;s go</Button>
+              <Button variant="secondary" onClick={() => setPlanOpen(false)}>Show on map</Button>
             </div>
           )}
         </div>
@@ -308,11 +312,19 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
             )}
           </div>
         );
+        // Already going: the outcome above carries Let's go when a friend said yes; otherwise it's here.
+        if (s.questId && isMember && answered.some(({ o }) => o.together)) return null;
         return s.questId ? (
           <div className="mt-3">
-            <Button block disabled={isMember || seats === 0 || busy === 'join'} onClick={() => void join()}>
-              {isMember || busy === 'join' ? "You're going" : seats === 0 ? 'Full' : 'Join'}
-            </Button>
+            {isMember ? (
+              <Button block icon={<Footprints size={18} />} data-testid="suggestion-lets-go" onClick={() => go(s.questId!)}>
+                Let&rsquo;s go &middot; you&rsquo;re in
+              </Button>
+            ) : (
+              <Button block disabled={seats === 0 || busy === 'join'} onClick={() => void join()}>
+                {busy === 'join' ? 'Joining…' : seats === 0 ? 'Full' : 'Join'}
+              </Button>
+            )}
           </div>
         ) : null;
       })()}

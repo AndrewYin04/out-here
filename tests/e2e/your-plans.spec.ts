@@ -16,8 +16,9 @@ test('two attendees can find a joined hangout and share one crew album', async (
   expect(created.ok()).toBeTruthy();
   const { quest } = await created.json();
 
-  await page.goto('/out-here?as=alex');
-  await page.getByRole('link', { name: 'Your plans' }).click();
+  await page.goto('/out-here?as=alex&mode=explore');
+  // Your plans is the Plans tab of the Out Here dashboard.
+  await page.getByTestId('dock-tab-plans').click();
   const alexPlan = page.getByRole('article', { name: title });
   await expect(alexPlan).toBeVisible();
   await expect(alexPlan.getByRole('link', { name: 'Walk there' })).toHaveAttribute('href', /travelmode=walking/);

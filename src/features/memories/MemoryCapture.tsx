@@ -1,7 +1,7 @@
 'use client';
 
-import { Camera } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { Camera, Image as ImageIcon, Lock } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { apiFetch, currentPersona, PERSONA_EVENT } from '@/features/data';
 import { Button, flash } from '@/features/ui';
 import type { CompleteQuestResponse,Memory } from '@/shared';
@@ -34,7 +34,7 @@ export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
   const inputId=useId();
   const [photo,setPhoto]=useState<File|null>(null),[preview,setPreview]=useState<string|null>(null);
   const [caption,setCaption]=useState(''),[pending,setPending]=useState(false),[error,setError]=useState<string|null>(null);
-  const [saved,setSaved]=useState<Memory|null>(null);
+  const [saved,setSaved]=useState<Memory|null>(null),[inputKey,setInputKey]=useState(0);
   const upload=useRef<AbortController|null>(null);
   useEffect(()=>{const clear=()=>{upload.current?.abort();upload.current=null;setPhoto(null);setSaved(null);setCaption('');setPending(false);};window.addEventListener(PERSONA_EVENT,clear);return()=>{upload.current?.abort();upload.current=null;window.removeEventListener(PERSONA_EVENT,clear);};},[]);
   useEffect(()=>{if(!photo){setPreview(null);return;}const url=URL.createObjectURL(photo);setPreview(url);return()=>URL.revokeObjectURL(url);},[photo]);
@@ -55,16 +55,37 @@ export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
     }catch(e){if(valid())setError(e instanceof Error?e.message:'Couldn’t save your photo.');}finally{if(valid()){upload.current=null;setPending(false);}}
   }
   if(saved)return <SavedPhotoReview memory={saved} onChange={setSaved}/>;
-  return <form className="mt-4 space-y-3" onSubmit={save}>
-    <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden/>Take a photo together</label>
-    <input id={inputId} type="file" accept="image/*" capture="environment" disabled={pending} className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-secondary-btn file:px-3 file:py-2" onChange={e=>{setPhoto(e.currentTarget.files?.[0]??null);setError(null);flash();}}/>
-    {preview&&
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={preview} alt="Photo preview" width={800} height={600} className="max-h-48 w-full object-contain"/>
-    }
-    <p className="text-sm text-fb-text-2">Only the people from this hangout can see it.</p>
-    <label className="block text-sm font-semibold">Caption (optional)<input value={caption} maxLength={500} onChange={e=>setCaption(e.target.value)} className="mt-1 w-full rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 font-normal"/></label>
+  // One step at a time: take or choose a photo; then the preview, an optional caption, who can see
+  // it, and Save. After saving, Muse can look at the photo and suggest a caption (SavedPhotoReview).
+  const pick=(e:ChangeEvent<HTMLInputElement>)=>{const f=e.currentTarget.files?.[0]??null;if(f)flash();setPhoto(f);setError(null);};
+  const picker='oh-press inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-btn px-4 text-[15px] font-semibold peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-fb-blue';
+  return <form className="mt-3 space-y-3" onSubmit={save}>
+    {!photo?(
+      <div className="flex flex-wrap gap-2">
+        <span className="relative">
+          <input key={`c${inputKey}`} id={inputId} type="file" accept="image/*" capture="user" disabled={pending} onChange={pick} className="peer sr-only"/>
+          <label htmlFor={inputId} className={`${picker} bg-fb-blue text-white hover:bg-fb-blue-hover`}><Camera size={18} aria-hidden/>Take a photo together</label>
+        </span>
+        <span className="relative">
+          <input key={`l${inputKey}`} id={`${inputId}-lib`} type="file" accept="image/*" disabled={pending} onChange={pick} className="peer sr-only"/>
+          <label htmlFor={`${inputId}-lib`} className={`${picker} bg-fb-secondary-btn text-fb-text hover:brightness-95`}><ImageIcon size={18} aria-hidden/>Choose a photo</label>
+        </span>
+      </div>
+    ):(
+      <>
+        {preview&&(
+          <div className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={preview} alt="Photo preview" width={800} height={600} className="max-h-56 w-full animate-polaroid rounded-btn bg-fb-bg object-contain p-1.5 shadow-card"/>
+            <button type="button" disabled={pending} onClick={()=>{setPhoto(null);setInputKey(k=>k+1);}}
+              className="absolute right-2 top-2 rounded-pill bg-[#1C1E21]/70 px-3 py-1 text-[13px] font-semibold text-white hover:bg-[#1C1E21]/85">Retake</button>
+          </div>
+        )}
+        <label className="block text-sm font-semibold">Caption (optional)<input value={caption} maxLength={500} disabled={pending} onChange={e=>setCaption(e.target.value)} className="mt-1 w-full rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 font-normal"/></label>
+        <p className="flex items-center gap-1.5 text-[13px] text-fb-text-2"><Lock size={13} aria-hidden/>Only the people from this hangout can see it.</p>
+        <Button type="submit" className="w-full" disabled={pending}>{pending?'Saving…':'Save to crew album'}</Button>
+      </>
+    )}
     {error&&<p role="alert" className="text-sm text-fb-red">{error}</p>}
-    <Button type="submit" disabled={!photo||pending}>{pending?'Saving…':'Save to crew album'}</Button>
   </form>;
 }
