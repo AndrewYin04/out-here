@@ -17,7 +17,7 @@ import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea} from './muse-layout';
 import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
-import { CategoryIcon, categoryOf, cn, footstep, sfx, useDemoTools } from '@/features/ui';
+import { CategoryIcon, categoryOf, cn, sfx, useDemoTools } from '@/features/ui';
 import { Footprints, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
 
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
@@ -589,8 +589,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let lastNear = 0;
     let lastCheck = 0;
     let lastMin: number | null = null;
-    // Soft footsteps while you walk: one every ~0.45 s of movement, never per frame.
-    let stepClock = 0;
     let lastMe = '';
     let lastPet = '';
     const walkerState = new Map<string, string>();
@@ -679,7 +677,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           }
         }
       }
-      if (moving) { stepClock += dt; if (stepClock >= 0.45) { stepClock = 0; footstep(); } } else stepClock = 0.3;
       const meState = moving ? 'walk' : 'idle';
       if (meState !== lastMe) { layer.setState('me', meState); lastMe = meState; }
       layer.setPose('me', pos.current, heading.current, 0);
@@ -813,7 +810,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const w = walkRef.current;
         setRoute(map, w ? pos.current : null, w ? w.to : null);
         const m = w ? minutesLeft(pos.current, w.to) : null;
-        if (m !== lastMin) { if (m != null && lastMin != null && m < lastMin) sfx('progress_tick'); lastMin = m; setWalkMin(m); }
+        if (m !== lastMin) { lastMin = m; setWalkMin(m); }
       }
       if (now - lastSecond > 1000) { lastSecond = now; setSecond((n) => n + 1); }
 
