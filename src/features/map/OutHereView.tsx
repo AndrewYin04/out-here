@@ -260,7 +260,7 @@ export function OutHereView() {
   const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
   const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
   // A want find ("track jacket under $25") first, then a pick from what the viewer watches.
-  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings);
+  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings, listingsApi.refetch);
   const allFinds = useMemo(() => [...(findsApi.data?.finds ?? []), ...watchFinds], [findsApi.data, watchFinds]);
   const find = allFinds.find((f) => !dismissedFinds.has(f.listingId)) ?? null;
   const watchFor = useCallback((listing: string | null) => {

@@ -44,6 +44,29 @@ test('beat 3: pop-up goes live, Alex reserves the jacket, Leo accepts, Maya gets
   const alexPhone = await open(browser, 'alex', 390, '&mode=explore');
   const maya = await open(browser, 'maya', 390, '&mode=explore');
   const mayaDesk = await open(browser, 'maya', 1440, '&mode=explore');
+  // Maya's phone as in the demo: the Friends map (the default mode). This tab's map misses the
+  // pop-up: every /api/listings/map read sent before Muse's pick for the bag reaches it answers
+  // with the pre-pop-up listings, as when a listings:new frame is dropped. The pick is held 2 s,
+  // so the reads the listings:new burst starts all get the stale answer. The find must still
+  // appear without a reload, because a pick that isn't on the map makes the map refetch.
+  const mayaFriends = await open(browser, 'maya', 390, '');
+  await expect(mayaFriends.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+  let stale: string | null = null;
+  let pickSeen = false;
+  await mayaFriends.route('**/api/muse/marketplace-picks**', async (route) => {
+    const res = await route.fetch();
+    const body = await res.text();
+    if (!pickSeen && /Y2K denim shoulder bag/.test(body)) {
+      await new Promise((r) => setTimeout(r, 2000));
+      pickSeen = true;
+    }
+    return route.fulfill({ response: res, body });
+  });
+  await mayaFriends.route('**/api/listings/map', async (route) => {
+    if (pickSeen || stale === null) return route.continue();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: stale });
+  });
+  stale = await (await mayaFriends.request.get('/api/listings/map', { headers: { 'x-persona': 'maya' } })).text();
 
   // 1. The seller's tab opens on the pop-up, items filled in.
   const sheet = leo.getByTestId('popup-sheet');
@@ -151,4 +174,10 @@ test('beat 3: pop-up goes live, Alex reserves the jacket, Leo accepts, Maya gets
     await expect(p.getByTestId('muse-find-line')).toContainText(/Reel|watched/i);
     await shot(p, `maya-denim-find-${w}`);
   }
+  // Maya's Friends-map phone missed the listings:new refetch; the pick brings the bag in anyway.
+  expect(pickSeen).toBe(true);
+  const ff = mayaFriends.getByTestId('muse-find');
+  await expect(ff).toBeVisible({ timeout: 20_000 });
+  await expect(ff).toContainText('Y2K denim shoulder bag');
+  await shot(mayaFriends, 'maya-denim-find-friends-390');
 });

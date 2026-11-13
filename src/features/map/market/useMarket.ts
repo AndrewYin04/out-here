@@ -82,9 +82,23 @@ const WATCH_FIND_MAX_AGE_MIN = 60;
  * as map finds when a matching listing has just gone up nearby. Same card as a want find; the
  * line is Muse's reason ("like the denim Reel you saved"). Refetches when a listing goes up.
  */
-export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | undefined): MuseFind[] {
+export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | undefined, refetchListings?: () => unknown): MuseFind[] {
   const path = origin ? `/api/muse/marketplace-picks?lat=${origin.lat.toFixed(5)}&lng=${origin.lng.toFixed(5)}` : null;
   const api = useApi<MarketplacePicksResponse>(path, ['listings:new']);
+  // A pick for a listing the map doesn't have yet means the map missed its listings:new message
+  // (a dropped realtime frame, or a listing posted while this tab was still subscribing). Refetch
+  // the map once per set of missing ids, so the find shows instead of being dropped below.
+  const missing = useMemo(() => {
+    if (!listings) return '';
+    const onMap = new Set(listings.map((l) => l.listing.id));
+    return [...new Set((api.data?.picks ?? []).map((p) => p.listing.id).filter((id) => !onMap.has(id)))].sort().join(',');
+  }, [api.data, listings]);
+  const tried = useRef('');
+  useEffect(() => {
+    if (!missing || !refetchListings || tried.current === missing) return;
+    tried.current = missing;
+    void refetchListings();
+  }, [missing, refetchListings]);
   return useMemo(() => {
     const onMap = new Map((listings ?? []).map((l) => [l.listing.id, l]));
     const t = Date.now();
