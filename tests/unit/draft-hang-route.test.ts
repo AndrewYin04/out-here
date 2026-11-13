@@ -50,6 +50,19 @@ describe('POST /api/muse/draft-hang', () => {
     expect(Date.parse(d.endsAt)).toBeLessThanOrEqual(Date.parse(until));
     // the friend's location never leaves the server, only their walking minutes
     expect(body.friend).not.toHaveProperty('location');
+    // Muse's work: real counts and distances, never a location
+    const w = body.work;
+    expect(w.checked).toBe(db.places.filter((p) => p.location).length);
+    expect(w.checked).toBeGreaterThanOrEqual(w.walkable);
+    expect(w.walkable).toBeGreaterThanOrEqual(w.inBudget);
+    expect(w.inBudget).toBeGreaterThanOrEqual(w.timeFits);
+    expect(w.timeFits).toBeGreaterThanOrEqual(w.open);
+    expect(w.open).toBeGreaterThan(0);
+    expect(w.togetherMin).toBeGreaterThanOrEqual(30);
+    expect(w.until).toBe(until);
+    expect(w.apartM).toBe(0); // both at DEMO_CENTER in this test
+    expect(w.myM).toBeGreaterThan(0);
+    expect(JSON.stringify(w)).not.toMatch(/"lat"|"lng"|location/);
     expect(Object.keys(d).sort()).toEqual(['category', 'description', 'emoji', 'endsAt', 'friendId', 'invite', 'location', 'myWalk',
       'pitch', 'placeId', 'priceMax', 'startsAt', 'theirWalk', 'title', 'venueName']);
 

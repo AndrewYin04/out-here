@@ -7,13 +7,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiPost, useQuest } from '@/features/data';
 import { Avatar, burst, cn } from '@/features/ui';
 import { formatDemoTime, type PersonCard, type Quest } from '@/shared';
-import type { HangDraft } from '@/features/muse';
+import type { HangDraft, HangWork } from '@/features/muse';
 import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel } from './SuggestionCard';
 
-type DraftResponse = { draft: HangDraft | null; friend: PersonCard | null; others?: PersonCard[]; reason?: string; mode?: 'live' | 'mock' | 'fallback' };
+type DraftResponse = { draft: HangDraft | null; work?: HangWork | null; friend: PersonCard | null; others?: PersonCard[]; reason?: string; mode?: 'live' | 'mock' | 'fallback' };
 type State =
   | { kind: 'loading' }
   | { kind: 'draft'; draft: HangDraft; friend: PersonCard; live: boolean; others: PersonCard[] }
@@ -38,6 +38,7 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetMax: number | null; onNone: () => void }) {
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [busy, setBusy] = useState(false);
+  const [work, setWork] = useState<HangWork | null>(null);
   const [error, setError] = useState<string | null>(null);
   const tried = useRef<string[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -59,6 +60,7 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
       const live = res.mode === 'live';
       if (res.draft && res.friend) {
         tried.current = [...tried.current, res.draft.placeId];
+        setWork(res.work ?? null);
         setState({ kind: 'draft', draft: res.draft, friend: res.friend, live, others: res.others ?? [] });
       } else if (another) {
         setError('That was the only spot that fits right now.');
@@ -142,6 +144,8 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
 
       {d.pitch && <p data-testid="draft-hang-why" className="mx-3 mt-3 text-[14px] leading-5 text-fb-text">{d.pitch}</p>}
 
+      {work && !made && <HangWorkList work={work} draft={d} fname={fname} />}
+
       {d.invite && !made && (
         <div className="mx-3 mt-2 rounded-[12px] bg-fb-bg px-3 py-2">
           <p className="text-[12px] font-semibold text-fb-text-2">{fname} gets</p>
@@ -199,5 +203,37 @@ function MadeStatus({ questId, friendId, fname }: { questId: string; friendId: s
       className="flex flex-1 items-center gap-1.5 text-[14px] font-semibold text-[#31A24C]">
       <Check size={18} aria-hidden />{joined ? `${fname}’s in · it’s a plan` : `You’re in · waiting on ${fname}`}
     </p>
+  );
+}
+
+const meters = (m: number) => (m < 1000 ? `${Math.max(10, m)} m` : `${(m / 1000).toFixed(1).replace(/\.0$/, '')} km`);
+
+/** "How Muse drafted this": the real checks and distances behind the pick (numbers from code). */
+function HangWorkList({ work: w, draft: d, fname }: { work: HangWork; draft: HangDraft; fname: string }) {
+  const stages: string[] = [`${w.checked} places near you two`];
+  if (w.walkable !== w.checked) stages.push(`${w.walkable} a short walk for both`);
+  if (w.inBudget !== w.walkable) stages.push(`${w.inBudget} in budget`);
+  if (w.timeFits !== w.inBudget) stages.push(`${w.timeFits} leave time together`);
+  if (w.open !== w.timeFits) stages.push(`${w.open} open then`);
+  return (
+    <div data-testid="draft-hang-work" className="mx-3 mt-2 rounded-[12px] border border-fb-divider px-3 py-2">
+      <p className="flex items-center gap-1.5 text-[12px] font-semibold text-fb-text-2">
+        <Sparkles size={13} className="text-fb-blue" aria-hidden /> How Muse drafted this
+      </p>
+      <ul className="mt-1 space-y-1 text-[13px] leading-[18px] text-fb-text">
+        <li data-testid="draft-hang-funnel">Checked {stages.join(' → ')}</li>
+        <li data-testid="draft-hang-distance">
+          You and {fname} are {meters(w.apartM)} apart. {d.venueName} is {meters(w.myM)} from you ({d.myWalk} min) and {meters(w.theirM)} from {fname} ({d.theirWalk} min).
+        </li>
+        <li data-testid="draft-hang-time">
+          {w.togetherMin} min together before {fname}’s free time ends at {formatDemoTime(w.until)}.
+        </li>
+        {w.alsoClose.length > 0 && (
+          <li className="text-fb-text-2">
+            Also fit: {w.alsoClose.map((p) => `${p.name} (${p.myWalk} · ${p.theirWalk} min)`).join(', ')}
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }
