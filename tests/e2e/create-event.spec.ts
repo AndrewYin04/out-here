@@ -13,24 +13,25 @@ async function openMap(page: Page, persona: string) {
 }
 
 test.describe("Post a plan", () => {
-  test("＋ opens the sheet with a draft pin, and Muse drafts from one line", async ({ page }) => {
+  test("＋ opens the host sheet with a draft pin, and Muse fills it in from the title", async ({ page }) => {
     await openMap(page, "jordan");
     await page.getByTestId("create-plan-btn").click();
     const sheet = page.getByTestId("create-plan-sheet");
     await expect(sheet).toBeVisible();
     await expect(page.getByTestId("draft-pin")).toBeVisible();
-    await expect(page.getByTestId("create-post")).toHaveText("Add a title");
-
-    await page.getByTestId("create-muse-input").fill("boba after class at 4");
+    // Step 1: What · When · Where. The title is the one line Muse fills the rest in from.
+    await expect(page.getByTestId("create-next")).toHaveText(/Add a title/);
+    await page.getByTestId("create-title").fill("boba after class at 4");
     await page.getByTestId("create-muse-btn").click();
     await expect(page.getByTestId("create-muse-pitch")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("create-title")).not.toHaveValue("");
     await expect(page.getByTestId("draft-pin")).toHaveText("🧋");
-    await expect(page.getByTestId("create-post")).toHaveText("Post");
+    await expect(page.getByTestId("create-next")).toHaveText(/Who.s coming\?/);
 
-    // Friends (invite only) needs at least one friend picked before Post.
+    // Step 2: Friends (invite only) needs at least one friend picked before going on.
+    await page.getByTestId("create-next").click();
     await page.getByTestId("visibility-friends").click();
-    await expect(page.getByTestId("create-post")).toHaveText("Pick at least one friend");
+    await expect(page.getByTestId("create-next")).toHaveText(/Pick at least one friend/);
 
     await page.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toHaveCount(0);
@@ -49,20 +50,26 @@ test.describe("Post a plan", () => {
       await Promise.all([openMap(sam, "sam"), openMap(nina, "nina"), openMap(maya, "maya")]);
       const title = `Game night ${Date.now() % 100000}`;
 
-      // Right-click drops the pin (long-press on touch).
+      // Right-click (long-press on touch) fans out the host picker; 🎮 starts a game night.
       const canvas = sam.getByTestId("map-canvas");
       const box = (await canvas.boundingBox())!;
       await canvas.click({ button: "right", position: { x: box.width * 0.6, y: box.height * 0.5 } });
+      await expect(sam.getByTestId("host-picker")).toBeVisible();
+      await sam.getByTestId("host-pick-games").click();
       await expect(sam.getByTestId("create-plan-sheet")).toBeVisible();
+      await expect(sam.getByTestId("create-title")).toHaveValue("Game night");
       await expect(sam.getByTestId("draft-pin")).toBeVisible();
 
       await sam.getByTestId("create-title").fill(title);
+      await sam.getByTestId("create-venue-chip").click();
       await sam.getByTestId("create-venue").fill("Ravenswood Board Game Cafe");
       await sam.getByTestId("create-when-0").click();
-      await sam.getByTestId("visibility-group").click();
-      const group = sam.getByTestId("create-group-select");
-      await expect(group).toBeVisible();
-      await group.selectOption({ label: "Peninsula Board Game Night" });
+      await sam.getByTestId("create-next").click();
+      // Step 2: one of Sam's Groups
+      await sam.getByTestId("create-group-peninsula-board-game-night").click();
+      await sam.getByTestId("create-next").click();
+      // Step 3: cover and the bubble on the map
+      await sam.getByRole("button", { name: "Bubble" }).click();
       await sam.getByTestId("create-bubble").fill("Bringing Wingspan 🐦");
       await sam.getByTestId("create-post").click();
 

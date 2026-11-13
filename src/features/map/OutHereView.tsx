@@ -10,11 +10,12 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Plus } from 'lucide-react';
-import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
+import { Button, burst, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
-import { CreatePlanSheet } from './create/CreatePlanSheet';
+import { CreatePlanSheet, type HostPreset } from './create/CreatePlanSheet';
+import { HostPicker } from './create/HostPicker';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 import { initialView, shouldEnter3d, type MapView } from './view3d';
@@ -72,7 +73,9 @@ export function OutHereView() {
     saveView(v);
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
-  const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
+  const [creating, setCreating] = useState<{ at: LatLng; emoji: string; preset: HostPreset | null } | null>(null);
+  // Long-press: the host picker fans out where you pressed, before the sheet opens.
+  const [hostAt, setHostAt] = useState<LatLng | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -208,21 +211,30 @@ export function OutHereView() {
   }, [select]);
 
   // Long-press / right-click on the map, or the ＋ button (map centre): start a new plan there.
-  const startCreate = useCallback((at?: LatLng) => {
+  const startCreate = useCallback((at?: LatLng, preset?: HostPreset | null) => {
     const c = map?.getCenter();
     const spot = at ?? (c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
     setPlanOpen(false);
     select(null);
-    setCreating((cur) => ({ at: spot, emoji: cur?.emoji ?? '📍' }));
+    setHostAt(null);
+    setCreating((cur) => ({ at: spot, emoji: preset?.emoji ?? cur?.emoji ?? '📍', preset: preset ?? null }));
   }, [map, select]);
+  const openHostPicker = useCallback((at: LatLng) => {
+    setPlanOpen(false);
+    select(null);
+    setHostAt(at);
+  }, [select]);
   const moveDraft = useCallback((at: LatLng) => setCreating((cur) => (cur ? { ...cur, at } : cur)), []);
   const draftEmoji = useCallback((emoji: string) => setCreating((cur) => (cur && cur.emoji !== emoji ? { ...cur, emoji } : cur)), []);
-  const onPosted = useCallback((q: Quest) => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const onPosted = useCallback((q: Quest, invited: number) => {
     setCreating(null);
     setMode('explore');
     void questsApi.refetch();
-    select(q.id);
-    toast.show('Your plan is live on the map.');
+    // The moment it's real: confetti over the map, then the plan card opens on "You're hosting".
+    burst(rootRef.current, [q.emoji, '🎉', '✨', q.emoji, '🎊'], 28);
+    toast.show(invited > 0 ? `${q.emoji} Posted · ${invited} invited` : `${q.emoji} Posted · it's on the map`);
+    window.setTimeout(() => select(q.id), 650);
   }, [questsApi, select, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
@@ -316,7 +328,7 @@ export function OutHereView() {
   }, [finishWalk]);
 
   return (
-    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkQuest?.id ?? undefined} data-arrived={arrivedId ?? undefined}>
+    <div ref={rootRef} className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkQuest?.id ?? undefined} data-arrived={arrivedId ?? undefined}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
         <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
@@ -335,7 +347,7 @@ export function OutHereView() {
           onSelect={creating ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
-          onPickLocation={startCreate}
+          onPickLocation={openHostPicker}
           draft={creating}
           onDraftMove={moveDraft}
         />
@@ -589,8 +601,13 @@ export function OutHereView() {
       )}
       <PlanSheet />
       <TogetherSheet />
+      {hostAt && map && !creating && (
+        <HostPicker map={map} at={hostAt} onPick={(p) => startCreate(hostAt, p)} onCancel={() => setHostAt(null)} />
+      )}
       {creating && (
         <CreatePlanSheet
+          key={`${creating.preset?.key ?? 'blank'}`}
+          preset={creating.preset}
           at={creating.at}
           friends={ctx?.friends ?? []}
           onMove={moveDraft}
