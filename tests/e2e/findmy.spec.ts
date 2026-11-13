@@ -184,10 +184,11 @@ for (const width of [390, 1440]) {
 
     test('the toggle and the open card live in the URL, so Back from Messenger returns to the card', async ({ page }) => {
       await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
-      await page.goto('/out-here?as=alex');
+      // Out Here opens on Friends; start from Explore so the toggle writes ?mode=friends
+      await page.goto('/out-here?as=alex&mode=explore');
       await page.getByTestId('map-mode-friends').click();
       await expect(page).toHaveURL(/[?&]mode=friends/);
-      await page.getByRole('button', { name: /^People/ }).click();
+      await openPeople(page);
       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
       const card = page.getByTestId('friend-card');
       await expect(card).toBeVisible();
@@ -198,11 +199,11 @@ for (const width of [390, 1440]) {
       await page.goBack();
       await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
       await expect(page.getByTestId('friend-card')).toContainText('craving dumplings', { timeout: 15_000 });
-      // closing the card drops ?friend=; Explore drops ?mode=
+      // closing the card drops ?friend=; Explore sets ?mode=explore
       await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
       await expect(page).not.toHaveURL(/friend=/);
       await page.getByTestId('map-mode-explore').click();
-      await expect(page).not.toHaveURL(/mode=friends/);
+      await expect(page).toHaveURL(/[?&]mode=explore/);
     });
 
     test('sharing settings open from the map', async ({ page }) => {
@@ -221,7 +222,7 @@ for (const width of [390, 1440]) {
 
     test('a friend in another city gets Message, not Want to hang?, and no walk time', async ({ page }) => {
       await openMap(page, 'alex', width);
-      await page.getByRole('button', { name: /^People/ }).click();
+      await openPeople(page);
       await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
       const card = page.getByTestId('friend-card');
       await expect(card.getByTestId('friend-far-note')).toContainText('Ben is in New York, NY');
