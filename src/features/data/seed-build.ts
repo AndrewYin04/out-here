@@ -128,12 +128,16 @@ const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
   currentCity: 'public', job: 'public', pronouns: 'public',
 };
 
-/** Seeded listings open for pickup on the Out Here map (ids from seed-content.json). */
-const PICKUP_LISTINGS = [
-  { id: 'l04', meters: 2600, bearing: 200, openMin: 150, listedMinAgo: 70, label: 'Downtown Menlo Park', spot: 'Bench outside the library, Alma St' },
-  { id: 'l10', meters: 1700, bearing: 95, openMin: 210, listedMinAgo: 35, label: 'East Palo Alto', spot: 'Front porch, white house on Bay Rd' },
-  { id: 'l05', meters: 1200, bearing: 300, openMin: 90, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
-  { id: 'l26', meters: 3400, bearing: 160, openMin: 240, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
+/**
+ * Seeded listings open for pickup on the Out Here map (ids from seed-content.json).
+ * openMin counts from the seed time and is at least 6.5 hours, so `npm run seed:demo` at about
+ * 6 AM PT keeps every window open through a 10:30-11:30 AM demo. It stays under MAX_PICKUP_HOURS.
+ */
+export const PICKUP_LISTINGS = [
+  { id: 'l04', meters: 2600, bearing: 200, openMin: 420, listedMinAgo: 70, label: 'Downtown Menlo Park', spot: 'Bench outside the library, Alma St' },
+  { id: 'l10', meters: 1700, bearing: 95, openMin: 480, listedMinAgo: 35, label: 'East Palo Alto', spot: 'Front porch, white house on Bay Rd' },
+  { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
+  { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
 ] as const;
 /** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
 export const ALEX_WANT = {

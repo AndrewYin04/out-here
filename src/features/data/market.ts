@@ -60,19 +60,33 @@ export function onMap(l: Listing, at: Date): boolean {
   return l.status !== 'sold' && !!l.location && !!l.pickupUntil && new Date(l.pickupUntil) > at;
 }
 
-/** A listing as `viewerId` may see it: no exact place or spot unless they are entitled to it. */
-export function mapListingFor(v: View, viewerId: ID, l: Listing, at: Date): MapListing {
-  const hold = activeHold(v, l.id, at);
-  const isSeller = l.sellerId === viewerId;
-  const exact = isSeller || (hold?.buyerId === viewerId && l.status !== 'sold');
-  const mine = holdsOf(v, l.id).find((h) => h.buyerId === viewerId) ?? null;
-  const listing: Listing = {
-    ...l,
-    pickupUntil: l.pickupUntil ?? null,
-    pickupLabel: l.pickupLabel ?? null,
+/** True for the seller, and for a buyer whose accepted hold has not expired on an unsold listing. */
+export function seesExactPickup(v: View, viewerId: ID, l: Listing, at: Date): boolean {
+  if (l.sellerId === viewerId) return true;
+  return l.status !== 'sold' && activeHold(v, l.id, at)?.buyerId === viewerId;
+}
+
+/**
+ * The listing row as `viewerId` may see it. Everyone else gets the same ~200 m fuzz the map pin
+ * uses (fuzzLocation seeded by the listing id, so a pin never jumps between views) and no spot.
+ * Every route that returns a listing goes through this.
+ */
+export function listingFor(v: View, viewerId: ID, l: Listing, at: Date): Listing {
+  const exact = seesExactPickup(v, viewerId, l, at);
+  return {
+    ...withPickup(l),
     pickupSpot: exact ? (l.pickupSpot ?? null) : null,
     location: l.location && !exact ? fuzzLocation(l.location, l.id) : l.location,
   };
+}
+
+/** A listing as `viewerId` may see it on the map: no exact place or spot unless they are entitled to it. */
+export function mapListingFor(v: View, viewerId: ID, l: Listing, at: Date): MapListing {
+  const hold = activeHold(v, l.id, at);
+  const isSeller = l.sellerId === viewerId;
+  const exact = seesExactPickup(v, viewerId, l, at);
+  const mine = holdsOf(v, l.id).find((h) => h.buyerId === viewerId) ?? null;
+  const listing = listingFor(v, viewerId, l, at);
   const requests = isSeller
     ? holdsOf(v, l.id)
       .filter((h) => h.status === 'requested' || h.id === hold?.id)
@@ -93,11 +107,6 @@ export function mapListingFor(v: View, viewerId: ID, l: Listing, at: Date): MapL
 /** The pickup fields read as null when migration 0007 has not added the columns yet. */
 function withPickup(l: Listing): Listing {
   return { ...l, pickupUntil: l.pickupUntil ?? null, pickupLabel: l.pickupLabel ?? null, pickupSpot: l.pickupSpot ?? null };
-}
-
-/** The listing without the exact spot, for the plain Marketplace routes. */
-export function publicListing(l: Listing): Listing {
-  return { ...withPickup(l), pickupSpot: null };
 }
 
 function findListing(v: View, id: ID): Listing {
