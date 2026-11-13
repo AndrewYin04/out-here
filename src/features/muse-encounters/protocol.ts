@@ -31,6 +31,9 @@ export type EncounterResult = {
 export const EventZ = z.object({
   id: z.string().max(100), type: z.enum(['accepted', 'sent', 'received']), recipientId: z.uuid(),
   mode: z.enum(['live', 'mock']),
+  /** One line, written by code from the validated structured message (never model prose): what the
+   * envelope says, for the speech bubbles. The initiator sees the same facts in the final answer. */
+  note: z.string().max(240).optional(),
 }).strict();
 export type EncounterEvent = z.infer<typeof EventZ>;
 export type EncounterSession = {

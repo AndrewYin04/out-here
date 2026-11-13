@@ -232,7 +232,8 @@ export function sendAgentMessage(raw: string, recipient: AgentRecipient, transpo
       if (!store.encounter || store.encounter.id !== id) return;
       store = { ...store, encounter: { ...store.encounter,
         sent: store.encounter.sent + (event.type === 'sent' ? 1 : 0),
-        received: store.encounter.received + (event.type === 'received' ? 1 : 0), messages: [...store.encounter.messages, event.type] } };
+        received: store.encounter.received + (event.type === 'received' ? 1 : 0), messages: [...store.encounter.messages, event.type],
+        notes: event.note ? [...(store.encounter.notes ?? []), { dir: event.type as 'sent' | 'received', text: event.note }] : store.encounter.notes } };
     }
     seen.add(event.id); emit();
   };
