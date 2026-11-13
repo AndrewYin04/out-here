@@ -17,7 +17,32 @@ export type FriendListRow = Omit<FriendList, 'memberIds'>;
 export type FriendListMemberRow = { listId: ID; userId: ID; addedAt: string };
 export type ThreadRow = Omit<Thread, 'memberIds'>;
 export type ThreadMemberRow = { threadId: ID; userId: ID; lastReadAt: string | null };
-export type DailyEntryRow = DailyEntry & { createdAt: string };
+/** A daily_entries row. The Side Quest fields are optional so rows from before they existed still read. */
+export type DailyEntryRow = DailyEntry & {
+  createdAt: string;
+  challengeId?: string | null;
+  audience?: 'only_me' | 'community';
+  caption?: string;
+  onTime?: boolean;
+  /** Private storage key of the photo (crew-photos bucket). */
+  photoKey?: string | null;
+  /** Board post when shared with the community. */
+  postId?: string | null;
+  crewMemoryId?: string | null;
+  submittedAt?: string | null;
+};
+/** One person's persisted Side Quest drop for a date: picked once, never rerolled. */
+export type SideQuestDropRow = {
+  date: string; userId: ID; challengeId: string;
+  dropAt: string; deadlineAt: string; durationMinutes: number;
+  windowStartMin: number; windowEndMin: number; tz: string;
+  /** Set by the demo controls (a triggered drop), so a reset can tell it from a real one. */
+  demo: boolean;
+  createdAt: string;
+};
+/** A person's active window (quiet hours are everything outside it). */
+export type SideQuestPrefsRow = { userId: ID; windowStartMin: number; windowEndMin: number; tz: string; updatedAt: string };
+export type DailyReportRow = { date: string; userId: ID; reporterId: ID; createdAt: string };
 export type InviteRow = Invite & { respondedAt: string | null };
 export type PlaceRow = Place & { description: string };
 
@@ -38,6 +63,9 @@ export type Db = {
   memories: Memory[];
   dailyQuests: DailyQuest[];
   dailyEntries: DailyEntryRow[];
+  sideQuestDrops: SideQuestDropRow[];
+  sideQuestPrefs: SideQuestPrefsRow[];
+  dailyReports: DailyReportRow[];
   events: EventRow[];
   eventRsvps: EventRsvp[];
   posts: Post[];
@@ -61,7 +89,8 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   friendListMembers: 'friend_list_members', groups: 'groups', groupMembers: 'group_members',
   places: 'places', availability: 'availability', quests: 'quests', questMembers: 'quest_members',
   invites: 'invites', crews: 'crews', crewMembers: 'crew_members', memories: 'memories',
-  dailyQuests: 'daily_quests', dailyEntries: 'daily_entries', events: 'events', eventRsvps: 'event_rsvps',
+  dailyQuests: 'daily_quests', dailyEntries: 'daily_entries', sideQuestDrops: 'side_quest_drops',
+  sideQuestPrefs: 'side_quest_prefs', dailyReports: 'daily_reports', events: 'events', eventRsvps: 'event_rsvps',
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares',
@@ -74,6 +103,7 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   groups: ['id'], groupMembers: ['groupId', 'userId'], places: ['id'], availability: ['id'], quests: ['id'],
   questMembers: ['questId', 'userId'], invites: ['id'], crews: ['id'], crewMembers: ['crewId', 'userId'],
   memories: ['id'], dailyQuests: ['date'], dailyEntries: ['date', 'userId'], events: ['id'],
+  sideQuestDrops: ['date', 'userId'], sideQuestPrefs: ['userId'], dailyReports: ['date', 'userId', 'reporterId'],
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
   notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'],

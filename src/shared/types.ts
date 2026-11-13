@@ -174,11 +174,12 @@ export type Event = {
 export type RsvpStatus = 'going' | 'interested' | 'invited';
 export type EventRsvp = { eventId: ID; userId: ID; status: RsvpStatus; createdAt: string };
 
-export type PostTargetType = 'profile' | 'group' | 'event';
+// sidequest: the Daily Side Quest community board (targetId = sideQuestBoardId(date), a uuid derived from the date).
+export type PostTargetType = 'profile' | 'group' | 'event' | 'sidequest';
 export type Post = {
   id: ID; authorId: ID;
   targetType: PostTargetType;
-  targetId: ID;              // profile id (the author's own for a timeline post), group id, or event id
+  targetId: ID;              // profile id (the author's own for a timeline post), group id, event id, or the side-quest board id
   audience: Audience;
   text: string; media: string[];
   sharedPostId: ID | null;

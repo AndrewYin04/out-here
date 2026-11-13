@@ -83,6 +83,17 @@ export interface DataStore {
   daily: CoreStore['daily'];
   dailyEntry: CoreStore['dailyEntry'];
   streak: CoreStore['streak'];
+  // Daily Side Quests
+  sideQuestState: CoreStore['sideQuestState'];
+  sideQuestSubmit: CoreStore['sideQuestSubmit'];
+  sideQuestBoard: CoreStore['sideQuestBoard'];
+  sideQuestUnshare: CoreStore['sideQuestUnshare'];
+  sideQuestReport: CoreStore['sideQuestReport'];
+  sideQuestHistory: CoreStore['sideQuestHistory'];
+  sideQuestPhoto: CoreStore['sideQuestPhoto'];
+  sideQuestPrefs: CoreStore['sideQuestPrefs'];
+  setSideQuestPrefs: CoreStore['setSideQuestPrefs'];
+  sideQuestDemo: CoreStore['sideQuestDemo'];
   // marketplace, reels, uploads
   listings: CoreStore['listings'];
   listing: CoreStore['listing'];

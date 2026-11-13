@@ -117,7 +117,7 @@ export type SeedTables = Record<(typeof TABLE_ORDER)[number], Row[]>;
 export const TABLE_ORDER = [
   'profiles', 'places', 'groups', 'group_members', 'friendships', 'friend_lists', 'friend_list_members',
   'quests', 'quest_members', 'availability', 'invites', 'crews', 'crew_members', 'memories',
-  'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
+  'daily_quests', 'daily_entries', 'side_quest_drops', 'side_quest_prefs', 'daily_reports', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
 ] as const;
 

@@ -7,3 +7,4 @@ export * from './visibility';
 export * from './seed/ids';
 export * from './seed/graph';
 export * from './seed/story';
+export * from './sidequest';

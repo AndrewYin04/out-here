@@ -75,6 +75,7 @@
 // GET  /api/listings  /  GET /api/listings/:id                          -> { listings: Listing[] } / { listing: Listing, seller: PersonCard }
 // GET  /api/reels                                                       -> { reels: Reel[] }
 
+import type { SideQuestAudience, SideQuestChallenge, SideQuestPhase } from './sidequest';
 import type {
   Audience, Availability, Comment, Crew, DailyEntry, DailyQuest, Event, EventRsvp, FriendList,
   Friendship, Group, GroupRole, ID, Invite, LatLng, Listing, Memory, Message, MusePlan,
@@ -200,3 +201,89 @@ export type ListingResponse = { listing: Listing; seller: PersonCard };
 export type ReelsResponse = { reels: Reel[] };
 export type MessagesResponse = { messages: Message[] };
 export type ThreadsResponse = { threads: ThreadView[] };
+
+// ---- Daily Side Quests (spec: docs/DAILY_SIDE_QUESTS.md) ----
+// GET    /api/daily/side-quest                  -> SideQuestState   (creates today's persisted drop on first read)
+// POST   /api/daily/side-quest/submit           multipart: photo, audience, caption?, crewId? -> SideQuestSubmitResponse
+// GET    /api/daily/side-quest/board?date       -> SideQuestBoardResponse
+// DELETE /api/daily/side-quest/entry?date       -> SideQuestState   (unshare: removes the board post, keeps the private memory)
+// POST   /api/daily/side-quest/report           body: { date, userId }
+// GET    /api/daily/side-quest/history          -> SideQuestHistoryResponse
+// GET|PUT /api/daily/side-quest/prefs           -> SideQuestPrefs   (active window / quiet hours)
+// GET    /api/daily/photo?date&userId           -> image bytes (owner, or anyone when shared with the community)
+// POST   /api/daily/side-quest/demo             body: SideQuestDemoBody (403 unless demo controls are enabled)
+export type SideQuestPrefs = { startMin: number; endMin: number; tz: string };
+
+/** A person's own entry for a date (private unless shared). */
+export type SideQuestEntry = {
+  date: string; challengeId: string; photoUrl: string; caption: string; audience: SideQuestAudience;
+  /** Submitted before the deadline. Always true for entries made through the quest. */
+  onTime: boolean; submittedAt: string;
+  /** The board post when shared with the community. */
+  postId: string | null;
+  /** Also added to this crew's album, when the person chose to. */
+  crewMemoryId: string | null;
+};
+
+export type SideQuestState = {
+  date: string;
+  challenge: SideQuestChallenge;
+  phase: SideQuestPhase;
+  /** Server clock, so the countdown stays right when the device clock is wrong. */
+  serverNow: string;
+  dropAt: string;
+  deadlineAt: string;
+  durationMinutes: number;
+  prefs: SideQuestPrefs;
+  entry: SideQuestEntry | null;
+  /** People who shared today's entry with the community. */
+  boardCount: number;
+  /** Crews the viewer can add the photo to. */
+  crews: { id: string; name: string }[];
+  /** The viewer's weekly in-person streak (existing meaning, unchanged). */
+  weeklyStreak: { weeks: number; thisWeekDone: boolean };
+  /** Demo controls are enabled on this server. */
+  demo: boolean;
+};
+
+export type SideQuestBoardEntry = {
+  date: string; userId: ID;
+  /** First name only for anyone who is not a friend. */
+  author: { name: string; avatarUrl: string; isFriend: boolean };
+  photoUrl: string; caption: string; onTime: boolean; submittedAt: string;
+  postId: string;
+  reactionCounts: ReactionCounts; viewerReaction: ReactionType | null;
+  mine: boolean;
+};
+
+export type SideQuestBoardResponse = {
+  date: string;
+  challenge: SideQuestChallenge;
+  /** Entries shared with the community for this date. */
+  count: number;
+  /** Entries are shown after you have entered or the quest ended; before that only the count. */
+  entriesVisible: boolean;
+  entries: SideQuestBoardEntry[];
+};
+
+export type SideQuestSubmitResponse = { entry: SideQuestEntry; state: SideQuestState };
+
+export type SideQuestHistoryItem = {
+  date: string; challengeId: string; title: string; emoji: string;
+  /** What happened that day: done, ended without a photo, today, or nothing to show. */
+  status: 'completed' | 'missed' | 'today' | 'none';
+  entry: SideQuestEntry | null;
+};
+export type SideQuestHistoryResponse = {
+  /** The last 7 days, oldest first. */
+  week: SideQuestHistoryItem[];
+  completedCount: number;
+  /** Completed entries, newest first (the personal Side Quest memories). */
+  memories: (SideQuestEntry & { title: string; emoji: string })[];
+};
+
+export type SideQuestDemoBody =
+  | { action: 'trigger'; deadlineSeconds?: number }
+  | { action: 'deadline'; deadlineSeconds: number }
+  | { action: 'reset' }
+  | { action: 'seed' };

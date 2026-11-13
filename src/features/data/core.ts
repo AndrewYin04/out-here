@@ -19,6 +19,11 @@ import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
+import {
+  setSideQuestPrefs, sideQuestBoard, sideQuestDemo, sideQuestHistory, sideQuestPhoto, sideQuestPrefs, sideQuestReport,
+  sideQuestState, sideQuestSubmit, sideQuestUnshare, type SubmitInput,
+} from './sidequest';
+import type { SideQuestDemoBody, SideQuestPrefs } from '@/shared/api';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -89,6 +94,7 @@ export class CoreStore {
     const groups = new Set(v.groupIdsOf(viewerId));
     const c = decodeCursor(cursor);
     const candidates = v.db.posts.filter((p) => {
+      if (p.targetType === 'sidequest') return false; // lives on the Side Quest board only
       const relevant = p.targetType === 'group'
         ? groups.has(p.targetId)
         : p.authorId === viewerId || friends.has(p.authorId);
@@ -262,7 +268,7 @@ export class CoreStore {
   async profilePhotos(viewerId: ID, handle: string): Promise<string[]> {
     const v = await this.view();
     const p = this.resolvePerson(v, handle);
-    return v.db.posts.filter((x) => x.authorId === p.id && x.media.length > 0 && v.canSeePost(viewerId, x))
+    return v.db.posts.filter((x) => x.authorId === p.id && x.media.length > 0 && x.targetType !== 'sidequest' && v.canSeePost(viewerId, x))
       .sort(postOrder).flatMap((x) => x.media);
   }
 
@@ -954,4 +960,16 @@ export class CoreStore {
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
+
+  // ---------- Daily Side Quests (logic in sidequest.ts) ----------
+  sideQuestState(viewerId: ID) { return sideQuestState(this, viewerId); }
+  sideQuestSubmit(viewerId: ID, input: SubmitInput) { return sideQuestSubmit(this, viewerId, input); }
+  sideQuestBoard(viewerId: ID, date?: string) { return sideQuestBoard(this, viewerId, date); }
+  sideQuestUnshare(viewerId: ID, date: string) { return sideQuestUnshare(this, viewerId, date); }
+  sideQuestReport(viewerId: ID, body: { date: string; userId: ID }) { return sideQuestReport(this, viewerId, body); }
+  sideQuestHistory(viewerId: ID) { return sideQuestHistory(this, viewerId); }
+  sideQuestPhoto(viewerId: ID, date: string, userId: ID) { return sideQuestPhoto(this, viewerId, date, userId); }
+  sideQuestPrefs(viewerId: ID) { return sideQuestPrefs(this, viewerId); }
+  setSideQuestPrefs(viewerId: ID, prefs: SideQuestPrefs) { return setSideQuestPrefs(this, viewerId, prefs); }
+  sideQuestDemo(viewerId: ID, body: SideQuestDemoBody) { return sideQuestDemo(this, viewerId, body); }
 }

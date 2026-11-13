@@ -160,6 +160,8 @@ export class View {
       return g.privacy === 'public' || this.groupRole(post.targetId, viewerId) !== null;
     }
     if (post.targetType === 'event') return true;
+    // The Side Quest community board: a post exists only while its author shares it publicly.
+    if (post.targetType === 'sidequest') return post.audience === 'public';
     return this.canSee(viewerId, post.authorId, post.audience);
   }
 
