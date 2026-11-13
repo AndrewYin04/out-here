@@ -22,6 +22,7 @@ import {
   ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
+import { headThereLine, walkLine } from './museLines';
 import { StadiumLabels } from './StadiumLabels';
 import { stadiumLabels } from './stadiums';
 import { useGps } from './useGps';
@@ -178,6 +179,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => window.clearTimeout(t);
   }, [cheer]);
 
+  // While walking Muse keeps you company with the live count; at leave-by it calls the moment.
+  const walkingLine = walk && walkMin != null
+    ? walkLine(walkMin, walk.emoji, walk.title, together.walkers.map((w) => w.name)) : null;
+  const headLine = !walk && !planOpen && upNext
+    ? headThereLine(upNext.quest.emoji ?? '✨', upNext.quest.title, Date.parse(upNext.quest.startsAt), upNext.walkMinutes, Date.now()) : null;
+
   const bubble: { text: string; tone: 'muse' | 'plain'; pending?: boolean } | null = cheer
     ? { text: cheer, tone: 'plain' }
     : plan.state === 'loading'
@@ -187,12 +194,16 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         ? { text: plan.topTitle ? 'Here’s what fits 👇' : 'Nothing fits that yet. Try a longer time 👇', tone: plan.live ? 'muse' : 'plain' }
         : plan.state === 'error' && planOpen
           ? { text: plan.error ?? 'I couldn’t make a plan right now.', tone: 'plain' }
-          : planOpen
+          : walkingLine
+            ? { text: walkingLine, tone: 'plain' }
+            : headLine
+              ? { text: headLine, tone: 'muse' }
+              : planOpen
             ? { text: 'What are you up for?', tone: 'plain' }
             : hello
               ? { text: helloLine(firstName(viewer.name), upNext), tone: 'plain' }
               : null;
-  const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
+  const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer || walkingLine || headLine ? 'front' : 'follow';
   const nextPetState = cheer ? 'happy' : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
   petMode.current = nextPetMode;
   petState.current = nextPetState;
