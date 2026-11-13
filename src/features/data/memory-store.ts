@@ -9,6 +9,7 @@ import { CoreStore } from './core';
 import { emptyDb, fromRow, TABLE_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
 import { badRequest, conflict, notFound } from './errors';
 import { buildSeed, PlacesZ, SeedContentZ } from './seed-build';
+import { subsetDb, TableNotLoadedError, tableList, type TableSet } from './tables';
 
 /** Builds a fresh Db from the committed seed content, with times relative to `at`. */
 export function buildMemoryDb(at: Date = now()): Db {
@@ -36,8 +37,16 @@ export class MemoryBackend implements Backend {
   readonly kind = 'memory' as const;
   constructor(private db: Db, private files: Files = new Map()) {}
 
-  /** Shallow copy: writes replace table arrays, so an earlier snapshot never changes under a reader. */
-  async snapshot(): Promise<Db> { return { ...this.db }; }
+  /**
+   * Shallow copy: writes replace table arrays, so an earlier snapshot never changes under a reader.
+   * With a set, the same rows, but reading a table outside the set throws, so tests catch a set
+   * that SupabaseStore would load too little for.
+   */
+  async snapshot(set?: TableSet): Promise<Db> {
+    if (!set) return { ...this.db };
+    const keys = tableList(set);
+    return subsetDb(this.db, keys, (k) => { throw new TableNotLoadedError(k); });
+  }
 
   async insert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void> {
     applyInsert(this.db, table, rows);

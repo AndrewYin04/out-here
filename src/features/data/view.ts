@@ -26,83 +26,100 @@ function groupBy<T, K>(rows: readonly T[], key: (r: T) => K): Map<K, T[]> {
 const byNewest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
 
 export class View {
-  readonly profileById: Map<ID, Profile>;
-  readonly profileByHandle: Map<string, Profile>;
-  private friendSets = new Map<ID, Set<ID>>();
-  private listMembers: Map<ID, ID[]>;
-  private groupMembersBy: Map<ID, Db['groupMembers']>;
-  private groupsByUser: Map<ID, Db['groupMembers']>;
-  private questMembersBy: Map<ID, Db['questMembers']>;
-  private questCheckinsBy: Map<ID, Db['questCheckins']>;
-  private questInvitees: Map<ID, Set<ID>>;
-  private questReporters: Map<ID, Set<ID>>;
-  private reactionsBy: Map<ID, Db['reactions']>;
-  private commentsBy: Map<ID, Comment[]>;
-  private sharesBy: Map<ID, number>;
-  private rsvpsBy: Map<ID, Db['eventRsvps']>;
-  private threadMembersBy: Map<ID, Db['threadMembers']>;
-  private messagesBy: Map<ID, Message[]>;
-  readonly groupById: Map<ID, GroupRow>;
-  readonly groupBySlug: Map<string, GroupRow>;
-  readonly postById: Map<ID, Post>;
-  readonly questById: Map<ID, QuestRow>;
-  readonly eventById: Map<ID, EventRow>;
-  readonly eventBySlug: Map<string, EventRow>;
   readonly online: Set<ID>;
+  /**
+   * Indexes are built on first use, so a View over a table subset (tables.ts) only reads the
+   * tables its caller touches.
+   */
+  private memo = new Map<string, unknown>();
+  private lazy<T>(key: string, build: () => T): T {
+    if (this.memo.has(key)) return this.memo.get(key) as T;
+    const v = build();
+    this.memo.set(key, v);
+    return v;
+  }
 
   constructor(readonly db: Db, online: readonly ID[] = []) {
     this.online = new Set(online);
-    this.profileById = new Map(db.profiles.map((p) => [p.id, p]));
-    this.profileByHandle = new Map(db.profiles.map((p) => [p.handle, p]));
-    for (const f of db.friendships) {
-      if (f.status !== 'accepted') continue;
-      this.friendSet(f.userA).add(f.userB);
-      this.friendSet(f.userB).add(f.userA);
-    }
-    this.listMembers = new Map();
-    for (const m of db.friendListMembers) {
-      const arr = this.listMembers.get(m.listId) ?? [];
-      arr.push(m.userId);
-      this.listMembers.set(m.listId, arr);
-    }
-    this.groupMembersBy = groupBy(db.groupMembers, (m) => m.groupId);
-    this.groupsByUser = groupBy(db.groupMembers, (m) => m.userId);
-    this.questMembersBy = groupBy(
-      [...db.questMembers].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)), (m) => m.questId);
-    this.questCheckinsBy = groupBy(db.questCheckins ?? [], (c) => c.questId);
-    this.questInvitees = new Map();
-    for (const i of db.invites) {
-      if (!i.questId) continue;
-      const set = this.questInvitees.get(i.questId) ?? new Set<ID>();
-      set.add(i.toId);
-      this.questInvitees.set(i.questId, set);
-    }
-    this.questReporters = new Map();
-    for (const r of db.questReports ?? []) {
-      const set = this.questReporters.get(r.questId) ?? new Set<ID>();
-      set.add(r.reporterId);
-      this.questReporters.set(r.questId, set);
-    }
-    this.reactionsBy = groupBy(db.reactions, (r) => r.postId);
-    this.commentsBy = groupBy([...db.comments].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), (c) => c.postId);
-    this.sharesBy = new Map();
-    for (const p of db.posts) if (p.sharedPostId) this.sharesBy.set(p.sharedPostId, (this.sharesBy.get(p.sharedPostId) ?? 0) + 1);
-    this.rsvpsBy = groupBy(db.eventRsvps, (r) => r.eventId);
-    this.threadMembersBy = groupBy(db.threadMembers, (m) => m.threadId);
-    this.messagesBy = groupBy([...db.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), (m) => m.threadId);
-    this.groupById = new Map(db.groups.map((g) => [g.id, g]));
-    this.groupBySlug = new Map(db.groups.map((g) => [g.slug, g]));
-    this.postById = new Map(db.posts.map((p) => [p.id, p]));
-    this.questById = new Map(db.quests.map((q) => [q.id, q]));
-    this.eventById = new Map(db.events.map((e) => [e.id, e]));
-    this.eventBySlug = new Map(db.events.map((e) => [e.slug, e]));
   }
 
-  private friendSet(id: ID): Set<ID> {
-    let s = this.friendSets.get(id);
-    if (!s) { s = new Set(); this.friendSets.set(id, s); }
-    return s;
+  get profileById(): Map<ID, Profile> { return this.lazy('profileById', () => new Map(this.db.profiles.map((p) => [p.id, p]))); }
+  get profileByHandle(): Map<string, Profile> { return this.lazy('profileByHandle', () => new Map(this.db.profiles.map((p) => [p.handle, p]))); }
+  private get friendSets(): Map<ID, Set<ID>> {
+    return this.lazy('friendSets', () => {
+      const m = new Map<ID, Set<ID>>();
+      const set = (id: ID) => { let s = m.get(id); if (!s) { s = new Set(); m.set(id, s); } return s; };
+      for (const f of this.db.friendships) {
+        if (f.status !== 'accepted') continue;
+        set(f.userA).add(f.userB);
+        set(f.userB).add(f.userA);
+      }
+      return m;
+    });
   }
+  private get listMembers(): Map<ID, ID[]> {
+    return this.lazy('listMembers', () => {
+      const m = new Map<ID, ID[]>();
+      for (const x of this.db.friendListMembers) {
+        const arr = m.get(x.listId) ?? [];
+        arr.push(x.userId);
+        m.set(x.listId, arr);
+      }
+      return m;
+    });
+  }
+  private get groupMembersBy() { return this.lazy('groupMembersBy', () => groupBy(this.db.groupMembers, (m) => m.groupId)); }
+  private get groupsByUser() { return this.lazy('groupsByUser', () => groupBy(this.db.groupMembers, (m) => m.userId)); }
+  private get questMembersBy() {
+    return this.lazy('questMembersBy', () => groupBy(
+      [...this.db.questMembers].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)), (m) => m.questId));
+  }
+  private get questCheckinsBy() { return this.lazy('questCheckinsBy', () => groupBy(this.db.questCheckins ?? [], (c) => c.questId)); }
+  private get questInvitees(): Map<ID, Set<ID>> {
+    return this.lazy('questInvitees', () => {
+      const m = new Map<ID, Set<ID>>();
+      for (const i of this.db.invites) {
+        if (!i.questId) continue;
+        const set = m.get(i.questId) ?? new Set<ID>();
+        set.add(i.toId);
+        m.set(i.questId, set);
+      }
+      return m;
+    });
+  }
+  private get questReporters(): Map<ID, Set<ID>> {
+    return this.lazy('questReporters', () => {
+      const m = new Map<ID, Set<ID>>();
+      for (const r of this.db.questReports ?? []) {
+        const set = m.get(r.questId) ?? new Set<ID>();
+        set.add(r.reporterId);
+        m.set(r.questId, set);
+      }
+      return m;
+    });
+  }
+  private get reactionsBy() { return this.lazy('reactionsBy', () => groupBy(this.db.reactions, (r) => r.postId)); }
+  private get commentsBy() {
+    return this.lazy('commentsBy', () => groupBy([...this.db.comments].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), (c) => c.postId));
+  }
+  private get sharesBy(): Map<ID, number> {
+    return this.lazy('sharesBy', () => {
+      const m = new Map<ID, number>();
+      for (const p of this.db.posts) if (p.sharedPostId) m.set(p.sharedPostId, (m.get(p.sharedPostId) ?? 0) + 1);
+      return m;
+    });
+  }
+  private get rsvpsBy() { return this.lazy('rsvpsBy', () => groupBy(this.db.eventRsvps, (r) => r.eventId)); }
+  private get threadMembersBy() { return this.lazy('threadMembersBy', () => groupBy(this.db.threadMembers, (m) => m.threadId)); }
+  private get messagesBy() {
+    return this.lazy('messagesBy', () => groupBy([...this.db.messages].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), (m) => m.threadId));
+  }
+  get groupById(): Map<ID, GroupRow> { return this.lazy('groupById', () => new Map(this.db.groups.map((g) => [g.id, g]))); }
+  get groupBySlug(): Map<string, GroupRow> { return this.lazy('groupBySlug', () => new Map(this.db.groups.map((g) => [g.slug, g]))); }
+  get postById(): Map<ID, Post> { return this.lazy('postById', () => new Map(this.db.posts.map((p) => [p.id, p]))); }
+  get questById(): Map<ID, QuestRow> { return this.lazy('questById', () => new Map(this.db.quests.map((q) => [q.id, q]))); }
+  get eventById(): Map<ID, EventRow> { return this.lazy('eventById', () => new Map(this.db.events.map((e) => [e.id, e]))); }
+  get eventBySlug(): Map<string, EventRow> { return this.lazy('eventBySlug', () => new Map(this.db.events.map((e) => [e.slug, e]))); }
 
   // ---------- graph ----------
   friendIds(id: ID): Set<ID> { return this.friendSets.get(id) ?? new Set(); }

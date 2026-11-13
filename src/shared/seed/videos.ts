@@ -51,3 +51,14 @@ export const ALEX_WATCH_HISTORY: readonly [string, number, number][] = [
   ['vinyl-dig', 420, 62],
   ['lamp-rewire', 240, 88],
 ];
+
+/**
+ * Maya's watch history for the thrift demo: she saved the denim styling Reel and watched a thrift
+ * outfit Reel, so a denim bag at a pop-up sale is a Muse pick for her (and the jacket is Alex's).
+ */
+export const MAYA_WATCH_HISTORY: readonly [string, number, number][] = [
+  ['reel-denim-5-ways', 55, 3],
+  ['reel-denim-5-ways', 50, 20],
+  ['reel-thrift-outfit-40', 45, 30],
+  ['spot-vintage-denim', 170, 50],
+];

@@ -1,4 +1,5 @@
 import { PRIMARY_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
+import type { TableSet } from './tables';
 import { conflict } from './errors';
 import type { ID } from '@/shared';
 
@@ -14,8 +15,11 @@ export type Match<T extends TableKey> = { [K in keyof RowOf<T>]?: RowOf<T>[K] | 
  */
 export interface Backend {
   readonly kind: 'memory' | 'supabase';
-  /** All tables. Callers only read the returned object; writes go through the methods below. */
-  snapshot(): Promise<Db>;
+  /**
+   * The tables in `set` (all when omitted, see tables.ts). Callers only read the returned
+   * object; writes go through the methods below.
+   */
+  snapshot(set?: TableSet): Promise<Db>;
   insert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void>;
   upsert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void>;
   update<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<void>;

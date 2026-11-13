@@ -1,17 +1,28 @@
 'use client';
-// Data hooks and formatting for Find My. Pins refetch when user:<me> receives a message
-// (a friend's share changed, see docs/REALTIME.md); payloads carry ids only.
+// Data hooks and formatting for Find My. Pins refetch when location:<me> receives a message (a
+// friend's share changed) and when user:<me> says a friend's availability or friendship changed
+// (docs/REALTIME.md); payloads carry ids only.
 import { useApi, useViewer } from '@/features/data';
 import type { FriendPin, LocationShare } from '@/shared/types';
 
 export function useFriendPins() {
   const { viewer } = useViewer();
-  return useApi<{ pins: FriendPin[] }>('/api/locations/friends', [`user:${viewer.id}`]);
+  return useApi<{ pins: FriendPin[] }>('/api/locations/friends', [`location:${viewer.id}`, `user:${viewer.id}`], undefined, undefined,
+    // Pins show availability and friends only; other user: messages (invites, messages...) change neither.
+    (_d, channel, payload) => channel.startsWith('user:') && payload.type !== 'availability' && payload.type !== 'friendship');
 }
 
 export function useMyShare() {
   const { viewer } = useViewer();
-  return useApi<{ share: LocationShare | null }>('/api/locations/me', [`user:${viewer.id}`]);
+  return useApi<{ share: LocationShare | null }>('/api/locations/me', [`location:${viewer.id}`], undefined, undefined,
+    // location:<me> also carries every friend's move ({id: friendId}); only my own share (changed
+    // in another of my tabs) changes this response.
+    myShareSkip(viewer.id));
+}
+
+/** useMyShare's skip: refetch only for a location message about the viewer's own share. */
+export function myShareSkip(viewerId: string) {
+  return (_d: unknown, _channel: string, payload: Record<string, unknown>) => payload.id !== viewerId;
 }
 
 /** "just now", "3 min ago", "2 hr ago". */

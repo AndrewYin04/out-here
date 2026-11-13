@@ -1,6 +1,6 @@
 'use client';
 // The next plan stays on the map with a leave-time reminder and a way to start the 3D walk.
-import { Footprints } from 'lucide-react';
+import { Footprints, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useViewer } from '@/features/data';
 import { requestSelfie } from '@/features/memories';
@@ -41,9 +41,30 @@ export function useUpNext(): YourPlan | null {
   }, [api.data, now]);
 }
 
+/** Plans (id@startsAt) whose Up next card was closed in this tab. A different plan, or a demo reseed
+ *  (new start times), shows the card again. */
+const DISMISS_KEY = 'oh:upnext-dismissed';
+
+function readDismissed(): string[] {
+  try { return JSON.parse(window.sessionStorage.getItem(DISMISS_KEY) ?? '[]') as string[]; } catch { return []; }
+}
+
+/** Whether the Up next card for `questId` (id@startsAt) was closed, and a function that closes it. */
+export function useUpNextDismissed(questId: string | null | undefined): [boolean, () => void] {
+  const [ids, setIds] = useState<string[]>([]);
+  useEffect(() => { setIds(readDismissed()); }, []);
+  const dismiss = () => {
+    if (!questId) return;
+    const next = [...new Set([...readDismissed(), questId])];
+    try { window.sessionStorage.setItem(DISMISS_KEY, JSON.stringify(next)); } catch { /* private mode: in-memory only */ }
+    setIds(next);
+  };
+  return [!!questId && ids.includes(questId), dismiss];
+}
+
 type Phase = 'later' | 'go' | 'live';
 
-export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
+export function UpNextCard({ plan, arrived, walking, onGo, onSee, onDismiss, className }: {
   plan: YourPlan;
   /** You got there in the 3D view. */
   arrived: boolean;
@@ -51,8 +72,11 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   walking: boolean;
   onGo: (questId: string) => void;
   onSee: (questId: string) => void;
+  /** Close the card: the X button, or a swipe up on a phone. */
+  onDismiss?: () => void;
   className?: string;
 }) {
+  const touchY = useRef<number | null>(null);
   const { viewer } = useViewer();
   const toast = useToast();
   const now = useClock();
@@ -87,7 +111,23 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   // One row: what, when, one button. Tapping the row opens the plan; details live there.
   return (
     <section aria-label="Up next" data-testid="up-next" data-phase={arrived ? 'arrived' : phase}
-      className={cn('rounded-card bg-fb-surface shadow-popover animate-drop-in', className)}>
+      onTouchStart={(e) => { touchY.current = e.touches[0]?.clientY ?? null; }}
+      onTouchEnd={(e) => {
+        const start = touchY.current;
+        touchY.current = null;
+        const end = e.changedTouches[0]?.clientY;
+        // A swipe up of 40 px or more closes it, like a phone notification.
+        if (onDismiss && start != null && end != null && start - end >= 40) onDismiss();
+      }}
+      className={cn('relative rounded-card bg-fb-surface shadow-popover animate-drop-in', className)}>
+      {/* On the card's top-right corner, not in the row: on a phone the floating Ask Muse button
+          covers the row's right end, so an X there would open Muse instead. */}
+      {onDismiss && (
+        <button type="button" data-testid="up-next-close" aria-label="Close Up next" onClick={onDismiss}
+          className="absolute -right-2 -top-2 z-10 flex size-7 items-center justify-center rounded-full bg-fb-surface text-fb-text-2 shadow-popover hover:bg-fb-hover">
+          <X size={16} aria-hidden />
+        </button>
+      )}
       <div className="flex items-center gap-3 p-2.5 pr-2">
         <CategoryIcon category={q.category} size={44} className={cn(phase === 'go' && !arrived && 'ring-2 ring-fb-blue')} />
         <div className="min-w-0 flex-1">

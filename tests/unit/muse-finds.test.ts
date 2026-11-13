@@ -104,16 +104,16 @@ describe("Muse's line is checked against the facts", () => {
 });
 
 describe('end to end in the memory store', () => {
-  it('a chair listed live is Alex\'s find; nothing before it', async () => {
+  it('a track jacket listed live is Alex\'s find; nothing before it', async () => {
     const store = createMemoryStore(NOW);
     const wants = await store.museWants(alex);
     expect(await museFinds(wants, await store.mapListings(alex), DEMO_CENTER, NOW, alex)).toEqual([]);
     await store.createListing(maya, {
-      title: 'Desk chair', priceUsd: 35, category: 'Furniture', location: offsetPoint(DEMO_CENTER, 2500, 60),
+      title: 'Track jacket', priceUsd: 20, category: 'Clothing', location: offsetPoint(DEMO_CENTER, 800, 60),
       pickupLabel: 'Belle Haven', pickupSpot: 'Blue door', pickupUntil: min(180),
     });
     const [find] = await museFinds(wants, await store.mapListings(alex), DEMO_CENTER, NOW, alex);
-    expect(find).toMatchObject({ title: 'Desk chair', priceUsd: 35, sellerFirstName: 'Maya', source: 'mock' });
-    expect(find.line).toMatch(/\$35 desk chair was just listed/);
+    expect(find).toMatchObject({ title: 'Track jacket', priceUsd: 20, sellerFirstName: 'Maya', source: 'mock' });
+    expect(find.line).toMatch(/\$20 track jacket was just listed/i);
   });
 });

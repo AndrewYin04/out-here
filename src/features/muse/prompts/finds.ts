@@ -28,6 +28,8 @@ export type FindLineFacts = {
   price: string;
   budget: string | null;
   driveMin: number;
+  /** Set when it is a short walk: say the walk, not the drive. */
+  walkMin: number | null;
   maxDriveMin: number | null;
   availableUntil: string;
   listedMinAgo: number;
@@ -42,7 +44,8 @@ export function findLineMessages(f: FindLineFacts): MuseMessage[] {
       content: [
         'You are Muse, a friendly assistant inside Facebook. Earlier the user told you what they wanted; a nearby listing now matches.',
         'Write one or two short sentences (under 30 words) telling them about it, like a friend would.',
-        'Use only these facts: the item title, the price, the drive time in minutes, when the seller is available until, how recently it was listed.',
+        'Use only these facts: the item title, the price, the trip time in minutes, when the seller is available until, how recently it was listed.',
+        'The trip: when walkMin is a number it is walkable, so say "a N-minute walk" with walkMin; otherwise say "a N-minute drive" with driveMin.',
         'Write numbers exactly as given ("$35", "12-minute drive", "until 5:00 PM"). Do not mention anything else: no condition, no colors, no other people, no promises.',
         'No emojis, no hype words.',
         'Example: "That $35 desk chair was just listed. It\'s a 12-minute drive, and the seller is around until 5:00 PM."',

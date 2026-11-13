@@ -28,7 +28,7 @@ describe('Marketplace pickup: listing on the map', () => {
     expect(pins.every((p) => p.status === 'available' && p.listing.pickupSpot === null && !p.exact)).toBe(true);
     expect(pins.some((p) => /chair/i.test(p.listing.title))).toBe(false);
     const wants = await store.museWants(alex);
-    expect(wants[0]).toMatchObject({ item: 'desk chair', maxPrice: 40, maxDriveMin: 15 });
+    expect(wants[0]).toMatchObject({ item: 'track jacket', maxPrice: 25, maxDriveMin: 15 });
   });
 
   it('a new listing goes on every map, with the exact spot only for the seller', async () => {

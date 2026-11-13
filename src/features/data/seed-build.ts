@@ -10,7 +10,7 @@ import {
   DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
 } from '../../shared/seed/story';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
-import { ALEX_WATCH_HISTORY } from '../../shared/seed/videos';
+import { ALEX_WATCH_HISTORY, MAYA_WATCH_HISTORY } from '../../shared/seed/videos';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -141,8 +141,8 @@ export const PICKUP_LISTINGS = [
 ] as const;
 /** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
 export const ALEX_WANT = {
-  text: 'I need a desk chair under $40, ideally within a 15-minute drive',
-  item: 'desk chair', keywords: ['desk chair', 'office chair', 'chair'], maxPrice: 40, maxDriveMin: 15,
+  text: 'Looking for a track jacket under $25, close enough to walk',
+  item: 'track jacket', keywords: ['track jacket', 'windbreaker', 'jacket'], maxPrice: 25, maxDriveMin: 15,
 };
 
 const iso = (d: Date) => d.toISOString();
@@ -606,7 +606,7 @@ export function buildSeed(
   }
   if (has('alex')) {
     t.muse_wants.push({
-      id: seedId('want', 'alex-desk-chair'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
+      id: seedId('want', 'alex-track-jacket'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
       keywords: ALEX_WANT.keywords, max_price: ALEX_WANT.maxPrice, max_drive_min: ALEX_WANT.maxDriveMin,
       active: true, created_at: iso(addMin(demoNow, -26 * 60)),
     });
@@ -617,6 +617,14 @@ export function buildSeed(
     ALEX_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
       t.watch_events.push({
         id: seedId('watch', `alex-${i}-${key}`), user_id: pid('alex'), video_key: key, seconds,
+        created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
+      });
+    });
+  }
+  if (has('maya')) {
+    MAYA_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
+      t.watch_events.push({
+        id: seedId('watch', `maya-${i}-${key}`), user_id: pid('maya'), video_key: key, seconds,
         created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
       });
     });
