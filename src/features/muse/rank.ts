@@ -221,13 +221,20 @@ export async function rankAndExplain(
       // shortlist (quest id and the friend ids under it), because c1/f1 follow that order.
       // Seats, walk minutes and start times are left out: validate() recomputes them from live
       // data after a cached pick, and the claim check replaces a reason whose numbers are off.
+      // Friend facts Muse is told to cite (their status line, shared interests, and who is already
+      // going) are IN the key, so an edited bubble or a friend leaving misses and goes live
+      // instead of repeating a stale line.
       cacheKey: {
         text: normalizeText(ctx.keyText ?? ctx.text),
         intent: {
           activities: intent.activities, budgetMax: intent.budgetMax, wantsFriends: intent.wantsFriends,
           openToNewPeople: intent.openToNewPeople, vibe: intent.vibe,
         },
-        shortlist: shortlist.map((c) => [c.questId, c.friendOverlap.map((f) => f.friendId)]),
+        shortlist: shortlist.map((c) => [
+          c.questId,
+          c.friendOverlap.map((f) => [f.friendId, normalizeText(f.status ?? ''), [...f.sharedWithQuest].sort()]),
+          c.friendMembers.map((m) => m.friendId).sort(),
+        ]),
       },
     });
     const suggestions = picksToSuggestions(res.data, maps);
