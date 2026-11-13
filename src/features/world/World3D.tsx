@@ -848,7 +848,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         if(manualChatCamera.current){chatCamera=null;returnCamera=null;map.setCenterClampedToGround(true);camBearing.current=map.getBearing();return;}
         if (!chatCamera) {
           const c = map.getCenter();
-          chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom: entering.current ? ENTER_ZOOM : zoom, bearing: map.getBearing(), elevation: map.getCenterElevation() };
+          chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom, bearing: map.getBearing(), elevation: map.getCenterElevation() };
           returnCamera = null; restoringUntil = 0;
           entering.current = false;
           map.stop(); map.setMaxZoom(24.2); map.setCenterClampedToGround(false);

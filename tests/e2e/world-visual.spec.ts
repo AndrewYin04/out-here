@@ -8,6 +8,6 @@ for(const reduced of [false,true])test(`metre-scale world, companion framing and
  const lat=await world.getAttribute('data-lat'),lng=await world.getAttribute('data-lng');await page.keyboard.down('ArrowUp');await expect.poll(async()=>`${await world.getAttribute('data-lat')}:${await world.getAttribute('data-lng')}`).not.toBe(`${lat}:${lng}`);await page.keyboard.up('ArrowUp');
  await page.getByTestId('muse-launcher').click();await expect(page.getByTestId('muse-chat')).toBeVisible();await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:30000}).toBeGreaterThan(23);await page.screenshot({path:info.outputPath('muse-chat.png')});await page.getByTestId('muse-close').click();
  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:15000}).toBeLessThan(22.4);
- await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'Map',exact:true}).click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
- await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'3D',exact:true}).click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
+ await page.getByTestId('view-map').click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
+ await page.getByTestId('view-3d').click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
 });

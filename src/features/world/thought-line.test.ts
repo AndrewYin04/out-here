@@ -1,26 +1,74 @@
 import { expect, it, vi } from 'vitest';
-vi.mock('@/features/outhere',()=>({museSteps:()=>[{key:'rank',text:'Two choices ranked'}]}));
+vi.mock('@/features/outhere', () => ({
+  museSteps: (plan: { meta: { understood?: boolean } }) => plan.meta.understood === false
+    ? [{ key: 'intent', text: "Couldn't tell what you're up for." }]
+    : [
+      { key: 'intent', text: 'Got it: food · 45 min' },
+      { key: 'friends', text: 'Maya is free till 6:00 PM' },
+      { key: 'plans', text: 'Checked 5 plans: 1 fit · 2 too far' },
+      { key: 'rank', text: 'Muse ranked 1 of 1 and explained why' },
+    ],
+}));
 import type { AgentEncounter, ChatMessage } from '@/features/muse-companion';
-import { companionThought } from './thought-line';
-const encounter={id:1,recipient:{id:'maya',name:'Maya Chen'},source:'backend',sent:0,received:0,messages:[],outcome:null} as unknown as AgentEncounter;
-it('uses actual hand-off events one at a time and settles cancellation',()=>{
- expect(companionThought('sending',encounter,undefined,false)).toBe('Asking Maya’s Muse');
- expect(companionThought('sending',{...encounter,sent:1},undefined,false)).toBe('Message sent');
- expect(companionThought('receiving',{...encounter,sent:1,received:1},undefined,false)).toBe('Maya’s Muse replied');
- expect(companionThought('idle',{...encounter,outcome:'cancelled'},undefined,false)).toBeNull();
+import { companionThoughts, thoughtDwellMs, THOUGHT_MAX } from './thought-line';
+
+const encounter = { id: 1, recipient: { id: 'maya', name: 'Maya Chen' }, source: 'backend', sent: 0, received: 0, messages: [], outcome: null } as unknown as AgentEncounter;
+const pick = { emoji: '🥟', title: 'Dumpling Den', travelMinutes: 9, seatsLeft: 2, reason: 'You both love dumplings and it fits before 6.', bridge: 'Maya can make it after work.' };
+const reply = (suggestions: unknown[], meta: object = {}) => ({ id: 'm1', role: 'muse', text: '', source: 'muse', ask: 'food', plan: { intent: {}, summary: '', suggestions, meta: { dropped: [], ...meta } } }) as unknown as ChatMessage;
+
+it('narrates a hand-off from the real agent events, in order', () => {
+  expect(companionThoughts('sending', encounter, undefined, false)).toEqual(['Asking Maya’s Muse']);
+  expect(companionThoughts('sending', { ...encounter, sent: 1 }, undefined, false)).toEqual(['Asking Maya’s Muse', 'Message sent']);
+  expect(companionThoughts('receiving', { ...encounter, sent: 1, received: 1 }, undefined, false).at(-1)).toBe('Maya’s Muse replied');
+  expect(companionThoughts('idle', { ...encounter, sent: 1, received: 1, outcome: 'success' }, undefined, false).at(-1)).toContain('in the chat');
+  expect(companionThoughts('idle', { ...encounter, outcome: 'cancelled' }, undefined, false)).toEqual([]);
 });
-it('never claims agreement for unavailable or failed encounters',()=>{
- expect(companionThought('idle',{...encounter,outcome:'unavailable'},undefined,false)).toBe('No plan was confirmed.');
- expect(companionThought('error',{...encounter,outcome:'error'},undefined,false)).toContain('did not finish');
+
+it('never claims agreement for unavailable or failed encounters', () => {
+  const lines = companionThoughts('idle', { ...encounter, outcome: 'unavailable' }, undefined, false);
+  expect(lines.at(-1)).toBe('No plan was confirmed.');
+  expect(lines.join(' ')).not.toMatch(/agreed|said yes|is in\b/i);
+  expect(companionThoughts('error', { ...encounter, outcome: 'error' }, undefined, false)[0]).toContain('did not finish');
 });
-it('only describes real pending work and tolerates responses without optional metadata',()=>{
- expect(companionThought('thinking',null,undefined,false)).toBe('Working on your request');
- expect(companionThought('evaluating',null,undefined,false)).toBe('Looking at your photo');
- expect(companionThought('idle',null,{role:'muse',plan:{summary:'No metadata'}} as ChatMessage,true)).toBeNull();
- expect(companionThought('idle',null,undefined,false)).toBeNull();
+
+it('talks through a fresh plan: understood, friends, checked, the pick, then Muse’s own words', () => {
+  expect(companionThoughts('idle', null, reply([pick, { ...pick, title: 'Boba' }]), true)).toEqual([
+    'Got it: food · 45 min',
+    'Maya is free till 6:00 PM',
+    'Checked 5 plans: 1 fit · 2 too far',
+    '🥟 Dumpling Den: 9 min walk · 2 seats left',
+    pick.reason,
+    pick.bridge,
+    '1 more idea in the chat',
+  ]);
 });
-it('never replays old plan recaps after the next message or an error',()=>{
- const last={role:'user',text:'A newer ask'} as ChatMessage;
- expect(companionThought('idle',null,last,true)).toBeNull();
- expect(companionThought('error',null,last,true)).toBeNull();
+
+it('leaves out what it does not know and cuts long lines at a word', () => {
+  const lines = companionThoughts('idle', null, reply([{ ...pick, seatsLeft: null, bridge: null, reason: 'word '.repeat(60) }]), true);
+  expect(lines).toContain('🥟 Dumpling Den: 9 min walk');
+  expect(lines.some((l) => l.includes('null'))).toBe(false);
+  const cut = lines.find((l) => l.startsWith('word'))!;
+  expect(cut.length).toBeLessThanOrEqual(THOUGHT_MAX);
+  expect(cut.endsWith('word…')).toBe(true);
+  expect(companionThoughts('idle', null, reply([]), true).at(-1)).toBe('Muse ranked 1 of 1 and explained why');
+  expect(companionThoughts('idle', null, reply([pick], { understood: false }), true)).toEqual(["Couldn't tell what you're up for."]);
+});
+
+it('only describes real pending work and tolerates responses without optional metadata', () => {
+  expect(companionThoughts('thinking', null, undefined, false)).toEqual(['Working on your request']);
+  expect(companionThoughts('evaluating', null, undefined, false)).toEqual(['Looking at your photo']);
+  expect(companionThoughts('idle', null, { role: 'muse', plan: { summary: 'No metadata' } } as ChatMessage, true)).toEqual([]);
+  expect(companionThoughts('idle', null, undefined, false)).toEqual([]);
+});
+
+it('never replays old plan recaps after the next message or an error', () => {
+  expect(companionThoughts('idle', null, { role: 'user', text: 'A newer ask' } as ChatMessage, true)).toEqual([]);
+  expect(companionThoughts('error', null, reply([pick]), true)).toEqual([]);
+  expect(companionThoughts('idle', null, reply([pick]), false)).toEqual([]);
+});
+
+it('gives each thought time to be read', () => {
+  expect(thoughtDwellMs('Message sent')).toBeGreaterThanOrEqual(2600);
+  expect(thoughtDwellMs('x'.repeat(110))).toBeGreaterThan(thoughtDwellMs('short'));
+  expect(thoughtDwellMs('x'.repeat(500))).toBeLessThanOrEqual(6500);
 });
