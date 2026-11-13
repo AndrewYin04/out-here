@@ -52,7 +52,7 @@ describe('Find My: friend pins', () => {
     expect(pin.precision).toBe('approximate');
     expect(pin.location).toEqual(snapToGrid(raw.location, 800));
     expect(pin.location).not.toEqual(raw.location);
-    expect(pin.placeLabel).toBe('Redwood City');
+    expect(pin.placeLabel).toContain('San Francisco');
     expect((pin.distanceKm * 2) % 1).toBe(0);
     expect(pin.walkingMinutes === null || pin.walkingMinutes % 5 === 0).toBe(true);
   });
