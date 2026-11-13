@@ -52,8 +52,8 @@ export type PlanMeta = {
   candidateCount: number;
   /** Pre-check: how many friends' agents were asked (all friends; busy ones just answer nothing). */
   friendsChecked: number;
-  /** Friends free in the window: first name and end time only, from availability they shared with the viewer. */
-  friendsFree: { firstName: string; freeUntil: string }[];
+  /** Friends free in the window: id (to find their pin), first name and end time only, from availability they shared with the viewer. */
+  friendsFree: { friendId: string; firstName: string; freeUntil: string }[];
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -138,7 +138,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     friendAvailability: ctx.friendAvailability, quests: ctx.quests, location: ctx.location, now,
   });
   const t3 = Date.now();
-  const friendsFree = result.friendsFree.map((f) => ({ firstName: f.firstName, freeUntil: f.freeUntil }));
+  const friendsFree = result.friendsFree.map((f) => ({ friendId: f.friendId, firstName: f.firstName, freeUntil: f.freeUntil }));
 
   if (result.candidates.length === 0) {
     const summary = summaryText([], parsed.intent, result.friendsFree.map((f) => f.firstName));

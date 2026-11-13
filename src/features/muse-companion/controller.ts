@@ -202,7 +202,7 @@ export function useChatError(): string | null {
 export function resetCompanionForTests(): void {
   clearTimer(); cancelInFlight(); clearActivity();
   store = { encounter: null, snap: INITIAL, messages: [], error: null, owner: '' };
-  worldOwners=0;viewport=EMPTY_VIEWPORT;photoTarget=null;
+  worldOwners=0;worldViews=0;viewport=EMPTY_VIEWPORT;photoTarget=null;
 }
 
 export const getCompanionForTests = () => store;
@@ -304,12 +304,14 @@ export function endPhotoAnalysis(id:number, outcome:'live'|'mock'|'error'|'cance
 }
 
 /** Presentation ownership never owns or cancels an API request. */
-export function attachMuseWorld():()=>void {
-  worldOwners++;let attached=true;emit();
-  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(!worldOwners&&store.encounter)store={...store,encounter:null};emit();};
+/** A view that shows encounters (the 3D world, or the 2D map's hand-off) keeps a finished one on screen until it calls finishAgentEncounter. */
+export function attachMuseWorld(kind:'world'|'map'='world'):()=>void {
+  worldOwners++;if(kind==='world')worldViews++;let attached=true;emit();
+  return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(kind==='world')worldViews=Math.max(0,worldViews-1);if(!worldOwners&&store.encounter)store={...store,encounter:null};emit();};
 }
+let worldViews=0;
 /** True while the 3D world is showing Jolly (the map's docked Jolly steps aside). */
-export function useMuseInWorld():boolean {return useSyncExternalStore(subscribe,()=>worldOwners>0,()=>false);}
+export function useMuseInWorld():boolean {return useSyncExternalStore(subscribe,()=>worldViews>0,()=>false);}
 
 // Where Jolly was on screen when the 3D world closed, so the map's docked Jolly can fly out from there.
 let dockFrom:{x:number;y:number;at:number}|null=null;
@@ -385,3 +387,13 @@ export function useMuseActivity():MuseActivity|null {
   return useSyncExternalStore(subscribe,()=>{ensureOwner();return activity;},()=>null);
 }
 export const getMuseActivityForTests=()=>activity;
+
+/**
+ * Muse speaking up on its own, from a real event (a friend just shared that they're free). Shown by
+ * the docked Jolly; its action asks the friend's Muse, the same as typing it in the chat.
+ */
+export type MuseNudge = { id: string; title: string; detail: string; quote: string | null; friend: AgentRecipient; ask: string; action: string };
+let nudge: MuseNudge | null = null;
+export function showMuseNudge(n: MuseNudge): void { nudge = n; emit(); }
+export function dismissMuseNudge(id?: string): void { if (!nudge || (id && nudge.id !== id)) return; nudge = null; emit(); }
+export function useMuseNudge(): MuseNudge | null { return useSyncExternalStore(subscribe, () => nudge, () => null); }

@@ -6,6 +6,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
+import { MuseMapLayer } from './MuseMapLayer';
+import { useFreeFriendNudge } from './useFreeFriendNudge';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
@@ -122,6 +124,8 @@ export function OutHereView() {
   }, [mode, visible, filter.keep, persona.id, selectedId]);
   const friendKeep = mode === 'friends' ? filter.keep : null;
   const allFriendPins = useMemo(() => friendPins.data?.pins ?? [], [friendPins.data]);
+  // Muse speaks up when a friend newly shares that they're free.
+  useFreeFriendNudge(friendPins.data?.pins ?? null);
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
@@ -380,6 +384,11 @@ export function OutHereView() {
           onWalkStop={finishWalk}
           onArrive={onArrive}
         />
+      )}
+
+      {/* Muse at work on the 2D map while its chat is open: Jolly hops to what he is talking about. */}
+      {!show3d && map && (
+        <MuseMapLayer map={map} me={ctx?.origin ?? DEMO_CENTER} quests={questsApi.data?.quests ?? []} friendPins={allFriendPins} />
       )}
 
       {viewNote && (

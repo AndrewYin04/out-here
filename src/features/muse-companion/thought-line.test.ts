@@ -9,11 +9,13 @@ vi.mock('@/features/outhere', () => ({
       { key: 'rank', text: 'Muse ranked 1 of 1 and explained why' },
     ],
 }));
-import type { AgentEncounter, ChatMessage } from '@/features/muse-companion';
-import { companionThoughts, thoughtDwellMs, THOUGHT_MAX } from './thought-line';
+import type { ChatMessage } from './controller';
+import type { AgentEncounter } from './encounter';
+import { companionThoughts as thoughts, thoughtDwellMs, THOUGHT_MAX } from './thought-line';
+const companionThoughts = (...a: Parameters<typeof thoughts>) => thoughts(...a).map((t) => t.text);
 
 const encounter = { id: 1, recipient: { id: 'maya', name: 'Maya Chen' }, source: 'backend', sent: 0, received: 0, messages: [], outcome: null } as unknown as AgentEncounter;
-const pick = { emoji: '🥟', title: 'Dumpling Den', travelMinutes: 9, seatsLeft: 2, reason: 'You both love dumplings and it fits before 6.', bridge: 'Maya can make it after work.' };
+const pick = { questId: 'q-dumpling', friendIds: ['maya'], emoji: '🥟', title: 'Dumpling Den', travelMinutes: 9, seatsLeft: 2, reason: 'You both love dumplings and it fits before 6.', bridge: 'Maya can make it after work.' };
 const reply = (suggestions: unknown[], meta: object = {}) => ({ id: 'm1', role: 'muse', text: '', source: 'muse', ask: 'food', plan: { intent: {}, summary: '', suggestions, meta: { dropped: [], ...meta } } }) as unknown as ChatMessage;
 
 it('narrates a hand-off from the real agent events, in order', () => {
@@ -71,4 +73,14 @@ it('gives each thought time to be read', () => {
   expect(thoughtDwellMs('Message sent')).toBeGreaterThanOrEqual(2600);
   expect(thoughtDwellMs('x'.repeat(110))).toBeGreaterThan(thoughtDwellMs('short'));
   expect(thoughtDwellMs('x'.repeat(500))).toBeLessThanOrEqual(6500);
+});
+
+it('points each thought at what it is about on the map', () => {
+  const r = { ...(reply([pick]) as object), plan: { intent: {}, summary: '', suggestions: [pick], meta: { dropped: [{ questId: 'q-ramen', reason: 'walk' }, { questId: 'q-x', reason: 'activity' }], friendsFree: [{ friendId: 'maya', firstName: 'Maya', freeUntil: '' }] } } } as unknown as ChatMessage;
+  const f = thoughts('idle', null, r, true).map((t) => t.focus);
+  expect(f[0]).toEqual({ kind: 'me' });
+  expect(f[1]).toEqual({ kind: 'friends', ids: ['maya'] });
+  expect(f[2]).toEqual({ kind: 'checked', lit: ['q-dumpling'], dropped: [{ id: 'q-ramen', label: 'too far' }] });
+  expect(f[3]).toEqual({ kind: 'quest', id: 'q-dumpling', friendIds: ['maya'] });
+  expect(thoughts('sending', encounter, undefined, false)[0].focus).toEqual({ kind: 'encounter', friendId: 'maya' });
 });

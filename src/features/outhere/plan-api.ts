@@ -12,7 +12,7 @@ export type PlanResponse = MusePlan & {
     // What Muse did, for the "Muse's work" steps. Optional so an older response still renders.
     understood?: boolean; candidateCount?: number;
     cache?: { parse:boolean; rank:boolean };
-    friendsFree?: { firstName: string; freeUntil: string }[];
+    friendsFree?: { friendId?: string; firstName: string; freeUntil: string }[];
     models?: { parse: string; rank: string }; rankFallback?: boolean;
     timings?: { totalMs: number };
     /** Agent coordination checks availability, never attendance or consent. */

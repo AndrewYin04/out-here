@@ -16,3 +16,6 @@ export {MuseActivityStatus} from './MuseActivityStatus';
 export type {MuseActivity, MuseActivityOutcome} from './controller';
 
 export type { ChatMessage } from './controller';
+export { useMuseCommentary, type MuseCommentary } from './commentary';
+export { showMuseNudge, dismissMuseNudge, useMuseNudge, type MuseNudge } from './controller';
+export type { Thought, ThoughtFocus } from './thought-line';

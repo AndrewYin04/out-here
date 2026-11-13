@@ -13,7 +13,7 @@ import type { PersonCard } from '@/shared';
 import {
   closeChat, museDispatch, openChat, retryLast, selectPlan, sendMessage,
   reportAgentRecipientError, sendAgentMessage, useAgentEncounter, useChatError, useChatMessages, useMuseSnapshot, type ChatMessage,
-  takeMuseDockFrom, useMuseInWorld,
+  takeMuseDockFrom, useMuseInWorld, useMuseNudge, dismissMuseNudge,
 } from './controller';
 import { simulationTransport } from './encounter';
 import { backendTransport, isCoordinationAsk } from '@/features/muse-encounters';
@@ -158,6 +158,19 @@ export function MuseChat() {
     a.onfinish = a.oncancel = () => el.classList.remove('muse-dock-flying');
     return () => a.cancel();
   }, [docked, showLauncher]);
+  // A nudge (a friend just got free) shows by the docked Jolly for a minute, or until acted on.
+  const nudge = useMuseNudge();
+  useEffect(() => {
+    if (!nudge) return;
+    const t = window.setTimeout(() => dismissMuseNudge(nudge.id), 60_000);
+    return () => window.clearTimeout(t);
+  }, [nudge]);
+  const askFromNudge = useCallback(() => {
+    if (!nudge) return;
+    dismissMuseNudge(nudge.id);
+    openChat();
+    sendAgentMessage(nudge.ask, nudge.friend, backendTransport);
+  }, [nudge]);
   const wasOpen = useRef(false);
   useEffect(() => { if (wasOpen.current && !snap.open) launcherRef.current?.focus({ preventScroll: true }); wasOpen.current = snap.open; }, [snap.open]);
 
@@ -198,6 +211,7 @@ export function MuseChat() {
           type="button"
           data-testid="muse-launcher"
           data-docked="true"
+          data-nudge={nudge ? 'true' : undefined}
           aria-label="Ask Muse"
           onClick={openChat}
           className="muse-dock group fixed right-3 z-30 flex size-[60px] items-center justify-center rounded-full bottom-[136px] max-md:bottom-auto max-md:top-[200px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fb-blue"
@@ -211,6 +225,20 @@ export function MuseChat() {
           {/* Desktop: a small "Ask Muse" tag beside him. Phones: just Jolly, so he never covers a sheet. */}
           <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-card transition-transform group-hover:-translate-x-0.5 max-md:sr-only">Ask Muse</span>
         </button>
+      )}
+      {!snap.open && !planOpen && docked && nudge && (
+        // Muse speaking up from the dock, from a real event (a friend just shared that they're free).
+        <div key={nudge.id} role="status" data-testid="muse-nudge" className="muse-nudge fixed z-30 w-[248px] rounded-card bg-fb-surface p-3 shadow-popover right-[84px] bottom-[128px] max-md:bottom-auto max-md:top-[192px] max-md:right-[80px] max-md:w-[228px]">
+          <p className="flex items-center gap-1 text-[12px] font-bold text-fb-blue"><span aria-hidden>✨</span>Muse</p>
+          <p className="mt-0.5 text-[15px] font-semibold leading-5 text-fb-text">{nudge.title}</p>
+          <p className="text-[13px] leading-[18px] text-fb-text-2">{nudge.detail}</p>
+          {nudge.quote && <p className="mt-1 truncate text-[13px] italic leading-[18px] text-fb-text">“{nudge.quote}”</p>}
+          <div className="mt-2 flex gap-2">
+            <button type="button" data-testid="muse-nudge-ask" onClick={askFromNudge} className="oh-press flex-1 rounded-[6px] bg-fb-blue px-2 py-1.5 text-[14px] font-semibold text-white hover:brightness-95">{nudge.action}</button>
+            <button type="button" data-testid="muse-nudge-dismiss" onClick={() => dismissMuseNudge(nudge.id)} className="rounded-[6px] bg-fb-hover px-2.5 py-1.5 text-[14px] font-semibold text-fb-text">Not now</button>
+          </div>
+          <span aria-hidden className="absolute -right-1.5 top-6 size-3 rotate-45 bg-fb-surface max-md:top-5" />
+        </div>
       )}
       {!snap.open && !planOpen && !docked && (
         <button
