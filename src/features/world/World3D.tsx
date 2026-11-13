@@ -121,7 +121,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   questsRef.current = quests;
   const friendsRef = useRef(friendPins);
   // ---- Walking there together (#46): your steps out, the other members' walks in ----
-  const together = useWalkTogether(quests, viewer.id, walk?.questId ?? null);
+  const walkQuests = useMemo(
+    () => walkTo && !quests.some((q) => q.id === walkTo.id) ? [...quests, walkTo] : quests,
+    [quests, walkTo],
+  );
+  const together = useWalkTogether(walkQuests, viewer.id, walk?.questId ?? null);
   const stepRef = useRef(together.step);
   stepRef.current = together.step;
   const walkersRef = useRef(together.walkers);
@@ -548,7 +552,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const meState = moving ? 'walk' : 'idle';
       if (meState !== lastMe) { layer.setState('me', meState); lastMe = meState; }
       layer.setPose('me', pos.current, heading.current, 0);
-      if (moving) stepRef.current(pos.current);
+      if (moving && sourceRef.current === 'demo') stepRef.current(pos.current);
 
       // People walking to the same plan: each avatar glides to their latest step.
       const walking = walkersRef.current;
@@ -742,7 +746,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
   useEffect(() => {
     if (!walkTo) {
-      if (walkRef.current?.questId === requestedWalk.current?.id && walkRef.current) setWalk(null);
+      if (requestedWalk.current && walkRef.current?.questId === requestedWalk.current.id) setWalk(null);
       requestedWalk.current = null;
       return;
     }

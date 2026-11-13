@@ -125,8 +125,6 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
               See plan
             </button>
           )}
-            </div>
-          )}
         </div>
       )}
     </section>
