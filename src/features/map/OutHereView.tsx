@@ -2,25 +2,17 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { CalendarCheck } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
-import { Plus } from 'lucide-react';
-import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, type LatLng, type Quest } from '@/shared';
-import type { MapListing } from '@/shared/api';
+import { FriendsLayer, useFriendPins } from '@/features/map/friends';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
+import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
+import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
-import { ListingSheet } from './market/ListingSheet';
-import { ListingsLayer } from './market/ListingsLayer';
-import { MarketMenu, MuseFindCard } from './market/MuseFind';
-import { SellSheet } from './market/SellSheet';
-import { useMapListings, useMuseFinds, useMuseWants } from './market/useMarket';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 import { initialView, shouldEnter3d, type MapView } from './view3d';
@@ -53,11 +45,21 @@ function useNow(intervalMs = 30_000): Date {
   return now;
 }
 
-function setQuestParam(id: string | null, key: 'quest' | 'listing' = 'quest') {
+/**
+ * Keeps ?quest=<id> in the URL. Opening a plan from the map adds a history entry, so the browser's
+ * Back closes the plan instead of leaving Out Here; closing it with X goes back over that entry.
+ * Switching from one plan to another replaces the entry (Back returns to the map, not plan A).
+ */
+const QUEST_ENTRY = 'ohQuest';
+function setQuestParam(id: string | null) {
   const url = new URL(window.location.href);
-  if (id) url.searchParams.set(key, id);
-  else url.searchParams.delete(key);
-  window.history.replaceState(window.history.state, '', url.toString());
+  const had = url.searchParams.has('quest');
+  if (id) url.searchParams.set('quest', id);
+  else url.searchParams.delete('quest');
+  const state = window.history.state as Record<string, unknown> | null;
+  if (!id && state?.[QUEST_ENTRY]) { window.history.back(); return; }
+  if (id && !had) window.history.pushState({ ...(state ?? {}), [QUEST_ENTRY]: true }, '', url.toString());
+  else window.history.replaceState(state, '', url.toString());
 }
 
 export function OutHereView() {
@@ -65,7 +67,8 @@ export function OutHereView() {
   const now = useNow();
   const questsApi = useQuests(DEMO_CENTER, 5000);
   const ctxApi = useApi<MapContext>('/out-here/context', [], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
-  const [mode, setMode] = useState<MapMode>('explore');
+  // Out Here opens on Friends (who's around), then Explore (every plan). ?mode=explore opens Explore.
+  const [mode, setMode] = useState<MapMode>('friends');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
@@ -78,12 +81,7 @@ export function OutHereView() {
     saveView(v);
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
-  // "Post a plan" or "Sell for pickup": the draft pin's spot and emoji while that sheet is open.
-  const [creating, setCreating] = useState<{ at: LatLng; emoji: string; kind: 'plan' | 'sell' } | null>(null);
-  // Marketplace pickup: the open listing sheet, whether listings show, and dismissed Muse finds.
-  const [listingId, setListingId] = useState<string | null>(null);
-  const [showListings, setShowListings] = useState(true);
-  const [dismissedFinds, setDismissedFinds] = useState<ReadonlySet<string>>(() => new Set());
+  const [creating, setCreating] = useState<{ at: LatLng; category: string } | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -93,8 +91,6 @@ export function OutHereView() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('quest');
     if (id) setSelectedId(id);
-    const lid = params.get('listing');
-    if (lid) setListingId(lid);
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
     // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
@@ -108,6 +104,7 @@ export function OutHereView() {
 
   const ctx = ctxApi.data && ctxApi.data.viewer.id === persona.id ? ctxApi.data : null;
   const live = useMemo(() => (questsApi.data?.quests ?? []).filter((q) => q.status !== 'done' && new Date(q.endsAt) > now), [questsApi.data, now]);
+  useEffect(() => { if (questsApi.data) rememberCategories(questsApi.data.quests); }, [questsApi.data]);
   const visible: Quest[] = useMemo(() => {
     if (mode === 'explore') return live;
     const friends = new Set(ctx?.friendIds ?? []);
@@ -128,7 +125,7 @@ export function OutHereView() {
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
-  const reasonLabel = filter.closest ? 'Closest' : filter.source === 'fallback' ? 'Quick match' : filter.live ? '✨ Muse' : 'Muse (offline)';
+  const reasonLabel = filter.closest ? 'Closest' : filter.source === 'fallback' ? 'Quick match' : filter.live ? 'Muse' : 'Muse (offline)';
   const reasonFor = useCallback((id: string) => {
     const text = filter.on ? filter.reasons.get(id) : undefined;
     return text ? { label: reasonLabel, text } : null;
@@ -141,7 +138,7 @@ export function OutHereView() {
       const byId = new Map(visible.map((q) => [q.id, q]));
       return [...filter.reasons].flatMap(([id, reason]) => {
         const q = byId.get(id);
-        return q ? [{ id, icon: q.emoji, name: q.title, reason }] : [];
+        return q ? [{ id, icon: q.category, name: q.title, reason }] : [];
       });
     }
     const byId = new Map(allFriendPins.map((p) => [p.friend.id, p]));
@@ -210,36 +207,21 @@ export function OutHereView() {
     return pts.length > 0 ? pts : null;
   }, [planPicks, mode, friendPins.data]);
 
-  const openListing = useCallback((id: string | null) => {
-    setListingId(id);
-    setQuestParam(id, 'listing');
-    if (id) { setSelectedId(null); setQuestParam(null); }
+  const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  // Back and Forward: the plan in the URL is the plan on screen.
+  useEffect(() => {
+    const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
-  const select = useCallback((id: string | null) => {
-    setSelectedId(id);
-    setQuestParam(id);
-    if (id) { setListingId(null); setQuestParam(null, 'listing'); }
-  }, []);
-
-  // Marketplace pickup on the map (Explore only), and what Muse found for the viewer's wants.
-  const listingsApi = useMapListings(mode === 'explore' && showListings);
-  const mapListings: MapListing[] = useMemo(
-    () => (mode === 'explore' && showListings ? listingsApi.data?.listings ?? [] : []), [mode, showListings, listingsApi.data],
-  );
-  const wantsApi = useMuseWants();
-  const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
-  const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
-  const find = (findsApi.data?.finds ?? []).find((f) => !dismissedFinds.has(f.listingId)) ?? null;
-  const viewFind = useCallback((id: string, at: LatLng | null) => {
-    setMode('explore');
-    setShowListings(true);
-    openListing(id);
-    if (map && at) map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700 });
-  }, [map, openListing]);
-  const openedListing = listingId ? listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
-  const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
   const togetherId = useTogetherId();
   const sheetOpen = planOpen || togetherId !== null;
+  // "View on map" from the Muse chat: show Explore (so the pin is there) and open that quest.
+  useEffect(() => {
+    const on = (e: Event) => { setMode('explore'); select((e as CustomEvent<string>).detail); };
+    window.addEventListener('muse:select-quest', on);
+    return () => window.removeEventListener('muse:select-quest', on);
+  }, [select]);
   // "See it on the map" from a confirmed shared plan opens that quest's panel here.
   useEffect(() => {
     const on = (e: Event) => select((e as CustomEvent<string>).detail);
@@ -253,25 +235,10 @@ export function OutHereView() {
     const spot = at ?? (c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
     setPlanOpen(false);
     select(null);
-    setCreating((cur) => ({ at: spot, emoji: cur?.kind === 'plan' ? cur.emoji : '📍', kind: 'plan' }));
+    setCreating((cur) => ({ at: spot, category: cur?.category ?? 'other' }));
   }, [map, select]);
-  const startSell = useCallback(() => {
-    const c = map?.getCenter();
-    setPlanOpen(false);
-    select(null);
-    openListing(null);
-    setCreating({ at: c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER, emoji: '🏷️', kind: 'sell' });
-  }, [map, select, openListing]);
-  const onListed = useCallback((l: MapListing) => {
-    setCreating(null);
-    setMode('explore');
-    setShowListings(true);
-    void listingsApi.refetch();
-    openListing(l.listing.id);
-    toast.show('Your listing is on the map.');
-  }, [listingsApi, openListing, toast]);
   const moveDraft = useCallback((at: LatLng) => setCreating((cur) => (cur ? { ...cur, at } : cur)), []);
-  const draftEmoji = useCallback((emoji: string) => setCreating((cur) => (cur && cur.emoji !== emoji ? { ...cur, emoji } : cur)), []);
+  const draftCategory = useCallback((category: string) => setCreating((cur) => (cur && cur.category !== category ? { ...cur, category } : cur)), []);
   const onPosted = useCallback((q: Quest) => {
     setCreating(null);
     setMode('explore');
@@ -354,6 +321,17 @@ export function OutHereView() {
     setMode('explore');
     letsGo(id);
   }, [letsGo]);
+  /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
+  const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
+  // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
+  const recenter = useCallback(() => {
+    if (show3d) { window.dispatchEvent(new Event('outhere:recenter')); return; }
+    const at = ctx?.origin ?? DEMO_CENTER;
+    map?.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 15), duration: 600 });
+  }, [show3d, ctx?.origin, map]);
+  // Tests drive the tools directly, so the Demo pill only shows for people.
+  const [navigatorIsTest, setNavigatorIsTest] = useState(true);
+  useEffect(() => setNavigatorIsTest(navigator.webdriver === true), []);
   const onArrive = useCallback((questId: string) => {
     finishWalk(questId);
     setArrivedId(questId);
@@ -388,7 +366,7 @@ export function OutHereView() {
       {show3d && map && (
         <World3D
           map={map}
-          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name }}
+          viewer={{ id: persona.id, name: ctx?.viewer.name ?? persona.name, avatarUrl: ctx?.viewer.avatarUrl ?? persona.avatarUrl }}
           home={ctx?.origin ?? null}
           quests={shown}
           picks={picks}
@@ -404,67 +382,30 @@ export function OutHereView() {
         />
       )}
 
-      {/* Keep the camera toggle clear of the action row and the 3D joystick. */}
-      {!unsupported && (
-        <div className={`absolute bottom-6 left-3 z-20 ${view === '3d' ? 'max-md:bottom-[250px]' : 'max-md:bottom-6'}`}>
-          <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
-            {(['map', '3d'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={view === v}
-                data-testid={`view-${v}`}
-                onClick={() => setView(v)}
-                className={cn(
-                  'h-8 rounded-pill px-3 text-[14px] font-semibold transition-colors',
-                  view === v ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
-                )}
-              >
-                {v === 'map' ? 'Map' : '3D'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       {viewNote && (
         <p role="status" className="absolute inset-x-4 top-[60px] z-[16] mx-auto max-w-[340px] rounded-card bg-fb-surface px-3 py-2 text-center text-[13px] text-fb-text-2 shadow-card">
           {viewNote}
         </p>
       )}
 
-      {/* Explore / Friends, and the Muse filter chip beside them */}
-      <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">
-        <div role="group" aria-label="Map view" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
-          {(['explore', 'friends'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              data-testid={`map-mode-${m}`}
-              onClick={() => setMode(m)}
-              className={cn(
-                'h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors',
-                mode === m ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
-              )}
-            >
-              {m === 'explore' ? 'Explore' : 'Friends'}
-            </button>
-          ))}
+      {/* Rehearsal tool (?tools=1): the Muse filter. Explore / Friends live in the dashboard below. */}
+      {tools && !show3d && (
+        <div className="absolute left-1/2 top-3 z-10 -translate-x-1/2">
+          <button
+            type="button"
+            aria-pressed={filter.on}
+            data-testid="muse-filter-toggle"
+            title="Muse shows only what matches what you're looking for"
+            onClick={() => filter.setOn(!filter.on)}
+            className={cn(
+              'h-10 whitespace-nowrap rounded-pill px-3 text-[15px] font-semibold shadow-card transition-colors',
+              filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
+            )}
+          >
+            Muse filter
+          </button>
         </div>
-        {tools && <button
-          type="button"
-          aria-pressed={filter.on}
-          data-testid="muse-filter-toggle"
-          title="Muse shows only what matches what you're looking for"
-          onClick={() => filter.setOn(!filter.on)}
-          className={cn(
-            'h-10 whitespace-nowrap rounded-pill px-3 text-[15px] font-semibold shadow-card transition-colors',
-            filter.on ? 'bg-fb-blue text-white hover:bg-fb-blue-hover' : 'bg-fb-surface text-fb-text hover:bg-fb-hover',
-          )}
-        >
-          <span aria-hidden>✨</span> Muse filter
-        </button>}
-      </div>
+      )}
 
       {filter.on && (
         <div className="pointer-events-none absolute inset-x-4 top-[60px] z-[15] flex flex-col items-center gap-1">
@@ -542,7 +483,9 @@ export function OutHereView() {
                     }}
                     className="flex w-full items-start gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-fb-hover"
                   >
-                    <span className="w-6 shrink-0 text-center text-[18px] leading-6" aria-hidden>{it.icon}</span>
+                    {mode === 'explore'
+                      ? <CategoryIcon category={it.icon} size={24} />
+                      : <span className="w-6 shrink-0 text-center text-[18px] leading-6" aria-hidden>{it.icon}</span>}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold leading-5 text-fb-text">{it.name}</span>
                       <span className="block text-[13px] leading-4 text-fb-text-2">
@@ -560,12 +503,6 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
-          <PeopleButton map={map} />
-          {visible.length > 0 && (
-            <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
-              Plans your friends joined · {visible.length}
-            </p>
-          )}
           {!unsupported && ctx && questsApi.data && visible.length === 0 && (
             <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
               <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">
@@ -583,10 +520,10 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && upNext && (
+      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && (
         // Below the Muse filter status and the Friends chip, so neither is ever covered.
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
-          mode === 'friends' && visible.length > 0 ? (filter.on ? 'top-[132px]' : 'top-[96px]') : filter.on ? 'top-[100px]' : 'top-[60px]')}>
+          filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}
             plan={upNext}
@@ -599,99 +536,55 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* Dock the availability card at the edge to leave room for the map and avatar. */}
-      {!selectedId && !creating && !sheetOpen && !upNext && (
-        <div className={cn(
-          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
-          show3d
-            ? mode === 'friends' && visible.length > 0
-              ? filter.on ? 'top-32' : 'top-24'
-              : filter.on ? 'top-24' : 'top-[60px]'
-            : 'bottom-[136px] md:bottom-auto',
-        )}>
-          <BothFreeNudge className="pointer-events-auto w-full" />
+      {/* "You're both free": the same top slot as Up next (only one shows), clear of the dashboard. */}
+      {!selectedId && !creating && !sheetOpen && !upNext && !show3d && (
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center md:inset-x-auto md:left-4 md:max-w-[380px]', filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
+          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
         </div>
       )}
 
-      {mode === 'explore' && (
-        <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null} onSelect={(id) => (creating ? undefined : openListing(id))} />
-      )}
-
-      {/* Muse found something the viewer is looking for: above the bottom row. */}
-      {find && !creating && !sheetOpen && !listingId && !selectedId && (
-        <div className="pointer-events-none absolute inset-x-3 bottom-[88px] z-20 flex justify-center max-md:bottom-[152px]">
-          <MuseFindCard
-            key={find.listingId}
-            find={find}
-            onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
-            onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
+      {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
+          for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
+      {!unsupported && !creating && !sheetOpen && (
+        <div className={cn(selectedId && 'max-md:hidden')}>
+          <OutHereDock
+            mode={mode}
+            onMode={setMode}
+            view={view}
+            onToggleView={() => setView(view === '3d' ? 'map' : '3d')}
+            onRecenter={recenter}
+            onCreate={() => startCreate()}
+            quests={shown}
+            walkMinutes={ctx?.walkMinutes ?? {}}
+            now={now}
+            onSelect={select}
+            showActions={!walkingNow}
           />
         </div>
       )}
 
-      {/* One row at the bottom: "I'm free" (it also shows your status), Marketplace, Your plans, and ＋ Post a plan. */}
-      {!creating && !sheetOpen && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
-          <div className="pointer-events-auto flex items-center gap-2">
-            <ImFreeButton />
-            {!unsupported && (
-              <MarketMenu
-                wants={wants}
-                onWantsChanged={() => { void wantsApi.refetch(); }}
-                onSell={startSell}
-                showListings={showListings}
-                onShowListings={setShowListings}
-              />
-            )}
-            <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
-              className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
-              <CalendarCheck size={22} aria-hidden />
-            </Link>
-            {!unsupported && (
-              <button
-                type="button"
-                data-testid="create-plan-btn"
-                aria-label="Post a plan"
-                title="Post a plan (or long-press the map)"
-                onClick={() => startCreate()}
-                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
-              >
-                <Plus size={26} aria-hidden />
-              </button>
-            )}
-          </div>
-        </div>
+      {/* Rehearsal tools are on (?tools=1): say so, and offer the way out. */}
+      {tools && !navigatorIsTest && (
+        <a href="?tools=0" data-testid="demo-pill" title="Demo tools are on. Tap to hide them."
+          className="absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-2 rounded-pill bg-[#1C1E21]/75 px-3 text-[14px] font-semibold text-white backdrop-blur hover:bg-[#1C1E21]/90">
+          <span aria-hidden className="size-2.5 rounded-full bg-[#31A24C]" />Demo
+        </a>
       )}
       <PlanSheet />
       <TogetherSheet />
-      {creating?.kind === 'sell' && (
-        <SellSheet at={creating.at} now={now} onClose={() => setCreating(null)} onPosted={onListed} />
-      )}
-      {creating?.kind === 'plan' && (
+      {creating && (
         <CreatePlanSheet
           at={creating.at}
           friends={ctx?.friends ?? []}
           onMove={moveDraft}
-          onEmoji={draftEmoji}
+          onCategory={draftCategory}
           onClose={() => setCreating(null)}
           onPosted={onPosted}
         />
       )}
 
       {!unsupported && (
-        <MapAttribution className={cn('absolute bottom-0 right-0', (selectedId || listingId) && 'max-md:hidden')} />
-      )}
-
-      {listingId && !creating && (
-        <ListingSheet
-          key={listingId}
-          listingId={listingId}
-          viewerId={persona.id}
-          driveMin={driveMin}
-          museLine={find?.listingId === listingId ? find.line : (findsApi.data?.finds ?? []).find((f) => f.listingId === listingId)?.line ?? null}
-          onClose={() => openListing(null)}
-          onChanged={() => { void listingsApi.refetch(); }}
-        />
+        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', selectedId && 'max-md:hidden')} />
       )}
 
       {selectedId && !creating && (

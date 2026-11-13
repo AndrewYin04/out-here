@@ -23,6 +23,7 @@ import { View } from './view';
 import {
   addMuseWant, createListing, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold,
 } from './market';
+import { marketplaceContext, recordWatch, watch } from './watch';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
   hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, mutualHangAgainMany, myRatings,
@@ -1170,7 +1171,9 @@ export class CoreStore {
     const crew = v.db.crews.find((c) => c.id === body.crewId);
     if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
     const quest = v.questById.get(body.questId);
-    if (!quest || crew.originQuestId !== quest.id || quest.status !== 'done') throw badRequest('Choose a completed hangout for this album.');
+    // Done, or about to start (the photo can be taken up to EARLY_PHOTO_MS early, see completeQuest).
+    const photoOpen = !!quest && (quest.status === 'done' || new Date(quest.startsAt).getTime() - now().getTime() <= EARLY_PHOTO_MS);
+    if (!quest || crew.originQuestId !== quest.id || !photoOpen) throw badRequest('Choose a completed hangout for this album.');
     const id = uuid();
     await this.backend.uploadFile('crew-photos', id, body.file.bytes, body.file.contentType);
     const m: Memory = {
@@ -1184,6 +1187,27 @@ export class CoreStore {
     return m;
   }
 
+  /** The memory page's title: the crew's name. Crew members only. */
+  async renameCrew(viewerId: ID, crewId: ID, name: string): Promise<Crew> {
+    const v = await this.view();
+    const crew = v.db.crews.find((c) => c.id === crewId);
+    if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
+    await this.backend.update('crews', { id: crewId }, { name });
+    for (const member of v.crewMemberIds(crewId)) await publish(`user:${member}`, { type: 'memory', id: crewId });
+    const after = await this.view();
+    return after.crew(after.db.crews.find((c) => c.id === crewId)!);
+  }
+
+  /** The memory page's story lives on its cover photo's caption. Crew members only. */
+  async captionMemory(viewerId: ID, memoryId: ID, caption: string): Promise<Memory> {
+    const v = await this.view();
+    const memory = v.db.memories.find((m) => m.id === memoryId);
+    if (!memory || !v.crewMemberIds(memory.crewId).includes(viewerId)) throw forbidden('crew members only');
+    await this.backend.update('memories', { id: memoryId }, { caption });
+    for (const member of v.crewMemberIds(memory.crewId)) if (member !== viewerId) await publish(`user:${member}`, { type: 'memory', id: memoryId });
+    return { ...memory, caption };
+  }
+
   async memoryPhoto(viewerId: ID, id: ID): Promise<Blob> {
     const v = await this.view();
     const memory = v.db.memories.find((m) => m.id === id);
@@ -1191,6 +1215,16 @@ export class CoreStore {
       throw notFound('photo_not_found');
     }
     return this.backend.downloadCrewPhoto(id);
+  }
+
+  /** Explicit uploader action only: updates the saved record, never uploads or publishes. */
+  async updateMemoryCaption(viewerId: ID, id: ID, caption: string): Promise<Memory> {
+    const v = await this.view();
+    const memory = v.db.memories.find(m => m.id === id);
+    if (!memory || memory.uploaderId !== viewerId || !v.crewMemberIds(memory.crewId).includes(viewerId)) throw notFound('memory_not_found');
+    await this.backend.update('memories', {id, uploaderId:viewerId}, {caption});
+    for (const member of v.crewMemberIds(memory.crewId)) if(member!==viewerId) await publish(`user:${member}`,{type:'memory',id});
+    return {...memory,caption};
   }
 
   async daily(date: string = demoDate()): Promise<DailyQuest> {
@@ -1271,6 +1305,10 @@ export class CoreStore {
   releaseHold(viewerId: ID, holdId: ID) { return releaseHold(this, viewerId, holdId); }
   markSold(viewerId: ID, listingId: ID) { return markSold(this, viewerId, listingId); }
   museWants(viewerId: ID) { return museWants(this, viewerId); }
+  // ---------- watch history (watch.ts) ----------
+  watch(viewerId: ID) { return watch(this, viewerId); }
+  recordWatch(viewerId: ID, videoKey: string, seconds: number) { return recordWatch(this, viewerId, videoKey, seconds); }
+  marketplaceContext(viewerId: ID) { return marketplaceContext(this, viewerId); }
   addMuseWant(viewerId: ID, w: Parameters<typeof addMuseWant>[2]) { return addMuseWant(this, viewerId, w); }
   removeMuseWant(viewerId: ID, id: ID) { return removeMuseWant(this, viewerId, id); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }

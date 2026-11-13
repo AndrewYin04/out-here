@@ -3,6 +3,7 @@
 // RawIntent with regexes, so both paths share resolveWindow.
 import { z } from 'zod';
 import type { MuseIntent, Profile } from '../../shared';
+import { normalizeText } from './cache-key';
 import { museJSON, reportFallback } from './client';
 import { parsePrompt } from './prompts/parse';
 import { localLabel, resolveWindow, type TimeExpression } from './time';
@@ -64,6 +65,14 @@ export type ParsedIntent = {
   latencyMs: number;
   /** Why the live call failed (only when model is "heuristic"). */
   error: string | null;
+  /** True when a cached Muse answer was served (muse_cache). */
+  cached: boolean;
+};
+
+export type ParseOpts = {
+  route?: string; deadline?: number; timeoutMs?: number;
+  /** Text the cache key uses instead of the sent text (plan together rounds its minutes). */
+  keyText?: string;
 };
 
 /** RawIntent -> MuseIntent with the window resolved against `now`. */
@@ -93,10 +102,10 @@ export async function parseIntent(
   text: string,
   now: Date,
   viewer: Pick<Profile, 'id' | 'interests'> | null,
-  opts: { route?: string; deadline?: number; timeoutMs?: number } = {},
+  opts: ParseOpts = {},
 ): Promise<ParsedIntent> {
   const started = Date.now();
-  let res: { data: RawIntent; model: string; latencyMs: number };
+  let res: { data: RawIntent; model: string; latencyMs: number; cached?: boolean };
   let error: string | null = null;
   try {
     res = await callParse(text, now, viewer, opts);
@@ -106,14 +115,17 @@ export async function parseIntent(
     reportFallback({ route: opts.route ?? 'muse/plan', step: 'intent', error, userId: viewer?.id ?? null });
     res = { data: mockParse(text, now), model: 'heuristic', latencyMs: Date.now() - started };
   }
-  return { intent: toMuseIntent(res.data, now), understood: res.data.understood, model: res.model, latencyMs: res.latencyMs, error };
+  return {
+    intent: toMuseIntent(res.data, now), understood: res.data.understood, model: res.model, latencyMs: res.latencyMs, error,
+    cached: res.cached === true,
+  };
 }
 
 function callParse(
   text: string,
   now: Date,
   viewer: Pick<Profile, 'id' | 'interests'> | null,
-  opts: { route?: string; deadline?: number; timeoutMs?: number },
+  opts: ParseOpts,
 ) {
   return museJSON({
     schemaName: 'intent',
@@ -127,6 +139,9 @@ function callParse(
     userId: viewer?.id ?? null,
     deadline: opts.deadline,
     timeoutMs: opts.timeoutMs,
+    // Cache key: persona + normalized text (+ the prompt template); the clock label is left out,
+    // so the same ask matches later in the day. Code resolves the relative times against now.
+    cacheKey: { text: normalizeText(opts.keyText ?? text) },
   });
 }
 

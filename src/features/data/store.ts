@@ -91,6 +91,10 @@ export interface DataStore {
   memories: CoreStore['memories'];
   addMemory: CoreStore['addMemory'];
   memoryPhoto: CoreStore['memoryPhoto'];
+  renameCrew: CoreStore['renameCrew'];
+  captionMemory: CoreStore['captionMemory'];
+  updateMemoryCaption: CoreStore['updateMemoryCaption'];
+
   daily: CoreStore['daily'];
   dailyEntry: CoreStore['dailyEntry'];
   streak: CoreStore['streak'];
@@ -107,6 +111,9 @@ export interface DataStore {
   museWants: CoreStore['museWants'];
   addMuseWant: CoreStore['addMuseWant'];
   removeMuseWant: CoreStore['removeMuseWant'];
+  watch: CoreStore['watch'];
+  recordWatch: CoreStore['recordWatch'];
+  marketplaceContext: CoreStore['marketplaceContext'];
   reels: CoreStore['reels'];
   uploadFile: CoreStore['uploadFile'];
   /** Raw tables + view helpers for server-side Muse candidate generation. Never send to the browser. */

@@ -4,11 +4,12 @@
 // along streets, never inside a building. Pure functions; Vitest covers them.
 import { haversineMeters, type LatLng } from '@/shared';
 import { offsetMeters } from './math';
+import type {TreeKind} from './vegetation';
 
-export type TreeSpot = { lat: number; lng: number; height: number; tone: number };
+export type TreeSpot = { lat: number; lng: number; height: number; tone: number;kind?:TreeKind };
 type Ring = number[][]; // [lng, lat][]
 export type Area = { rings: Ring[]; spacing: number };
-export type Street = { coords: number[][]; spacing: number; offset: number };
+export type Street = { coords: number[][]; spacing: number; offset: number; width?:number;trees?:boolean };
 
 const M_PER_DEG = 111_320;
 
@@ -65,10 +66,23 @@ export function placeTrees(opts: {
   const blockers = opts.blockers.map((rings) => ({ rings, box: boxOf(rings) }));
   const blocked = (p: LatLng) => blockers.some((b) => inBox(p, b.box) && inPolygon(p, b.rings));
   const near = (p: LatLng) => haversineMeters(center, p) <= radiusM;
+  const roadCells=new Map<string,{ax:number;ay:number;dx:number;dy:number;len2:number;r:number}[]>(),cell=24,focus=offsetMeters(origin,center);
+  for(const st of opts.streets)for(let k=1;k<st.coords.length;k++){
+    const a=offsetMeters(origin,{lng:st.coords[k-1][0],lat:st.coords[k-1][1]}),b=offsetMeters(origin,{lng:st.coords[k][0],lat:st.coords[k][1]}),r=(st.width??(st.offset>9?8:5.5))/2+1.7;
+    const segment={ax:a.east,ay:a.north,dx:b.east-a.east,dy:b.north-a.north,len2:(b.east-a.east)**2+(b.north-a.north)**2,r};
+    const x0=Math.floor(Math.max(focus.east-radiusM,Math.min(a.east,b.east)-r)/cell),x1=Math.floor(Math.min(focus.east+radiusM,Math.max(a.east,b.east)+r)/cell),y0=Math.floor(Math.max(focus.north-radiusM,Math.min(a.north,b.north)-r)/cell),y1=Math.floor(Math.min(focus.north+radiusM,Math.max(a.north,b.north)+r)/cell);
+    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){const key=`${x}:${y}`,list=roadCells.get(key)??[];list.push(segment);roadCells.set(key,list);}
+  }
+  const roadBlocked=(p:LatLng)=>{const o=offsetMeters(origin,p);for(const s of roadCells.get(`${Math.floor(o.east/cell)}:${Math.floor(o.north/cell)}`)??[]){const t=s.len2?Math.max(0,Math.min(1,((o.east-s.ax)*s.dx+(o.north-s.ay)*s.dy)/s.len2)):0;if((o.east-s.ax-t*s.dx)**2+(o.north-s.ay-t*s.dy)**2<s.r*s.r)return true;}return false;};
   const out = new Map<string, TreeSpot & { d: number }>();
   const keep = (p: LatLng, key: string, salt: number) => {
     if (out.has(key) || !near(p) || blocked(p)) return;
-    out.set(key, { ...p, height: 7 + hash01(salt, key.length, 7) * 7, tone: hash01(salt, 3, key.length), d: haversineMeters(center, p) });
+    // Keep trunks and the inner crown clear of building walls, not just the centre point.
+    for(const [e,n] of [[1.8,0],[-1.8,0],[0,1.8],[0,-1.8]])if(blocked(fromOffset(p,e,n)))return;
+    if(roadBlocked(p))return;
+    const tone=hash01(salt,3,key.length),kind=Math.min(3,Math.floor(tone*4)) as TreeKind;
+    const height=kind===3?3.8+tone*1.8:key.startsWith('s:')?5.5+tone*2.5:7+tone*4;
+    out.set(key,{...p,height,tone,kind,d:haversineMeters(center,p)});
   };
 
   // Green areas: a grid in meters from the origin, one jittered tree per cell.
@@ -78,19 +92,21 @@ export function placeTrees(opts: {
     const sw = offsetMeters(origin, { lat: b.minLat, lng: b.minLng });
     const ne = offsetMeters(origin, { lat: b.maxLat, lng: b.maxLng });
     const s = a.spacing;
-    const i0 = Math.floor(sw.east / s), i1 = Math.ceil(ne.east / s);
-    const j0 = Math.floor(sw.north / s), j1 = Math.ceil(ne.north / s);
+    const i0 = Math.floor(Math.max(sw.east,focus.east-radiusM) / s), i1 = Math.ceil(Math.min(ne.east,focus.east+radiusM) / s);
+    const j0 = Math.floor(Math.max(sw.north,focus.north-radiusM) / s), j1 = Math.ceil(Math.min(ne.north,focus.north+radiusM) / s);
     if ((i1 - i0) * (j1 - j0) > 40_000) continue; // a huge polygon at low zoom: skip
     for (let i = i0; i <= i1; i++) {
       for (let j = j0; j <= j1; j++) {
         const p = fromOffset(origin, (i + 0.15 + hash01(i, j, 1) * 0.7) * s, (j + 0.15 + hash01(i, j, 2) * 0.7) * s);
-        if (inPolygon(p, a.rings)) keep(p, `a${s}:${i}:${j}`, i * 31 + j);
+        const density=.45+hash01(Math.floor(i/3),Math.floor(j/3),23)*.4;
+        if (hash01(i,j,24)<density&&inPolygon(p, a.rings)) keep(p, `a${s}:${i}:${j}`, i * 31 + j);
       }
     }
   }
 
   // Street trees: every `spacing` meters along each line, on both sides at `offset` meters.
   for (const st of opts.streets) {
+    if(st.trees===false)continue;
     for (let k = 1; k < st.coords.length; k++) {
       const a = offsetMeters(origin, { lng: st.coords[k - 1][0], lat: st.coords[k - 1][1] });
       const b = offsetMeters(origin, { lng: st.coords[k][0], lat: st.coords[k][1] });
@@ -98,8 +114,9 @@ export function placeTrees(opts: {
       const len = Math.hypot(dx, dy);
       if (len < 1) continue;
       const nx = -dy / len, ny = dx / len;
-      for (let t = st.spacing / 2; t < len; t += st.spacing) {
-        const ex = a.east + (dx * t) / len, ny0 = a.north + (dy * t) / len;
+      for (let t = Math.max(14,st.spacing*.5); t < len-14; t += st.spacing) {
+        const jitter=(hash01(Math.round(a.east),Math.round(t),11)-.5)*st.spacing*.35;
+        const ex = a.east + (dx * (t+jitter)) / len, ny0 = a.north + (dy * (t+jitter)) / len;
         for (const side of [-1, 1]) {
           const e = ex + nx * st.offset * side, n = ny0 + ny * st.offset * side;
           // Snap to a 6 m grid so the same street split across tiles gives the same trees.
@@ -110,7 +127,7 @@ export function placeTrees(opts: {
     }
   }
 
-  return [...out.values()].sort((x, y) => x.d - y.d).slice(0, cap).map((t) => ({ lat: t.lat, lng: t.lng, height: t.height, tone: t.tone }));
+  return [...out.values()].sort((x, y) => x.d - y.d).slice(0, cap).map((t) => ({ lat: t.lat, lng: t.lng, height: t.height, tone: t.tone,kind:t.kind }));
 }
 
 /** A fast "is this point inside a building?" test over many polygons (bounding boxes first). */
@@ -149,4 +166,14 @@ export function nearestOnLines(p: LatLng, lines: number[][][], maxM: number): La
     }
   }
   return best ? fromOffset(p, best.e, best.n) : null;
+}
+
+/** Face along the nearest mapped street at startup, rather than framing a wall across it. */
+export function streetHeading(p:LatLng,lines:number[][][],current:number):number|null{
+ let best=Infinity,heading:number|null=null;
+ for(const coords of lines)for(let k=1;k<coords.length;k++){
+  const segment=[coords[k-1],coords[k]],point=nearestOnLines(p,[segment],80);if(!point)continue;const distance=haversineMeters(p,point);if(distance>=best)continue;
+  const a=offsetMeters(p,{lng:coords[k-1][0],lat:coords[k-1][1]}),b=offsetMeters(p,{lng:coords[k][0],lat:coords[k][1]});if(Math.hypot(b.east-a.east,b.north-a.north)<2)continue;
+  const forward=(Math.atan2(b.east-a.east,b.north-a.north)*180/Math.PI+360)%360,back=(forward+180)%360,difference=(a:number,b:number)=>Math.abs(((a-b+540)%360)-180);heading=difference(forward,current)<=difference(back,current)?forward:back;best=distance;
+ }return heading;
 }

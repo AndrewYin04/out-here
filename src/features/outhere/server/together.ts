@@ -60,7 +60,8 @@ export async function proposeTogether(store: DataStore, viewerId: ID, friendIds:
   for (const planner of members) {
     const others = members.filter((m) => m !== planner);
     const context = await provider.getPlanContext({ userId: planner, location: null, now });
-    const out = await plan({ text, userId: planner, location: null, now, context });
+    // keyText: the Muse cache key rounds the minutes to 15, so a warmed plan still matches a minute later.
+    const out = await plan({ text, keyText: text.replace(/\d+ min$/, `~${Math.round(minutes / 15) * 15} min`), userId: planner, location: null, now, context });
     const questById = new Map(context.quests.map((q) => [q.id, q]));
     const windows = new Map<ID, typeof context.friendAvailability>();
     for (const a of context.friendAvailability) windows.set(a.userId, [...(windows.get(a.userId) ?? []), a]);
