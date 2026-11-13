@@ -13,7 +13,7 @@ type PaintValue = Parameters<MapLibreMap['setPaintProperty']>[2];
 /** Paint overrides on Positron's own layers: [layer id, property, value]. Missing layers are skipped. */
 const PAINT: [string, PaintProp, PaintValue][] = [
   // Sunny, saturated and clean: lawn greens, bay blue, dark asphalt with white curbs.
-  ['background', 'background-color', '#EEF3E1'],
+  ['background', 'background-color', '#CDE8AF'],
   ['park', 'fill-color', '#8FD16F'],
   ['landcover_wood', 'fill-color', '#5FB653'],
   ['landuse_residential', 'fill-color', '#F3EEDF'],
@@ -83,12 +83,12 @@ export function applyCityTheme(map: MapLibreMap): () => void {
   };
 
   if (source) {
-    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#F4EEDD','#ECEADF'],'fill-opacity':.85}},firstRoad);
+    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#F4EEDD','#EFEDE2'],'fill-opacity':.5}},firstRoad);
     // Grass and sports fields: in the tiles, not drawn by Positron.
     add({
       id: GRASS_ID, type: 'fill', source, 'source-layer': 'landcover',
       filter: ['match', ['get', 'class'], ['grass', 'wetland', 'farmland'], true, false],
-      paint: { 'fill-color': ['match',['get','class'],'wetland','#7FCBB0','farmland','#C8DC8A','#9FDB7C'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': ['match',['get','class'],'wetland','#A6D99A','farmland','#C8DC8A','#9FDB7C'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',

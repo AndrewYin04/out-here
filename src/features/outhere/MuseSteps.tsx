@@ -29,7 +29,7 @@ export function MuseStepsLoading({ steps = LOADING_STEPS, className, title, sub 
   return (
     <div data-testid="muse-steps-loading" className={cn('mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card', className)}>
       <p className="mb-1.5 flex items-center gap-2 text-[15px] font-semibold text-fb-text">
-        <span aria-hidden className="size-6 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-4px_7px_rgba(0,60,180,.45)]" />
+        <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[11px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
         <span>{title ?? 'Muse is working…'}{sub && <span className="block text-[13px] font-normal text-fb-text-2">{sub}</span>}</span>
       </p>
       <ul className="flex flex-col gap-1">

@@ -287,7 +287,14 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       void loadModels().then((models) => { if (!cancelled && (models.avatar || models.pet)) layer?.setModels(models); });
 
       // Follow the avatar and ease down to street level behind it (see `entering` in the loop).
-      heading.current = normalizeDeg(map.getBearing());
+      // Open facing something worth seeing: the plan you're walking to, else the nearest plan
+      // within a short walk, else the way the map was already turned (never a blank wall by chance).
+      const target = walkRef.current?.to
+        ?? questsRef.current
+          .map((q) => ({ q, d: haversineMeters(pos.current, q.location) }))
+          .filter((x) => x.d > 25 && x.d < 900)
+          .sort((a, b) => a.d - b.d)[0]?.q.location;
+      heading.current = target ? bearingDeg(pos.current, target) : normalizeDeg(map.getBearing());
       camBearing.current = heading.current;
       entering.current = true;
       setFollow(true);
