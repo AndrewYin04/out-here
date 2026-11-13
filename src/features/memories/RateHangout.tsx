@@ -33,19 +33,22 @@ const SCORE_COLOR: Record<HangoutVerdict, string> = {
 
 const FRESH = { headers: { 'x-outhere-fresh': '1' } };
 
-/** The questionnaire as a dialog. Mount it with a questId to open it. */
-export function RateHangoutDialog({ questId, crewId = null, onClose, onSaved }: {
-  questId: ID | null; crewId?: ID | null; onClose: () => void; onSaved?: (rating: HangoutRating) => void;
+/**
+ * The questionnaire as a dialog. Mount it with a questId to open it. initialPhotoIds: memories
+ * already taken for this hangout (the arrival selfie) that the photo step starts with.
+ */
+export function RateHangoutDialog({ questId, crewId = null, initialPhotoIds, onClose, onSaved }: {
+  questId: ID | null; crewId?: ID | null; initialPhotoIds?: ID[]; onClose: () => void; onSaved?: (rating: HangoutRating) => void;
 }) {
   return (
     <Modal open={!!questId} onClose={onClose} title="Rate your hangout" size="md">
-      {questId && <RateHangout key={questId} questId={questId} crewId={crewId} onClose={onClose} onSaved={onSaved} />}
+      {questId && <RateHangout key={questId} questId={questId} crewId={crewId} initialPhotoIds={initialPhotoIds} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
 }
 
-export function RateHangout({ questId, crewId, onClose, onSaved }: {
-  questId: ID; crewId: ID | null; onClose: () => void; onSaved?: (rating: HangoutRating) => void;
+export function RateHangout({ questId, crewId, initialPhotoIds, onClose, onSaved }: {
+  questId: ID; crewId: ID | null; initialPhotoIds?: ID[]; onClose: () => void; onSaved?: (rating: HangoutRating) => void;
 }) {
   const [state, setState] = useState<HangoutRatingState | null>(null);
   const [quest, setQuest] = useState<Quest | null>(null);
@@ -66,13 +69,19 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
 
   useEffect(() => {
     let alive = true;
+    const preset = initialPhotoIds?.length && crewId ? initialPhotoIds : [];
     Promise.all([
       apiFetch<HangoutRatingState>(`/api/quests/${questId}/rating`, FRESH),
       apiFetch<QuestDetailLite>(`/api/quests/${questId}`, FRESH),
-    ]).then(([s, d]) => {
+      // The preset photos resolve through the crew album; only this hangout's memories are kept.
+      preset.length
+        ? apiFetch<{ memories: Memory[] }>(`/api/memories?crewId=${crewId}`, FRESH).catch(() => ({ memories: [] as Memory[] }))
+        : Promise.resolve({ memories: [] as Memory[] }),
+    ]).then(([s, d, album]) => {
       if (!alive) return;
       setState(s);
       setQuest(d.quest);
+      const given = preset.flatMap((id) => album.memories.filter((m) => m.id === id && m.questId === questId));
       if (s.rating) {
         // Editing keeps the saved placement: the verdict and score start as saved, and placement
         // runs again only for a different verdict or "Re-rank".
@@ -82,9 +91,12 @@ export function RateHangout({ questId, crewId, onClose, onSaved }: {
         setNote(s.rating.note);
         setPhotos(s.photos ?? []);
       }
+      if (given.length) setPhotos((cur) => [...cur, ...given.filter((m) => !cur.some((x) => x.id === m.id))]);
       setAgain(Object.fromEntries(s.again.map((a) => [a.subjectId, a.again])));
     }).catch((e) => { if (alive) setLoadError(e instanceof Error ? e.message : 'Couldn’t load this hangout.'); });
     return () => { alive = false; };
+    // initialPhotoIds and crewId are read when the dialog opens for questId (it is keyed on it).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questId]);
 
   // The viewer's other ratings in the chosen bucket, best first: what "Which was better?" compares with.

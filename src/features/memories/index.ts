@@ -1,6 +1,8 @@
 // Barrel for the memories area: the Memories page (client) and the pure regroup logic the
 // /api/muse/regroup route uses (no node-only imports, safe on both sides).
+export { MEMORY_SAVED, RATE_HANGOUT, type MemorySavedDetail, type RateHangoutDetail } from './arrival';
 export { MemoriesPage } from './MemoriesPage';
+export { RateHangoutListener } from './RateHangoutListener';
 export { YourPlans } from './YourPlans';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
