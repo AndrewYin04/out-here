@@ -41,7 +41,7 @@ One page for stage and rehearsals. Story: Alex and Maya both have a free 45 minu
 ## Cut from the story
 
 - **Maya's "denim purse like the Reel you saved":** Reel-based picks (#62) live on the Marketplace page, not on the map. Run the single jacket listing (the script's own fallback).
-- **"Campus Thrift Pop-Up" with several items:** not built. One listing is enough.
+- **"Campus Thrift Pop-Up" with several items:** #84 adds `?sell=popup`, which prefills the $20 track jacket and the Y2K denim bag at one pin. Use it if #84 is merged and rehearsed; otherwise one jacket listing is enough.
 
 ## Rehearsal notes (Fri 4–5 AM, localhost + dev database)
 
@@ -55,9 +55,9 @@ One page for stage and rehearsals. Story: Alex and Maya both have a free 45 minu
 | Piece | Where | Status |
 |---|---|---|
 | Muse plan, draft plan, invite, Up next, 3D walk, arrival photo | main | ✅ |
-| Marketplace pickup on the map (deleted by the #75 merge) | `fix/restore-map-marketplace` (Alex) | ⏳ needs a PR |
+| Marketplace pickup on the map (deleted by the #75 merge), pop-up prefill (`?sell=popup`), watch-history finds on the map | #84 (Rishab) | ⏳ open |
 | Reset also clears Marketplace, Memories, ratings, messages | `feat/reset-everything` (Alex) | ⏳ needs a PR |
 | Muse answer cache and warm-up | #76 (Andrew), migration 0009 | ✅ merged; the stage ask is added to the warm-up in `feat/reset-everything` |
-| Muse finds say "an N-minute walk" when walkable, not "a 1-minute drive" | `fix/restore-map-marketplace` (Alex) | ⏳ needs a PR |
+| Muse finds say "an N-minute walk" when walkable, not "a 1-minute drive" | commit cb1f5f9, offered on #84 | ⏳ follow-up after #84 |
 | Story seed: Maya's status "free after class · down for boba" (optional: the jacket and Alex's watch are posted live) | seed (Andrew) | ⏳ |
 | Demo database reseeded (`npm run seed:demo`) | Andrew's laptop, around 6 to 7 AM | ⏳ |
