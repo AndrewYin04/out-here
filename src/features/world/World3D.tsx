@@ -989,23 +989,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       data-lng={pos.current.lng.toFixed(5)}
       className="pointer-events-none absolute inset-0 z-[5]"
     >
-      {!settled && (
-        // While the street view loads: Jolly, thinking, says what's happening.
-        <div data-testid="world-loading" className="absolute inset-0 z-[1] flex flex-col items-center justify-center bg-[#EEF0F2]/35 backdrop-blur-[2px]">
-          <p role="status" className="relative mb-3 rounded-[18px] bg-fb-surface px-4 py-2 text-[15px] font-semibold text-fb-text shadow-popover">
-            Switching views
-            <span aria-hidden className="ml-0.5 inline-flex gap-[3px] align-middle">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className="size-1 rounded-full bg-fb-text-2 animate-[oh-think-dot_1.2s_ease-in-out_infinite] motion-reduce:animate-none" style={{ animationDelay: `${i * 0.18}s` }} />
-              ))}
-            </span>
-            <span aria-hidden className="absolute -bottom-[6px] left-1/2 size-3 -translate-x-1/2 rotate-45 bg-fb-surface" />
-          </p>
-          {/* eslint-disable-next-line @next/next/no-img-element -- a small static render of Jolly */}
-          <img src="/muse/jolly-thinking.webp" alt="" width={102} height={160}
-            className="h-40 w-auto animate-[oh-jolly-bob_2.4s_ease-in-out_infinite] drop-shadow-[0_6px_10px_rgba(0,0,0,.12)] motion-reduce:animate-none" />
-        </div>
-      )}
+      {/* No loading screen: the map's own zoom into 3D (and back out) is the transition. */}
       {/* Walking: one capsule at the top. The plan, everyone's progress along the way, minutes left. */}
       {walk && walkMin != null && (
         <div role="status" data-testid="walk-countdown"
