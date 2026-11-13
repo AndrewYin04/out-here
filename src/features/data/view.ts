@@ -366,6 +366,7 @@ export class View {
       case 'quest': return `/out-here/plan/${n.objectId}`;
       case 'invite': return `/out-here?invite=${n.objectId}`;
       case 'thread': return `/messages/${n.objectId}`;
+      case 'listing': return `/out-here?listing=${n.objectId}`;
       default: return '/';
     }
   }
