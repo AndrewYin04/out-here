@@ -71,3 +71,11 @@ export class ApiFetchError extends Error {
 export function apiPost<T = unknown>(path: string, body?: unknown, method = 'POST'): Promise<T> {
   return apiFetch<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 }
+
+/** Uploads one image to POST /api/uploads (Storage bucket "uploads") and returns its URL. */
+export async function uploadImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const r = await apiFetch<{ url: string }>('/api/uploads', { method: 'POST', body: form });
+  return r.url;
+}

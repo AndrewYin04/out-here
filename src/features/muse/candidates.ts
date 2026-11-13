@@ -166,13 +166,17 @@ export function friendsFreeInWindow(input: Pick<CandidateInput, 'intent' | 'frie
 }
 
 /**
- * Can the viewer see this quest at all? Public quests, quests they host or joined, and
- * private quests a friend is in. Same rule the data layer applies; Muse re-applies it so a
- * provider that returns too much still leaks nothing.
+ * Defense in depth on top of the data layer's canSeeQuest (src/shared/visibility.ts), which
+ * already filtered the provider's quests. Muse only knows friend ids here, so it keeps
+ * community plans, plans the viewer hosts or joined, and other plans only when the host or a
+ * member is a friend. It can hide more than canSeeQuest (a Group plan with no friend in it),
+ * never less, so a provider that returns too much still leaks nothing.
  */
 export function questVisibleTo(q: Quest, viewerId: ID, friendIds: ReadonlySet<ID>): boolean {
-  if (q.isPublic || q.hostId === viewerId || q.memberIds.includes(viewerId)) return true;
-  return q.memberIds.some((id) => friendIds.has(id));
+  if (q.hostId === viewerId || q.memberIds.includes(viewerId)) return true;
+  if (q.isPublic && (q.visibility ?? 'community') === 'community') return true;
+  if (q.visibility === 'friends') return false;
+  return friendIds.has(q.hostId) || q.memberIds.some((id) => friendIds.has(id));
 }
 
 // ---------- main ----------

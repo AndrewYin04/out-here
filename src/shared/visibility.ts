@@ -1,4 +1,4 @@
-import type { Audience, ID } from './types';
+import type { Audience, ID, QuestVisibility } from './types';
 
 export type VisibilityContext = {
   /** True when viewer and owner have an accepted friendship. */
@@ -41,4 +41,45 @@ export function canSee(
   const listId = audienceListId(audience);
   if (listId) return ctx.areFriends && (ctx.listMemberIds ?? []).includes(viewerId);
   return false;
+}
+
+/** What the server knows about one viewer and one plan, for canSeeQuest. */
+export type QuestVisibilityContext = {
+  isMemberOrHost: boolean;
+  isGroupMember: boolean;
+  areFriendsWithHost: boolean;
+  /** The viewer and host share at least one friend (friends of friends). */
+  hasMutualWithHost: boolean;
+  /** The viewer has an invite to this plan. */
+  isInvited: boolean;
+  /** The viewer reported this plan; it is hidden from them. */
+  hasReported: boolean;
+};
+
+/**
+ * The one visibility rule for Out Here plans (map, plan page, Group Hangouts, Muse candidates).
+ * - community: everyone
+ * - group: members of the plan's Group
+ * - open: the host's friends and friends of friends
+ * - friends: invited friends only
+ * The host and members always see it. A viewer who reported it does not.
+ */
+export function canSeeQuest(
+  q: { visibility: QuestVisibility; groupId: ID | null },
+  ctx: QuestVisibilityContext,
+): boolean {
+  if (ctx.isMemberOrHost) return true;
+  if (ctx.hasReported) return false;
+  switch (q.visibility) {
+    case 'community': return true;
+    case 'group': return q.groupId !== null && ctx.isGroupMember;
+    case 'open': return ctx.areFriendsWithHost || ctx.hasMutualWithHost;
+    case 'friends': return ctx.isInvited;
+    default: return false;
+  }
+}
+
+/** visibility plus the isPublic flag that mirrors it, for building Quest rows. */
+export function questVisibilityFields(visibility: QuestVisibility): { visibility: QuestVisibility; isPublic: boolean } {
+  return { visibility, isPublic: visibility === 'community' };
 }

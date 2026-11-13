@@ -2,6 +2,17 @@
 
 Out Here is built for the **Facebook Closer Together AI Hackathon 2026** (deadline Fri Nov 13 2026, 10:30 AM PT). The product is a working Facebook web app with fictional people; Out Here is one tab in it: a live map of nearby plans you can join right now. **Muse** turns "I'm free" into a real plan with a friend and a chance to meet new people.
 
+## Working with the team (all agents)
+
+**Demo priority until Fri Nov 13, 10:30 AM PT:** the end-to-end flow in `docs/DEMO_FLOW.md`. Before starting a task, name the scene it moves; tasks that move no scene wait (`docs/TEAM.md`, "Demo priority").
+
+Teammates and their agents coordinate through GitHub issues with `scripts/team.sh`. Rules and commands: `docs/TEAM.md`. Tracker: issue #33. Every agent does these 4 things:
+
+1. **Check gh.** Run `gh --version`; if it is missing, install it (Windows `winget install --id GitHub.cli`, macOS `brew install gh`). If `gh auth status` fails, ask your human to run `gh auth login`; never handle the token yourself.
+2. **Sync.** Run `bash scripts/team.sh sync` at session start, before starting any task, after every commit or PR, and at least every 30 minutes (Claude Code: `/loop 30m bash scripts/team.sh sync`).
+3. **Claim before building.** `bash scripts/team.sh claim <n> "<plan>"`. Never work on a task someone else has claimed; ask on its issue.
+4. **Keep it current.** `update` when direction changes, `block` with what you need from whom, `review <n> <PR url>`, and `done` when merged.
+
 **`MVP-BUILD-PLAN-itr-1.md` is the master plan. It overrides `docs/MASTER_PROMPT.md` and the rest of the kit where they differ.**
 
 The rules for every agent and subagent working in this repo live in `.claude/rules/`. Claude Code loads them automatically; if you can't see them in your context, read all five before doing anything:

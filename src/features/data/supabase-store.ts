@@ -5,11 +5,11 @@
 // share an 800 ms cache. Seats only move through the join_quest/leave_quest RPCs.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ID } from '@/shared';
-import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match, type TogetherVoteResult } from './backend';
 import { CoreStore } from './core';
-import { emptyDb, fromRow, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
+import { emptyDb, fromRow, OPTIONAL_TABLES, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
 import type { SupabaseEnv } from './env';
-import { conflict, HttpError, notFound } from './errors';
+import { badRequest, conflict, HttpError, notFound } from './errors';
 import { currentScope } from './request-scope';
 
 const PAGE = 1000;
@@ -17,7 +17,6 @@ export const SNAPSHOT_TTL_MS = 10_000;
 /** Ordinary reads may serve a snapshot up to this old while one background reload runs. */
 export const SNAPSHOT_STALE_MS = 60_000;
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-const OPTIONAL_TABLES = new Set<TableKey>(['hangoutRatings', 'hangAgain']);
 
 type DbError = { message: string; code?: string } | null;
 
@@ -25,6 +24,14 @@ function fail(table: string, error: DbError): void {
   if (!error) return;
   if (error.code === '23505') throw conflict(`duplicate key in ${table}`);
   throw new HttpError(502, `database error on ${table}: ${error.message}`);
+}
+
+/** Warn once per missing optional table (OPTIONAL_TABLES in db.ts); see loadTable. */
+const warned = new Set<string>();
+function warnMissing(table: string) {
+  if (warned.has(table)) return;
+  warned.add(table);
+  console.warn(`[supabase] table ${table} is missing; reading it as empty. Run the latest migration (npm run db:migrate:dev / :demo).`);
 }
 
 export class SupabaseBackend implements Backend {
@@ -57,9 +64,12 @@ export class SupabaseBackend implements Backend {
     // First page also returns the exact row count; the remaining pages load in parallel
     // (reactions has ~3k rows, so this is 2 round trips instead of 4 sequential ones).
     const first = await page(0, true);
-    // Rating tables arrive in migration 0004. Until a project has it, they read as empty
-    // instead of failing every snapshot load.
-    if (first.error && OPTIONAL_TABLES.has(key) && ['42P01', 'PGRST205'].includes(first.error.code ?? '')) return [];
+    // Tables added by a later migration read as empty until that migration is applied, so a
+    // deploy that lands before `db:migrate` still serves every page (writes to them fail).
+    if (first.error && OPTIONAL_TABLES.has(key) && /Could not find the table|does not exist|PGRST205|42P01/.test(`${first.error.code ?? ''} ${first.error.message ?? ''}`)) {
+      warnMissing(table);
+      return [];
+    }
     fail(table, first.error);
     const rows: Record<string, unknown>[] = [...((first.data ?? []) as Record<string, unknown>[])];
     const total = first.count ?? rows.length;
@@ -227,6 +237,57 @@ export class SupabaseBackend implements Backend {
 
   async leaveQuest(questId: ID, userId: ID): Promise<number> {
     return this.seatRpc('leave_quest', { p_quest: questId, p_user: userId }, questId);
+  }
+
+  /** Re-reads one table into this request's working snapshot (e.g. a row another request just inserted). */
+  async reload(table: TableKey): Promise<void> {
+    const scope = currentScope();
+    if (!scope?.working) return;
+    const rows = await this.loadTable(table);
+    const db = await scope.working;
+    (db[table] as unknown[]) = rows;
+  }
+
+  /** public.vote_together (0006), then the plan and the quest it touched are read back into the working snapshot. */
+  async voteTogether(planId: ID, userId: ID, questId: ID, isIn: boolean): Promise<TogetherVoteResult> {
+    const scope = currentScope();
+    this.gen++;
+    let result: TogetherVoteResult;
+    try {
+      if (scope) scope.queries++;
+      const { data, error } = await this.client.rpc('vote_together', { p_plan: planId, p_user: userId, p_quest: questId, p_in: isIn });
+      if (error) {
+        const m = error.message ?? '';
+        if (m.includes('plan_not_found')) throw notFound('plan_not_found');
+        if (m.includes('not_an_option')) throw badRequest('not_an_option');
+        this.rpcError(error);
+      }
+      const row = (Array.isArray(data) ? data[0] : data) as { out_status: TogetherVoteResult['status']; out_quest: string | null; out_seats: number | null } | undefined;
+      result = { status: row?.out_status ?? 'proposing', questId: row?.out_quest ?? null, seatsLeft: row?.out_seats ?? null };
+    } finally {
+      this.gen++;
+    }
+    if (scope?.working) {
+      scope.queries += result.questId ? 3 : 1;
+      const [pl, q, m] = await Promise.all([
+        this.client.from(TABLE_NAMES.togetherPlans).select('*').eq('id', planId),
+        result.questId ? this.client.from(TABLE_NAMES.quests).select('*').eq('id', result.questId) : Promise.resolve({ data: null, error: null }),
+        result.questId ? this.client.from(TABLE_NAMES.questMembers).select('*').eq('quest_id', result.questId) : Promise.resolve({ data: null, error: null }),
+      ]);
+      fail(TABLE_NAMES.togetherPlans, pl.error);
+      const db = await scope.working;
+      const plans = ((pl.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('togetherPlans', r));
+      db.togetherPlans = [...db.togetherPlans.filter((x) => x.id !== planId), ...plans];
+      if (result.questId) {
+        fail(TABLE_NAMES.quests, q.error);
+        fail(TABLE_NAMES.questMembers, m.error);
+        const quests = ((q.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('quests', r));
+        const members = ((m.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('questMembers', r));
+        db.quests = [...db.quests.filter((x) => x.id !== result.questId), ...quests];
+        db.questMembers = [...db.questMembers.filter((x) => x.questId !== result.questId), ...members];
+      }
+    }
+    return result;
   }
 
   async uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string> {

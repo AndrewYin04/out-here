@@ -13,7 +13,7 @@ test.describe("Muse picks on the map", () => {
     await expect(page.locator("[data-dimmed]")).toHaveCount(0);
 
     await page.getByRole("button", { name: "I'm free" }).click();
-    await page.getByPlaceholder(PLACEHOLDER).fill(PLACEHOLDER);
+    await page.locator("#imfree-text").fill(PLACEHOLDER);
     await page.getByRole("button", { name: "Find a plan" }).click();
     await expect(page.getByTestId("plan-summary")).toBeVisible({ timeout: 15_000 });
 

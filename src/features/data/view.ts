@@ -1,7 +1,7 @@
 // Read-side helpers over one snapshot of the tables: indexes, visibility and view models.
 // Every view model that leaves the server is built here, so canSee is applied in one place.
 import {
-  canSee, audienceListId, now, REACTION_TYPES,
+  canSee, canSeeQuest, audienceListId, now, REACTION_TYPES, type QuestVisibility,
   type Audience, type Comment, type ID, type Post, type Profile, type ProfileField, type Quest,
   type ReactionCounts, type ReactionType, type Group, type Event, type FriendList, type Crew,
   type Thread, type Message, type Notification, type GroupRole, type RsvpStatus,
@@ -33,6 +33,9 @@ export class View {
   private groupMembersBy: Map<ID, Db['groupMembers']>;
   private groupsByUser: Map<ID, Db['groupMembers']>;
   private questMembersBy: Map<ID, Db['questMembers']>;
+  private questCheckinsBy: Map<ID, Db['questCheckins']>;
+  private questInvitees: Map<ID, Set<ID>>;
+  private questReporters: Map<ID, Set<ID>>;
   private reactionsBy: Map<ID, Db['reactions']>;
   private commentsBy: Map<ID, Comment[]>;
   private sharesBy: Map<ID, number>;
@@ -66,6 +69,20 @@ export class View {
     this.groupsByUser = groupBy(db.groupMembers, (m) => m.userId);
     this.questMembersBy = groupBy(
       [...db.questMembers].sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)), (m) => m.questId);
+    this.questCheckinsBy = groupBy(db.questCheckins ?? [], (c) => c.questId);
+    this.questInvitees = new Map();
+    for (const i of db.invites) {
+      if (!i.questId) continue;
+      const set = this.questInvitees.get(i.questId) ?? new Set<ID>();
+      set.add(i.toId);
+      this.questInvitees.set(i.questId, set);
+    }
+    this.questReporters = new Map();
+    for (const r of db.questReports ?? []) {
+      const set = this.questReporters.get(r.questId) ?? new Set<ID>();
+      set.add(r.reporterId);
+      this.questReporters.set(r.questId, set);
+    }
     this.reactionsBy = groupBy(db.reactions, (r) => r.postId);
     this.commentsBy = groupBy([...db.comments].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), (c) => c.postId);
     this.sharesBy = new Map();
@@ -160,6 +177,10 @@ export class View {
       return g.privacy === 'public' || this.groupRole(post.targetId, viewerId) !== null;
     }
     if (post.targetType === 'event') return true;
+    if (post.targetType === 'quest') {
+      const q = this.questById.get(post.targetId);
+      return !!q && this.canSeeQuest(viewerId, q);
+    }
     return this.canSee(viewerId, post.authorId, post.audience);
   }
 
@@ -241,17 +262,51 @@ export class View {
   // ---------- quests ----------
   questMemberIds(questId: ID): ID[] { return (this.questMembersBy.get(questId) ?? []).map((m) => m.userId); }
   seatsLeft(q: QuestRow): number { return Math.max(q.capacity - this.questMemberIds(q.id).length, 0); }
-  /** Quest as the viewer may see it: exact location only for members. */
+  /**
+   * Quest as the viewer may see it: exact location only for members. A viewer who may not see
+   * the guest list gets only their own friends' ids; everyone else is a `hidden:<n>` placeholder,
+   * so counts and seats stay right without saying who is going.
+   */
   questFor(viewerId: ID, q: QuestRow): Quest {
-    const memberIds = this.questMemberIds(q.id);
-    const isMember = memberIds.includes(viewerId);
-    return { ...q, memberIds, location: isMember ? q.location : q.approxLocation };
+    const all = this.questMemberIds(q.id);
+    const isMember = all.includes(viewerId);
+    const memberIds = this.canSeeQuestGuests(viewerId, q)
+      ? all
+      : all.map((id, i) => (id === viewerId || this.areFriends(viewerId, id) ? id : `hidden:${i}`));
+    return {
+      ...q, memberIds, location: isMember ? q.location : q.approxLocation,
+      visibility: this.questVisibility(q), posterUrl: q.posterUrl ?? null, bubbleText: q.bubbleText ?? null,
+    };
   }
+  /** A quest's visibility; rows written before migration 0003 fall back to isPublic. */
+  questVisibility(q: QuestRow): QuestVisibility {
+    return q.visibility ?? (q.isPublic ? 'community' : q.groupId ? 'group' : 'open');
+  }
+  /** The one quest visibility rule (src/shared/visibility.ts) with this snapshot's facts filled in. */
   canSeeQuest(viewerId: ID, q: QuestRow): boolean {
-    if (q.isPublic) return true;
-    if (this.questMemberIds(q.id).includes(viewerId) || q.hostId === viewerId) return true;
-    if (q.groupId && this.groupRole(q.groupId, viewerId)) return true;
-    return this.areFriends(viewerId, q.hostId);
+    const visibility = this.questVisibility(q);
+    return canSeeQuest({ visibility, groupId: q.groupId }, {
+      isMemberOrHost: q.hostId === viewerId || this.questMemberIds(q.id).includes(viewerId),
+      isGroupMember: !!q.groupId && this.groupRole(q.groupId, viewerId) !== null,
+      areFriendsWithHost: this.areFriends(viewerId, q.hostId),
+      hasMutualWithHost: visibility === 'open' && this.mutualIds(viewerId, q.hostId).length > 0,
+      isInvited: this.questInvitees.get(q.id)?.has(viewerId) ?? false,
+      hasReported: this.questReporters.get(q.id)?.has(viewerId) ?? false,
+    });
+  }
+  /** Strangers see how many are going, never who: guests show to the host, members and the host's friends. */
+  canSeeQuestGuests(viewerId: ID, q: QuestRow): boolean {
+    return q.hostId === viewerId || this.questMemberIds(q.id).includes(viewerId) || this.areFriends(viewerId, q.hostId);
+  }
+  questCheckinIds(questId: ID): ID[] { return (this.questCheckinsBy.get(questId) ?? []).map((c) => c.userId); }
+  /** Posts on a plan's page, newest first. */
+  questPostIds(questId: ID): ID[] {
+    return this.db.posts.filter((p) => p.targetType === 'quest' && p.targetId === questId)
+      .sort(byNewest).map((p) => p.id);
+  }
+  /** Live = between start and end (computed; status is not stored for this). */
+  isQuestLive(q: QuestRow, at: Date = now()): boolean {
+    return q.status !== 'done' && new Date(q.startsAt) <= at && at < new Date(q.endsAt);
   }
 
   // ---------- crews ----------
@@ -292,7 +347,7 @@ export class View {
       case 'profile': return `/profile/${this.profileById.get(n.objectId)?.handle ?? ''}`;
       case 'group': return `/groups/${this.groupById.get(n.objectId)?.slug ?? ''}`;
       case 'event': return `/events/${this.eventById.get(n.objectId)?.slug ?? ''}`;
-      case 'quest': return `/out-here?quest=${n.objectId}`;
+      case 'quest': return `/out-here/plan/${n.objectId}`;
       case 'invite': return `/out-here?invite=${n.objectId}`;
       case 'thread': return `/messages/${n.objectId}`;
       default: return '/';

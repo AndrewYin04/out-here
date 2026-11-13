@@ -3,11 +3,12 @@
 import { ApiFetchError, apiPost, currentPersona } from '@/features/data';
 import { DEMO_CENTER, type LatLng, type MusePlan } from '@/shared';
 import type { DroppedView } from './dropped';
+import { availabilityChanged } from './plan-state';
 
 export type PlanResponse = MusePlan & {
   meta: {
     mode: 'mock' | 'live'; source: 'muse' | 'fallback' | 'mock'; contextSource: 'store' | 'seed';
-    dropped: DroppedView[]; origin?: LatLng;
+    dropped: DroppedView[]; origin?: LatLng; friendsChecked?: number;
     // What Muse did, for the "Muse's work" steps. Optional so an older response still renders.
     understood?: boolean; candidateCount?: number;
     friendsFree?: { firstName: string; freeUntil: string }[];
@@ -48,6 +49,7 @@ export async function shareAvailability(text: string, plan: PlanResponse): Promi
     await apiPost('/api/availability', {
       text, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), location: plan.meta?.origin ?? DEMO_CENTER,
     });
+    availabilityChanged();
   } catch {
     // the plan still works without the shared signal
   }
