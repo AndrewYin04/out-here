@@ -7,6 +7,7 @@ export { InviteInbox } from './InviteInbox';
 export { BothFreeNudge, StatusCard, useMyAvailability, useMyStatus } from './FreeStatus';
 export { TogetherSheet } from './TogetherSheet';
 export { UpNextCard, useUpNext } from './UpNext';
+export { listenLetsGo, useLetsGo, LETS_GO } from './lets-go';
 export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, OfflineLabel, SeatsBadge } from './SuggestionCard';
 export { MuseStepsLoading } from './MuseSteps';

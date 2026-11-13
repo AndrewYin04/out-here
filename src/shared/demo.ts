@@ -65,3 +65,10 @@ export function formatDemoTime(iso: string): string {
     timeZone: DEMO_TZ, hour: 'numeric', minute: '2-digit',
   }).format(new Date(iso));
 }
+
+/**
+ * Attendees can take the hangout photo (which forms the crew album) this long before the start:
+ * you walked there together and you're early, so the moment is now (docs/UX_PLAN.md). The plan
+ * is only marked done once it has actually started, so anyone still walking keeps its pin.
+ */
+export const EARLY_PHOTO_MS = 30 * 60_000;
