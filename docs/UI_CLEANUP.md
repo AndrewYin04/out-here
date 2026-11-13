@@ -2,27 +2,21 @@
 
 Branch `feature/ui-cleanup`, cut from `origin/main` (4eb3cc8). Rules: `.claude/rules/50-design-standards.md` (on `chore/out-here-design-rules`), plus the `deslop-ui`, `deslop-copy`, `anti-slop-design`, `frontend-design` and `web-design-guidelines` skills.
 
-## Changed
+## Scope
+
+Out Here only. The Facebook demo platform (feed, profile, friends, groups, events, search, saved, Messenger) is unchanged. An earlier round touched Facebook pages; those commits were reverted at the session owner's request.
+
+The one shared file is `fb/shell/MobileTabBar.tsx`. Its compact style applies only on `/out-here*` and `/memories`; every other page renders the tab bar exactly as before.
+
+## Round 1 (Out Here)
 
 | Change | Files |
 |---|---|
-| Events (Discover), Search and Saved showed skeleton loaders forever. They now say what is true and give one next step (the map, Friends) | `src/app/(fb)/events/page.tsx`, `search/page.tsx`, `saved/page.tsx` |
-| **Post a plan:** visibility choices use line icons instead of 🌍 👥 🤝 🔒 | `src/features/map/visibility.ts`, `map/event/parts.tsx` |
-| **Post a plan:** "✨ Draft" becomes "Draft" | `src/features/map/create/CreatePlanSheet.tsx` |
-| **Post a plan:** the timed fake steps become one "Muse is drafting your plan…" line | same file |
-| **Post a plan:** poster, map note and details are folded behind one link, which opens by itself when Muse fills one in | same file |
-| Joining a plan bursts only the quest's emoji (no ✨ 🎉 confetti); the avatar still flies onto the pin | `src/features/ui/motion.ts` |
-| Home feed Out Here card: one "I'm free" button (the rows above already open the map), and a quieter seat badge in the existing seat style | `src/features/fb/feed/OutHereCard.tsx` |
-| Visible keyboard focus on search, comment and post fields (`focus-within` on pill containers, `focus-visible` on fields) | `fb/feed/Comments.tsx`, `fb/friends/FriendsView.tsx`, `fb/friends/ListsManager.tsx`, `fb/profile/ProfileView.tsx`, `fb/shell/SectionNav.tsx`, `fb/groups/GroupPage.tsx`, `fb/groups/PostPage.tsx`, `fb/profile/EditProfileModal.tsx` |
-| E2E tests updated for the new heading and the folded extras | `tests/e2e/shell.spec.ts`, `tests/e2e/create-event.spec.ts` |
-
-### Kept on purpose
-
-- Facebook's 7 reaction emoji, which are the product.
-- Activity emoji on quests: category markers and data.
-- The "✨ Muse" label, which rule 10 requires on Muse output.
-- The red Live dot.
-- Seeded posts: fictional users' own words.
+| **Post a plan:** line icons instead of emoji on who-can-see-it | `map/visibility.ts`, `map/event/parts.tsx` |
+| **Post a plan:** a plain "Draft" button | `map/create/CreatePlanSheet.tsx` |
+| **Post a plan:** one honest status line instead of timed fake steps | same file |
+| **Post a plan:** poster, map note and details folded until wanted | same file |
+| Joining a plan bursts only the quest's emoji | `ui/motion.ts`, used only by Out Here |
 
 ## Round 2: the Out Here mobile screens (claimed files, edited at the session owner's request)
 
@@ -69,8 +63,6 @@ These files are claimed by #56, #45 and #12, and Codex's Phase 5 branches touch 
 | The group name appears twice on the plan page | `map/event/PlanPage.tsx` | `wt/event-intro` |
 | Toast "You're checked in. Have fun!" | `map/event/PlanPage.tsx` | `wt/event-intro` |
 | Memories capture burst | `memories/MemoryCapture.tsx` | #47 |
-| Messenger and Marketplace skeleton pages | their own pages | Their own branches |
-| Search results (the page says it isn't available) | Search page | #29 |
 | The "both free" nudge card covers the top of the 3D view on phones | `BothFreeNudge` | It is a demo scene, so it was left as is |
 
 ## Verification
