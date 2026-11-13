@@ -77,6 +77,12 @@ export type FriendPin = {
 };
 
 export type QuestStatus = 'open' | 'full' | 'live' | 'done';
+/**
+ * Who can see a plan (ext). community = everyone nearby; group = members of groupId;
+ * open = the host's friends and friends of friends; friends = invited friends only.
+ */
+export type QuestVisibility = 'community' | 'group' | 'open' | 'friends';
+export const QUEST_VISIBILITIES: readonly QuestVisibility[] = ['community', 'group', 'open', 'friends'];
 export type QuestCategory =
   'food' | 'music' | 'sports' | 'study' | 'thrift' | 'art' | 'outdoors' | 'games' | 'other';
 export type Quest = {
@@ -91,6 +97,9 @@ export type Quest = {
   // ext
   groupId: ID | null;        // set when the quest is a Group hangout
   placeId: ID | null;
+  visibility: QuestVisibility; // isPublic mirrors visibility === 'community'
+  posterUrl: string | null;  // pop-up poster image
+  bubbleText: string | null; // pop-up text bubble, <= 80 chars
 };
 
 export type Invite = {
@@ -209,7 +218,7 @@ export type Event = {
 export type RsvpStatus = 'going' | 'interested' | 'invited';
 export type EventRsvp = { eventId: ID; userId: ID; status: RsvpStatus; createdAt: string };
 
-export type PostTargetType = 'profile' | 'group' | 'event';
+export type PostTargetType = 'profile' | 'group' | 'event' | 'quest';
 export type Post = {
   id: ID; authorId: ID;
   targetType: PostTargetType;

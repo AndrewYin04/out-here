@@ -9,10 +9,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
-import { Button, cn, EmptyState } from '@/features/ui';
+import { Plus } from 'lucide-react';
+import { Button, cn, EmptyState, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
+import { CreatePlanSheet } from './create/CreatePlanSheet';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 
@@ -62,6 +64,10 @@ export function OutHereView() {
   const [view, setViewState] = useState<MapView>('map');
   const [viewNote, setViewNote] = useState<string | null>(null);
   const setView = useCallback((v: MapView) => { setViewState(v); saveView(v); }, []);
+  // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
+  const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
+  const planOpen = usePlanOpen();
+  const toast = useToast();
 
   // ?quest=<id> deep link opens that quest's sheet; ?mode=friends|explore sets the toggle.
   useEffect(() => {
@@ -185,7 +191,6 @@ export function OutHereView() {
   }, [planPicks, mode, friendPins.data]);
 
   const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
-  const planOpen = usePlanOpen();
   const togetherId = useTogetherId();
   const sheetOpen = planOpen || togetherId !== null;
   // "See it on the map" from a confirmed shared plan opens that quest's panel here.
@@ -194,7 +199,27 @@ export function OutHereView() {
     window.addEventListener('outhere:select-quest', on);
     return () => window.removeEventListener('outhere:select-quest', on);
   }, [select]);
+
+  // Long-press / right-click on the map, or the ＋ button (map centre): start a new plan there.
+  const startCreate = useCallback((at?: LatLng) => {
+    const c = map?.getCenter();
+    const spot = at ?? (c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
+    setPlanOpen(false);
+    select(null);
+    setCreating((cur) => ({ at: spot, emoji: cur?.emoji ?? '📍' }));
+  }, [map, select]);
+  const moveDraft = useCallback((at: LatLng) => setCreating((cur) => (cur ? { ...cur, at } : cur)), []);
+  const draftEmoji = useCallback((emoji: string) => setCreating((cur) => (cur && cur.emoji !== emoji ? { ...cur, emoji } : cur)), []);
+  const onPosted = useCallback((q: Quest) => {
+    setCreating(null);
+    setMode('explore');
+    void questsApi.refetch();
+    select(q.id);
+    toast.show('Your plan is live on the map.');
+  }, [questsApi, select, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
+  // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
+  const noSelect = useCallback(() => {}, []);
   const refetchAll = useCallback(() => { void questsApi.refetch(); void ctxApi.refetch(); }, [questsApi, ctxApi]);
   // A friend tapped in the 3D view opens their Find My card (it lives in Friends mode).
   const openFriend = useCallback((id: string) => {
@@ -229,9 +254,12 @@ export function OutHereView() {
           fitTo={fitTo}
           now={now}
           testIdFor={testIdFor}
-          onSelect={select}
+          onSelect={creating ? noSelect : select}
           onMap={setMap}
           onUnsupported={onUnsupported}
+          onPickLocation={startCreate}
+          draft={creating}
+          onDraftMove={moveDraft}
         />
       )}
 
@@ -434,8 +462,8 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* One row at the bottom: the "I'm free" button (it also shows your status) and Your plans. */}
-      {!sheetOpen && (
+      {/* One row at the bottom: "I'm free" (it also shows your status), Your plans, and ＋ Post a plan. */}
+      {!sheetOpen && !creating && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
           <div className="pointer-events-auto flex items-center gap-2">
             <ImFreeButton />
@@ -443,17 +471,39 @@ export function OutHereView() {
               className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
               <CalendarCheck size={22} aria-hidden />
             </Link>
+            {!unsupported && (
+              <button
+                type="button"
+                data-testid="create-plan-btn"
+                aria-label="Post a plan"
+                title="Post a plan (or long-press the map)"
+                onClick={() => startCreate()}
+                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
+              >
+                <Plus size={26} aria-hidden />
+              </button>
+            )}
           </div>
         </div>
       )}
       <PlanSheet />
       <TogetherSheet />
+      {creating && (
+        <CreatePlanSheet
+          at={creating.at}
+          friends={ctx?.friends ?? []}
+          onMove={moveDraft}
+          onEmoji={draftEmoji}
+          onClose={() => setCreating(null)}
+          onPosted={onPosted}
+        />
+      )}
 
       {!unsupported && (
         <MapAttribution className={cn('absolute bottom-0 right-0', selectedId && 'max-md:hidden')} />
       )}
 
-      {selectedId && (
+      {selectedId && !creating && (
         <QuestPanel
           key={selectedId}
           questId={selectedId}

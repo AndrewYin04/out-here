@@ -4,7 +4,7 @@ import { ChevronDown, ChevronLeft, Globe, Images, ListChecks, Lock, Users, X } f
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Audience, FriendList } from '@/shared';
 import type { FriendListsResponse, PostView } from '@/shared/api';
-import { apiFetch, apiPost, useViewer, type PostWithShared } from '@/features/data';
+import { apiFetch, apiPost, uploadImage, useViewer, type PostWithShared } from '@/features/data';
 import { Avatar, Button, Card, Modal, cn, useToast } from '@/features/ui';
 import { audienceLabel, firstName } from './format';
 import { AudienceIcon } from './AudienceIcon';
@@ -78,10 +78,8 @@ export function CreatePostModal({
     for (const file of Array.from(files ?? []).slice(0, 10 - uploads.length)) {
       const localUrl = URL.createObjectURL(file);
       setUploads((u) => [...u, { localUrl, url: null, error: null }]);
-      const form = new FormData();
-      form.append('file', file);
-      apiFetch<{ url: string }>('/api/uploads', { method: 'POST', body: form })
-        .then((r) => setUploads((u) => u.map((x) => (x.localUrl === localUrl ? { ...x, url: r.url } : x))))
+      uploadImage(file)
+        .then((url) => setUploads((u) => u.map((x) => (x.localUrl === localUrl ? { ...x, url } : x))))
         .catch((e: unknown) => setUploads((u) => u.map((x) => (x.localUrl === localUrl ? { ...x, error: e instanceof Error ? e.message : 'Upload failed' } : x))));
     }
   };

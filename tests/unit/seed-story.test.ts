@@ -59,8 +59,11 @@ describe('demo story: "hungry, got like 40 min, under $15"', () => {
     expect(nonSportsIn15.map((q) => q.key)).toEqual(['boba']);
   });
 
-  it('has the kit 15 quests plus the ramen and sushi decoys', () => {
-    expect(DEMO_QUESTS).toHaveLength(17);
+  it('has the kit 15 quests plus the ramen and sushi decoys, and one live Group-only plan', () => {
+    expect(DEMO_QUESTS).toHaveLength(18);
+    const group = DEMO_QUESTS.filter((q) => q.visibility === 'group');
+    expect(group.map((q) => q.key)).toEqual(['new-grads-frisbee']);
+    expect(group[0].startsInMin).toBeLessThan(0);
   });
 });
 

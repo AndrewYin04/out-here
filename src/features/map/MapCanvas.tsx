@@ -35,6 +35,13 @@ const LABEL_ALL_ZOOM = 15;
 const MOBILE_NEAREST = 5;
 /** Desktop quest panel: 380 px wide plus its 16 px inset. */
 const PANEL_INSET = 396;
+/** Hold this long on the map (touch) to drop a pin. */
+const LONG_PRESS_MS = 550;
+/** A finger that moves this far is panning, not long-pressing. */
+const LONG_PRESS_SLOP_PX = 10;
+/** Pop-up text bubbles show from this zoom (and always on the selected pin). */
+const BUBBLE_ZOOM = 16;
+const VIS_GLYPH: Record<string, string> = { group: '👥', open: '🤝', friends: '🔒' };
 
 export type MapCanvasProps = {
   quests: Quest[];
@@ -55,11 +62,17 @@ export type MapCanvasProps = {
   onMap: (map: MapLibreMap | null) => void;
   /** WebGL is missing or the map could not be created. */
   onUnsupported: () => void;
+  /** Long-press (touch) or right-click on the map: drop a new plan's pin there. */
+  onPickLocation?: (at: LatLng) => void;
+  /** The plan being created: a draggable pin with its emoji. */
+  draft?: { at: LatLng; emoji: string } | null;
+  onDraftMove?: (at: LatLng) => void;
 };
 
 type PinParts = {
   root: HTMLDivElement; button: HTMLButtonElement; circle: HTMLSpanElement; badge: HTMLSpanElement;
   label: HTMLSpanElement; more: HTMLButtonElement; faces: HTMLSpanElement; pick: HTMLSpanElement;
+  bubble: HTMLSpanElement; vis: HTMLSpanElement;
 };
 type PinRefs = PinParts & { marker: Marker; seats: number; facesKey: string };
 
@@ -114,9 +127,20 @@ function buildPin(q: Quest, testId: string): PinParts {
   pick.textContent = '✨ Muse pick';
   pick.style.cssText = 'position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 7px;background:#0866FF;color:#fff;font:700 11px/16px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;';
 
-  button.append(circle, badge, label, faces);
-  root.append(button, more);
-  return { root, button, circle, badge, label, more, faces, pick };
+  // The plan's pop-up text bubble, above the pin (shown when zoomed in or selected; see layout).
+  const bubble = document.createElement('span');
+  bubble.setAttribute('data-role', 'pin-bubble');
+  bubble.style.cssText = 'position:absolute;left:50%;bottom:46px;transform:translateX(-50%);display:none;max-width:180px;width:max-content;white-space:normal;text-align:center;border-radius:12px;padding:4px 8px;background:#fff;color:#080809;font:600 12px/15px var(--font-sans);box-shadow:0 1px 4px rgba(0,0,0,.3);pointer-events:none;';
+
+  // Who can see it, for plans that are not Community: 👥 Group, 🤝 friends of friends, 🔒 invite only.
+  const vis = document.createElement('span');
+  vis.setAttribute('aria-hidden', 'true');
+  vis.setAttribute('data-role', 'pin-visibility');
+  vis.style.cssText = 'position:absolute;left:28px;top:-6px;display:none;width:18px;height:18px;border-radius:9999px;background:#fff;font-size:10px;line-height:18px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.3);pointer-events:none;';
+
+  button.append(circle, badge, label, faces, vis);
+  root.append(bubble, button, more);
+  return { root, button, circle, badge, label, more, faces, pick, bubble, vis };
 }
 
 function paintFaces(p: PinRefs, faces: FriendFace[]) {
@@ -142,6 +166,10 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.badge.textContent = seatText;
   p.badge.style.background = seats > 0 ? '#0866FF' : '#65686C';
   p.label.textContent = `${shortTitle(q.title)} · ${time}`;
+  p.bubble.textContent = q.bubbleText ?? '';
+  const glyph = VIS_GLYPH[q.visibility ?? 'community'];
+  p.vis.textContent = glyph ?? '';
+  p.vis.style.display = glyph ? 'block' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
   p.button.setAttribute('aria-label', `${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
@@ -167,7 +195,10 @@ function pulse(el: HTMLElement) {
   );
 }
 
-export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported }: MapCanvasProps) {
+export default function MapCanvas({
+  quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
+  onPickLocation, draft, onDraftMove,
+}: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const pins = useRef(new Map<string, PinRefs>());
@@ -180,7 +211,10 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
   const [tiles, setTiles] = useState<'loading' | 'ready' | 'failed'>('loading');
-  useEffect(() => { select.current = onSelect; });
+  const pick = useRef(onPickLocation);
+  const draftMove = useRef(onDraftMove);
+  const draftMarker = useRef<{ marker: Marker; el: HTMLDivElement } | null>(null);
+  useEffect(() => { select.current = onSelect; pick.current = onPickLocation; draftMove.current = onDraftMove; });
 
   // Show the pins that fit; a pin that would overlap a higher-priority one joins its "+N" group.
   const layout = useRef(() => {});
@@ -212,6 +246,10 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       const show = fits || id === selectedRef.current;
       if (show) taken.push(lb);
       ref.label.style.display = show ? 'block' : 'none';
+      // Text bubble: zoomed in or selected, and never on top of a "✨ Muse pick" pill.
+      const bubbleOn = !!ref.bubble.textContent && !ref.pick.isConnected && !ref.root.hasAttribute('data-dimmed')
+        && (id === selectedRef.current || map.getZoom() >= BUBBLE_ZOOM);
+      ref.bubble.style.display = bubbleOn ? 'block' : 'none';
     }
     for (const [id, ref] of pins.current) {
       const members = g.get(id);
@@ -280,12 +318,37 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     map.on('error', () => {});
     map.on('move', schedule);
     map.on('resize', schedule);
+    // Drop a pin: right-click (desktop) or long-press (touch). Markers stop their own clicks,
+    // so this only fires on the map itself.
+    map.on('contextmenu', (e) => {
+      e.preventDefault();
+      pick.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    });
+    let press: { timer: number; x: number; y: number } | null = null;
+    const cancelPress = () => { if (press) { window.clearTimeout(press.timer); press = null; } };
+    map.on('touchstart', (e) => {
+      cancelPress();
+      if (e.originalEvent.touches.length !== 1) return;
+      const at = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+      press = {
+        x: e.point.x, y: e.point.y,
+        timer: window.setTimeout(() => { press = null; pick.current?.(at); }, LONG_PRESS_MS),
+      };
+    });
+    map.on('touchmove', (e) => {
+      if (press && Math.hypot(e.point.x - press.x, e.point.y - press.y) > LONG_PRESS_SLOP_PX) cancelPress();
+    });
+    map.on('touchend', cancelPress);
+    map.on('touchcancel', cancelPress);
+    map.on('zoomstart', cancelPress);
     onMap(map);
     const current = pins.current;
     return () => {
       window.clearTimeout(timer);
+      cancelPress();
       cancelAnimationFrame(frame.current);
       current.clear();
+      draftMarker.current = null;
       me.current = null;
       onMap(null);
       map.remove();
@@ -375,6 +438,40 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     });
     schedule();
   }, [quests, origin, walkMinutes]);
+
+  // The plan being created: a draggable pin. Dragging it moves the plan.
+  const draftKey = draft ? `${draft.at.lat.toFixed(6)},${draft.at.lng.toFixed(6)}` : '';
+  const hasDraft = !!draft;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !hasDraft) return;
+    const el = document.createElement('div');
+    el.setAttribute('data-testid', 'draft-pin');
+    el.setAttribute('data-map-marker', 'draft');
+    el.setAttribute('aria-label', 'New plan pin. Drag to move');
+    el.setAttribute('role', 'img');
+    el.style.cssText = 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:9999px;background:#fff;font-size:26px;line-height:1;cursor:grab;box-shadow:0 0 0 3px #0866FF,0 4px 10px rgba(0,0,0,.35);';
+    const marker = new Marker({ element: el, anchor: 'center', draggable: true }).setLngLat([0, 0]).addTo(map);
+    marker.on('dragend', () => {
+      const ll = marker.getLngLat();
+      draftMove.current?.({ lat: ll.lat, lng: ll.lng });
+    });
+    draftMarker.current = { marker, el };
+    return () => { marker.remove(); draftMarker.current = null; };
+  }, [hasDraft]);
+  useEffect(() => {
+    const d = draftMarker.current;
+    if (!d || !draft) return;
+    d.el.textContent = draft.emoji || '📍';
+    const cur = d.marker.getLngLat();
+    if (Math.abs(cur.lat - draft.at.lat) > 1e-7 || Math.abs(cur.lng - draft.at.lng) > 1e-7) {
+      d.marker.setLngLat([draft.at.lng, draft.at.lat]);
+      const map = mapRef.current;
+      if (map && !map.getBounds().contains([draft.at.lng, draft.at.lat])) map.easeTo({ center: [draft.at.lng, draft.at.lat], duration: 400 });
+    }
+    // draft is read through draftKey and its emoji.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, draft?.emoji, hasDraft]);
 
   // The viewer's own dot (where walking times are measured from).
   useEffect(() => {

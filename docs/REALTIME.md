@@ -20,11 +20,13 @@ arrives.
 
 | Channel | Sent when | Payload |
 |---|---|---|
-| `quest:<questId>` | join, leave, complete, status change | `{ seatsLeft: number, memberCount: number }` |
-| `user:<userId>` | a notification, invite, or message for that user is created | `{ type: "notification" \| "invite" \| "message", id: string }` |
+| `quest:<questId>` | join, leave, complete, status change, check-in, a post on the plan page | `{ seatsLeft: number, memberCount: number, hereCount?: number }` or `{ postCount: number }` |
+| `quests:new` | someone posts a new plan | `{ questId: string }` (every map refetches `/api/quests`, which applies `canSeeQuest`, so a Group or invite-only plan reaches only the people who may see it) |
+| `user:<userId>` | a notification, invite, message, friendship, availability, memory or location change for that user | `{ type: "notification" \| "invite" \| "message" \| "friendship" \| "availability" \| "memory" \| "location", id: string }` |
 | `thread:<threadId>` | a message is posted in the thread | `{ messageId: string }` |
 | `presence:online` | (Presence) a tab opens or closes | presence state: `{ userId: string }` per tab |
 | `post:<postId>` | a reaction or comment changes | `{ reactions: number, comments: number }` (totals) |
+| `event:<eventId>` | an RSVP changes (Facebook Events) | `{ goingCount: number, interestedCount: number }` |
 
 The `id` in a `user:` message is the id of the new notification, invite, or message. The client
 loads it through `/api/notifications`, `/api/invites/...`, or `/api/threads/:id/messages`.
@@ -32,8 +34,9 @@ loads it through `/api/notifications`, `/api/invites/...`, or `/api/threads/:id/
 ## TypeScript shapes
 
 ```ts
-type QuestBroadcast = { seatsLeft: number; memberCount: number };
-type UserBroadcast = { type: 'notification' | 'invite' | 'message'; id: string };
+type QuestBroadcast = { seatsLeft: number; memberCount: number; hereCount?: number } | { postCount: number };
+type NewQuestBroadcast = { questId: string };
+type UserBroadcast = { type: 'notification' | 'invite' | 'message' | 'friendship' | 'availability' | 'memory' | 'location'; id: string };
 type ThreadBroadcast = { messageId: string };
 type PostBroadcast = { reactions: number; comments: number };
 type OnlinePresence = { userId: string };
@@ -53,6 +56,6 @@ quest raises the error message `quest_full`, which the route maps to HTTP 409.
 
 ## MemoryStore fallback
 
-Without Supabase env, the MemoryStore sends the same channel names and payloads over a
-`BroadcastChannel` named `out-here`, as `{ channel, payload }`. Hooks therefore handle both stores
-the same way.
+Without Supabase env, the MemoryStore sends the same channel names and payloads in-process, and the
+browser receives them over Server-Sent Events from `GET /api/realtime?channels=...` (the route only
+accepts the channel names in this table). Hooks therefore handle both stores the same way.
