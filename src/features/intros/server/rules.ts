@@ -2,9 +2,10 @@
 // quality bar and the weekly cap. Pure functions over one store snapshot (View), so the unit
 // tests and the routes agree. The model never decides who is in reach or whether the bar is met.
 import {
-  haversineMeters, INTRO_KINDS,
-  type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type Profile, type TrustPath,
+  haversineMeters, INTRO_KINDS, overlapWindow, walkingMinutesExact,
+  type DatingPrefs, type ID, type Intro, type IntroGender, type IntroKind, type IntroProfile, type LatLng, type Profile, type TrustPath,
 } from '@/shared';
+import { interestsMatchingQuest } from '@/features/muse';
 import type { View } from '@/features/data/server';
 
 export const SCORE_THRESHOLD = 85;
@@ -92,6 +93,7 @@ const STOP = new Set([
   'people', 'person', 'friends', 'friend', 'someone', 'with', 'about', 'coffee', 'chats', 'chat', 'more', 'some', 'into',
   'buddies', 'buddy', 'partner', 'partners', 'classes', 'work', 'that', 'this', 'from', 'like', 'love', 'want', 'wants',
   'good', 'great', 'nights', 'night', 'other', 'their', 'them', 'they', 'just', 'here', 'also', 'free',
+  'likes', 'loves', 'wants', 'liking', 'loving', 'looking', 'find', 'anyone', 'come', 'along', 'going',
 ]);
 export function keywords(text: string): string[] {
   return [...new Set(text.toLowerCase().split(/[^a-z0-9-]+/).flatMap((w) => w.split('-')).filter((w) => w.length >= 4 && !STOP.has(w)))];
@@ -187,6 +189,8 @@ export type SharedFact = {
   citedA?: boolean; citedB?: boolean;
   /** For a shared interest: how many people list it. Rarer interests are more specific and read first. */
   commonness?: number;
+  /** Ties b to the plan a plan-anchored intro is for; such facts read first. */
+  plan?: true;
 };
 
 const sameTopic = (x: string[], y: string[]) => x.some((k) => y.includes(k));
@@ -211,7 +215,7 @@ export function distinctTopics(facts: SharedFact[]): number {
  */
 export function orderedFacts(facts: SharedFact[], side: 'a' | 'b'): SharedFact[] {
   const cited = (f: SharedFact) => (side === 'a' ? f.citedA : f.citedB) === true;
-  const rank = (f: SharedFact) => (f.looker === side ? 0 : f.looker === null ? (cited(f) ? 1 : 2) : 3);
+  const rank = (f: SharedFact) => (f.plan ? -1 : f.looker === side ? 0 : f.looker === null ? (cited(f) ? 1 : 2) : 3);
   const seen: string[][] = [];
   const out: SharedFact[] = [];
   const rarer = (x: SharedFact, y: SharedFact) => (x.commonness !== undefined && y.commonness !== undefined ? x.commonness - y.commonness : 0);
@@ -352,12 +356,121 @@ export function codeScore(distinctFacts: number): number {
   return Math.min(97, 55 + 12 * distinctFacts);
 }
 
+// ---------- plan-anchored intros ("find someone to go to THIS plan with") ----------
+type QuestRow = View['db']['quests'][number];
+/** The walk cap for a plan-anchored candidate, the same 25 min Muse plans use. */
+export const PLAN_WALK_MIN = 25;
+
+/** A plan anyone could still join: open or live, and not over. */
+export const isJoinablePlan = (q: QuestRow | undefined, nowMs: number): q is QuestRow =>
+  !!q && (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs;
+
+/**
+ * Where `userId` would walk to `q` from, when they are free for it: one of their shared
+ * availability windows (their Free status) overlaps the plan's startsAt..endsAt, using the same
+ * overlapWindow as "who's free when you are", and that window's spot is within PLAN_WALK_MIN on
+ * foot. The nearest such window wins. Null when they are busy then or too far away.
+ */
+export function freeForPlan(v: View, userId: ID, q: QuestRow, nowMs: number): { location: LatLng; walkMin: number } | null {
+  const at = new Date(nowMs);
+  let best: { location: LatLng; walkMin: number } | null = null;
+  for (const a of v.db.availability) {
+    if (a.userId !== userId || Date.parse(a.endsAt) <= nowMs) continue;
+    if (!overlapWindow(a, q, at)) continue;
+    const walkMin = walkingMinutesExact(a.location, q.location);
+    if (walkMin > PLAN_WALK_MIN) continue;
+    if (!best || walkMin < best.walkMin) best = { location: a.location, walkMin };
+  }
+  return best;
+}
+
+/** Whole walking minutes to the plan: from the window that makes them free for it, else from home. */
+export function walkToPlan(v: View, userId: ID, q: QuestRow, nowMs: number): number | null {
+  const free = freeForPlan(v, userId, q, nowMs);
+  if (free) return Math.max(1, Math.round(free.walkMin));
+  const home = v.profileById.get(userId)?.home;
+  return home ? Math.max(1, Math.round(walkingMinutesExact(home, q.location))) : null;
+}
+
+/**
+ * Interests of b (as a may see them) that match the plan's tags, title or category. Each is a
+ * concrete reason for this intro: Jordan likes comics and this is a comics open house. When a
+ * likes it too it reads "You both love comics, and that's what 🦸 Comic open house is about";
+ * otherwise A reads "Jordan is into comics, a fit for 🦸 Comic open house" and B reads that A
+ * wants company for a plan about something B likes. The topic is the interest's keywords, so the
+ * generic "You both love comics" fact is replaced, not repeated.
+ */
+export function planFacts(v: View, a: Profile, b: Profile, q: QuestRow): SharedFact[] {
+  const plan = `${q.emoji} ${q.title}`;
+  const quest = { ...q, memberIds: [] };
+  const bSeen = v.profileFor(a.id, b).interests;
+  const aLikes = new Set(interestsMatchingQuest(v.profileFor(b.id, a).interests, quest).map((i) => i.toLowerCase()));
+  const A = firstName(a); const B = firstName(b);
+  const out: SharedFact[] = interestsMatchingQuest(bSeen, quest).map((i) => {
+    const both = aLikes.has(i.toLowerCase());
+    const shared = `You both love ${i}, and that's what ${plan} is about`;
+    return {
+      keyword: i.toLowerCase(),
+      forA: both ? shared : `${B} is into ${i}, a fit for ${plan}`,
+      forB: both ? shared : `${A} wants company for ${plan}, and you're into ${i}`,
+      looker: null,
+      topic: keywords(i).length ? keywords(i) : [i.toLowerCase()],
+      plan: true as const,
+    };
+  });
+  if (out.length) return out;
+  // No interest matches: b's job or bio (as a may see them) naming what the plan is about still
+  // ties b to it ("Jordan's bio mentions posters, a fit for 🖼️ Art walk").
+  const seen = v.profileFor(a.id, b);
+  const planKeys = questKeywords(q);
+  const job = seen.job ? hit(planKeys, seen.job) : null;
+  const k = job ?? hit(planKeys, seen.bio);
+  if (!k) return [];
+  return [{
+    keyword: k,
+    forA: job && seen.job
+      ? `${B} works as ${article(seen.job)} ${seen.job.toLowerCase()}, a fit for ${plan}`
+      : `${B}'s bio mentions ${k}, a fit for ${plan}`,
+    forB: `${A} wants company for ${plan}, and it's about ${k}`,
+    looker: null, topic: [k], plan: true,
+  }];
+}
+
+/** The words a plan is about: its title, tags and category, minus generic plan words. */
+export function questKeywords(q: Pick<QuestRow, 'title' | 'tags' | 'category'>): string[] {
+  return keywords([q.title, ...q.tags.filter((t) => !t.includes(':')), q.category === 'other' ? '' : q.category].join(' '))
+    .filter((w) => !['open', 'house', 'hangout', 'pregame', 'night'].includes(w));
+}
+
+/**
+ * What the viewer typed when asking ("someone who likes comics") checked against b's profile as
+ * the viewer may see it. The ask is an extra fact for the viewer only (b is never told what a
+ * typed): "You asked for someone who likes comics, and Jordan is into comics". It never replaces
+ * the viewer's saved looking-for text.
+ */
+export function askFacts(v: View, a: Profile, b: Profile, ask: string, kind: IntroKind): SharedFact[] {
+  const text = ask.trim().replace(/[.!?]+$/, '');
+  const keys = keywords(text);
+  if (!keys.length) return [];
+  const e = evidence(v.profileFor(a.id, b), keys, kind);
+  if (!e) return [];
+  return [{
+    keyword: hit(keys, e.term) ?? keys[0],
+    forA: `You asked for ${text}, and ${e.they(firstName(b))}`,
+    forB: null, looker: 'a', topic: keywords(e.term).length ? keywords(e.term) : [e.term.toLowerCase()],
+  }];
+}
+
 // ---------- candidates ----------
-export type Candidate = { profile: Profile; kind: IntroKind; trust: TrustPath; facts: SharedFact[]; codeScore: number };
+export type Candidate = {
+  profile: Profile; kind: IntroKind; trust: TrustPath; facts: SharedFact[]; codeScore: number;
+  /** For a plan-anchored request: at least one fact ties this person to the plan. */
+  planTie?: boolean;
+};
 
 /** Who can be introduced to the viewer for `kinds` right now (consent, reach, distance, cooldown). */
 export function candidatesFor(
-  v: View, viewerId: ID, opts: { kinds: IntroKind[]; nowMs: number; viewerProfile?: IntroProfile },
+  v: View, viewerId: ID, opts: { kinds: IntroKind[]; nowMs: number; viewerProfile?: IntroProfile; quest?: QuestRow; ask?: string },
 ): Candidate[] {
   const me = v.profileById.get(viewerId);
   if (!me) return [];
@@ -367,10 +480,15 @@ export function candidatesFor(
     .filter((i) => (i.aId === viewerId || i.bId === viewerId) && opts.nowMs - Date.parse(i.createdAt) < REINTRO_COOLDOWN_MS)
     .map((i) => (i.aId === viewerId ? i.bId : i.aId)));
   const pendingFriend = (other: ID) => v.friendship(viewerId, other) !== null;
+  // A plan-anchored request: only people who could go to it (see it, not already on it, free
+  // for its window and within the walk cap of it).
+  const q = opts.quest;
+  const planMembers = new Set(q ? v.questMemberIds(q.id) : []);
+  const couldGo = (id: ID) => !q || (!planMembers.has(id) && v.canSeeQuest(id, q) && !!freeForPlan(v, id, q, opts.nowMs));
   const out: Candidate[] = [];
   for (const id of reach) {
     const p = v.profileById.get(id);
-    if (!p || recent.has(id) || pendingFriend(id)) continue;
+    if (!p || recent.has(id) || pendingFriend(id) || !couldGo(id)) continue;
     const theirs = introProfileOf(v, id);
     if (theirs.paused) continue;
     const kinds = opts.kinds.filter((k) => theirs.kinds[k]?.on && myP.kinds[k]?.on);
@@ -385,13 +503,19 @@ export function candidatesFor(
     // Facts come from one kind only, so the intro is made for the kind with the most distinct
     // facts (ties keep the order of `kinds`): Alex and Jordan share more as a coffee chat than
     // as friends, and a friendship intro never borrows their coffee-chat wants.
+    // For a plan, the first kind (in `kinds` order) that clears the bar wins, so a comics open
+    // house stays a Friendship intro even when a coffee chat would share one more fact.
     let best: { kind: IntroKind; facts: SharedFact[]; score: number } | null = null;
+    const pf = q ? planFacts(v, me, p, q) : [];
     for (const kind of eligible) {
-      const facts = sharedFacts(v, me, p, kind, opts.viewerProfile);
+      if (q && best && best.score >= SCORE_THRESHOLD) break;
+      // Plan facts go first, so they replace a generic shared interest on the same topic; the
+      // viewer's typed ask adds a fact without replacing what they saved.
+      const facts = [...pf, ...(opts.ask ? askFacts(v, me, p, opts.ask, kind) : []), ...sharedFacts(v, me, p, kind, opts.viewerProfile)];
       const score = codeScore(distinctTopics(facts));
       if (!best || score > best.score) best = { kind, facts, score };
     }
-    out.push({ profile: p, kind: best!.kind, trust, facts: best!.facts, codeScore: best!.score });
+    out.push({ profile: p, kind: best!.kind, trust, facts: best!.facts, codeScore: best!.score, ...(q ? { planTie: pf.length > 0 } : {}) });
   }
   return out.sort((x, y) => y.codeScore - x.codeScore || x.profile.id.localeCompare(y.profile.id));
 }

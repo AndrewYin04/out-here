@@ -52,13 +52,14 @@ function Actions({ intro, busy, respond }: { intro: IntroCardData; busy: null | 
     return (
       <div className="mt-2 space-y-1.5">
         <div className="grid grid-cols-2 gap-2 sm:max-w-[340px]">
-          <Button block onClick={() => respond(true)} disabled={!!busy} icon={<Check size={16} aria-hidden />}>
-            {busy === 'accept' ? 'Accepting…' : 'Accept'}
+          <Button block onClick={() => respond(true)} disabled={!!busy} icon={<Check size={16} aria-hidden />} data-testid="intro-accept">
+            {busy === 'accept' ? 'Accepting…' : intro.joinLine ? 'Yes, go together' : 'Accept'}
           </Button>
           <Button block variant="secondary" onClick={() => respond(false)} disabled={!!busy} icon={<X size={16} aria-hidden />}>
             {busy === 'pass' ? 'Saving…' : 'Not now'}
           </Button>
         </div>
+        {intro.joinLine && <p className="text-[14px] font-semibold text-fb-text" data-testid="intro-join-line">{intro.joinLine}</p>}
         <p className="text-[13px] text-fb-text-2">
           {intro.otherAccepted
             ? `${name} already said yes. Nothing is shared until you do.`
@@ -91,13 +92,13 @@ function FirstStep({ intro }: { intro: IntroCardData }) {
   return (
     <div className="flex flex-col gap-2 rounded-btn bg-fb-input px-3 py-2 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-fb-text-2">Suggested first step</p>
+        <p className="text-[13px] font-semibold text-fb-text-2" data-testid="first-step-title">{s.anchored ? 'The plan' : 'Suggested first step'}</p>
         <p className="text-[15px] text-fb-text" data-testid="first-step">{s.label}</p>
         {meta && <p className="text-[13px] text-fb-text-2" data-testid="first-step-when">{meta}</p>}
       </div>
       {s.href && (
         <LinkButton href={s.href} variant="secondary" size="sm" icon={<MapPin size={14} aria-hidden />}>
-          {intro.state === 'connected' ? 'Plan it together' : 'See on map'}
+          {intro.state === 'connected' && !s.anchored ? 'Plan it together' : 'See on map'}
         </LinkButton>
       )}
     </div>
@@ -218,6 +219,8 @@ export function IntroCard({ intro, onRespond, onPlan }: {
           <Actions intro={intro} busy={busy} respond={(a) => void respond(a)} />
         </div>
       </div>
+      {/* For a plan, the what and when come before the reasons, so they show above the fold on a phone. */}
+      {intro.step.anchored && <FirstStep intro={intro} />}
       <section aria-label="Why your agents think you'd click" className="border-t border-fb-divider-soft pt-3">
         <h4 className="flex items-center gap-2 text-[15px] font-semibold text-fb-text">Why your agents think you&apos;d click <MuseTag /></h4>
         <p className="mt-1 text-[15px] text-fb-text" data-testid="intro-summary">{intro.summary}</p>
@@ -227,7 +230,7 @@ export function IntroCard({ intro, onRespond, onPlan }: {
           ))}
         </ul>
       </section>
-      <FirstStep intro={intro} />
+      {!intro.step.anchored && <FirstStep intro={intro} />}
       {intro.state === 'connected' && <MusePlan intro={intro} onPlan={onPlan} />}
       <div>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}

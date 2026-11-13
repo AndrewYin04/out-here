@@ -206,6 +206,108 @@ test.describe('Muse Intros', () => {
     await reset(request);
   });
 
+  test('plan-anchored: Alex asks for someone to go to a plan with, Jordan accepts, both are on it', async ({ browser, request }) => {
+    test.setTimeout(180_000);
+    // Scene 5: the seeded comics open house, asked for with the scripted line.
+    const near = await (await request.get('/api/quests?radiusM=6000', { headers: as('alex') })).json() as {
+      quests: { id: string; title: string; startsAt: string; endsAt: string; approxLocation: { lat: number; lng: number }; capacity: number; memberIds: string[] }[];
+    };
+    const q = near.quests.find((x) => x.title === 'Comics open house')!;
+    expect(q, 'seed has the Comics open house plan').toBeTruthy();
+    const detail = async (h: string) => (await (await request.get(`/api/quests/${q.id}`, { headers: as(h) })).json()) as { seatsLeft: number; viewerIsMember: boolean };
+    for (const width of [1440, 390]) {
+      await reset(request);
+      for (const h of ['alex', 'jordan']) if ((await detail(h)).viewerIsMember) await request.post(`/api/quests/${q.id}/leave`, { headers: as(h), data: {} });
+      // Jordan is free tonight, a short walk from the plan.
+      expect((await request.post('/api/availability', {
+        headers: as('jordan'),
+        data: { text: 'free tonight', startsAt: new Date().toISOString(), endsAt: q.endsAt, location: q.approxLocation },
+      })).ok()).toBe(true);
+      const seatsBefore = (await detail('alex')).seatsLeft;
+
+      // Entry point on the plan page, then the pre-filled ask.
+      const ctx = await browser.newContext({ viewport: { width, height: width < 800 ? 844 : 900 }, isMobile: width < 800, hasTouch: width < 800 });
+      const alex = await ctx.newPage();
+      await alex.goto(`/out-here/plan/${q.id}?as=alex`);
+      const entry = alex.getByTestId('plan-find-someone');
+      await expect(entry).toBeVisible({ timeout: 20_000 });
+      await alex.screenshot({ path: `.verify/event-intro/entry-plan-page-${width}.png` });
+      await entry.click();
+      await expect(alex).toHaveURL(new RegExp(`/intros\\?quest=${q.id}`));
+      const ask = alex.getByTestId('ask-muse');
+      await expect(ask.getByTestId('ask-plan')).toContainText('Comics open house', { timeout: 20_000 });
+      await expect(ask.getByRole('heading', { name: 'Find someone to go with' })).toBeVisible();
+      // For a plan Muse tries every kind Alex has on, so there is no kind to pick.
+      await expect(ask.getByRole('radio', { name: 'Coffee chat' })).toHaveCount(0);
+      await ask.getByLabel('What are you looking for?').fill('someone who likes comics');
+      await alex.screenshot({ path: `.verify/event-intro/prefilled-${width}.png` });
+      await ask.getByRole('button', { name: 'Ask Muse' }).click();
+      await expect(ask.getByTestId('ask-answer')).toContainText('meet Jordan', { timeout: 20_000 });
+
+      const card = alex.locator('[data-testid="intro-card"][data-handle="jordan"]');
+      await expect(card).toBeVisible();
+      await expect(card.getByTestId('first-step-title')).toHaveText('The plan');
+      await expect(card.getByTestId('first-step')).toContainText('Comics open house');
+      await expect(card.getByRole('link', { name: 'See on map' })).toHaveAttribute('href', `/out-here?quest=${q.id}`);
+      await expect(card.getByTestId('intro-reasons').locator('li').first()).toContainText('📚 Comics open house');
+      await expect(card.getByTestId('intro-join-line')).toContainText('Saying yes adds you to 📚 Comics open house');
+      await card.getByRole('button', { name: 'Yes, go together' }).click();
+      await expect(card.getByTestId('intro-status')).toHaveText('Waiting for Jordan');
+      expect((await detail('alex')).viewerIsMember).toBe(false);
+
+      // Jordan's card: the plan, the time and the walk are above the fold before he decides.
+      const jctx = await browser.newContext({ viewport: { width, height: width < 800 ? 844 : 900 }, isMobile: width < 800, hasTouch: width < 800 });
+      const jp = await jctx.newPage();
+      await jp.goto('/intros?as=jordan');
+      const jcard = jp.locator('[data-testid="intro-card"][data-handle="alex"]');
+      await expect(jcard).toBeVisible({ timeout: 20_000 });
+      await expect(jcard.getByRole('button', { name: 'Yes, go together' })).toBeInViewport();
+      await expect(jcard.getByTestId('intro-join-line')).toBeInViewport();
+      await expect(jcard.getByTestId('intro-join-line')).toContainText('Saying yes adds you to 📚 Comics open house');
+      await expect(jcard.getByTestId('first-step')).toContainText('Comics open house');
+      await jp.screenshot({ path: `.verify/event-intro/jordan-card-${width}.png` });
+      await jctx.close();
+
+      // Jordan says yes from the API; both join on that yes.
+      const list = await (await request.get('/api/intros', { headers: as('jordan') })).json() as { intros: { id: string; other: { handle: string } }[] };
+      const mine = list.intros.find((i) => i.other.handle === 'alex')!;
+      const res = await request.post(`/api/intros/${mine.id}/respond`, { headers: as('jordan'), data: { accept: true } });
+      expect(res.ok()).toBe(true);
+      expect(((await res.json()) as { intro: { state: string } }).intro.state).toBe('connected');
+      expect((await detail('alex')).viewerIsMember).toBe(true);
+      expect((await detail('jordan')).viewerIsMember).toBe(true);
+      expect((await detail('alex')).seatsLeft).toBe(seatsBefore - 2);
+
+      // Alex's card updates live and shows the plan, held, with the map link.
+      await expect(card.getByTestId('intro-status')).toHaveText("You're connected", { timeout: 10_000 });
+      await expect(card.getByTestId('seats-held')).toContainText('Seats held for you and Jordan');
+      await expect(card.getByTestId('first-step')).toContainText('Comics open house');
+      await expect(card.getByRole('link', { name: 'See on map' })).toBeVisible();
+      const href = await card.getByRole('link', { name: 'Open chat' }).getAttribute('href');
+      const threadId = decodeURIComponent(href!.split('thread=')[1]);
+      const msgs = await (await request.get(`/api/threads/${threadId}/messages`, { headers: as('alex') })).json() as { messages?: { text: string; kind: string }[] } | { text: string; kind: string }[];
+      const notes = (Array.isArray(msgs) ? msgs : msgs.messages ?? []).filter((m) => m.kind === 'muse');
+      expect(notes).toHaveLength(1);
+      expect(notes[0].text).toContain("You're both going to 📚 Comics open house");
+      expect(notes[0].text).toMatch(/about a \d+ min walk for Alex and \d+ min for Jordan/);
+      await card.scrollIntoViewIfNeeded();
+      await alex.screenshot({ path: `.verify/event-intro/connected-${width}.png` });
+
+      // The quest panel on the map has the same entry point.
+      await alex.goto(`/out-here?quest=${q.id}`);
+      const panelEntry = alex.getByTestId('quest-find-someone');
+      await expect(panelEntry).toBeVisible({ timeout: 30_000 });
+      await expect(panelEntry).toHaveAttribute('href', `/intros?quest=${q.id}`);
+      await panelEntry.scrollIntoViewIfNeeded();
+      await alex.screenshot({ path: `.verify/event-intro/entry-quest-panel-${width}.png` });
+
+      for (const h of ['alex', 'jordan']) expect((await request.post(`/api/quests/${q.id}/leave`, { headers: as(h), data: {} })).ok()).toBe(true);
+      await ctx.close();
+    }
+    await request.delete('/api/availability', { headers: as('jordan') });
+    await reset(request);
+  });
+
   test('intro API is per viewer and validates input', async ({ request }) => {
     expect((await request.post('/api/intros/request', { headers: as('alex'), data: { kind: 'hookup' } })).status()).toBe(400);
     expect((await request.post('/api/intros/not-an-id/respond', { headers: as('alex'), data: { accept: true } })).status()).toBe(404);

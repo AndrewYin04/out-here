@@ -310,7 +310,11 @@ export type TrustPath = { mutualIds: ID[]; groupIds: ID[]; label: string };
  * are stored with text '' and only `outcome`, a one-line result that side may see.
  */
 export type AgentTurn = { agent: 'a' | 'b'; text: string; outcome?: string };
-export type FirstStep = { text: string; questId: ID | null; placeId: ID | null };
+/**
+ * The first step of an intro. `anchored` is true when the person asked for someone to go to this
+ * plan with (an intro request with a questId): on double accept both people join it.
+ */
+export type FirstStep = { text: string; questId: ID | null; placeId: ID | null; anchored?: boolean };
 export type IntroStatus = 'proposed' | 'a_accepted' | 'b_accepted' | 'accepted' | 'declined' | 'expired';
 export type IntroSource = 'auto' | 'request';
 /**
@@ -327,7 +331,7 @@ export type Intro = {
   createdAt: string; decidedAt: string | null;
 };
 /** The suggested first step on a card: a real quest with a relative time and a map link, or a fallback. */
-export type IntroStepView = { label: string; when: string | null; href: string | null; seatsLeft: number | null };
+export type IntroStepView = { label: string; when: string | null; href: string | null; seatsLeft: number | null; anchored?: boolean };
 /** What one side sees: the other person's card plus only their own agent's turns. */
 export type IntroCardView = {
   id: ID; kind: IntroKind; score: number;

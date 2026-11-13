@@ -251,6 +251,16 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               <span>Open plan page{shown.postCount ? ` · ${shown.postCount} ${shown.postCount === 1 ? 'post' : 'posts'}` : ''}</span>
               <ChevronRight size={18} aria-hidden />
             </Link>
+            {q.status !== 'done' && Date.parse(q.endsAt) > now.getTime() && (
+              <Link
+                href={`/intros?quest=${encodeURIComponent(q.id)}`}
+                data-testid="quest-find-someone"
+                className="mt-2 flex items-center justify-between rounded-btn bg-fb-blue-tint px-3 py-2 text-fb-body font-semibold text-fb-blue hover:brightness-95"
+              >
+                <span>Find someone to go with ✨</span>
+                <ChevronRight size={18} aria-hidden />
+              </Link>
+            )}
           </>
         )}
       </div>
