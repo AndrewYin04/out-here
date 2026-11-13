@@ -1,8 +1,14 @@
 import type { LatLng } from './types';
 
-/** Meta HQ, 1 Hacker Way, Menlo Park. Change only this constant to move the demo, then re-seed. */
-export const DEMO_CENTER: LatLng = { lat: 37.4847, lng: -122.1477 };
-export const DEMO_AREA_LABEL = 'Menlo Park';
+/** Fictional demo streets in San Francisco; remote stores change only through an explicit seed. */
+export const DEMO_CENTER: LatLng = { lat: 37.7895, lng: -122.4078 };
+/** Authored street-level starts match the three detailed demo districts. */
+export const DEMO_CITY_STARTS: Readonly<Record<string, LatLng>> = {
+  alex: DEMO_CENTER,
+  maya: { lat: 37.7931, lng: -122.4069 },
+  leo: { lat: 37.7857, lng: -122.4025 },
+};
+export const DEMO_AREA_LABEL = 'San Francisco';
 /** Render all times in this zone; the database stores timestamptz. */
 export const DEMO_TZ = 'America/Los_Angeles';
 

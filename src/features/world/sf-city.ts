@@ -20,7 +20,8 @@ export type CityPlacement = {
   /** Width in metres for buildings, overall height for trees/props, tile width for roads. */
   size: number; tint?: string; building?: boolean;
 };
-const TINTS = ['#FFAA8C', '#83D8D0', '#FFDA83', '#91BEED', '#E3AED9', '#A8D79A'];
+// Bright, saturated tints (they multiply the kit's colour atlas, so pastels read dusty).
+const TINTS = ['#FF9A76', '#5FE0D2', '#FFD966', '#79B8FF', '#FF9ED8', '#9BE07A'];
 const SHOPS: Asset[] = ['shopA', 'shopC', 'shopF', 'shopH', 'shopK', 'shopM'];
 const HOUSES: Asset[] = ['houseB', 'houseF', 'houseJ'];
 const TOWERS: Asset[] = ['towerA', 'towerB', 'towerD'];
@@ -118,7 +119,7 @@ export async function buildSfCity(origin: LatLng, centers: readonly CityCenter[]
   for (const [name, prototype] of loaded) {
     const geometry = prototype.geometry.clone(), material = prototype.material.clone();
     material.roughness = .82; material.metalness = 0; material.side = THREE.FrontSide;
-    material.emissive.set('#FFF4D8'); material.emissiveIntensity = .06;
+    material.emissive.set('#FFF4D8'); material.emissiveIntensity = .14;
     if (material.map) { material.map = material.map.clone(); material.map.needsUpdate = true; textures.add(material.map); }
     geometries.add(geometry); materials.add(material); protos.set(name, { geometry, material, bounds: prototype.bounds });
   }

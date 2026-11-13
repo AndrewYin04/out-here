@@ -3,6 +3,7 @@
 // olivia is paused). Jordan, Nina and Priya also share, with their own friends only, and are not
 // Alex's friends, so they never appear on Alex's map. Far-away pins are Alex's college and
 // hometown friends. Times are minutes relative to the seed clock.
+import { DEMO_CITY_STARTS } from '../demo';
 import type { Audience, LatLng, LocationPrecision, StatusBubble } from '../types';
 
 export type SeedLocationShare = {
@@ -24,25 +25,28 @@ const b = (emoji: string, thought: string, doing: string | null, wantsTo: string
 
 export const SEED_LOCATION_SHARES: SeedLocationShare[] = [
   // the viewer
-  { handle: 'alex', at: { place: 'Hacker Way Courts', offsetM: 330, bearingDeg: 250 }, placeLabel: 'Hacker Way, Menlo Park',
+  { handle: 'alex', at: DEMO_CITY_STARTS.alex, placeLabel: 'Union Square, San Francisco',
     precision: 'exact', bubble: b('👋', 'new here, say hi', 'at work till 5', 'find people to grab food with'), updatedMinAgo: 6 },
 
+  { handle: 'leo', at: DEMO_CITY_STARTS.leo, placeLabel: 'SoMa, San Francisco',
+    precision: 'exact', bubble: b('☕', 'coffee before the next thing', 'working near Yerba Buena', 'meet someone for a walk'), updatedMinAgo: 4 },
+
   // local friends of Alex
-  { handle: 'maya', at: { place: 'El Camino Coffee Works', offsetM: 40, bearingDeg: 120 }, placeLabel: 'El Camino Coffee Works',
+  { handle: 'maya', at: DEMO_CITY_STARTS.maya, placeLabel: 'Chinatown, San Francisco',
     precision: 'exact', bubble: b('🥟', 'craving dumplings', 'lunch break for ~45 min', 'try Dumpling Den'), updatedMinAgo: 3 },
   { handle: 'kai', at: { place: 'Boulder Bay Gym' }, placeLabel: 'Boulder Bay Gym',
     precision: 'exact', bubble: b('🧗', 'chalked up', 'bouldering till 1', 'find a climbing buddy'), updatedMinAgo: 12 },
-  { handle: 'ethan', at: { place: 'Dumpling Den', offsetM: 220, bearingDeg: 35 }, placeLabel: 'near Willow Rd',
+  { handle: 'ethan', at: { place: 'Dumpling Den', offsetM: 220, bearingDeg: 35 }, placeLabel: 'near Union Square, San Francisco',
     precision: 'exact', bubble: b('☕', 'need a second coffee', 'working from a cafe', 'walk somewhere after'), updatedMinAgo: 9 },
   { handle: 'zara', at: { place: 'Ravenswood Board Game Cafe', offsetM: 60, bearingDeg: 300 }, placeLabel: 'Ravenswood Board Game Cafe',
     precision: 'exact', bubble: b('🎲', 'board game brain', 'setting up for tonight', 'teach someone Wingspan'), updatedMinAgo: 18 },
-  { handle: 'lena', at: { lat: 37.39335, lng: -122.07987 }, placeLabel: 'Mountain View',
+  { handle: 'lena', at: { lat: 37.7838, lng: -122.4143 }, placeLabel: 'Civic Center, San Francisco',
     precision: 'approximate', bubble: b('🌮', 'taco tuesday energy', 'errands downtown', 'find a new taco spot'), updatedMinAgo: 25 },
-  { handle: 'liam', at: { lat: 37.48521, lng: -122.23635 }, placeLabel: 'Redwood City',
+  { handle: 'liam', at: { lat: 37.7980, lng: -122.4090 }, placeLabel: 'North Beach, San Francisco',
     precision: 'approximate', bubble: b('🚲', 'biking home later', 'remote day', 'ride the Bay Trail'), updatedMinAgo: 34 },
-  { handle: 'rosa', at: { lat: 37.46883, lng: -122.14102 }, placeLabel: 'East Palo Alto',
+  { handle: 'rosa', at: { lat: 37.7800, lng: -122.4035 }, placeLabel: 'SoMa, San Francisco',
     precision: 'approximate', bubble: b('🎧', 'new playlist on repeat', 'heads down till 4', 'catch a local show'), updatedMinAgo: 41 },
-  { handle: 'olivia', at: { lat: 37.44188, lng: -122.14302 }, placeLabel: 'Palo Alto',
+  { handle: 'olivia', at: { lat: 37.7907, lng: -122.4180 }, placeLabel: 'Nob Hill, San Francisco',
     precision: 'exact', paused: true, bubble: b('📚', 'deadline mode', 'in meetings', null), updatedMinAgo: 70 },
 
   // far-away friends (college and hometown)
@@ -83,9 +87,9 @@ export const SEED_LOCATION_SHARES: SeedLocationShare[] = [
   // sharers who are NOT Alex's friends (they share with their own friends)
   { handle: 'jordan', at: { place: 'The Signal Room', offsetM: 50, bearingDeg: 10 }, placeLabel: 'The Signal Room',
     precision: 'exact', bubble: b('🎸', 'soundcheck soon', 'loading in gear', 'grab food before the show'), updatedMinAgo: 11 },
-  { handle: 'nina', at: { place: 'Dumpling Den', offsetM: 90, bearingDeg: 200 }, placeLabel: 'near Willow Rd',
+  { handle: 'nina', at: { place: 'Dumpling Den', offsetM: 90, bearingDeg: 200 }, placeLabel: 'near Union Square, San Francisco',
     precision: 'exact', bubble: b('🥟', 'dumplings again', 'meeting a friend', null), updatedMinAgo: 7 },
-  { handle: 'priya', at: { lat: 37.42752, lng: -122.16972 }, placeLabel: 'Stanford',
+  { handle: 'priya', at: { lat: 37.7820, lng: -122.4050 }, placeLabel: 'Yerba Buena, San Francisco',
     precision: 'exact', bubble: b('🧪', 'lab day', 'running experiments', 'study sprint later'), updatedMinAgo: 20 },
 ];
 

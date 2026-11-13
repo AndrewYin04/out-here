@@ -15,19 +15,19 @@ import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAg
 import { ArrivalSelfie, OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import {photoFocusBearing} from '@/features/muse-vision';
 import {museCameraArea, museConversationArea, museStage} from './muse-layout';
-import {loadSceneryAssets} from './scenery-assets';
 import {placeStreetFurniture} from './street-furniture';
 import { CategoryIcon, categoryOf, cn, useDemoTools } from '@/features/ui';
 import { Footprints, LocateFixed, MapPin, Sparkles, X } from 'lucide-react';
 
-import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_CITY_STARTS, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { EncounterMotion } from './encounter-motion';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
-import { buildHq, loadHq, type HqLabel } from './hq';
+import type { HqLabel } from './hq';
+import { buildSfCity } from './sf-city';
 import { blockerTest, nearestOnLines, nearestOpen, placeTrees, streetHeading,type Area, type Street } from './trees';
 import {
-  ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
+  ARRIVE_METERS, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, EXIT_3D_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
 } from './math';
 import { headThereLine, walkLine } from './museLines';
@@ -107,9 +107,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return () => { done = true; map.off('idle', finish); window.clearTimeout(t); };
   }, [ready, settled, map]);
   /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
-  const [hqLabels, setHqLabels] = useState<HqLabel[]>([]);
-  const hqBox = useRef<number[][] | null>(null);
-  const hqFlatten = useRef<((f: number) => void) | null>(null);
+  const [hqLabels] = useState<HqLabel[]>([]);
+  const cityBounds = useRef<number[][][]>([]);
+  const cityContains = useRef<(p: LatLng) => boolean>(() => false);
+  const cityBlocked = useRef<((p: LatLng) => boolean) | null>(null);
+  const osmBlocked = useRef<(p: LatLng) => boolean>(() => false);
   const [tour, setTour] = useState<string | null>(null);
   const tourToken = useRef(0);
   const touring = useRef(false);
@@ -460,34 +462,53 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     return blocked(along) ? p : along;
   }, []);
 
-  // ---- Meta HQ in detail (hq.ts): real footprints, floors, facades, rooftop park, mapped trees ----
+  // ---- Detailed, instanced San Francisco demo districts in the existing world layer ----
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     let dispose: (() => void) | null = null;
-    void Promise.all([loadHq(),loadSceneryAssets()]).then(([data,assets]) => {
-      const layer = layerRef.current;
-      if (cancelled || !data || !layer) return;
-      const model = buildHq(data, layer.getOrigin(),assets);
-      layer.setStatic('hq', model.group);
-      dispose = model.dispose;
-      hqFlatten.current = model.setFlatten;
-      // The map's plain boxes for these buildings would poke through the models: hide them
-      // (OpenMapTiles building ids are the OSM way id × 10).
-      if (map.getLayer(BUILDINGS_ID)) map.setFilter(BUILDINGS_ID, ['!', ['in', ['id'], ['literal', model.wayIds.map((id) => id * 10)]]]);
-      const b = data.box;
-      hqBox.current = [[b.w, b.s], [b.e, b.s], [b.e, b.n], [b.w, b.n], [b.w, b.s]];
-      setHqLabels(model.labels);
-    });
-    return () => {
-      cancelled = true;
-      layerRef.current?.setStatic('hq', null);
-      hqFlatten.current = null;
-      dispose?.();
-      if (map.getLayer(BUILDINGS_ID)) map.setFilter(BUILDINGS_ID, null);
-      hqBox.current = null;
+    let hideCityBuildings: (() => void) | null = null;
+    const origin=layerRef.current?.getOrigin();
+    if (!origin) return;
+    void buildSfCity(origin,Object.entries(DEMO_CITY_STARTS).map(([id,center])=>({id,center}))).then(city=>{
+      if (cancelled || !layerRef.current) { city.dispose(); return; }
+      layerRef.current.setStatic('sf-city',city.group);
+      dispose=city.dispose;cityBounds.current=city.bounds;
+      cityContains.current=blockerTest(city.bounds.map(ring=>[ring]));
+      cityBlocked.current=city.isBlocked;
+      blockedRef.current=p=>cityContains.current(p)?city.isBlocked(p):osmBlocked.current(p);
+      // Real downtown towers (OSM extrusions) would swallow the Kenney blocks: hide every building
+      // with a corner inside a district, by id (MapLibre's 'within' does not filter polygons).
+      // Re-checked when new tiles arrive; the colorful real skyline stays everywhere else.
+      const hidden=new Set<number>();
+      hideCityBuildings=()=>{
+        const src=tileSourceId(map);if(!src||!map.getLayer(BUILDINGS_ID))return;
+        const before=hidden.size;
+        for(const f of map.querySourceFeatures(src,{sourceLayer:'building'})){
+          if(f.id==null||hidden.has(Number(f.id)))continue;
+          const g=f.geometry;const rings=g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.flat():[];
+          if(rings.some(r=>r.some(([lng,lat])=>cityContains.current({lat,lng}))))hidden.add(Number(f.id));
+        }
+        if(hidden.size!==before||before===0)map.setFilter(BUILDINGS_ID,hidden.size?['!',['in',['id'],['literal',[...hidden]]]]:null);
+      };
+      hideCityBuildings();map.on('idle',hideCityBuildings);
+      map.getContainer().dataset.worldCity='sf';
+      map.getContainer().dataset.cityInstances=String(city.stats.instances);
+      snapPending.current=true;
+      if(!moved.current&&sourceRef.current==='demo'){
+        const start=homeRef.current??DEMO_CENTER;
+        if(cityContains.current(start)){pos.current=start;petPos.current=start;heading.current=0;streetHeadingSet.current=true;}
+      }
+    }).catch(()=>{ /* Keep the live map usable when a local scenery asset cannot load. */ });
+    return()=>{
+      cancelled=true;layerRef.current?.setStatic('sf-city',null);dispose?.();
+      cityBounds.current=[];cityContains.current=()=>false;cityBlocked.current=null;
+      blockedRef.current=osmBlocked.current;
+      delete map.getContainer().dataset.worldCity;delete map.getContainer().dataset.cityInstances;
+      if(hideCityBuildings)map.off('idle',hideCityBuildings);
+      if(map.getLayer(BUILDINGS_ID))map.setFilter(BUILDINGS_ID,null);
     };
-  }, [map, ready]);
+  },[map,ready]);
 
   const stopTour = useCallback(() => {
     if (!touring.current) return;
@@ -570,20 +591,21 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const water = map.querySourceFeatures(source, { sourceLayer: 'water' }).flatMap((f) => polys(f));
       // No trees on sports fields, playgrounds or in the water.
       const blockers = [...buildings, ...q('landcover',['wetland']).flatMap(f=>polys(f)), ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water,
-        // Meta HQ has its real, mapped trees (hq.ts); no generated ones there.
-        ...(hqBox.current ? [[hqBox.current]] : [])];
+        // Authored city blocks already include trees, pavement and street props.
+        ...cityBounds.current.map(ring=>[ring])];
       // You can't walk into a building or the bay. The demo walk starts on open ground.
-      blockedRef.current = blockerTest([...buildings, ...water]);
+      osmBlocked.current = blockerTest([...buildings, ...water]);
+      blockedRef.current = p=>cityContains.current(p)?(cityBlocked.current?.(p)??false):osmBlocked.current(p);
       if (sourceRef.current === 'demo' && !moved.current) {
         // Start on the nearest street or footpath (a home inside a campus courtyard reads as a
         // rooftop from the low camera), and never inside a building.
         const start = homeRef.current ?? DEMO_CENTER;
         const roads = q('transportation', ['minor', 'tertiary', 'secondary']).flatMap((f) => lines(f));
         const paths = q('transportation', ['service', 'path']).flatMap((f) => lines(f));
-        const onStreet = nearestOnLines(start, roads, 250) ?? nearestOnLines(start, paths, 150) ?? start;
+        const onStreet = cityContains.current(start)?start:nearestOnLines(start, roads, 250) ?? nearestOnLines(start, paths, 150) ?? start;
         pos.current = nearestOpen(onStreet, blockedRef.current);
         petPos.current = pos.current;
-        if(followRef.current&&!streetHeadingSet.current){const aligned=streetHeading(pos.current,roads.length?roads:paths,heading.current);if(aligned!==null){heading.current=aligned;streetHeadingSet.current=true;}}
+        if(followRef.current&&!streetHeadingSet.current&&!cityContains.current(pos.current)){const aligned=streetHeading(pos.current,roads.length?roads:paths,heading.current);if(aligned!==null){heading.current=aligned;streetHeadingSet.current=true;}}
       }
       const spots=placeTrees({ origin: DEMO_CENTER, center: focus, radiusM: 650, cap: 480, areas, streets, blockers });layer.setTrees(spots);
       layer.setStreetFurniture(placeStreetFurniture({origin:DEMO_CENTER,center:focus,streets,blockers,radiusM:500,cap:48}).filter(lamp=>!spots.some(tree=>haversineMeters(lamp,tree)<3)));
@@ -868,7 +890,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // Camera: behind the avatar while following. The tilt is set from the zoom on every camera
       // update by transformCameraUpdate (setup effect), so it changes smoothly during a pinch or
       // scroll. Any camera call stops MapLibre's gestures, so following waits out a user zoom.
-      hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
       if (chatOpen.current) {
         if(manualChatCamera.current){previousCamera=null;chatCamera=null;returnCamera=null;map.setCenterClampedToGround(true);camBearing.current=map.getBearing();return;}

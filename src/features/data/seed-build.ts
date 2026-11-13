@@ -2,7 +2,7 @@
 // (builds the same rows in-process). No Node imports, so it runs inside Next route handlers.
 import { faker } from '@faker-js/faker/locale/en';
 import { z } from 'zod';
-import { DEMO_CENTER, demoDate, floorToHour, PERSONA_HANDLES } from '../../shared/demo';
+import { DEMO_CENTER, DEMO_CITY_STARTS, demoDate, floorToHour, PERSONA_HANDLES } from '../../shared/demo';
 import { fuzzLocation, offsetPoint } from '../../shared/geo';
 import { deriveFriendGraph, friendAdjacency, LOCAL_CIRCLES } from '../../shared/seed/graph';
 import { mulberry32, profileId, seedId, shuffled } from '../../shared/seed/ids';
@@ -134,10 +134,10 @@ const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
  * 6 AM PT keeps every window open through a 10:30-11:30 AM demo. It stays under MAX_PICKUP_HOURS.
  */
 export const PICKUP_LISTINGS = [
-  { id: 'l04', meters: 2600, bearing: 200, openMin: 420, listedMinAgo: 70, label: 'Downtown Menlo Park', spot: 'Bench outside the library, Alma St' },
-  { id: 'l10', meters: 1700, bearing: 95, openMin: 480, listedMinAgo: 35, label: 'East Palo Alto', spot: 'Front porch, white house on Bay Rd' },
-  { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
-  { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
+  { id: 'l04', meters: 2600, bearing: 200, openMin: 420, listedMinAgo: 70, label: 'Civic Center, San Francisco', spot: 'Bench outside the library on Grove St' },
+  { id: 'l10', meters: 1700, bearing: 95, openMin: 480, listedMinAgo: 35, label: 'Rincon Hill, San Francisco', spot: 'Building entrance on Folsom St' },
+  { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Nob Hill, San Francisco', spot: 'Lobby of the California St apartments' },
+  { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Mission Bay, San Francisco', spot: 'Green door by the courtyard on Third St' },
 ] as const;
 /** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
 export const ALEX_WANT = {
@@ -174,9 +174,8 @@ export function buildSeed(
   });
   const homes = new Map<string, { lat: number; lng: number }>();
   for (const p of people) {
-    const home = p.handle === 'alex'
-      ? DEMO_CENTER
-      : offsetPoint(DEMO_CENTER, faker.number.int({ min: 300, max: 2800 }), faker.number.int({ min: 0, max: 359 }));
+    const generated = p.handle === 'alex' ? DEMO_CENTER : offsetPoint(DEMO_CENTER, faker.number.int({ min: 300, max: 2800 }), faker.number.int({ min: 0, max: 359 }));
+    const home = DEMO_CITY_STARTS[p.handle] ?? generated;
     homes.set(p.handle, { lat: Number(home.lat.toFixed(6)), lng: Number(home.lng.toFixed(6)) });
   }
   const isLocal = (h: string) => byHandle.get(h)?.circles.some((c) => LOCAL_CIRCLES.includes(c)) ?? false;
