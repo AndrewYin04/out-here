@@ -5,13 +5,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Crew, Quest } from '@/shared';
 import type { FriendAvailabilityResponse, NotificationView, PostView } from '@/shared/api';
-import { apiFetch, currentPersona, initPersonaFromUrl, PERSONA_EVENT, setPersona as setPersonaRaw } from './client';
+import { apiFetch, currentPersona, initPersonaFromUrl, PERSONA_EVENT, setPersona as setPersonaRaw, tabPersona } from './client';
 import { FRESH_HEADER } from './fresh';
 import { subscribeChannels, subscribePresence, type ChannelHandler } from './realtime-client';
 import { PERSONAS, personaByHandle, type Persona } from './personas';
 
 // ---------- identity ----------
-export function useViewer(): { viewer: Persona; handle: string; setPersona: (handle: string) => void; personas: readonly Persona[] } {
+/**
+ * The tab's persona. The first render (server and hydration) is always the default persona and
+ * an effect catches up, so `ready` is false until `handle` matches the persona apiFetch sends.
+ * A path built from viewer.id before then names the wrong person (the route answers 403).
+ */
+export function useViewer(): { viewer: Persona; handle: string; ready: boolean; setPersona: (handle: string) => void; personas: readonly Persona[] } {
   const [handle, setHandle] = useState<string>('alex');
   useEffect(() => {
     setHandle(initPersonaFromUrl());
@@ -20,7 +25,8 @@ export function useViewer(): { viewer: Persona; handle: string; setPersona: (han
     return () => window.removeEventListener(PERSONA_EVENT, on);
   }, []);
   const setPersona = useCallback((h: string) => setPersonaRaw(h), []);
-  return { viewer: personaByHandle(handle) ?? PERSONAS[0], handle, setPersona, personas: PERSONAS };
+  const ready = typeof window !== 'undefined' && handle === tabPersona();
+  return { viewer: personaByHandle(handle) ?? PERSONAS[0], handle, ready, setPersona, personas: PERSONAS };
 }
 
 // ---------- realtime ----------
@@ -56,16 +62,18 @@ export type ApiState<T> = { data: T | null; error: string | null; loading: boole
  * `channels` (or the ones `channelsOf(data)` returns) receives a message. `path` null = idle.
  */
 export function useApi<T>(
-  path: string | null,
+  pathArg: string | null,
   channels: readonly string[] = [],
   channelsOf?: (data: T) => string[],
   /** Optional: apply a realtime payload (ids/counts only) to the current data at once, before the refetch confirms it. */
   patch?: (data: T, channel: string, payload: unknown) => T,
 ): ApiState<T> {
-  const { handle } = useViewer();
+  const { handle, ready } = useViewer();
+  // Idle until the persona has resolved, so a path built from the default persona's id is never fetched.
+  const path = ready ? pathArg : null;
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(path !== null);
+  const [loading, setLoading] = useState<boolean>(pathArg !== null);
   const seq = useRef(0);
   // The newest response applied so far. A burst of realtime messages starts several fetches; a
   // response is shown if it is newer than the last one shown, not only if it is the very last
@@ -89,7 +97,7 @@ export function useApi<T>(
   // A new path or persona: ignore every fetch still in flight for the old one.
   useEffect(() => { applied.current = seq.current; void load(false); }, [load, handle]);
   const derived = data && channelsOf ? channelsOf(data) : [];
-  useChannel([...channels, ...derived], (channel, payload) => {
+  useChannel(ready ? [...channels, ...derived] : [], (channel, payload) => {
     if (patch) setData((prev) => (prev ? patch(prev, channel, payload) : prev));
     void load(true);
   });

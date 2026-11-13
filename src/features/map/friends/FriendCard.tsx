@@ -1,8 +1,7 @@
 'use client';
 // A friend's Find My card: name, place, distance and walking time, the 3-part status bubble,
 // and its actions: Want to hang?, View profile (/profile/<handle>) and Message
-// (/messages?to=<handle>). Message stays hidden until MESSENGER_READY, because /messages cannot
-// open a thread from ?to= yet and a button there would lead to a page that never loads. The hang composer shows what the invite proposes (a quest or place picked
+// (/messages?to=<handle>, which opens or starts the thread). The hang composer shows what the invite proposes (a quest or place picked
 // from the friend's bubble, free window and walking time) before it is sent.
 import { Clock, Footprints, Hand, MapPin, MessageCircle, Send, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,8 +11,6 @@ import { Avatar, Button, LinkButton, Sheet, Skeleton, useToast } from '@/feature
 import { formatDemoTime } from '@/shared/demo';
 import type { FriendPin } from '@/shared/types';
 
-/** Flip to true when /messages opens or creates the thread named by ?to=<handle>. */
-const MESSENGER_READY = false;
 import { distanceLine, firstName, floatingPanel, updatedAgo } from './useFindMy';
 
 export type FriendCardProps = {
@@ -134,15 +131,13 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
             <Button variant="primary" block icon={<Hand size={16} aria-hidden />} onClick={() => setComposing(true)} aria-expanded={composing}>
               Want to hang?
             </Button>
-            <div className={MESSENGER_READY ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
+            <div className="grid grid-cols-2 gap-2">
               <LinkButton href={`/profile/${encodeURIComponent(f.handle)}`} variant="secondary" icon={<UserRound size={16} aria-hidden />}>
                 View profile
               </LinkButton>
-              {MESSENGER_READY && (
-                <LinkButton href={`/messages?to=${encodeURIComponent(f.handle)}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
-                  Message
-                </LinkButton>
-              )}
+              <LinkButton href={`/messages?to=${encodeURIComponent(f.handle)}`} variant="secondary" icon={<MessageCircle size={16} aria-hidden />}>
+                Message
+              </LinkButton>
             </div>
           </div>
         )}
@@ -188,7 +183,7 @@ export function FriendCard({ pin, onClose, museReason = null }: FriendCardProps)
               className="w-full resize-none rounded-btn bg-fb-input px-3 py-2 text-[15px] outline-none focus:ring-2 focus:ring-fb-blue"
             />
             {error && <p role="alert" className="text-[13px] text-fb-red">{error}</p>}
-            <div className={MESSENGER_READY ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
+            <div className="grid grid-cols-2 gap-2">
               <Button variant="secondary" onClick={() => setComposing(false)}>Cancel</Button>
               <Button variant="primary" disabled={sending || suggestion === undefined} onClick={send} icon={<Send size={16} aria-hidden />}>
                 {sending ? 'Sending…' : 'Send invite'}

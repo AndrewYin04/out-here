@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
+import { FriendsLayer, PeopleButton, SharingButton, useFriendPins } from '@/features/map/friends';
 import { ImFreeButton, MuseLabel, PlanSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanSuggestions } from '@/features/outhere';
 import { Button, cn, EmptyState } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
@@ -318,7 +318,11 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
-          <PeopleButton map={map} />
+          {/* People and Your status sit below the centred chips at phone width, top left on desktop */}
+          <div className={cn('absolute left-3 z-10 flex gap-2 md:top-16', filter.on ? 'max-md:top-[136px]' : 'max-md:top-[100px]')}>
+            <PeopleButton map={map} />
+            <SharingButton />
+          </div>
           {visible.length > 0 && (
             <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
