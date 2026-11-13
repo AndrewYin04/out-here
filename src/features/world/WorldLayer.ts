@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { makeAvatar, makePet, type Character, type ModelSet } from './characters';
 import { characterScale, offsetMeters } from './math';
+import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
 import type { TreeSpot } from './trees';
 
 export type ActorKind = 'avatar' | 'pet';
@@ -23,6 +24,8 @@ type Actor = {
   /** The DOM label kept above this actor's head. */
   label: HTMLElement | null;
   labelLift: number;
+  /** Muse's energy wake (pets only). Lives in the characters scene, in world space. */
+  trail: MuseTrail | null;
 };
 export type BeaconSpec = { id: string; pos: LatLng; color: string; height: number; strong: boolean };
 type Beacon = { spec: BeaconSpec; group: THREE.Group; beam: THREE.Mesh; ring: THREE.Mesh };
@@ -52,6 +55,7 @@ export class WorldLayer implements CustomLayerInterface {
   private elapsed = 0;
   private full = new THREE.Matrix4();
   private tmp = new THREE.Vector4();
+  private trailPos = new THREE.Vector3();
   private trunkGeo = new THREE.CylinderGeometry(0.18, 0.26, 1, 6);
   private canopyGeo = new THREE.IcosahedronGeometry(1, 0);
   private trunkMat = new THREE.MeshStandardMaterial({ color: '#8A6A4F', roughness: 0.9 });
@@ -95,13 +99,16 @@ export class WorldLayer implements CustomLayerInterface {
     const char = kind === 'pet' ? makePet(this.models, seed) : makeAvatar(this.models, seed);
     char.root.traverse((o) => { o.frustumCulled = false; });
     this.charScene.add(char.root);
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0 });
+    const trail = kind === 'pet' ? new MuseTrail() : null;
+    if (trail) this.charScene.add(trail.object);
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0, trail });
   }
 
   removeActor(id: string) {
     const a = this.actors.get(id);
     if (!a) return;
     this.charScene.remove(a.char.root);
+    a.trail?.dispose();
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
     this.actors.delete(id);
@@ -116,6 +123,9 @@ export class WorldLayer implements CustomLayerInterface {
   }
 
   setState(id: string, state: string) { this.actors.get(id)?.char.setState(state); }
+
+  /** Muse's wake follows its speed by default ('auto'); force a look for scripted moves. */
+  setTrailMode(id: string, mode: MuseTrailModeSetting) { this.actors.get(id)?.trail?.setMode(mode); }
 
   /** Keep `el` positioned above the actor's head (CSS transform), or stop when el is null. */
   bindLabel(id: string, el: HTMLElement | null, liftMeters = 0.25) {
@@ -256,6 +266,14 @@ export class WorldLayer implements CustomLayerInterface {
       a.char.root.rotation.set(0, Math.PI - toRad(a.heading), 0);
       a.char.root.scale.setScalar(s);
       a.char.update(dt, this.elapsed);
+      if (a.trail) {
+        if (showChars) {
+          // Muse's actual world position (its centre), never a separate simulation. Vertical motion is
+          // ignored: height here is altitude x zoom scale, which changes while zooming.
+          this.trailPos.set(o.east, a.altitude * scale + a.char.height * s * 0.5, -o.north);
+          a.trail.update(this.trailPos, dt, { camera: this.full, scale: s, verticalWeight: 0 });
+        } else a.trail.object.visible = false;
+      }
       if (a.label) {
         // Project the point just above the head into screen pixels.
         const y = a.altitude * scale + (a.char.height + a.labelLift) * s;
