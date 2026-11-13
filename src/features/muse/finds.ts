@@ -103,6 +103,8 @@ export function matchListings(
     for (const m of listings) {
       const l = m.listing;
       if (seen.has(l.id) || m.status !== 'available' || l.sellerId === viewerId || !l.location || !l.pickupUntil) continue;
+      // Already asked for it: the find has done its job.
+      if (m.myHold && (m.myHold.status === 'requested' || m.myHold.status === 'accepted')) continue;
       if (!titleMatches(`${l.title} ${l.category}`, w.keywords.length ? w.keywords : [w.item])) continue;
       if (w.maxPrice !== null && l.priceUsd > w.maxPrice) continue;
       const driveMin = drivingMinutes(origin, l.location);

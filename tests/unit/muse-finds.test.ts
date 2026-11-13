@@ -63,6 +63,14 @@ describe('matchListings (code only)', () => {
     ], DEMO_CENTER, NOW, alex);
     expect(out).toEqual([]);
   });
+  it('drops a listing the viewer already asked to reserve', () => {
+    const asked = listing({ id: 'asked' });
+    asked.myHold = {
+      id: 'h1', listingId: 'asked', buyerId: alex, offerUsd: 35, message: '', etaMin: 30, status: 'requested',
+      createdAt: NOW.toISOString(), acceptedAt: null, expiresAt: null,
+    };
+    expect(matchListings([want], [asked], DEMO_CENTER, NOW, alex)).toEqual([]);
+  });
   it('matches whole words and plurals only', () => {
     expect(titleMatches('Office chairs (2)', ['chair'])).toBe(true);
     expect(titleMatches('Armchairs', ['chair'])).toBe(false);
