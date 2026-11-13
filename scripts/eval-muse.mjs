@@ -3,7 +3,7 @@
 //   npm run eval:muse:plan                     all cases, real API (needs MUSE_API_KEY in .env.local)
 //   npm run eval:muse:plan -- --only demo-hungry-40
 //   node --import tsx scripts/eval-muse.mjs --allow-mock   wiring check without a key
-// Dev responses are cached in .cache/muse by input hash; pass --fresh to skip the cache.
+// Answers are cached (muse_cache, or .cache/muse without Supabase) and read first; pass --fresh to skip the cache.
 // In live mode a case also FAILS when any step fell back to code (meta.source "fallback",
 // models.parse or models.rank "heuristic"): a silent fallback must never count as a pass.
 // Writes .verify/eval-muse-plan.json (gitignored). Never prints keys or prompts.
@@ -17,6 +17,7 @@ const allowMock = args.includes('--allow-mock');
 const onlyIdx = args.indexOf('--only');
 const only = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
 if (args.includes('--fresh')) process.env.MUSE_CACHE = '0';
+else process.env.MUSE_PREBAKED ??= '1';
 process.env.MUSE_QUIET = '1';
 
 if (!allowMock) {
