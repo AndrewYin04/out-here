@@ -15,10 +15,12 @@
 // call with payload { resync: true }, so data hooks refetch whatever they may have missed.
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { apiFetch, currentPersona, PERSONA_EVENT } from './client';
+import { markArrival } from './coalesce';
 import { personaByHandle } from './personas';
 
 export type RealtimeConfig = { mode: 'supabase'; url: string; key: string } | { mode: 'sse' };
-export type ChannelHandler = (channel: string, payload: Record<string, unknown>) => void;
+/** `arrived`: one markArrival() per message, shared by every handler it reaches (see coalesce.ts). */
+export type ChannelHandler = (channel: string, payload: Record<string, unknown>, arrived: number) => void;
 
 export const PRESENCE_CHANNEL = 'presence:online';
 const REMOVE_GRACE_MS = 1500;
@@ -44,8 +46,9 @@ const presenceListeners = new Set<(ids: string[]) => void>();
 let onlineIds: string[] = [];
 
 function fanout(channel: string, payload: Record<string, unknown>) {
+  const arrived = markArrival();
   for (const h of [...(handlers.get(channel) ?? [])]) {
-    try { h(channel, payload); } catch { /* one handler must not break the others */ }
+    try { h(channel, payload, arrived); } catch { /* one handler must not break the others */ }
   }
 }
 
