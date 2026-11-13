@@ -262,7 +262,7 @@ export function PlanCard({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold text-fb-text">{p.id === viewerId ? `${p.name} (you)` : p.name}</span>
                   <span className="block text-[12px] text-fb-text-2">
-                    {p.id === q.hostId ? 'Host' : p.isFriend ? 'Friend' : p.mutualFriendCount ? `${p.mutualFriendCount} mutual friends` : 'Going'}
+                    {p.id === q.hostId ? 'Host' : p.isFriend ? 'Friend' : p.mutualFriendCount ? `${p.mutualFriendCount} mutual ${p.mutualFriendCount === 1 ? 'friend' : 'friends'}` : 'Going'}
                   </span>
                 </span>
               </li>
