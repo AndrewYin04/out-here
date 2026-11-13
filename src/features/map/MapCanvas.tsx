@@ -27,6 +27,24 @@ const BOX_BOTTOM = 32;
 const LABEL_H = 16;
 const LABEL_GAP = 6;
 /** Share of the map the phone plan sheet covers while results show . */
+/**
+ * A friendlier 2D base than plain Positron: bay-blue water, soft green parks and woods, warm land.
+ * Light touches only, so pins and Facebook UI stay the loudest things on screen. The 3D theme
+ * records these as its "before" values, so leaving 3D comes back to this look.
+ */
+function brightenBase(map: MapLibreMap) {
+  const paint: [string, string, string][] = [
+    ['background', 'background-color', '#F6F4EF'],
+    ['water', 'fill-color', '#A9D8F2'],
+    ['waterway', 'line-color', '#A9D8F2'],
+    ['park', 'fill-color', '#D6EDC6'],
+    ['landcover_wood', 'fill-color', '#C9E5B6'],
+  ];
+  for (const [id, prop, value] of paint) {
+    try { if (map.getLayer(id)) map.setPaintProperty(id, prop as Parameters<MapLibreMap['setPaintProperty']>[1], value as Parameters<MapLibreMap['setPaintProperty']>[2]); } catch { /* layer differs in this style */ }
+  }
+}
+
 const PHONE_RESULTS_SHEET = 0.62; // PlanSheet: max-h-[62%] once Muse has picks
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
 const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 14;
@@ -344,7 +362,7 @@ export default function MapCanvas({
       symbolLayers.current = map.getStyle().layers.filter((layer) => layer.type === 'symbol').map((layer) => layer.id);
       schedule();
     });
-    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); schedule(); });
+    map.on('load', () => { loaded = true; window.clearTimeout(timer); brightenBase(map); setTiles('ready'); schedule(); });
     // Tile or style errors are shown as the plain-background state, not thrown to the console.
     map.on('error', () => {});
     map.on('move', schedule);
