@@ -84,7 +84,7 @@ export function PeopleSheet({ open, onClose, map }: { open: boolean; onClose: ()
 }
 
 /** Map overlay button that opens the People sheet. */
-export function PeopleButton({ map }: { map?: MapLibreMap | null }) {
+export function PeopleButton({ map, className }: { map?: MapLibreMap | null; className?: string }) {
   const [open, setOpen] = useState(false);
   const { data } = useFriendPins();
   const count = data?.pins.length ?? 0;
@@ -97,7 +97,7 @@ export function PeopleButton({ map }: { map?: MapLibreMap | null }) {
           // keep pins clear of the desktop People panel
           if (map && window.matchMedia('(min-width: 768px)').matches) map.easeTo({ padding: panelPadding('left'), duration: 300 });
         }}
-        className="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]"
+        className={className ?? 'flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]'}
       >
         <Users size={18} aria-hidden />
         People

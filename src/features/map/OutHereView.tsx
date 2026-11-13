@@ -2,18 +2,16 @@
 // The Out Here tab: full-height map with the Explore / Friends toggle, quest pins with live seat
 // badges, the quest sheet, and the Find My and "I'm free" layers from the other Out Here areas.
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { CalendarCheck, Map as MapIcon } from 'lucide-react';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
-import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
-import { Plus } from 'lucide-react';
+import { FriendsLayer, useFriendPins } from '@/features/map/friends';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
 import { Button, cn, EmptyState, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
+import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
@@ -284,25 +282,8 @@ export function OutHereView() {
         </p>
       )}
 
-      {/* Explore / Friends, and the Muse filter chip beside them */}
+      {/* The Muse filter at the top; Explore / Friends live in the dock at the bottom. */}
       <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">
-        <div role="group" aria-label="Map view" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
-          {(['explore', 'friends'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              data-testid={`map-mode-${m}`}
-              onClick={() => setMode(m)}
-              className={cn(
-                'h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors',
-                mode === m ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover',
-              )}
-            >
-              {m === 'explore' ? 'Explore' : 'Friends'}
-            </button>
-          ))}
-        </div>
         <button
           type="button"
           aria-pressed={filter.on}
@@ -412,7 +393,6 @@ export function OutHereView() {
       {mode === 'friends' && (
         <>
           <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
-          <PeopleButton map={map} />
           {visible.length > 0 && (
             <p role="status" data-testid="friends-filter-chip" className={cn('pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1 text-[13px] text-fb-text-2 shadow-card', filter.on ? 'top-[96px]' : 'top-[60px]')}>
               Plans your friends joined · {visible.length}
@@ -441,47 +421,29 @@ export function OutHereView() {
             ? mode === 'friends' && visible.length > 0
               ? filter.on ? 'top-32' : 'top-24'
               : filter.on ? 'top-24' : 'top-[60px]'
-            : 'bottom-[136px] md:bottom-auto',
+            : 'bottom-[148px] md:bottom-auto',
         )}>
           <BothFreeNudge className="pointer-events-auto w-full" />
         </div>
       )}
 
-      {/* One row at the bottom: Map/3D, "I'm free" (it also shows your status), Your plans, and ＋ Post a plan. */}
+      {/* The dock: I'm free, one contextual action, Map/3D, and the Explore / Friends / Your plans /
+          Memories pills in one sheet. One panel at a time: it steps aside for the composer, the
+          create sheet, and (on phones) a quest's sheet. */}
       {!sheetOpen && !creating && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center max-md:bottom-20">
-          <div className="pointer-events-auto flex items-center gap-2">
-            {/* Map / 3D: one round button that names the view it switches to. */}
-            {!unsupported && (
-              <button
-                type="button"
-                data-testid={view === '3d' ? 'view-map' : 'view-3d'}
-                aria-label={view === '3d' ? 'Switch to the map view' : 'Switch to the 3D view'}
-                title={view === '3d' ? 'Map view' : '3D view'}
-                onClick={() => setView(view === '3d' ? 'map' : '3d')}
-                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-[15px] font-bold text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue"
-              >
-                {view === '3d' ? <MapIcon size={22} aria-hidden /> : '3D'}
-              </button>
-            )}
-            <ImFreeButton />
-            <Link href="/events?tab=going" aria-label="Your plans" title="Your plans"
-              className="inline-flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover">
-              <CalendarCheck size={22} aria-hidden />
-            </Link>
-            {!unsupported && (
-              <button
-                type="button"
-                data-testid="create-plan-btn"
-                aria-label="Post a plan"
-                title="Post a plan (or long-press the map)"
-                onClick={() => startCreate()}
-                className="flex size-12 items-center justify-center rounded-full bg-fb-surface text-fb-blue shadow-popover hover:bg-fb-hover"
-              >
-                <Plus size={26} aria-hidden />
-              </button>
-            )}
-          </div>
+        <div className={cn(selectedId && 'max-md:hidden')}>
+          <OutHereDock
+            mode={mode}
+            onMode={setMode}
+            view={view}
+            onToggleView={unsupported ? null : () => setView(view === '3d' ? 'map' : '3d')}
+            onCreate={unsupported ? null : () => startCreate()}
+            map={map}
+            quests={shown}
+            walkMinutes={ctx?.walkMinutes ?? {}}
+            now={now}
+            onSelect={select}
+          />
         </div>
       )}
       <PlanSheet />
