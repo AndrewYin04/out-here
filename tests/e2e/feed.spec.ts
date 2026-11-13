@@ -140,18 +140,22 @@ test('like, pick a reaction, and remove it', async ({ page }, info) => {
   await like.click();
   await expect(like).toHaveAttribute('aria-label', 'Remove Like');
 
-  // open the picker: hover with a mouse, long-press on touch
-  if (isPhone(info.project.name)) {
-    const box = (await like.boundingBox())!;
-    await like.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, clientX: box.x + 5, clientY: box.y + 5 });
-    await page.waitForTimeout(700);
-    await like.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
-  } else {
-    await page.mouse.move(0, 0);
-    await like.hover();
-  }
+  // open the picker: hover with a mouse, long-press on touch. In a full run other specs add posts
+  // above this one while it runs; the shift moves the post out from under the pointer and the
+  // picker closes, so open it again until it stays.
   const picker = page.getByTestId('reaction-picker');
-  await expect(picker).toBeVisible();
+  await expect(async () => {
+    if (isPhone(info.project.name)) {
+      const box = (await like.boundingBox())!;
+      await like.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true, clientX: box.x + 5, clientY: box.y + 5 });
+      await page.waitForTimeout(700);
+      await like.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
+    } else {
+      await page.mouse.move(0, 0);
+      await like.hover();
+    }
+    await expect(picker).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
   await expect(picker.getByRole('button')).toHaveCount(7);
   await picker.getByRole('button', { name: 'Love' }).click();
   await expect(like).toHaveAttribute('aria-label', 'Remove Love');
