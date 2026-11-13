@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
-import { IconButton, Skeleton, cn } from '@/features/ui';
+import { IconButton, Skeleton, cn, useSheetDrag } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
@@ -187,6 +187,9 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
 
+  const drag = useSheetDrag({ onClose: () => setPlanOpen(false) });
+  const resetDrag = drag.reset;
+  useEffect(() => { if (open) resetDrag(); }, [open, resetDrag]);
   const ask = composeAsk(moods, text, duration);
   const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
@@ -252,16 +255,20 @@ export function PlanSheet({ className }: { className?: string }) {
         <section
           aria-label="I'm free"
           data-testid="plan-sheet"
+          style={drag.sheetStyle}
           className={cn(
             'absolute inset-x-0 bottom-0 z-30 flex animate-sheet-up flex-col rounded-t-[16px] bg-fb-surface shadow-popover md:animate-panel-in',
-            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[82%]',
+            // Phones: half height by default, full height after a drag up (or the handle).
+            drag.snap === 'full' ? 'max-h-[calc(100%-8px)]' : result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[82%]',
             // Desktop: fit the form until there are results, then take the full height.
             status === 'idle' ? 'md:inset-x-auto md:bottom-auto md:left-4 md:top-4 md:max-h-[calc(100%-32px)] md:w-[400px] md:rounded-card'
               : 'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
         >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-fb-divider md:hidden" aria-hidden />
+          <button {...drag.handleProps} data-testid="plan-sheet-handle" className="flex h-5 w-full shrink-0 touch-none items-center justify-center md:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue">
+            <span aria-hidden className="h-1 w-10 rounded-full bg-fb-divider" />
+          </button>
           <header className="flex shrink-0 items-center justify-between px-4 pb-1 pt-2">
             <h2 className="text-[20px] font-bold text-fb-text">I&apos;m free</h2>
             <IconButton label="Close" size="md" onClick={() => setPlanOpen(false)}>

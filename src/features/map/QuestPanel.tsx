@@ -5,7 +5,7 @@ import { ChevronRight, Clock, Footprints, MapPin, Users, Wallet, X } from 'lucid
 import Link from 'next/link';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
-import { Avatar, Button, IconButton, Skeleton, bump, celebrateJoin, cn, useToast } from '@/features/ui';
+import { Avatar, Button, IconButton, Skeleton, bump, celebrateJoin, cn, useSheetDrag, useToast } from '@/features/ui';
 import type { PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
 import { friendsGoingLine, priceLabel, startsLabel, walkLabel } from './format';
@@ -94,18 +94,20 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
   const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
   const walk = walkLabel(walkMinutes);
+  const drag = useSheetDrag({ onClose });
 
   return (
     <section
       aria-label={q ? q.title : 'Plan details'}
       data-testid="quest-sheet"
-      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[58%] animate-sheet-up flex-col rounded-t-sheet bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[380px] md:animate-panel-in md:rounded-card"
+      style={drag.sheetStyle}
+      className={cn('absolute inset-x-0 bottom-0 z-20 flex animate-sheet-up flex-col', drag.snap === 'full' ? 'max-h-[calc(100%-8px)]' : 'max-h-[58%]', ' rounded-t-sheet bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[380px] md:animate-panel-in md:rounded-card')}
     >
       {/* On phones the attribution rides on top of the sheet so it is never covered. */}
       <MapAttribution className="absolute bottom-full right-0 mb-1 md:hidden" />
-      <div className="flex justify-center pt-2 md:hidden" aria-hidden>
-        <span className="h-1 w-10 rounded-full bg-fb-divider" />
-      </div>
+      <button {...drag.handleProps} data-testid="quest-sheet-handle" className="flex h-5 w-full shrink-0 touch-none items-end justify-center md:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue">
+        <span aria-hidden className="h-1 w-10 rounded-full bg-fb-divider" />
+      </button>
       <div className="flex items-start gap-3 px-4 pb-2 pt-2 md:pt-4">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-fb-input text-[30px]" aria-hidden>
           {q?.emoji ?? ''}
