@@ -32,9 +32,9 @@ export const CAMPUS_THRIFT_POPUP: PopUpSale = {
   name: 'Campus Thrift Pop-Up',
   spot: 'Folding tables by the bike racks, Hacker Way entrance',
   items: [
-    { title: 'Vintage track jacket', priceUsd: 20, category: 'Clothing', imageUrl: '/seed/listings/l27.webp',
+    { title: 'Vintage track jacket', priceUsd: 20, category: 'Clothing', imageUrl: '/seed/listings/p01.webp',
       description: 'Zip-up track jacket, size M, barely worn. At the Campus Thrift Pop-Up today only.' },
-    { title: 'Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing', imageUrl: null,
+    { title: 'Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing', imageUrl: '/seed/listings/p02.webp',
       description: 'Early-2000s denim purse with a short shoulder strap. At the Campus Thrift Pop-Up today only.' },
   ],
 };

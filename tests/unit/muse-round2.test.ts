@@ -91,24 +91,24 @@ describe('live mode, card text', () => {
     setMuseTransport(rankWith((c) => [{
       candidate: dumpling(c).id, friends: dumpling(c).friendsWhoCanCome.map((f) => f.id),
       reason: 'Starts 4:25 PM, a 9 min walk, $12 and under your $15. You and Maya both like dumplings.',
-      bridge: "Maya's free till 4:50 PM.", inviteDraft: 'Maya! Dumplings at 4:25 PM, 9 min walk, $12?',
+      bridge: "Maya's free till 5:30 PM.", inviteDraft: 'Maya! Dumplings at 4:25 PM, 9 min walk, $12?',
     }]));
     const out = await plan({ text: TEXT, userId: 'alex', now: NOW });
     const top = out.plan.suggestions[0];
     expect(out.meta.issues).toEqual([]);
     expect(top.reason).toBe('Starts 4:25 PM, a 9 min walk, $12 and under your $15. You and Maya both like dumplings.');
-    expect(top.bridge).toBe("Maya's free till 4:50 PM.");
+    expect(top.bridge).toBe("Maya's free till 5:30 PM.");
     expect(top.inviteDraft).toBe('Maya! Dumplings at 4:25 PM, 9 min walk, $12?');
     expect(out.meta.summarySource).toBe('muse');
   });
 
-  it("replaces a bridge with the wrong free-until time (Maya's seeded window ends 4:50 PM)", async () => {
+  it("replaces a bridge with the wrong free-until time (Maya's seeded window ends 5:30 PM)", async () => {
     setMuseTransport(rankWith((c) => [{
       candidate: dumpling(c).id, friends: dumpling(c).friendsWhoCanCome.map((f) => f.id),
       reason: 'Dumplings for $12.', bridge: "Maya's free till 6:00 PM.", inviteDraft: null,
     }]));
     const out = await plan({ text: TEXT, userId: 'alex', now: NOW });
-    expect(out.plan.suggestions[0].bridge).toBe("Maya's free till 4:50 PM and is into dumplings too.");
+    expect(out.plan.suggestions[0].bridge).toBe("Maya's free till 5:30 PM and is into dumplings too.");
     expect(out.meta.issues).toEqual([expect.objectContaining({ field: 'bridge', issue: 'bridge quoted 6:00 pm' })]);
     // a missing invite is written by code when a friend is invited
     expect(out.plan.suggestions[0].inviteDraft).toMatch(/^Hey Maya!/);

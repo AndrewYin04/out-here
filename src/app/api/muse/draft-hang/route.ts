@@ -44,8 +44,10 @@ export const POST = route(async ({ store, viewer, req }) => {
     ?? null;
   const meAt = locOf(viewer.id) ?? DEMO_CENTER;
   const excluded = new Set(b.excludePlaceIds);
-  // Local testing at night only: OUTHERE_IGNORE_HOURS=1 skips opening hours (never set on Vercel).
-  const ignoreHours = process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1';
+  // Rehearsals at night: OUTHERE_IGNORE_HOURS=1 locally, and every Vercel preview (dev data),
+  // skip opening hours. Production keeps them.
+  const ignoreHours = process.env.VERCEL_ENV === 'preview'
+    || (process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1');
   const fitsFor = (i: (typeof tryFriends)[number]) =>
     hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, locOf(i.friend.id) ?? DEMO_CENTER, at, new Date(i.until), b.budgetMax ?? null, { ignoreHours });
   // The first free friend may have only a few minutes left (say Maya's window ends in 25 min): try the next one

@@ -139,9 +139,9 @@ export const PICKUP_LISTINGS = [
   { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
   { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
 ] as const;
-/** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
+/** The watch Alex set with Muse yesterday; the pop-up's $20 track jacket fits it. */
 export const ALEX_WANT = {
-  text: 'Looking for a track jacket under $25, close enough to walk',
+  text: 'track jacket under $25',
   item: 'track jacket', keywords: ['track jacket', 'windbreaker', 'jacket'], maxPrice: 25, maxDriveMin: 15,
 };
 
@@ -324,7 +324,8 @@ export function buildSeed(
   for (const a of DEMO_AVAILABILITY) {
     const handle = a.handle ?? alexLocalFriends[a.friendSlot ?? 0];
     if (!handle || !has(handle)) { warnings.push(`availability "${a.text}": no person for slot`); continue; }
-    const near = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const base = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const near = a.offsetM ? offsetPoint(base, a.offsetM, a.bearingDeg ?? 0) : base;
     t.availability.push({
       id: seedId('availability', `${handle}:${a.text}`), user_id: pid(handle), text: a.text,
       starts_at: iso(addMin(demoNow, a.startsInMin)), ends_at: iso(addMin(demoNow, a.endsInMin)),
@@ -621,6 +622,7 @@ export function buildSeed(
       });
     });
   }
+
   if (has('maya')) {
     MAYA_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
       t.watch_events.push({
