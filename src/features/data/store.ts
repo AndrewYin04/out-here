@@ -63,13 +63,24 @@ export interface DataStore {
   search: CoreStore['search'];
   // Out Here
   questsNear: CoreStore['questsNear'];
+  yourPlans: CoreStore['yourPlans'];
   quest: CoreStore['quest'];
   createQuest: CoreStore['createQuest'];
   joinQuest: CoreStore['joinQuest'];
   leaveQuest: CoreStore['leaveQuest'];
   completeQuest: CoreStore['completeQuest'];
+  questPosts: CoreStore['questPosts'];
+  checkIn: CoreStore['checkIn'];
+  reportQuest: CoreStore['reportQuest'];
   createAvailability: CoreStore['createAvailability'];
   myAvailability: CoreStore['myAvailability'];
+  clearAvailability: CoreStore['clearAvailability'];
+  freeWithMe: CoreStore['freeWithMe'];
+  openTogether: CoreStore['openTogether'];
+  createTogether: CoreStore['createTogether'];
+  togetherPlans: CoreStore['togetherPlans'];
+  together: CoreStore['together'];
+  voteTogether: CoreStore['voteTogether'];
   friendAvailability: CoreStore['friendAvailability'];
   invites: CoreStore['invites'];
   invite: CoreStore['invite'];
@@ -78,6 +89,7 @@ export interface DataStore {
   crews: CoreStore['crews'];
   memories: CoreStore['memories'];
   addMemory: CoreStore['addMemory'];
+  memoryPhoto: CoreStore['memoryPhoto'];
   daily: CoreStore['daily'];
   dailyEntry: CoreStore['dailyEntry'];
   streak: CoreStore['streak'];

@@ -7,6 +7,9 @@ import { seedId } from '../../src/shared/seed/ids';
 // which api.spec.ts uses) and puts it back afterwards.
 
 const DUMPLINGS = seedId('quest', 'dumplings');
+/** Reporting hides a plan for the reporter (event-creation branch), so the Report check uses a
+ *  plan no other spec depends on; reporting Dumpling Den would hide it from every later test. */
+const ART_WALK = seedId('quest', 'art-walk');
 
 type Box = { x: number; y: number; width: number; height: number };
 const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
@@ -77,10 +80,13 @@ test.describe('phone 390', () => {
     expect(a.y + a.height).toBeLessThanOrEqual(s.y + 1);
     expect(a.y).toBeGreaterThan(56);
 
-    await sheet.getByRole('button', { name: 'Report' }).click();
-    await expect(page.getByText('Thanks. We’ll review this plan.')).toBeVisible();
     await sheet.getByRole('button', { name: 'Close' }).click();
     await expect(sheet).toHaveCount(0);
+
+    await openMap(page, 'alex', `&quest=${ART_WALK}`);
+    await expect(sheet.getByRole('heading', { name: 'Art walk at Gallery 1600' })).toBeVisible();
+    await sheet.getByRole('button', { name: 'Report' }).click();
+    await expect(page.getByText('Thanks. We’ll review this plan.')).toBeVisible();
     expect(errors).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { MapPin } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { apiPost, ApiFetchError, useApi, useViewer } from '@/features/data';
 import { Button, Card, EmptyState, LinkButton, Skeleton, SkeletonGroup, cn, useToast } from '@/features/ui';
@@ -60,7 +61,9 @@ function HangoutRow({ quest, now, onChanged }: { quest: Quest; now: number; onCh
         <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-fb-input text-3xl">{quest.emoji}</span>
         <div className="min-w-0">
           <p className="text-fb-meta font-semibold text-fb-text">{startsLabel(quest.startsAt, quest.endsAt, now)}</p>
-          <h3 className="truncate text-[17px] font-semibold leading-[22px] text-fb-text">{quest.title}</h3>
+          <h3 className="truncate text-[17px] font-semibold leading-[22px] text-fb-text">
+            <Link href={`/out-here/plan/${quest.id}`} className="hover:underline" data-testid="hangout-plan-link">{quest.title}</Link>
+          </h3>
           <p className="flex items-center gap-1 truncate text-[15px] text-fb-text-2">
             <MapPin size={14} aria-hidden className="shrink-0" />
             <span className="truncate">{quest.venueName}</span>

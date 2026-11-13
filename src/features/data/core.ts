@@ -2,20 +2,22 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId,
+  demoDate, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite, type Intro, type IntroProfile,
+  type Story, type Invite, type Intro, type IntroProfile, type TogetherOption, type QuestVisibility,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView,
+  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
 import type { Backend } from './backend';
-import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
-import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
+import { pairSignals } from './matching';
+import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow, TogetherRow } from './db';
+import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
@@ -25,7 +27,28 @@ const iso = () => now().toISOString();
 const uuid = () => crypto.randomUUID();
 const firstName = (p: Profile | undefined) => p?.name.split(' ')[0] ?? 'Someone';
 
-export type QuestDetail = { quest: Quest; seatsLeft: number; host: PersonCard | null; members: PersonCard[]; viewerIsMember: boolean };
+export type QuestDetail = {
+  quest: Quest; seatsLeft: number; host: PersonCard | null; members: PersonCard[]; viewerIsMember: boolean;
+  /** Going count, host included. Shown to everyone, even when `members` is hidden. */
+  memberCount: number;
+  /** False for strangers to the host: `members` then holds only the viewer and their own friends; the rest is a count. */
+  canSeeGuests: boolean;
+  /** Members who checked in at the spot ("5 here"). */
+  hereCount: number;
+  viewerCheckedIn: boolean;
+  /** Between start and end right now. */
+  isLive: boolean;
+  /** Posts on the plan's page. */
+  postCount: number;
+  group: { slug: string; name: string } | null;
+};
+
+/** How many plans one person can post in a rolling 24 hours. */
+export const EVENTS_PER_DAY = 5;
+/** Check-in must be this close to the exact spot. */
+export const CHECKIN_RADIUS_M = 150;
+/** Check-in opens this long before the start. */
+const CHECKIN_EARLY_MIN = 15;
 export type AvailabilityItem = Availability & { friend: Profile };
 export type InviteView = Invite & { from: PersonCard | null; to: PersonCard | null; quest: Quest | null };
 export type PostWithShared = PostView & { sharedPost: PostView | null };
@@ -122,6 +145,10 @@ export class CoreStore {
       const e = v.eventBySlug.get(body.target.slug);
       if (!e) throw notFound('event_not_found');
       targetType = 'event'; targetId = e.id;
+    } else if (body.target?.type === 'quest') {
+      const q = v.questById.get(body.target.id);
+      if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+      targetType = 'quest'; targetId = q.id;
     }
     const listId = audienceListId(body.audience);
     if (listId) {
@@ -145,6 +172,9 @@ export class CoreStore {
         await this.notify(after, m, 'group_post', viewerId, 'post', post.id,
           `${firstName(after.profileById.get(viewerId))} posted in ${g.name}.`);
       }
+    }
+    if (targetType === 'quest') {
+      await publish(`quest:${targetId}`, { postCount: after.questPostIds(targetId).length });
     }
     if (post.sharedPostId) {
       const orig = after.postById.get(post.sharedPostId)!;
@@ -590,35 +620,126 @@ export class CoreStore {
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt)).map((q) => v.questFor(viewerId, q));
   }
 
+  async yourPlans(viewerId: ID): Promise<YourPlan[]> {
+    const v = await this.view();
+    const viewer = this.resolvePerson(v, viewerId);
+    const joined = new Set(v.db.questMembers.filter((m) => m.userId === viewerId).map((m) => m.questId));
+    const crews = new Map(v.db.crews.filter((c) => v.crewMemberIds(c.id).includes(viewerId))
+      .map((c) => [c.originQuestId, c.id]));
+    return v.db.quests.filter((q) => joined.has(q.id))
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .map((q) => ({
+        quest: v.questFor(viewerId, q), members: v.people(viewerId, v.questMemberIds(q.id)),
+        walkMinutes: walkingMinutes(viewer.home, q.location), crewId: crews.get(q.id) ?? null,
+      }));
+  }
+
   async quest(viewerId: ID, questId: ID): Promise<QuestDetail> {
     const v = await this.view();
     const q = v.questById.get(questId);
     if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
     const memberIds = v.questMemberIds(q.id);
+    const canSeeGuests = v.canSeeQuestGuests(viewerId, q);
+    const here = v.questCheckinIds(q.id);
+    const g = q.groupId ? v.groupById.get(q.groupId) : undefined;
     return {
       quest: v.questFor(viewerId, q), seatsLeft: v.seatsLeft(q), host: v.person(viewerId, q.hostId),
-      members: v.people(viewerId, memberIds), viewerIsMember: memberIds.includes(viewerId),
+      // Strangers to the host still see their own friends going (never anyone else).
+      members: v.people(viewerId, canSeeGuests ? memberIds : memberIds.filter((m) => m === viewerId || v.areFriends(viewerId, m))),
+      viewerIsMember: memberIds.includes(viewerId),
+      memberCount: memberIds.length, canSeeGuests,
+      hereCount: here.length, viewerCheckedIn: here.includes(viewerId), isLive: v.isQuestLive(q),
+      postCount: v.questPostIds(q.id).length,
+      group: g ? { slug: g.slug, name: g.name } : null,
     };
   }
 
-  async createQuest(viewerId: ID, body: Omit<CreateQuestBody, 'hostId'> & { hostId?: ID }): Promise<Quest> {
+  /** Posts on a plan's page, newest first. */
+  async questPosts(viewerId: ID, questId: ID): Promise<PostView[]> {
+    const v = await this.view();
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    // Strangers to the host see posts by the host, themselves and their own friends only, so the
+    // feed never names guests the guest list hides.
+    const open = v.canSeeQuestGuests(viewerId, q);
+    return v.questPostIds(questId).map((id) => v.postById.get(id)!)
+      .filter((p) => open || p.authorId === viewerId || p.authorId === q.hostId || v.areFriends(viewerId, p.authorId))
+      .map((p) => v.postView(viewerId, p));
+  }
+
+  /**
+   * "I'm here": a member checks in at the spot while the plan is live (or 15 min before).
+   * The point must be within CHECKIN_RADIUS_M of the exact location.
+   */
+  async checkIn(viewerId: ID, questId: ID, at: LatLng): Promise<{ hereCount: number }> {
+    const v = await this.view();
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    if (!v.questMemberIds(q.id).includes(viewerId)) throw forbidden('join the plan to check in');
+    const t = now();
+    if (t < new Date(new Date(q.startsAt).getTime() - CHECKIN_EARLY_MIN * 60_000)) throw badRequest('check-in opens 15 min before the start');
+    if (t >= new Date(q.endsAt) || q.status === 'done') throw badRequest('this plan has ended');
+    if (haversineMeters(at, q.location) > CHECKIN_RADIUS_M) throw badRequest('you need to be at the spot to check in');
+    await this.backend.upsert('questCheckins', [{ questId, userId: viewerId, checkedInAt: iso() }]);
+    const after = await this.view();
+    const aq = after.questById.get(questId)!;
+    const hereCount = after.questCheckinIds(questId).length;
+    await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(aq), memberCount: after.questMemberIds(questId).length, hereCount });
+    return { hereCount };
+  }
+
+  /** Report a plan: stored for review, and hidden from the reporter right away. */
+  async reportQuest(viewerId: ID, questId: ID, reason: string): Promise<{ ok: true }> {
+    const v = await this.view();
+    // Reporting twice is a no-op (the plan is already hidden from this viewer).
+    if (v.db.questReports.some((r) => r.questId === questId && r.reporterId === viewerId)) return { ok: true };
+    const q = v.questById.get(questId);
+    if (!q || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+    if (q.hostId === viewerId) throw badRequest('you host this plan');
+    await this.backend.insert('questReports', [{ id: uuid(), questId, reporterId: viewerId, reason: reason.slice(0, 300), createdAt: iso() }]);
+    return { ok: true };
+  }
+
+  async createQuest(viewerId: ID, body: Omit<CreateQuestBody, 'hostId' | 'visibility' | 'posterUrl' | 'bubbleText'> & {
+    hostId?: ID; visibility?: QuestVisibility; posterUrl?: string | null; bubbleText?: string | null; isPublic?: boolean;
+  }): Promise<Quest> {
     const v = await this.view();
     if (body.hostId && body.hostId !== viewerId) throw forbidden('hostId must be the viewer');
     if (body.groupId && !v.groupRole(body.groupId, viewerId)) throw forbidden('join the group to host a hangout there');
     if (new Date(body.endsAt) <= new Date(body.startsAt)) throw badRequest('endsAt must be after startsAt');
+    // Older callers send only isPublic; visibility wins when both are present.
+    const visibility: QuestVisibility = body.visibility ?? (body.isPublic === false ? (body.groupId ? 'group' : 'open') : 'community');
+    if (visibility === 'group' && !body.groupId) throw badRequest('pick a group for a group plan');
+    const inviteIds = [...new Set((body.inviteIds ?? []).filter((id) => id !== viewerId))];
+    if (visibility === 'friends' && inviteIds.length === 0) throw badRequest('invite at least one friend');
+    for (const id of inviteIds) if (!v.areFriends(viewerId, id)) throw badRequest('invites go to friends');
+    const dayAgo = new Date(now().getTime() - 24 * 60 * 60_000).toISOString();
+    const recent = v.db.quests.filter((q) => q.hostId === viewerId && q.createdAt > dayAgo).length;
+    if (recent >= EVENTS_PER_DAY) throw tooMany(`You can post ${EVENTS_PER_DAY} plans a day`);
     const id = uuid();
     const row: QuestRow = {
       id, hostId: viewerId, title: body.title, emoji: body.emoji, category: body.category,
       description: body.description, venueName: body.venueName, location: body.location,
       approxLocation: fuzzLocation(body.location, id), startsAt: body.startsAt, endsAt: body.endsAt,
       capacity: body.capacity, priceMax: body.priceMax, tags: body.tags, status: 'open',
-      isPublic: body.isPublic, createdAt: iso(), groupId: body.groupId ?? null, placeId: body.placeId ?? null,
+      isPublic: visibility === 'community', visibility, posterUrl: body.posterUrl ?? null,
+      bubbleText: body.bubbleText?.trim() || null,
+      createdAt: iso(), groupId: body.groupId ?? null, placeId: body.placeId ?? null,
     };
     await this.backend.insert('quests', [row]);
     await this.backend.joinQuest(id, viewerId, null);
+    for (const toId of inviteIds) {
+      await this.createInvite(viewerId, {
+        toId, questId: id, suggestionTitle: `${row.emoji} ${row.title}`,
+        message: `${row.emoji} ${row.title}, want to come?`,
+      });
+    }
     const after = await this.view();
     const q = after.questById.get(id)!;
     await publish(`quest:${id}`, { seatsLeft: after.seatsLeft(q), memberCount: after.questMemberIds(id).length });
+    await publish(`user:${viewerId}`, { type: 'quest', id });
+    // Ids only: every map refetches /api/quests, which applies canSeeQuest for its viewer.
+    await publish('quests:new', { questId: id });
     return after.questFor(viewerId, q);
   }
 
@@ -634,6 +755,7 @@ export class CoreStore {
     await publish(`quest:${questId}`, { seatsLeft, memberCount: memberIds.length });
     const joined = memberIds.filter((m) => !wasMember.includes(m));
     for (const m of joined) {
+      await publish(`user:${m}`, { type: 'quest', id: questId });
       await this.notify(after, q.hostId, 'quest_join', m, 'quest', questId,
         `${firstName(after.profileById.get(m))} joined ${q.title}.`);
     }
@@ -647,6 +769,7 @@ export class CoreStore {
     const seatsLeft = await this.backend.leaveQuest(questId, viewerId);
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft, memberCount: after.questMemberIds(questId).length });
+    await publish(`user:${viewerId}`, { type: 'quest', id: questId });
     return { quest: after.questFor(viewerId, after.questById.get(questId)!), seatsLeft };
   }
 
@@ -654,28 +777,32 @@ export class CoreStore {
     const v = await this.view();
     const q = v.questById.get(questId);
     if (!q) throw notFound('quest_not_found');
-    if (q.hostId !== viewerId) throw forbidden('only the host can complete a quest');
     const memberIds = v.questMemberIds(questId);
+    if (!memberIds.includes(viewerId)) throw forbidden('only attendees can complete a hangout');
+    if (q.status !== 'done' && new Date(q.startsAt) > now()) throw conflict('This hangout has not started yet.');
     const t = iso();
-    await this.backend.update('quests', { id: questId }, { status: 'done' });
     // shared prefs: quest tags plus interests at least two members share
     const counts = new Map<string, number>();
     for (const m of memberIds) for (const i of new Set(v.profileById.get(m)?.interests ?? [])) counts.set(i, (counts.get(i) ?? 0) + 1);
     const shared = [...counts].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).map(([i]) => i);
     const sharedPrefs = [...new Set([...q.tags, ...shared])].slice(0, 8);
-    let crew = v.db.crews.find((c) => c.originQuestId === questId);
-    if (crew) {
-      await this.backend.update('crews', { id: crew.id }, { lastHangoutAt: t, sharedPrefs });
-    } else {
-      crew = { id: uuid(), name: `${q.title} crew`, originQuestId: questId, sharedPrefs, lastHangoutAt: t, createdAt: t } satisfies CrewRow;
-      await this.backend.insert('crews', [crew]);
+    const existingCrew = v.db.crews.find((c) => c.originQuestId === questId);
+    const crew = existingCrew ?? {
+      id: seedId('hangout-crew', questId), name: `${q.title} crew`, originQuestId: questId,
+      sharedPrefs, lastHangoutAt: t, createdAt: t,
+    } satisfies CrewRow;
+    if (!existingCrew) {
+      // A stable ID and upserts let two attendees complete at once or retry an interrupted write.
+      await this.backend.upsert('crews', [crew]);
     }
     const existing = v.crewMemberIds(crew.id);
-    const add = memberIds.filter((m) => !existing.includes(m));
-    if (add.length) await this.backend.insert('crewMembers', add.map((userId) => ({ crewId: crew!.id, userId })));
+    const add = memberIds.filter((userId) => !existing.includes(userId));
+    if (add.length) await this.backend.upsert('crewMembers', add.map((userId) => ({ crewId: crew.id, userId })));
+    if (q.status !== 'done') await this.backend.update('quests', { id: questId }, { status: 'done' });
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
-    return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(after.db.crews.find((c) => c.id === crew!.id)!) };
+    for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
+    return { quest: after.questFor(viewerId, after.questById.get(questId)!), crew: after.crew(crew) };
   }
 
   // ---------- Out Here: availability ----------
@@ -699,6 +826,54 @@ export class CoreStore {
     return availability;
   }
 
+  /** "Busy": ends the viewer's current and upcoming free windows and tells friends. */
+  async clearAvailability(viewerId: ID): Promise<void> {
+    const v = await this.view();
+    const at = now();
+    const nowIso = at.toISOString();
+    const open = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
+    for (const a of open) {
+      // An upcoming window is closed to a 1 s window in the past (the table requires ends_at > starts_at).
+      const patch = a.startsAt < nowIso ? { endsAt: nowIso } : { startsAt: new Date(at.getTime() - 1000).toISOString(), endsAt: nowIso };
+      await this.backend.update('availability', { id: a.id }, patch);
+    }
+    if (open.length === 0) return;
+    const after = await this.view();
+    for (const f of after.friendIds(viewerId)) await publish(`user:${f}`, { type: 'availability', id: open[0].id });
+  }
+
+  /** Friends free when the viewer is, ranked, with a suggested group. Empty when the viewer is busy. */
+  async freeWithMe(viewerId: ID): Promise<FreeWithMeResponse> {
+    const v = await this.view();
+    const at = now();
+    const t = at.toISOString();
+    const mine = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t);
+    if (mine.length === 0) return { items: [], group: [] };
+    const me = v.profileById.get(viewerId);
+    const best = new Map<ID, FreeFriendInput & { text: string }>();
+    for (const a of v.db.availability) {
+      if (a.endsAt <= t || !v.areFriends(viewerId, a.userId) || !v.canSee(viewerId, a.userId, a.audience)) continue;
+      for (const w of mine) {
+        const o = overlapWindow(w, a, at);
+        if (!o) continue;
+        const prev = best.get(a.userId);
+        if (prev && prev.from <= o.from) continue;
+        const p = v.profileById.get(a.userId);
+        const theirs = p ? v.profileFor(viewerId, p).interests : [];
+        const shared = (me?.interests ?? []).filter((i) => theirs.some((x) => x.toLowerCase() === i.toLowerCase()));
+        best.set(a.userId, { id: a.userId, from: o.from, until: o.until, friendUntil: a.endsAt, sharedInterests: shared, text: a.text });
+      }
+    }
+    const pair = await pairSignals(this, [viewerId, ...best.keys()]);
+    const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), at, { viewerId, pair });
+    const items: FreeWithMeItem[] = ranked.flatMap((r) => {
+      const friend = v.person(viewerId, r.id);
+      if (!friend) return [];
+      return [{ friend, from: r.from, until: r.until, text: best.get(r.id)!.text, sharedInterests: r.sharedInterests, knows: r.knows, freeNow: r.freeNow, score: r.score }];
+    });
+    return { items, group };
+  }
+
   async myAvailability(viewerId: ID): Promise<Availability[]> {
     const v = await this.view();
     const t = iso();
@@ -716,12 +891,115 @@ export class CoreStore {
       .map(({ audience: _a, ...a }) => { void _a; return { ...a, friend: v.profileFor(viewerId, v.profileById.get(a.userId)!) }; });
   }
 
+  // ---------- Out Here: plan together ----------
+  private togetherView(v: View, viewerId: ID, row: TogetherRow): TogetherView {
+    const { memberKey: _k, ...plan } = row;
+    void _k;
+    const expired = plan.status === 'proposing' && plan.expiresAt <= iso();
+    return { ...plan, status: expired ? 'expired' : plan.status, members: v.people(viewerId, plan.memberIds) };
+  }
+
+  private togetherRow(v: View, viewerId: ID, id: ID): TogetherRow {
+    const row = v.db.togetherPlans.find((p) => p.id === id);
+    if (!row || !row.memberIds.includes(viewerId)) throw notFound('plan_not_found');
+    return row;
+  }
+
+  /**
+   * The group's open shared plan (viewer + friendIds), or null. `fresh` re-reads the plans table
+   * first, so a plan another member created during this request is found (Supabase snapshots
+   * are loaded once per request).
+   */
+  async openTogether(viewerId: ID, friendIds: ID[], opts: { fresh?: boolean } = {}): Promise<TogetherView | null> {
+    if (opts.fresh) await this.backend.reload('togetherPlans');
+    const v = await this.view();
+    const key = [...new Set([viewerId, ...friendIds])].sort().join(',');
+    const t = iso();
+    const row = v.db.togetherPlans.find((p) => p.memberKey === key && p.status === 'proposing' && p.expiresAt > t);
+    return row ? this.togetherView(v, viewerId, row) : null;
+  }
+
+  /**
+   * Creates the group's shared plan. If another member created one in the meantime (both
+   * tapped at once), returns theirs: the unique index on (member_key) where open makes the
+   * second insert fail, and the in-process check covers MemoryStore.
+   */
+  async createTogether(viewerId: ID, body: { friendIds: ID[]; options: TogetherOption[]; summary: string; expiresAt: string }): Promise<TogetherView> {
+    const v = await this.view();
+    const memberIds = [...new Set([viewerId, ...body.friendIds])].sort();
+    if (memberIds.length < 2) throw badRequest('pick at least one friend');
+    for (const id of memberIds) if (id !== viewerId && !v.areFriends(viewerId, id)) throw badRequest('everyone must be your friend');
+    const existing = await this.openTogether(viewerId, body.friendIds, { fresh: true });
+    if (existing) return existing;
+    const row: TogetherRow = {
+      id: uuid(), memberKey: memberIds.join(','), memberIds, startedBy: viewerId,
+      options: body.options, votes: {}, status: 'proposing', confirmedQuestId: null,
+      summary: body.summary, expiresAt: body.expiresAt, createdAt: iso(),
+    };
+    try {
+      await this.backend.insert('togetherPlans', [row]);
+    } catch (e) {
+      const theirs = await this.openTogether(viewerId, body.friendIds, { fresh: true });
+      if (theirs) return theirs;
+      throw e;
+    }
+    for (const m of memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id: row.id });
+    return this.togetherView(await this.view(), viewerId, row);
+  }
+
+  /** The viewer's open plans and ones confirmed in the last 2 hours, newest first. */
+  async togetherPlans(viewerId: ID): Promise<TogetherView[]> {
+    const v = await this.view();
+    const t = now().getTime();
+    return v.db.togetherPlans
+      .filter((p) => p.memberIds.includes(viewerId) && (
+        (p.status === 'proposing' && Date.parse(p.expiresAt) > t)
+        || (p.status === 'confirmed' && Date.parse(p.createdAt) > t - 2 * 3600_000)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((p) => this.togetherView(v, viewerId, p));
+  }
+
+  async together(viewerId: ID, id: ID): Promise<TogetherView> {
+    const v = await this.view();
+    return this.togetherView(v, viewerId, this.togetherRow(v, viewerId, id));
+  }
+
+  /**
+   * "I'm in" (or not) on one option. The backend does the vote and, when every member is in on
+   * one option, the seat check and the whole group's join in one transaction (vote_together):
+   * two people tapping at once never lose a vote, and a group is never split by the last seat.
+   */
+  async voteTogether(viewerId: ID, id: ID, questId: ID, isIn: boolean): Promise<TogetherView> {
+    const v = await this.view();
+    const row = this.togetherRow(v, viewerId, id);
+    if (row.status !== 'proposing' || row.expiresAt <= iso()) return this.togetherView(v, viewerId, row);
+    const before = row.options.some((o) => o.questId === questId) ? v.questMemberIds(questId) : [];
+    const r = await this.backend.voteTogether(id, viewerId, questId, isIn);
+    const after = await this.view();
+    if (r.status === 'confirmed' && r.questId) {
+      const q = after.questById.get(r.questId);
+      const memberIds = after.questMemberIds(r.questId);
+      await publish(`quest:${r.questId}`, { seatsLeft: r.seatsLeft ?? 0, memberCount: memberIds.length });
+      for (const m of row.memberIds) {
+        await publish(`user:${m}`, { type: 'quest', id: r.questId });
+        if (q && r.questId === questId && !before.includes(m)) {
+          await this.notify(after, q.hostId, 'quest_join', m, 'quest', r.questId, `${firstName(after.profileById.get(m))} joined ${q.title}.`);
+        }
+      }
+    }
+    const updated = after.db.togetherPlans.find((p) => p.id === id) ?? row;
+    await publish(`together:${id}`, { status: updated.status });
+    for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
+    return this.togetherView(after, viewerId, updated);
+  }
+
   // ---------- Out Here: invites ----------
   private inviteView(v: View, viewerId: ID, i: InviteRow): InviteView {
     const q = i.questId ? v.questById.get(i.questId) : undefined;
     const { respondedAt: _r, ...invite } = i;
     void _r;
-    return { ...invite, from: v.person(viewerId, i.fromId), to: v.person(viewerId, i.toId), quest: q ? v.questFor(viewerId, q) : null };
+    // A plan the viewer may not see (Group or invite-only) is never described through an invite.
+    return { ...invite, from: v.person(viewerId, i.fromId), to: v.person(viewerId, i.toId), quest: q && v.canSeeQuest(viewerId, q) ? v.questFor(viewerId, q) : null };
   }
 
   async invites(viewerId: ID): Promise<{ incoming: InviteView[]; outgoing: InviteView[] }> {
@@ -749,7 +1027,11 @@ export class CoreStore {
     let seatsLeft: number | null = null;
     if (body.questId) {
       const q = v.questById.get(body.questId);
-      if (!q || !v.isActiveQuest(q)) throw notFound('quest_not_found');
+      if (!q || !v.isActiveQuest(q) || !v.canSeeQuest(viewerId, q)) throw notFound('quest_not_found');
+      // An invite to an invite-only plan makes it visible, so only the host and members send them.
+      if (v.questVisibility(q) === 'friends' && q.hostId !== viewerId && !v.questMemberIds(q.id).includes(viewerId)) {
+        throw forbidden('only people going can invite to this plan');
+      }
       seatsLeft = v.seatsLeft(q);
     }
     const row: InviteRow = {
@@ -835,15 +1117,32 @@ export class CoreStore {
     return v.db.memories.filter((m) => m.crewId === crewId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async addMemory(viewerId: ID, body: { crewId: ID; questId: ID; photoUrl: string; caption?: string }): Promise<Memory> {
+  async addMemory(viewerId: ID, body: { crewId: ID; questId: ID; caption: string; file: { bytes: Uint8Array; contentType: string } }): Promise<Memory> {
     const v = await this.view();
-    if (!v.crewMemberIds(body.crewId).includes(viewerId)) throw forbidden('crew members only');
-    const m: Memory = { id: uuid(), crewId: body.crewId, questId: body.questId, uploaderId: viewerId, photoUrl: body.photoUrl, caption: body.caption ?? '', createdAt: iso() };
+    const crew = v.db.crews.find((c) => c.id === body.crewId);
+    if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
+    const quest = v.questById.get(body.questId);
+    if (!quest || crew.originQuestId !== quest.id || quest.status !== 'done') throw badRequest('Choose a completed hangout for this album.');
+    const id = uuid();
+    await this.backend.uploadFile('crew-photos', id, body.file.bytes, body.file.contentType);
+    const m: Memory = {
+      id, crewId: crew.id, questId: quest.id, uploaderId: viewerId,
+      photoUrl: `/api/memories/${id}/photo`, caption: body.caption, createdAt: iso(),
+    };
     await this.backend.insert('memories', [m]);
     for (const member of v.crewMemberIds(body.crewId)) {
       if (member !== viewerId) await publish(`user:${member}`, { type: 'memory', id: m.id });
     }
     return m;
+  }
+
+  async memoryPhoto(viewerId: ID, id: ID): Promise<Blob> {
+    const v = await this.view();
+    const memory = v.db.memories.find((m) => m.id === id);
+    if (memory?.photoUrl !== `/api/memories/${id}/photo` || !v.crewMemberIds(memory.crewId).includes(viewerId)) {
+      throw notFound('photo_not_found');
+    }
+    return this.backend.downloadCrewPhoto(id);
   }
 
   async daily(date: string = demoDate()): Promise<DailyQuest> {

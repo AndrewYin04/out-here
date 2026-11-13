@@ -2,6 +2,9 @@ import { PRIMARY_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from '.
 import { conflict } from './errors';
 import type { ID } from '@/shared';
 
+/** What vote_together did. questId/seatsLeft are set when the plan confirmed or an option was full. */
+export type TogetherVoteResult = { status: 'proposing' | 'confirmed' | 'expired'; questId: ID | null; seatsLeft: number | null };
+
 /** A match value that is an array matches any of its items (SQL `in`). */
 export type Match<T extends TableKey> = { [K in keyof RowOf<T>]?: RowOf<T>[K] | RowOf<T>[K][] };
 
@@ -21,8 +24,17 @@ export interface Backend {
   joinQuest(questId: ID, userId: ID, withFriendId: ID | null): Promise<number>;
   /** leave_quest semantics: reopens a full quest; no-op for non-members. Returns seats left. */
   leaveQuest(questId: ID, userId: ID): Promise<number>;
-  /** Stores a file and returns a URL the browser can load. */
-  uploadFile(bucket: 'uploads' | 'memories', path: string, bytes: Uint8Array, contentType: string): Promise<string>;
+  /**
+   * vote_together semantics (migration 0006), one transaction: lock the plan, record this
+   * member's vote, and if every member is in on one option, either join them all to that quest
+   * and confirm, or (not enough seats for everyone) join nobody and mark the option full.
+   */
+  voteTogether(planId: ID, userId: ID, questId: ID, isIn: boolean): Promise<TogetherVoteResult>;
+  /** Re-reads one table into the current request's snapshot (Supabase); a no-op in memory, which is always current. */
+  reload(table: TableKey): Promise<void>;
+  /** Stores a file. Public buckets return a browser URL; private photos return their key. */
+  uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string>;
+  downloadCrewPhoto(id: ID): Promise<Blob>;
 }
 
 export function rowMatches(row: Record<string, unknown>, match: Record<string, unknown>): boolean {

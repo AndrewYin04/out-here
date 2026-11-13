@@ -37,7 +37,7 @@ for (const width of [390, 1440]) {
       const composer = page.locator('#imfree-text');
       await expect(composer).toBeFocused();
       await expect(composer).toHaveValue('');
-      await expect(composer).toHaveAttribute('placeholder', /hungry/);
+      await expect(composer).toHaveAttribute('placeholder', /Anything else/);
       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
       await expect(page.getByTestId('plan-summary')).toHaveCount(0);
       // The param is consumed so a reload does not reopen the sheet.

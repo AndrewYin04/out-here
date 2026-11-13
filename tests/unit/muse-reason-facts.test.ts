@@ -13,7 +13,7 @@ const quest: Quest = {
   id: 'q-boba', hostId: 'h', title: 'Boba + sketching', emoji: '🧋', category: 'food', description: '',
   venueName: 'Tea Lab', location: LOC, approxLocation: LOC, startsAt: at(9), endsAt: at(60),
   capacity: 6, memberIds: ['h'], priceMax: 7, tags: ['boba', 'sketching'], status: 'open', isPublic: true,
-  createdAt: at(-60), groupId: null, placeId: null,
+  createdAt: at(-60), groupId: null, placeId: null, visibility: 'community', posterUrl: null, bubbleText: null,
 };
 
 const candidate = (over: Partial<PlanCandidate> = {}): PlanCandidate => ({

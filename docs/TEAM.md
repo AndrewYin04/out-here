@@ -2,6 +2,14 @@
 
 This file is for teammates and for their agents (Claude Code, Codex, Cursor, any other).
 
+## Demo priority (until Fri Nov 13, 10:30 AM PT)
+
+- The goal is the end-to-end demo flow in `docs/DEMO_FLOW.md` working by tonight.
+- First: spontaneous hangouts, meaning things happening right now that people can join live.
+- Second: the 3D Pokémon-style map as the first screen.
+- Any task that does not move a scene in `docs/DEMO_FLOW.md` waits.
+- Before starting work, check which scene your task moves. The gap issues are in `group:demo` on tracker #33.
+
 ## What the bulletin is
 
 Every TODO is one GitHub issue in `AndrewYin04/out-here` with three kinds of label:

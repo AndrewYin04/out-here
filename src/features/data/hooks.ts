@@ -96,10 +96,10 @@ export function useApi<T>(
   return { data, error, loading, refetch };
 }
 
-/** Quests near a point; refetches when any listed quest's seats change. */
+/** Quests near a point; refetches when any listed quest's seats change or someone posts a new plan. */
 export function useQuests(center: { lat: number; lng: number } | null, radiusM = 3000): ApiState<{ quests: Quest[] }> {
   const path = center ? `/api/quests?lat=${center.lat}&lng=${center.lng}&radiusM=${radiusM}` : null;
-  return useApi<{ quests: Quest[] }>(path, [], (d) => d.quests.map((q) => `quest:${q.id}`));
+  return useApi<{ quests: Quest[] }>(path, ['quests:new'], (d) => d.quests.map((q) => `quest:${q.id}`));
 }
 
 export function useQuest(id: string | null) {

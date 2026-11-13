@@ -1,9 +1,9 @@
 'use client';
 
-import { CheckCircle2, Footprints, Clock, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Footprints, Clock, Users } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, cn } from '@/features/ui';
+import { Avatar, Button, burst, celebrateJoin, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
@@ -68,6 +68,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const { viewer } = useViewer();
   const [inviteFor, setInviteFor] = useState<PersonCard | null>(null);
   const [draft, setDraft] = useState('');
+  const [whyOpen, setWhyOpen] = useState(false);
   /** friend id -> invite id */
   const [sentTo, setSentTo] = useState<Map<string, string>>(new Map());
   /** friend id -> what they answered */
@@ -76,6 +77,12 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const [busy, setBusy] = useState<'invite' | 'join' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  /** The button the viewer last tapped in this card: joins fly from it to the pin. */
+  const tapped = useRef<HTMLElement | null>(null);
+  const celebrate = (joined: boolean) => {
+    if (joined) celebrateJoin(tapped.current, s.questId, viewer.avatarUrl, s.emoji);
+    else burst(tapped.current, ['💌', '✨'], 6);
+  };
 
   const openInvite = (p: PersonCard) => {
     setInviteFor(p);
@@ -111,13 +118,38 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     if ((payload as { type?: string } | null)?.type === 'invite') void checkAnswers();
   });
 
+  /** Go with a friend: join (if not in yet) and send the invite in one step. */
+  const goWith = async (p: PersonCard, message: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy('invite');
+    setError(null);
+    try {
+      const joining = !!s.questId && !isMember;
+      celebrate(joining); // optimistic: the moment shows on tap; an error below undoes the label
+      if (joining) await apiPost(`/api/quests/${s.questId}/join`, {});
+      const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: p.id, questId: s.questId, suggestionTitle: s.title, message: message.trim() });
+      setSentTo((prev) => new Map(prev).set(p.id, out.invite.id));
+      setInviteFor(null);
+      await quest.refetch();
+      onJoined?.();
+    } catch (e) {
+      setError(errorText(e, "Couldn't send the invite. Try again."));
+    } finally {
+      inFlight.current = false;
+      setBusy(null);
+    }
+  };
+
   const sendInvite = async () => {
     if (!inviteFor || inFlight.current) return;
+    if (!isMember) return goWith(inviteFor, draft);
     inFlight.current = true;
     setBusy('invite');
     setError(null);
     try {
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: inviteFor.id, questId: s.questId, suggestionTitle: s.title, message: draft.trim() });
+      celebrate(false);
       setSentTo((prev) => new Map(prev).set(inviteFor.id, out.invite.id));
       setInviteFor(null);
     } catch (e) {
@@ -134,6 +166,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setBusy('join');
     setError(null);
     try {
+      celebrate(true); // optimistic, as above
       await apiPost(`/api/quests/${s.questId}/join`, {});
       await quest.refetch();
       onJoined?.();
@@ -149,7 +182,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
   const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
 
   return (
-    <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card">
+    <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"
+      onClickCapture={(e) => { tapped.current = (e.target as HTMLElement).closest('button'); }}>
       <div className="flex items-start gap-3">
         <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-bg text-[22px]">{s.emoji}</span>
         <div className="min-w-0 flex-1">
@@ -166,13 +200,39 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       </div>
 
-      <div className="mt-2">
-        {showMuse && (s.reason || s.bridge) && <MuseLabel />}
-        {s.reason && <p data-testid="suggestion-reason" className="mt-1 text-[15px] leading-5 text-fb-text">{s.reason}</p>}
-        {s.bridge && <p className="mt-1 text-[13px] text-fb-text-2">{s.bridge}</p>}
-      </div>
+      {/* The short bridge line shows; Muse's full reasoning opens on tap so the card stays light. */}
+      {s.bridge && !(s.precheck && s.precheck.length > 0) && <p className="mt-2 text-[13px] text-fb-text-2">{s.bridge}</p>}
+      {s.reason && (
+        <div className="mt-1.5">
+          <button
+            type="button"
+            aria-expanded={whyOpen}
+            onClick={() => setWhyOpen((v) => !v)}
+            data-testid="suggestion-why"
+            className="inline-flex items-center gap-1 rounded-full py-0.5 text-[13px] font-semibold text-fb-blue hover:underline"
+          >
+            {showMuse ? '✨ Why Muse picked this' : 'Why this plan'}
+            {whyOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+          </button>
+          {whyOpen && <p data-testid="suggestion-reason" className="mt-1 text-[13px] leading-[18px] text-fb-text">{s.reason}</p>}
+        </div>
+      )}
 
-      {people.length > 0 && (
+      {people.length > 0 && s.precheck && s.precheck.length > 0 ? (
+        <ul className="mt-2 flex flex-wrap gap-2" data-testid="precheck">
+          {s.precheck.flatMap((c) => {
+            const p = friends.get(c.friendId);
+            if (!p) return [];
+            return [(
+              <li key={c.friendId} title={c.because.join(' · ')}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F3E8] py-0.5 pl-0.5 pr-2.5 text-[13px] font-semibold text-fb-green">
+                <Avatar src={p.avatarUrl} name={p.name} size={24} decorative />
+                ✓ {p.name.split(' ')[0]}&apos;s likely down
+              </li>
+            )];
+          })}
+        </ul>
+      ) : people.length > 0 && (
         <div className="mt-2 flex items-center gap-2 text-[13px] text-fb-text-2">
           <Users size={14} aria-hidden />
           <div className="flex -space-x-1.5">
@@ -208,7 +268,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       {error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{error}</p>}
 
       {answered.length > 0 && (
-        <div data-testid="invite-outcome" aria-live="polite" className="mt-3 rounded-card bg-fb-bg p-2">
+        <div data-testid="invite-outcome" aria-live="polite" className="mt-3 animate-pop-in rounded-card bg-fb-bg p-2">
           {answered.map(({ p, o }) => (
             <p key={p.id} className="flex items-start gap-2 text-[15px] leading-5 text-fb-text">
               {o.together && <CheckCircle2 size={18} aria-hidden className="mt-0.5 shrink-0 text-fb-green" />}
@@ -223,28 +283,32 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         </div>
       )}
 
-      {!inviteFor && (
-        <div className="mt-3 flex gap-2">
-          {people.slice(0, 2).filter((p) => !outcomes.has(p.id)).map((p) => {
-            const sent = sentTo.has(p.id);
-            return (
-              <Button key={p.id} variant={sent ? 'secondary' : 'primary'} block disabled={sent} onClick={() => openInvite(p)}>
-                {sent ? `Invite sent to ${p.name.split(' ')[0]}` : `Invite ${p.name.split(' ')[0]}`}
-              </Button>
-            );
-          })}
-          {s.questId && (
-            <Button
-              variant={people.length > 0 ? 'secondary' : 'primary'}
-              block
-              disabled={isMember || seats === 0 || busy === 'join'}
-              onClick={() => void join()}
-            >
-              {isMember ? "You're going" : busy === 'join' ? 'Joining…' : seats === 0 ? 'Full' : 'Join'}
+      {!inviteFor && (() => {
+        const lead = people.find((p) => !outcomes.has(p.id));
+        const sent = lead ? sentTo.has(lead.id) : false;
+        // With a friend: one main action, "Go with Maya" (join + Muse's invite). Without: Join.
+        if (lead && s.questId) return (
+          <div className="mt-3">
+            <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null || (!isMember && seats === 0)}
+              onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
+              {sent || busy === 'invite' ? `Invite sent to ${lead.name.split(' ')[0]}` : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
             </Button>
-          )}
-        </div>
-      )}
+            {!sent && (
+              <div className="mt-1.5 flex justify-center gap-4 text-[13px] font-semibold text-fb-text-2">
+                <button type="button" className="hover:underline" onClick={() => openInvite(lead)}>Edit invite first</button>
+                {!isMember && (seats ?? 0) > 0 && <button type="button" className="hover:underline" disabled={busy !== null} onClick={() => void join()}>Just me</button>}
+              </div>
+            )}
+          </div>
+        );
+        return s.questId ? (
+          <div className="mt-3">
+            <Button block disabled={isMember || seats === 0 || busy === 'join'} onClick={() => void join()}>
+              {isMember || busy === 'join' ? "You're going" : seats === 0 ? 'Full' : 'Join'}
+            </Button>
+          </div>
+        ) : null;
+      })()}
     </article>
   );
 }

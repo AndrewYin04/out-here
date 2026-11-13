@@ -77,6 +77,12 @@ export type FriendPin = {
 };
 
 export type QuestStatus = 'open' | 'full' | 'live' | 'done';
+/**
+ * Who can see a plan (ext). community = everyone nearby; group = members of groupId;
+ * open = the host's friends and friends of friends; friends = invited friends only.
+ */
+export type QuestVisibility = 'community' | 'group' | 'open' | 'friends';
+export const QUEST_VISIBILITIES: readonly QuestVisibility[] = ['community', 'group', 'open', 'friends'];
 export type QuestCategory =
   'food' | 'music' | 'sports' | 'study' | 'thrift' | 'art' | 'outdoors' | 'games' | 'other';
 export type Quest = {
@@ -91,6 +97,9 @@ export type Quest = {
   // ext
   groupId: ID | null;        // set when the quest is a Group hangout
   placeId: ID | null;
+  visibility: QuestVisibility; // isPublic mirrors visibility === 'community'
+  posterUrl: string | null;  // pop-up poster image
+  bubbleText: string | null; // pop-up text bubble, <= 80 chars
 };
 
 export type Invite = {
@@ -129,6 +138,41 @@ export type PlanSuggestion = {
   bridge: string | null;         // "Maya's going too" — only from public/shared info
   startsAt: string; travelMinutes: number; fitsWindow: true;   // non-fitting suggestions are dropped by code
   seatsLeft: number | null; inviteDraft: string | null;
+  /** Pre-check: what each invited friend's agent answered, from what that friend shared. */
+  precheck?: FriendCheck[];
+};
+
+// ---- Plan together: one shared plan for friends who are free at the same time ----
+// Muse proposes the same options to everyone; each person taps "I'm in" on the ones they like.
+// It locks when every member is in on the same option. Nobody sees a "no": an unanswered plan
+// just expires when the shared free time ends.
+export type TogetherOption = {
+  questId: ID; title: string; emoji: string; venueName: string;
+  startsAt: string; priceMax: number; seatsLeft: number;
+  reason: string;                    // one plain sentence from Muse (or code on fallback)
+};
+export type TogetherStatus = 'proposing' | 'confirmed' | 'expired';
+export type TogetherPlan = {
+  id: ID;
+  memberIds: ID[];                   // sorted; includes whoever started it
+  startedBy: ID;
+  options: TogetherOption[];
+  votes: Record<ID, ID[]>;           // member id -> quest ids they're in for (members only)
+  status: TogetherStatus;
+  confirmedQuestId: ID | null;
+  summary: string;
+  expiresAt: string;                 // end of the shared free time
+  createdAt: string;
+};
+
+// Pre-check: before a suggestion is shown, the friend's agent answers "likely down" only from
+// what the friend chose to share (free window, interests, status). Busy or unshared friends are
+// never listed, so nobody sees a no.
+export type FriendCheck = {
+  friendId: ID;
+  verdict: 'likely_down';
+  freeUntil: string;   // ISO
+  because: string[];   // ["free till 12:10 PM", "likes dumplings", "craving dumplings"]
 };
 
 export type MusePlan = { intent: MuseIntent; suggestions: PlanSuggestion[]; summary: string };
@@ -174,7 +218,7 @@ export type Event = {
 export type RsvpStatus = 'going' | 'interested' | 'invited';
 export type EventRsvp = { eventId: ID; userId: ID; status: RsvpStatus; createdAt: string };
 
-export type PostTargetType = 'profile' | 'group' | 'event';
+export type PostTargetType = 'profile' | 'group' | 'event' | 'quest';
 export type Post = {
   id: ID; authorId: ID;
   targetType: PostTargetType;

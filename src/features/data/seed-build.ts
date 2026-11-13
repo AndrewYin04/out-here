@@ -117,7 +117,7 @@ export type SeedTables = Record<(typeof TABLE_ORDER)[number], Row[]>;
 /** Insert order (parents first). TRUNCATE uses the same list. muse_runs is never touched. */
 export const TABLE_ORDER = [
   'profiles', 'places', 'groups', 'group_members', 'friendships', 'friend_lists', 'friend_list_members',
-  'quests', 'quest_members', 'availability', 'invites', 'crews', 'crew_members', 'memories',
+  'quests', 'quest_members', 'quest_checkins', 'quest_reports', 'availability', 'invites', 'crews', 'crew_members', 'memories',
   'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
   'intro_profiles', 'intros',
@@ -282,6 +282,7 @@ export function buildSeed(
     const starts = addMin(demoNow, q.startsInMin);
     const hasGroup = q.groupSlug !== null && groupBySlug.has(q.groupSlug);
     if (q.groupSlug && !hasGroup) warnings.push(`quest ${q.key}: group ${q.groupSlug} missing, group_id null`);
+    const visibility = q.visibility === 'group' && !hasGroup ? 'community' : q.visibility ?? 'community';
     t.quests.push({
       id, host_id: pid(members[0]), title: q.title, emoji: q.emoji, category: q.category,
       description: q.description, venue_name: place.name, place_id: placeId(place.name),
@@ -289,11 +290,16 @@ export function buildSeed(
       lat: exact.lat, lng: exact.lng, approx_lat: approx.lat, approx_lng: approx.lng,
       starts_at: iso(starts), ends_at: iso(addMin(starts, q.durationMin)),
       capacity: q.capacity, price_max: q.priceMax, tags: q.tags,
-      status: members.length >= q.capacity ? 'full' : 'open', is_public: true,
-      created_at: iso(addMin(demoNow, -(60 + qi * 7))),
+      status: members.length >= q.capacity ? 'full' : 'open',
+      is_public: visibility === 'community', visibility, poster_url: null, bubble_text: q.bubbleText ?? null,
+      // Over a day old, so seeded plans never count toward a host's daily posting cap (EVENTS_PER_DAY).
+      created_at: iso(addMin(demoNow, -(25 * 60 + qi * 7))),
     });
     members.forEach((m, i) => t.quest_members.push({
       quest_id: id, user_id: pid(m), joined_at: iso(addMin(demoNow, -(50 - i * 5 + qi))), via_friend_id: null,
+    }));
+    members.slice(0, q.checkedIn ?? 0).forEach((m, i) => t.quest_checkins.push({
+      quest_id: id, user_id: pid(m), checked_in_at: iso(addMin(demoNow, -(10 - i * 2))),
     }));
   });
 
@@ -330,7 +336,8 @@ export function buildSeed(
       description: '', venue_name: place.name, place_id: placeId(place.name), group_id: null,
       lat: exact.lat, lng: exact.lng, approx_lat: approx.lat, approx_lng: approx.lng,
       starts_at: iso(starts), ends_at: iso(ends), capacity: members.length + 1, price_max: h.priceMax,
-      tags: h.tags, status: 'done', is_public: true, created_at: iso(addMin(starts, -120)),
+      tags: h.tags, status: 'done', is_public: true, visibility: 'community', poster_url: null, bubble_text: null,
+      created_at: iso(addMin(starts, -120)),
     });
     members.forEach((m) => t.quest_members.push({ quest_id: id, user_id: pid(m), joined_at: iso(addMin(starts, -60)), via_friend_id: null }));
     if (h.crew) {

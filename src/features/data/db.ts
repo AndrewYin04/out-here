@@ -3,11 +3,13 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, Intro, IntroProfile,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, Intro, IntroProfile, TogetherPlan,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
 export type QuestMemberRow = { questId: ID; userId: ID; joinedAt: string; viaFriendId: ID | null };
+export type QuestCheckinRow = { questId: ID; userId: ID; checkedInAt: string };
+export type QuestReportRow = { id: ID; questId: ID; reporterId: ID; reason: string; createdAt: string };
 export type AvailabilityRow = Availability & { audience: Audience };
 export type GroupRow = Omit<Group, 'memberCount'>;
 export type EventRow = Omit<Event, 'goingCount' | 'interestedCount'>;
@@ -20,6 +22,8 @@ export type ThreadMemberRow = { threadId: ID; userId: ID; lastReadAt: string | n
 export type DailyEntryRow = DailyEntry & { createdAt: string };
 export type InviteRow = Invite & { respondedAt: string | null };
 export type PlaceRow = Place & { description: string };
+/** member_key = sorted member ids joined by ','; one open plan per key (unique index in 0005). */
+export type TogetherRow = TogetherPlan & { memberKey: string };
 
 export type Db = {
   profiles: Profile[];
@@ -32,6 +36,8 @@ export type Db = {
   availability: AvailabilityRow[];
   quests: QuestRow[];
   questMembers: QuestMemberRow[];
+  questCheckins: QuestCheckinRow[];
+  questReports: QuestReportRow[];
   invites: InviteRow[];
   crews: CrewRow[];
   crewMembers: CrewMemberRow[];
@@ -53,6 +59,7 @@ export type Db = {
   locationShares: LocationShare[];
   introProfiles: IntroProfile[];
   intros: Intro[];
+  togetherPlans: TogetherRow[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -62,11 +69,12 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   profiles: 'profiles', friendships: 'friendships', friendLists: 'friend_lists',
   friendListMembers: 'friend_list_members', groups: 'groups', groupMembers: 'group_members',
   places: 'places', availability: 'availability', quests: 'quests', questMembers: 'quest_members',
+  questCheckins: 'quest_checkins', questReports: 'quest_reports',
   invites: 'invites', crews: 'crews', crewMembers: 'crew_members', memories: 'memories',
   dailyQuests: 'daily_quests', dailyEntries: 'daily_entries', events: 'events', eventRsvps: 'event_rsvps',
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
-  listings: 'listings', reels: 'reels', locationShares: 'location_shares',
+  listings: 'listings', reels: 'reels', locationShares: 'location_shares', togetherPlans: 'together_plans',
   introProfiles: 'intro_profiles', intros: 'intros',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
@@ -75,19 +83,16 @@ export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   profiles: ['id'], friendships: ['userA', 'userB'], friendLists: ['id'], friendListMembers: ['listId', 'userId'],
   groups: ['id'], groupMembers: ['groupId', 'userId'], places: ['id'], availability: ['id'], quests: ['id'],
-  questMembers: ['questId', 'userId'], invites: ['id'], crews: ['id'], crewMembers: ['crewId', 'userId'],
+  questMembers: ['questId', 'userId'], questCheckins: ['questId', 'userId'], questReports: ['id'], invites: ['id'], crews: ['id'], crewMembers: ['crewId', 'userId'],
   memories: ['id'], dailyQuests: ['date'], dailyEntries: ['date', 'userId'], events: ['id'],
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
-  notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'],
+  notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'], togetherPlans: ['id'],
   introProfiles: ['userId'], intros: ['id'],
 };
 
-/**
- * Tables added by migration 0003. A Supabase project that has not run it yet loads them as
- * empty instead of failing every request.
- */
-export const OPTIONAL_TABLES: ReadonlySet<TableKey> = new Set<TableKey>(['introProfiles', 'intros']);
+/** Tables from later migrations (0003 and up): they read as empty until the migration is applied. */
+export const OPTIONAL_TABLES = new Set<TableKey>(['introProfiles', 'intros', 'togetherPlans', 'questCheckins', 'questReports']);
 
 export function emptyDb(): Db {
   return Object.fromEntries(TABLE_KEYS.map((k) => [k, []])) as unknown as Db;
@@ -100,7 +105,7 @@ const snake = (s: string) => s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 const TIME_KEYS = /(_at|^starts_at|^ends_at)$/;
 const NUMERIC_KEYS = new Set(['price_max', 'price_usd', 'typical_cost_usd', 'budget_max', 'price_level']);
 const JSON_KEYS = new Set([
-  'field_visibility', 'hours', 'intent', 'output',
+  'field_visibility', 'hours', 'intent', 'output', 'options', 'votes',
   'kinds', 'dating_prefs', 'trust_path', 'reasons', 'reasons_b', 'first_step', 'agent_log_a', 'agent_log_b',
 ]);
 
