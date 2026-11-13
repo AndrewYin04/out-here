@@ -176,7 +176,7 @@ export type AvailabilitySpec = {
 };
 
 export const DEMO_AVAILABILITY: AvailabilitySpec[] = [
-  { handle: 'maya', text: 'free after class, down for boba', startsInMin: 0, endsInMin: 50, nearPlace: 'El Camino Coffee Works' },
+  { handle: 'maya', text: 'free after class, down for boba', startsInMin: 0, endsInMin: 60, nearPlace: 'El Camino Coffee Works' },
   { handle: null, friendSlot: 0, text: 'down for boba or a walk later', startsInMin: 60, endsInMin: 180, nearPlace: 'Gallery 1600' },
   { handle: null, friendSlot: 1, text: 'board games tonight?', startsInMin: 150, endsInMin: 300, nearPlace: 'Ravenswood Board Game Cafe' },
   { handle: null, friendSlot: 2, text: 'working from the coffee place, can take a food break', startsInMin: -30, endsInMin: 90, nearPlace: 'El Camino Coffee Works' },

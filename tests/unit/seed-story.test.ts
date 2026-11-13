@@ -85,10 +85,10 @@ describe('buildSeed with the fixture content', () => {
     expect(q.approx_lat === q.lat && q.approx_lng === q.lng).toBe(false);
   });
 
-  it("Maya's availability runs now to now+50 (lunch break), friends-only", () => {
+  it("Maya's availability runs now to now+60 (free after class), friends-only", () => {
     const a = tables.availability.find((r) => r.user_id === profileId('maya'))!;
     expect(new Date(a.starts_at as string).getTime() - now.getTime()).toBe(0);
-    expect(new Date(a.ends_at as string).getTime() - now.getTime()).toBe(50 * 60_000);
+    expect(new Date(a.ends_at as string).getTime() - now.getTime()).toBe(60 * 60_000);
     expect(a.audience).toBe('friends');
   });
 
