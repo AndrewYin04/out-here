@@ -178,7 +178,7 @@ export function PlanCard({
           )}
 
           {/* Four numbers */}
-          <ul className="mt-3 grid grid-cols-4 gap-2" aria-label="At a glance">
+          <ul className="mt-3 grid gap-2" style={{ gridTemplateColumns: `repeat(${tiles.length}, minmax(0, 1fr))` }} aria-label="At a glance">
             {tiles.map((t) => (
               <li key={t.icon} className="flex min-w-0 flex-col items-center rounded-[14px] bg-fb-input px-1 py-2 text-center">
                 <span aria-hidden className="text-[20px] leading-6">{t.icon}</span>
