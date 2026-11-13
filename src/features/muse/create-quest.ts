@@ -135,22 +135,25 @@ export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: 
 
 // ---------- mock (offline) ----------
 
-const RULES: { re: RegExp; emoji: string; category: QuestCategory; tags: string[]; placeCategory?: RegExp }[] = [
-  { re: /\bboba|bubble tea|milk tea\b/, emoji: '🧋', category: 'food', tags: ['boba'], placeCategory: /cafe|boba/i },
-  { re: /\bcoffee|latte|cafe\b/, emoji: '☕', category: 'food', tags: ['coffee'], placeCategory: /cafe/i },
-  { re: /\bdumpling/, emoji: '🥟', category: 'food', tags: ['dumplings'], placeCategory: /food/i },
-  { re: /\bpho|ramen|noodle/, emoji: '🍜', category: 'food', tags: ['noodles'], placeCategory: /food/i },
-  { re: /\btaco/, emoji: '🌮', category: 'food', tags: ['tacos'], placeCategory: /food/i },
-  { re: /\blunch|dinner|eat|food|hungry\b/, emoji: '🍽️', category: 'food', tags: ['food'], placeCategory: /food/i },
-  { re: /\bstudy|homework|exam|cs club\b/, emoji: '📚', category: 'study', tags: ['study'], placeCategory: /library|cafe/i },
-  { re: /\bvolleyball|soccer|basketball|frisbee|pickup\b/, emoji: '🏐', category: 'sports', tags: ['pickup'], placeCategory: /sports/i },
-  { re: /\bclimb|boulder/, emoji: '🧗', category: 'sports', tags: ['climbing'], placeCategory: /climb/i },
-  { re: /\brun\b|\b5k\b|\bjog/, emoji: '🏃', category: 'outdoors', tags: ['running'], placeCategory: /outdoor|park/i },
-  { re: /\bwalk|sunset|park\b/, emoji: '🌅', category: 'outdoors', tags: ['walk'], placeCategory: /outdoor|park/i },
-  { re: /\bthrift|vintage\b/, emoji: '🧥', category: 'thrift', tags: ['thrifting'], placeCategory: /thrift/i },
-  { re: /\bboard games?|smash|games?\b/, emoji: '🎲', category: 'games', tags: ['games'], placeCategory: /games/i },
-  { re: /\bshow|band|music|open mic\b/, emoji: '🎸', category: 'music', tags: ['live music'], placeCategory: /music/i },
-  { re: /\bsketch|draw|art|gallery\b/, emoji: '🎨', category: 'art', tags: ['art'], placeCategory: /art|cafe/i },
+// `place` matches a nearby place's "name category": a specific dish needs a place that serves it
+// (tacos -> the taco trucks, never the dumpling shop); only generic "food" takes any food place.
+const RULES: { re: RegExp; emoji: string; category: QuestCategory; tags: string[]; place?: RegExp; what: string }[] = [
+  { re: /\bboba|bubble tea|milk tea\b/, emoji: '🧋', category: 'food', tags: ['boba'], place: /boba|bubble tea/i, what: 'boba spot' },
+  { re: /\bcoffee|latte|cafe\b/, emoji: '☕', category: 'food', tags: ['coffee'], place: /coffee|\bcafe\b/i, what: 'coffee place' },
+  { re: /\bdumpling/, emoji: '🥟', category: 'food', tags: ['dumplings'], place: /dumpling/i, what: 'dumpling place' },
+  { re: /\bpho|ramen|noodle/, emoji: '🍜', category: 'food', tags: ['noodles'], place: /pho|ramen|noodle/i, what: 'noodle place' },
+  { re: /\btaco/, emoji: '🌮', category: 'food', tags: ['tacos'], place: /taco/i, what: 'taco spot' },
+  { re: /\bsushi/, emoji: '🍣', category: 'food', tags: ['sushi'], place: /sushi|kaiten/i, what: 'sushi place' },
+  { re: /\blunch|dinner|eat|food|hungry\b/, emoji: '🍽️', category: 'food', tags: ['food'], place: /\bfood\b/i, what: 'place to eat' },
+  { re: /\bstudy|homework|exam|midterm|cs club\b/, emoji: '📚', category: 'study', tags: ['study'], place: /library|study/i, what: 'study spot' },
+  { re: /\bvolleyball|soccer|basketball|frisbee|pickup\b/, emoji: '🏐', category: 'sports', tags: ['pickup'], place: /court|\bsports\b/i, what: 'court' },
+  { re: /\bclimb|boulder/, emoji: '🧗', category: 'sports', tags: ['climbing'], place: /climb|boulder/i, what: 'climbing gym' },
+  { re: /\brun\b|\b5k\b|\bjog/, emoji: '🏃', category: 'outdoors', tags: ['running'], place: /trail|park|\boutdoors\b/i, what: 'trail' },
+  { re: /\bwalk|sunset|park\b/, emoji: '🌅', category: 'outdoors', tags: ['walk'], place: /park|trail|overlook|\boutdoors\b/i, what: 'park' },
+  { re: /\bthrift|vintage\b/, emoji: '🧥', category: 'thrift', tags: ['thrifting'], place: /thrift/i, what: 'thrift store' },
+  { re: /\bboard games?|smash|games?\b/, emoji: '🎲', category: 'games', tags: ['games'], place: /game|arcade/i, what: 'game spot' },
+  { re: /\bshow|band|music|open mic\b/, emoji: '🎸', category: 'music', tags: ['live music'], place: /music|signal room/i, what: 'music venue' },
+  { re: /\bsketch|draw|art|gallery\b/, emoji: '🎨', category: 'art', tags: ['art'], place: /gallery|\bart\b/i, what: 'gallery' },
 ];
 
 function clockFrom(h: string, m: string | undefined, ampm: string | undefined): string {
@@ -168,9 +171,7 @@ export function mockDraft(ctx: CreateQuestContext): RawDraft {
   const at = /\bat (\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/.exec(text);
   const inMin = /\bin (\d+)\s*(?:min|mins|minutes)\b/.exec(text);
   const people = /\b(\d+)\s*(?:people|ppl|spots|of us)\b/.exec(text) ?? /\bme \+ ?(\d+)\b/.exec(text);
-  const place = rule?.placeCategory
-    ? ctx.places.find((p) => rule.placeCategory!.test(p.category) || rule.re.test(p.name.toLowerCase())) ?? null
-    : null;
+  const place = rule?.place ? ctx.places.find((p) => rule.place!.test(`${p.name} ${p.category}`)) ?? null : null;
   const title = ctx.text.trim()
     .replace(/\b(at \d{1,2}(:\d{2})?\s*(am|pm)?|in \d+\s*(min|mins|minutes)|today|tonight|rn|right now)\b/gi, '')
     .replace(/[,.!?]+$/g, '').replace(/\s{2,}/g, ' ').trim();
@@ -188,6 +189,8 @@ export function mockDraft(ctx: CreateQuestContext): RawDraft {
     priceMax: null,
     tags: rule?.tags ?? [],
     bubbleText: rule ? `${rule.emoji} ${nice}, come join` : `${nice}, come join`,
-    pitch: place ? `I picked ${place.name}, ${place.walkMin} min from your pin.` : 'I kept your pin as the spot.',
+    pitch: place
+      ? `I picked ${place.name}, ${place.walkMin} min from your pin.`
+      : rule ? `No ${rule.what} right by your pin, so I kept your pin as the spot.` : 'I kept your pin as the spot.',
   };
 }

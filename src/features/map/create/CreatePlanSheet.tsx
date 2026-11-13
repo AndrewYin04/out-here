@@ -5,7 +5,7 @@
 import { ImagePlus, Minus, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiFetchError, apiPost, currentPersona, uploadImage, useApi } from '@/features/data';
-import { MuseLabel, MuseStepsLoading, OfflineLabel } from '@/features/outhere';
+import { MuseLabel, MuseStepsLoading } from '@/features/outhere';
 import { Avatar, Button, Chip, IconButton, cn } from '@/features/ui';
 import { DEMO_TZ, type LatLng, type Quest, type QuestCategory, type QuestVisibility } from '@/shared';
 import type { GroupView, MuseCreateQuestResponse } from '@/shared/api';
@@ -226,7 +226,11 @@ export function CreatePlanSheet({ at, friends, onMove, onEmoji, onClose, onPoste
           {muse.status === 'loading' && <MuseStepsLoading steps={DRAFT_STEPS} className="mb-0 mt-2" />}
           {muse.status === 'done' && (
             <div data-testid="create-muse-pitch" className="mt-2 flex flex-wrap items-center gap-1.5 px-1 text-[13px] text-fb-text">
-              {muse.mode === 'live' ? <MuseLabel /> : <OfflineLabel />}
+              {muse.mode === 'live' ? <MuseLabel /> : (
+                <span data-testid="offline-label" className="inline-flex items-center rounded-full bg-fb-secondary-btn px-2 py-0.5 text-[12px] font-semibold text-fb-text-2">
+                  {muse.mode === 'mock' ? 'Muse is off (mock mode) · quick draft' : 'Muse is busy · quick draft'}
+                </span>
+              )}
               <span>{muse.pitch}</span>
             </div>
           )}

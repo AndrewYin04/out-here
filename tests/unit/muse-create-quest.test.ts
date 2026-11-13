@@ -56,6 +56,18 @@ describe('mockDraft + validateDraft', () => {
   });
 });
 
+describe('mockDraft picks a place that serves what was asked', () => {
+  it('"taco crawl rn" never lands on the dumpling shop', async () => {
+    const dumplingDen = { lat: 37.4806, lng: -122.1513 };
+    const ctx = await ctxFor('taco crawl rn', dumplingDen);
+    const { draft, pitch } = validateDraft(mockDraft(ctx), ctx);
+    expect(draft.emoji).toBe('🌮');
+    expect(draft.venueName).not.toBe('Dumpling Den');
+    expect(draft.venueName === 'Dropped pin' || /taco/i.test(draft.venueName)).toBe(true);
+    if (draft.venueName === 'Dropped pin') expect(pitch).toContain('taco spot');
+  });
+});
+
 describe('validateDraft never trusts the model', () => {
   it('drops an invented place id and keeps the pin', async () => {
     const ctx = await ctxFor('boba');
