@@ -111,6 +111,11 @@ describe('plan together', () => {
     await store.createAvailability(alex, { text: 'hungry', startsAt: at(-1), endsAt: at(60), location: DEMO_CENTER });
     const free = await store.freeWithMe(alex);
     expect(free.items.map((i) => i.friend.id)).toContain(maya);
+    // Maya's line is her status bubble, not her window note or a Muse ask she typed.
+    await store.createAvailability(maya, { text: 'hungry, 40 min, under $15', startsAt: at(-1), endsAt: at(60), location: DEMO_CENTER });
+    const line = (await store.freeWithMe(alex)).items.find((i) => i.friend.id === maya)!.text;
+    expect(line).not.toContain('40 min');
+    expect(line).toMatch(/craving dumplings/);
     await store.clearAvailability(alex);
     expect((await store.freeWithMe(alex)).items).toEqual([]);
   });

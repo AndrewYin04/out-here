@@ -3,7 +3,7 @@
 // picks ids from the list, and code drops any id it did not send. On a Muse error or timeout a
 // code ranking (interest and tag overlap, time fit) answers instead, marked source "fallback".
 import { z } from 'zod';
-import { walkingMinutes, type ID } from '@/shared';
+import { formatDemoTime, walkingMinutes, type ID } from '@/shared';
 import { firstName, isMockMode, museJSON, reportFallback } from '@/features/muse';
 import type { StorePlanContext } from './plan-context';
 
@@ -41,6 +41,8 @@ export const FILTER_WIDE_WINDOW_MIN = 12 * 60;
 export type QuestCandidate = {
   id: ID; title: string; emoji: string; category: string; venueName: string; tags: string[];
   priceMax: number; startsInMin: number; walkMinutes: number; seatsLeft: number;
+  /** When it starts, and with a free window, that it fits: "starts in 23 min, inside your free time". */
+  timeFact: string;
 };
 export type FriendCandidate = {
   id: ID; firstName: string; sharedInterests: string[]; bubble: string | null;
@@ -84,8 +86,32 @@ const sameish = (a: string, b: string) => norm(a) === norm(b) || phraseIn(a, b) 
 
 // ---------- candidates ----------
 
+/** The viewer's own free window in minutes from now, or null when they have no "Free till X". */
+export type FreeWindow = { startMin: number; endMin: number; endsAt: string };
+export function freeWindowOf(ctx: StorePlanContext): FreeWindow | null {
+  const w = ctx.viewerWindow;
+  if (!w) return null;
+  const now = ctx.now.getTime();
+  const endMin = Math.floor((Date.parse(w.endsAt) - now) / 60_000);
+  if (!(endMin > 0)) return null;
+  return { startMin: Math.max(0, Math.round((Date.parse(w.startsAt) - now) / 60_000)), endMin, endsAt: w.endsAt };
+}
+
+/**
+ * The same time-fit rule the plan uses, applied to the filter: with a free window, a plan must
+ * start early enough that the viewer can walk there before the window ends, and must not be
+ * over before the window starts.
+ */
+export function fitsFreeWindow(w: FreeWindow, startsInMin: number, endsInMin: number, walkMin: number): boolean {
+  if (walkMin >= w.endMin) return false; // can't even get there before the window ends
+  if (startsInMin > w.endMin - walkMin) return false;
+  if (endsInMin <= w.startMin + walkMin) return false;
+  return true;
+}
+
 export function questCandidates(ctx: StorePlanContext, windowMin = FILTER_WINDOW_MIN, maxWalk = FILTER_MAX_WALK_MIN): QuestCandidate[] {
   const now = ctx.now.getTime();
+  const free = freeWindowOf(ctx);
   const out: QuestCandidate[] = [];
   for (const q of ctx.quests) {
     if (q.status !== 'open') continue;
@@ -97,9 +123,11 @@ export function questCandidates(ctx: StorePlanContext, windowMin = FILTER_WINDOW
     if (startsInMin > windowMin) continue;
     const walk = walkingMinutes(ctx.location, q.location);
     if (walk > maxWalk) continue;
+    if (free && !fitsFreeWindow(free, startsInMin, Math.round((Date.parse(q.endsAt) - now) / 60_000), walk)) continue;
     out.push({
       id: q.id, title: q.title, emoji: q.emoji, category: q.category, venueName: q.venueName, tags: q.tags,
       priceMax: q.priceMax, startsInMin, walkMinutes: walk, seatsLeft,
+      timeFact: free ? freeTimeFact(startsInMin) : startsLabel(startsInMin),
     });
   }
   return out;
@@ -133,11 +161,15 @@ const STRONG_SCORE = 3;
 
 const isFoodQuest = (q: QuestCandidate) => q.category === 'food' || q.tags.some((t) => FOOD_TAGS.has(norm(t)));
 const startsLabel = (min: number) => (min <= 0 ? 'happening now' : min < 60 ? `starts in ${min} min` : `starts in ${Math.round(min / 6) / 10} h`);
+/** "starts in 23 min, inside your free time": every filter reason says when, once the viewer is free. */
+export const freeTimeFact = (startsInMin: number) => `${startsLabel(startsInMin)}, inside your free time`;
+const TIME_WORDS = /\b(start|starts|starting|now|free time|min(ute)?s? from now|in \d+ ?(min|h))\b/i;
 
 export function scoreQuests(ctx: StorePlanContext, cands: QuestCandidate[], text: string): Scored[] {
   const ft = parseFilterText(text);
   const hasText = text.trim().length > 0;
   const budget = ft.budget ?? ctx.viewer.budgetMax;
+  const free = freeWindowOf(ctx);
   const friendTexts = friendCandidates(ctx).flatMap((f) =>
     [f.bubble, f.availabilityText].filter((x): x is string => !!x).map((t) => ({ name: f.firstName, text: t })));
   const out: Scored[] = [];
@@ -166,7 +198,8 @@ export function scoreQuests(ctx: StorePlanContext, cands: QuestCandidate[], text
     const score = (textHit ? 4 : 0) + (interest ? 3 : 0) + (friendHit ? 2 : 0) + (foodInterest ? 1 : 0) + soon - q.walkMinutes / 50;
     // No text: a strong match needs a shared interest, or several weaker signals adding up to 3.
     const strong = hasText ? textHit : !!interest || score >= STRONG_SCORE;
-    if (facts.length === 1) facts.unshift(startsLabel(q.startsInMin));
+    if (free) facts.unshift(q.timeFact);
+    else if (facts.length === 1) facts.unshift(startsLabel(q.startsInMin));
     out.push({ id: q.id, score, strong, reason: facts.join(' · ') });
   }
   return out.sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
@@ -220,7 +253,8 @@ const MUSE_FILTER_JSON_SCHEMA: Record<string, unknown> = {
 };
 
 function filterMessages(ctx: StorePlanContext, mode: FilterMode, text: string, quests: QuestCandidate[], friends: FriendCandidate[]) {
-  const viewer = { interests: ctx.viewer.interests, budgetMax: ctx.viewer.budgetMax };
+  const free = freeWindowOf(ctx);
+  const viewer = { interests: ctx.viewer.interests, budgetMax: ctx.viewer.budgetMax, freeUntilMin: free?.endMin ?? null };
   const items = mode === 'explore'
     ? quests.map((q) => ({ id: q.id, title: q.title, tags: q.tags, price: q.priceMax, startsInMin: q.startsInMin, walkMin: q.walkMinutes, seatsLeft: q.seatsLeft }))
     : friends.map((f) => ({ id: f.id, name: f.firstName, sharedInterests: f.sharedInterests, bubble: f.bubble, said: f.availabilityText, freeUntilMin: f.freeUntilMin }));
@@ -231,6 +265,7 @@ function filterMessages(ctx: StorePlanContext, mode: FilterMode, text: string, q
         'You are Muse inside Facebook Out Here. The map is crowded; keep only what matches what the user is looking for. ' +
         `Pick at most ${FILTER_MAX_KEEP} ids, only from the list. For each, write one short reason (under 90 characters) that cites a concrete fact from the list ` +
         '(a shared interest, a tag, the price, the walk minutes, the start time, or what a friend said). Never invent facts. ' +
+        'If me.freeUntilMin is set, every item already fits that free time; each quest reason must say when it starts ("starts in 23 min, inside your free time"). ' +
         'If the user gave a time ("15 min"), drop items that start or take longer than that to walk to. If they gave a budget, drop items over it. ' +
         'summary: one sentence saying what you kept and why. Reply as JSON.',
     },
@@ -256,13 +291,19 @@ function summaryFor(mode: FilterMode, kept: number, total: number, text: string)
 }
 
 /** Keeps only ids present in the candidate list (first reason wins), at most FILTER_MAX_KEEP. */
-export function validateKeep(raw: { id: string; reason: string }[], allowed: Map<ID, string>, kind: FilterKeep['kind']): FilterKeep[] {
+export function validateKeep(
+  raw: { id: string; reason: string }[], allowed: Map<ID, string>, kind: FilterKeep['kind'],
+  /** id -> "starts in 23 min, inside your free time", put first when the model's reason gives no time. */
+  timeFacts?: Map<ID, string>,
+): FilterKeep[] {
   const seen = new Set<ID>();
   const out: FilterKeep[] = [];
   for (const k of raw) {
     if (!allowed.has(k.id) || seen.has(k.id)) continue;
     seen.add(k.id);
-    const reason = k.reason.trim().replace(/\s+/g, ' ').slice(0, 140) || allowed.get(k.id)!;
+    let reason = k.reason.trim().replace(/\s+/g, ' ').slice(0, 140) || allowed.get(k.id)!;
+    const t = timeFacts?.get(k.id);
+    if (t && !TIME_WORDS.test(reason)) reason = `${t} · ${reason}`.slice(0, 160);
     out.push({ id: k.id, kind, reason });
     if (out.length >= FILTER_MAX_KEEP) break;
   }
@@ -271,7 +312,7 @@ export function validateKeep(raw: { id: string; reason: string }[], allowed: Map
 
 export type FilterInput = { ctx: StorePlanContext; mode: FilterMode; text: string };
 
-const questFact = (q: QuestCandidate) => `${startsLabel(q.startsInMin)} · ${q.walkMinutes} min walk`;
+const questFact = (q: QuestCandidate) => `${q.timeFact} · ${q.walkMinutes} min walk`;
 
 /**
  * Nothing matched: the closest FILTER_CLOSEST plans by walk (then start), or the best-scored
@@ -317,6 +358,11 @@ export async function runMuseFilter({ ctx, mode, text }: FilterInput): Promise<F
   );
   const mock = isMockMode();
   const hasText = text.trim().length > 0;
+  const free = mode === 'explore' ? freeWindowOf(ctx) : null;
+  if (!total && free) {
+    // Free till X and nothing fits before then: say so, and never light up plans after it.
+    return { keep: [], summary: `Nothing fits before ${formatDemoTime(free.endsAt)}.`, source: 'muse', total: 0, mode: mock ? 'mock' : 'live', closest: false };
+  }
   if (!total) {
     // Nothing in the normal window: widen the walk and start limits and show the closest plans.
     const wide = mode === 'explore' ? questCandidates(ctx, FILTER_WIDE_WINDOW_MIN, FILTER_WIDE_WALK_MIN) : [];
@@ -353,7 +399,8 @@ export async function runMuseFilter({ ctx, mode, text }: FilterInput): Promise<F
         return { keep: kept.map((s) => ({ id: s.id, reason: s.reason })), summary: `[mock] ${summaryFor(mode, kept.length, total, text)}` };
       },
     });
-    const keep = validateKeep(res.data.keep, allowed, kind);
+    const timeFacts = freeWindowOf(ctx) ? new Map(quests.map((q) => [q.id, q.timeFact])) : undefined;
+    const keep = validateKeep(res.data.keep, allowed, kind, timeFacts);
     const out: FilterResult = { keep, summary: res.data.summary.trim() || summaryFor(mode, keep.length, total, text), source: 'muse', total, mode: res.mock ? 'mock' : 'live', closest: false };
     return ensureKept(out, quests, friends, scored, mode, text);
   } catch (err) {
@@ -376,12 +423,13 @@ export function fallbackFilter(scored: Scored[], kind: FilterKeep['kind'], mode:
 
 const cache = new Map<string, { at: number; value: FilterResult }>();
 
-export function filterCacheKey(viewerId: ID, mode: FilterMode, text: string): string {
-  return `${viewerId}|${mode}|${text.trim().toLowerCase().replace(/\s+/g, ' ')}`;
+/** The free window is part of the key: a new "Free till X" must not reuse the answer for the old one. */
+export function filterCacheKey(viewerId: ID, mode: FilterMode, text: string, windowEnd: string | null = null): string {
+  return `${viewerId}|${mode}|${text.trim().toLowerCase().replace(/\s+/g, ' ')}|${windowEnd ?? ''}`;
 }
 
 export async function cachedMuseFilter(input: FilterInput, nowMs = Date.now()): Promise<FilterResult & { cached: boolean }> {
-  const key = filterCacheKey(input.ctx.viewer.id, input.mode, input.text);
+  const key = filterCacheKey(input.ctx.viewer.id, input.mode, input.text, input.ctx.viewerWindow?.endsAt ?? null);
   const hit = cache.get(key);
   if (hit && nowMs - hit.at < FILTER_CACHE_MS) return { ...hit.value, cached: true };
   const value = await runMuseFilter(input);

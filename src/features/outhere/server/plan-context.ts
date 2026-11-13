@@ -13,13 +13,20 @@ import {
 export type PlanFriendStatus = { friendId: ID; firstName: string; line: string; bubble: StatusBubble; updatedAt: string };
 
 /** PlanContext plus the friends' status bubbles (also copied onto each PlanFriend.status for the rank prompt). */
-export type StorePlanContext = PlanContext & { friendStatuses: PlanFriendStatus[] };
+export type StorePlanContext = PlanContext & {
+  friendStatuses: PlanFriendStatus[];
+  /**
+   * The viewer's own active "Free till X" window (the earliest one running or upcoming), or null
+   * when they are busy. The Muse filter keeps only plans that fit inside it.
+   */
+  viewerWindow?: { startsAt: string; endsAt: string } | null;
+};
 
 /** Quests farther than this from the viewer are not planning candidates. */
 const QUEST_RADIUS_M = 5_000;
 
 type ShareRow = {
-  userId: ID; paused?: boolean; audience?: Audience; expiresAt?: string; updatedAt?: string;
+  userId: ID; paused?: boolean; audience?: Audience; expiresAt?: string; updatedAt?: string; location?: LatLng;
   bubble?: Partial<StatusBubble> | null;
 };
 
@@ -55,13 +62,21 @@ export async function buildStorePlanContext(
     .filter((a) => friendIds.has(a.userId) && a.endsAt > at && view.canSee(viewer.id, a.userId, a.audience))
     .map(({ audience: _a, ...a }) => { void _a; return a; });
 
-  const location: LatLng = req.location ?? (viewer.handle === DEMO_DRIVER_HANDLE ? DEMO_CENTER : viewer.home ?? DEMO_CENTER);
+  // Location shares are optional in the Db (the Find My layer adds the table): read them if present.
+  const shares = ((db as unknown as { locationShares?: ShareRow[] }).locationShares ?? []);
+  const own = db.availability
+    .filter((a) => a.userId === viewer.id && a.endsAt > at)
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+  const ownShare = shares.find((s) => s.userId === viewer.id && !s.paused && (!s.expiresAt || s.expiresAt > at) && s.location);
+  // Where the viewer is now: Alex starts at the demo center; anyone else from the free window they
+  // already share, then their shared location, then home. A new ask from the same person therefore
+  // keeps the place friends already see, instead of jumping to home (Maya would be 2 km north).
+  const location: LatLng = req.location
+    ?? (viewer.handle === DEMO_DRIVER_HANDLE ? DEMO_CENTER : own?.location ?? ownShare?.location ?? viewer.home ?? DEMO_CENTER);
   const quests = db.quests
     .filter((q) => view.isActiveQuest(q) && view.canSeeQuest(viewer.id, q) && haversineMeters(location, q.location) <= QUEST_RADIUS_M)
     .map((q) => ({ ...q, memberIds: view.questMemberIds(q.id) }));
 
-  // Location shares are optional in the Db (the Find My layer adds the table): read them if present.
-  const shares = ((db as unknown as { locationShares?: ShareRow[] }).locationShares ?? []);
   const friendStatuses: PlanFriendStatus[] = [];
   for (const s of shares) {
     if (!friendIds.has(s.userId) || s.paused) continue;
@@ -83,6 +98,7 @@ export async function buildStorePlanContext(
 
   return {
     viewer,
+    viewerWindow: own ? { startsAt: own.startsAt, endsAt: own.endsAt } : null,
     friends,
     friendAvailability,
     quests,

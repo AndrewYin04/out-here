@@ -815,8 +815,12 @@ export class CoreStore {
     const nowIso = iso();
     const prior = (await this.view()).db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
     for (const a of prior) await this.backend.update('availability', { id: a.id }, { endsAt: nowIso });
+    // A new window with no note of its own ("free") keeps the note friends already see, so a
+    // Muse ask changes when you're free, not what your status says.
+    const plain = !body.text.trim() || body.text.trim().toLowerCase() === 'free';
+    const keptNote = plain ? prior.map((a) => a.text).find((t) => t.trim() && t.trim().toLowerCase() !== 'free') : undefined;
     const row: AvailabilityRow = {
-      id: uuid(), userId: viewerId, text: body.text, startsAt: body.startsAt, endsAt: body.endsAt,
+      id: uuid(), userId: viewerId, text: keptNote ?? (body.text.trim() || 'free'), startsAt: body.startsAt, endsAt: body.endsAt,
       location: body.location, intent: null, createdAt: iso(), audience: body.audience ?? 'friends',
     };
     await this.backend.insert('availability', [row]);
@@ -866,6 +870,14 @@ export class CoreStore {
         const shared = (me?.interests ?? []).filter((i) => theirs.some((x) => x.toLowerCase() === i.toLowerCase()));
         best.set(a.userId, { id: a.userId, from: o.from, until: o.until, friendUntil: a.endsAt, sharedInterests: shared, text: a.text });
       }
+    }
+    // The line shown for a friend is their status bubble ("craving dumplings 🥟") when they share
+    // one with the viewer; their window note only when there is no bubble.
+    for (const s of v.db.locationShares ?? []) {
+      const b = best.get(s.userId);
+      if (!b || s.paused || s.expiresAt <= t || !v.canSee(viewerId, s.userId, s.audience)) continue;
+      const line = [s.bubble?.thought?.trim(), s.bubble?.emoji?.trim()].filter(Boolean).join(' ');
+      if (line) b.text = line;
     }
     const pair = await pairSignals(this, [viewerId, ...best.keys()]);
     const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), at, { viewerId, pair });

@@ -3,6 +3,7 @@
 // from POST /api/muse/filter. "On" is per tab, kept in sessionStorage "outhere.museFilter".
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiPost, useViewer } from '@/features/data';
+import { useMyAvailability } from './FreeStatus';
 
 export const MUSE_FILTER_KEY = 'outhere.museFilter';
 const DEBOUNCE_MS = 600;
@@ -56,7 +57,10 @@ export function useMuseFilter(mode: MuseFilterMode, text: string | null): MuseFi
   const setOn = useCallback((next: boolean) => { writeOn(next); setOnState(next); }, []);
 
   const ask = text?.trim() ?? '';
-  const key = `${viewer.id}|${mode}|${ask.toLowerCase()}`;
+  // A new "Free till X" changes which plans fit, so the window end is part of the key.
+  const mine = useMyAvailability();
+  const windowEnd = (mine.data?.items ?? []).map((a) => a.endsAt).sort()[0] ?? '';
+  const key = `${viewer.id}|${mode}|${ask.toLowerCase()}|${windowEnd}`;
 
   useEffect(() => {
     if (!on) return;

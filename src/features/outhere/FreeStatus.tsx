@@ -24,8 +24,16 @@ export function useMyAvailability() {
     window.addEventListener(CHANGED, on);
     return () => window.removeEventListener(CHANGED, on);
   }, [refetch]);
-  return api;
+  // A status UI that mounts later (the composer reopened after an ask) reads past the server's
+  // snapshot cache, and until its own answer arrives it shows the last answer any status UI on
+  // the page got, never an empty list that reads as "You're busy".
+  useEffect(() => { void refetch(); }, [refetch]);
+  const fresh = api.data;
+  useEffect(() => { if (fresh) lastKnown.set(viewer.id, fresh); }, [fresh, viewer.id]);
+  return fresh ? api : { ...api, data: lastKnown.get(viewer.id) ?? null };
 }
+/** Viewer id -> the newest /api/availability answer, shared by every status UI on the page. */
+const lastKnown = new Map<string, { items: Availability[] }>();
 
 /**
  * Re-render every 30 s so "free till" states expire on screen. Callers read the clock fresh at

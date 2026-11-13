@@ -578,15 +578,12 @@ export function OutHereView() {
         </div>
       )}
 
-      {/* Dock the availability card at the edge to leave room for the map and avatar. */}
-      {!selectedId && !creating && !sheetOpen && !upNext && (
+      {/* Dock the availability card at the edge to leave room for the map and avatar. It waits
+          while the Muse filter is on, so it never covers the pins Muse kept. */}
+      {!selectedId && !creating && !sheetOpen && !upNext && !filter.on && (
         <div className={cn(
           'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
-          show3d
-            ? mode === 'friends' && visible.length > 0
-              ? filter.on ? 'top-32' : 'top-24'
-              : filter.on ? 'top-24' : 'top-[60px]'
-            : 'bottom-[136px] md:bottom-auto',
+          show3d ? (mode === 'friends' && visible.length > 0 ? 'top-24' : 'top-[60px]') : 'bottom-[136px] md:bottom-auto',
         )}>
           <BothFreeNudge className="pointer-events-auto w-full" />
         </div>

@@ -125,3 +125,28 @@ describe('why not others', () => {
     expect(shownDrops(all).map((d) => d.questId)).toEqual(['b', 'c']);
   });
 });
+
+describe('a friend who asks Muse keeps their place and status (both personas)', () => {
+  it("Maya's own ask keeps her shared spot and note, and Alex's dumpling pick still says Maya", async () => {
+    const before = (await store.friendAvailability(alex)).find((a) => a.userId === maya)!;
+    expect(before).toBeTruthy();
+    // Maya asks Muse; the plan starts from where she already shares, not from home 2 km north.
+    const mctx = await buildStorePlanContext({ userId: maya, location: null, now: NOW }, store);
+    expect(mctx.location).toEqual(before.location);
+    const mine = await plan({ text: TEXT, userId: maya, now: NOW, context: mctx });
+    expect(mine.plan.suggestions.length).toBeGreaterThan(0);
+    // The ask becomes her window with no note of its own ("free"), as the composer sends it.
+    await store.createAvailability(maya, {
+      text: 'free', startsAt: NOW.toISOString(), endsAt: mine.plan.intent.windowEnd, location: mctx.location,
+    });
+    const after = (await store.friendAvailability(alex)).filter((a) => a.userId === maya && a.endsAt > NOW.toISOString());
+    expect(after).toHaveLength(1);
+    expect(after[0]!.text).toBe(before.text);
+    expect(after[0]!.location).toEqual(before.location);
+
+    const actx = await buildStorePlanContext({ userId: alex, location: null, now: NOW }, store);
+    const out = await plan({ text: TEXT, userId: alex, now: NOW, context: actx });
+    expect(out.plan.suggestions[0]?.questId).toBe(dumplings);
+    expect(out.plan.suggestions[0]?.friendIds).toContain(maya);
+  });
+});

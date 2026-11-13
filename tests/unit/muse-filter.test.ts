@@ -29,6 +29,52 @@ beforeEach(() => { setNow(NOW); store = createMemoryStore(NOW); clearFilterCache
 afterEach(() => { setMuseTransport(null); });
 
 const ctxFor = (userId: string) => buildStorePlanContext({ userId, location: null, now: NOW }, store);
+/** The viewer starting from home, far from their shared spot (these scenarios are about distance). */
+const ctxAtHome = async (userId: string) => {
+  const home = (await ctxFor(userId)).viewer.home;
+  return buildStorePlanContext({ userId, location: home, now: NOW }, store);
+};
+
+describe('muse filter: the viewer free window', () => {
+  const freeFor = (userId: string, minutes: number) => store.createAvailability(userId, {
+    text: 'free', startsAt: new Date(NOW.getTime() - 5_000).toISOString(),
+    endsAt: new Date(NOW.getTime() + minutes * 60_000).toISOString(), location: { lat: 37.4847, lng: -122.1477 },
+  });
+
+  it('free for 40 min: no plan starting after the window (minus the walk) lights up, and every reason says when', async () => {
+    await freeFor(alex, 40);
+    const ctx = await ctxFor(alex);
+    expect(ctx.viewerWindow).toBeTruthy();
+    const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
+    const byId = new Map(ctx.quests.map((q) => [q.id, q]));
+    expect(out.keep.length).toBeGreaterThan(0);
+    expect(out.keep.map((k) => k.id)).not.toContain(bands); // starts in 4 h
+    expect(out.keep.map((k) => k.id)).not.toContain(seedId('quest', '5k')); // starts in 1 h
+    for (const k of out.keep) {
+      const q = byId.get(k.id)!;
+      expect(Date.parse(q.startsAt)).toBeLessThanOrEqual(NOW.getTime() + 40 * 60_000);
+      expect(k.reason).toMatch(/(starts in \d+ min|happening now), inside your free time/);
+    }
+  });
+
+  it('nothing fits a short window: says so and keeps no late plan', async () => {
+    await freeFor(alex, 3);
+    const out = await runMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
+    expect(out.keep).toEqual([]);
+    expect(out.closest).toBe(false);
+    expect(out.summary).toMatch(/^Nothing fits before \d{1,2}:\d{2} [AP]M\.$/);
+  });
+
+  it('a new free window is a new cache key', async () => {
+    await freeFor(alex, 40);
+    const a = await cachedMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
+    await freeFor(alex, 3);
+    const b = await cachedMuseFilter({ ctx: await ctxFor(alex), mode: 'explore', text: '' });
+    expect(a.keep.length).toBeGreaterThan(0);
+    expect(b.cached).toBe(false);
+    expect(b.keep).toEqual([]);
+  });
+});
 
 describe('muse filter: mock mode', () => {
   it('alex, explore, no text: keeps dumplings, local bands and boba', async () => {
@@ -55,7 +101,7 @@ describe('muse filter: mock mode', () => {
   });
 
   it('maya, explore, no text: a short list is kept whole, never emptied', async () => {
-    const ctx = await ctxFor(maya);
+    const ctx = await ctxAtHome(maya);
     const total = questCandidates(ctx).length;
     const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
     expect(total).toBeGreaterThan(0);
@@ -66,7 +112,9 @@ describe('muse filter: mock mode', () => {
   });
 
   it('kai, explore, no candidates in the window: keeps the closest plans from a wider search', async () => {
-    const ctx = await ctxFor(profileId('kai'));
+    // Busy (no free window), so the wider search may reach plans later tonight.
+    await store.clearAvailability(profileId('kai'));
+    const ctx = await ctxAtHome(profileId('kai'));
     const out = await runMuseFilter({ ctx, mode: 'explore', text: '' });
     expect(out.keep.length).toBeGreaterThan(0);
     expect(out.keep.length).toBeLessThanOrEqual(3);

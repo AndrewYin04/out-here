@@ -167,7 +167,9 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
  * byMuse: the live model ranked the picks ("Muse pick"), else "Top pick".
  * mine: the viewer joined this plan, so it reads "You're going" and stands out (docs/UX_PLAN.md).
  */
-function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, byMuse: boolean, mine = false) {
+function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, byMuse: boolean, mine = false, rank = 0) {
+  // Only the first suggestion is the top pick; the others get a plain number ("2", "3") in the plan's order.
+  const top = rank === 0;
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);
   const time = pinTime(q, now);
@@ -180,7 +182,7 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.vis.textContent = glyph ?? '';
   p.vis.style.display = glyph ? 'block' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
-  p.button.setAttribute('aria-label', `${mine ? 'You’re going: ' : ''}${picked ? (byMuse ? 'Muse pick: ' : 'Top pick: ') : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
+  p.button.setAttribute('aria-label', `${mine ? 'You’re going: ' : ''}${picked ? (top ? (byMuse ? 'Muse pick: ' : 'Top pick: ') : `Pick ${rank + 1}: `) : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
   const ring = selected || picked || mine ? '0 0 0 3px #0866FF,' : isSoon(q, now) ? '0 0 0 2.5px #24832C,' : '';
   p.circle.style.boxShadow = `${ring}0 1px 3px rgba(0,0,0,.35)`;
@@ -191,7 +193,11 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.button.style.opacity = dimmed ? '0.4' : '1';
   p.button.style.transition = 'opacity .2s';
   p.root.toggleAttribute('data-dimmed', dimmed);
-  p.pick.textContent = byMuse ? '✨ Muse pick' : 'Top pick';
+  p.pick.textContent = top ? (byMuse ? '✨ Muse pick' : 'Top pick') : String(rank + 1);
+  p.pick.dataset.rank = String(rank + 1);
+  p.pick.style.padding = top ? '1px 7px' : '1px 6px';
+  p.pick.style.minWidth = top ? '' : '18px';
+  p.pick.style.textAlign = 'center';
   if (picked && !p.pick.isConnected) p.button.append(p.pick);
   else if (!picked && p.pick.isConnected) p.pick.remove();
   paintFaces(p, faces);
@@ -432,7 +438,7 @@ export default function MapCanvas({
         const seats = seatsLeftOf(q);
         if (seats !== ref.seats) { ref.seats = seats; pulse(ref); }
       }
-      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, picksByMuse, !!viewerId && q.memberIds.includes(viewerId));
+      paintPin(ref, q, q.id === selectedId, now, friendFaces?.[q.id] ?? [], pickSet ? pickSet.has(q.id) : null, picksByMuse, !!viewerId && q.memberIds.includes(viewerId), Math.max(0, picks?.indexOf(q.id) ?? 0));
     }
     for (const [id, ref] of pins.current) {
       if (!seen.has(id)) { ref.marker.remove(); pins.current.delete(id); }

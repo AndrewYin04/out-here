@@ -127,6 +127,36 @@ test("Muse filter: the why stays clear of the map", async ({ page }, info) => {
   await expect(line).toHaveCount(0);
 });
 
+test("after an ask: the reopened composer says free, and the Muse filter keeps only plans inside the free time", async ({ page }, info) => {
+  const phone = info.project.name === "phone";
+  if (phone) await page.setViewportSize({ width: 390, height: 844 });
+  // A persona other tests do not ask as, so its free window is this test's own.
+  await page.goto("/out-here?as=lena");
+  await page.getByRole("button", { name: "I'm free" }).click();
+  await page.locator("#imfree-text").fill("hungry, 40 min, under $15");
+  await page.getByRole("button", { name: "Find a plan" }).click();
+  await expect(page.getByTestId("plan-loading")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId("picked-summary")).toContainText(/Free till \d{1,2}:\d{2} [AP]M/, { timeout: 15_000 });
+  await page.getByTestId("picked-summary").getByRole("button", { name: "Change" }).click();
+  await expect(page.getByTestId("status-row")).toHaveAttribute("data-status", "free");
+  await expect(page.getByTestId("status-row")).toContainText(/Free till \d{1,2}:\d{2} [AP]M/);
+
+  await page.reload();
+  await page.getByTestId("muse-filter-toggle").click();
+  const status = page.getByTestId("muse-filter-status");
+  await expect(status).not.toContainText("filtering", { timeout: 15_000 });
+  // The both-free card never covers the pins Muse kept.
+  await expect(page.getByTestId("both-free")).toHaveCount(0);
+  if (!(await page.getByTestId("muse-filter-why").count())) {
+    await expect(status).toContainText(/Nothing fits before \d{1,2}:\d{2} [AP]M/);
+    return;
+  }
+  await page.getByTestId("muse-filter-why").first().click();
+  const items = page.getByTestId("muse-filter-reason-item");
+  await expect(items.first()).toBeVisible();
+  for (const r of await items.allInnerTexts()) expect(r).toMatch(/(starts in [\d.]+ (min|h)|happening now), inside your free time/);
+});
+
 test("the 15 min time picker narrows the picks to boba, and the work panel reads it", async ({ page }) => {
   mkdirSync(SHOTS, { recursive: true });
   await page.goto("/out-here?as=alex");

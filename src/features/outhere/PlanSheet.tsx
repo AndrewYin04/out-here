@@ -210,7 +210,10 @@ export function PlanSheet({ className }: { className?: string }) {
     if (!t) return;
     // A picked time sets your status right away (friends see it while Muse thinks).
     const picked = durationMinutes(duration);
-    if (picked !== null) void myStatus.setFree(0, picked, noteFor(moods, text));
+    // The note friends see is the picked moods only: never the raw ask ("hungry, 40 min, under $15")
+    // as if it were a status. With no mood the server keeps the note already shared.
+    const note = noteFor(moods, '');
+    if (picked !== null) void myStatus.setFree(0, picked, note);
     setPickersOpen(false);
     // A new ask replaces one still in flight: abort it, and seq drops any late answer.
     inFlight.current?.abort();
@@ -239,7 +242,7 @@ export function PlanSheet({ className }: { className?: string }) {
       });
       // Only the ask whose results are shown becomes the viewer's availability (unless a time
       // was picked, which already set it).
-      if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
+      if (picked === null) void shareAvailability(note, r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
