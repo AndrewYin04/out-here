@@ -95,6 +95,10 @@
 // GET  /api/muse/wants  /  POST /api/muse/wants  body: { text }        -> { wants: MuseWant[] } / { want: MuseWant }
 // DELETE /api/muse/wants?id=<id>                                       -> { ok: true }
 // GET  /api/muse/finds?lat&lng                                         -> MuseFindsResponse (listings matching your wants, with Muse's line)
+// ---- Watch + Muse Marketplace picks ----
+// GET  /api/watch                                                       -> WatchResponse (the videos and the viewer's history)
+// POST /api/watch/:key/view           body: { seconds }                -> { ok: true }     (publishes user:<id> {type:"watch"})
+// GET  /api/muse/marketplace-picks?lat&lng&exclude=a,b                 -> MarketplacePicksResponse
 // GET  /api/reels                                                       -> { reels: Reel[] }
 
 import type {
@@ -275,6 +279,38 @@ export type MuseFind = {
   line: string; source: 'muse' | 'mock' | 'fallback';
 };
 export type MuseFindsResponse = { finds: MuseFind[] };
+
+/** A Watch video as the app shows it. */
+export type WatchVideo = { key: string; title: string; minutes: number; topics: string[]; posterUrl: string; creator: PersonCard | null };
+/** The viewer's history, one row per video: total seconds and the last time they watched it. */
+export type WatchHistoryItem = { videoKey: string; seconds: number; lastAt: string };
+export type WatchResponse = { videos: WatchVideo[]; history: WatchHistoryItem[] };
+
+/** What Muse thinks the viewer is into, with the videos that show it. */
+export type TasteTopic = { name: string; why: string; minutes: number; /** Watched in the last few minutes. */ justNow: boolean; evidence: { video: WatchVideo; minutes: number; seconds: number }[] };
+export type MarketplacePick = {
+  listing: Listing;
+  seller: PersonCard;
+  topic: string;
+  reason: string;
+  /** The watched videos behind this pick. */
+  evidence: { video: WatchVideo; minutes: number; seconds: number }[];
+  driveMin: number | null;
+  /** A plan linked to this listing (quest tag listing:<id>), if any. */
+  openHouse: { questId: ID; title: string; startsAt: string; venueName: string } | null;
+  /** Its evidence includes a view from the last few minutes. */
+  isNew: boolean;
+};
+export type MarketplacePicksResponse = {
+  topics: TasteTopic[];
+  picks: MarketplacePick[];
+  /** Listings Muse checked and hid because they match nothing the viewer watches. */
+  hidden: { listing: Listing; seller: PersonCard }[];
+  checked: number;
+  videosRead: number;
+  source: 'muse' | 'mock' | 'fallback';
+  ms: number;
+};
 export type ReelsResponse = { reels: Reel[] };
 export type MessagesResponse = { messages: Message[] };
 export type ThreadsResponse = { threads: ThreadView[] };

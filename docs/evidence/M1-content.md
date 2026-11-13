@@ -273,4 +273,35 @@ Model muse-image-1.0, $0.01/image, cache .cache/images/, cap 200/run.
 | /seed/stories/7.webp | 30914 | true | generated | 76.9 |
 | /seed/stories/8.webp | 10470 | true | generated | 51.8 |
 | /seed/stories/9.webp | 10285 | true | generated | 78.9 |
+
+### Run 2026-11-13T05:32:24.167Z
+
+`referenced=199 processed=14 generated=14 cacheHits=0 fallbacks=0 failures=0 stillMissing=0 spendUsd=0.14 publicSeedMB=8.01 seconds=83`
+
+| Kind | Files | Avg KB |
+|---|---|---|
+| portrait | 62 | 11.8 |
+| cover | 12 | 57.9 |
+| post | 45 | 61.0 |
+| story | 16 | 83.3 |
+| event | 20 | 63.7 |
+| listing | 30 | 29.7 |
+| video | 14 | 38.3 |
+
+| Path | ms | ok | how | KB |
+|---|---|---|---|---|
+| /seed/videos/basement-set.webp | 21838 | true | generated | 48.1 |
+| /seed/videos/bass-lines.webp | 19444 | true | generated | 33.3 |
+| /seed/videos/comic-haul.webp | 22233 | true | generated | 34.1 |
+| /seed/videos/desk-tour.webp | 15412 | true | generated | 23.7 |
+| /seed/videos/dj-mix.webp | 15165 | true | generated | 28.9 |
+| /seed/videos/dumpling-folds.webp | 21969 | true | generated | 64.9 |
+| /seed/videos/everyday-makeup.webp | 20558 | true | generated | 25.9 |
+| /seed/videos/film-basics.webp | 37276 | true | generated | 40.5 |
+| /seed/videos/film-walk.webp | 21618 | true | generated | 37.2 |
+| /seed/videos/first-v3.webp | 20038 | true | generated | 37.7 |
+| /seed/videos/ink-timelapse.webp | 25526 | true | generated | 52.3 |
+| /seed/videos/panel-layout.webp | 13414 | true | generated | 41.9 |
+| /seed/videos/volley-rally.webp | 23178 | true | generated | 41.2 |
+| /seed/videos/zine-fold.webp | 10683 | true | generated | 27.1 |
 <!-- images:end -->

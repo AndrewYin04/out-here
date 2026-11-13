@@ -291,6 +291,9 @@ export type ListingHold = {
   status: ListingHoldStatus; createdAt: string; acceptedAt: string | null; expiresAt: string | null;
 };
 
+/** One view of a seeded Watch video (key from src/shared/seed/videos.json). */
+export type WatchEvent = { id: ID; userId: ID; videoKey: string; seconds: number; createdAt: string };
+
 /** Something a person told Muse they are looking for ("desk chair under $40, 15 min drive"). */
 export type MuseWant = {
   id: ID; userId: ID; text: string; item: string; keywords: string[];

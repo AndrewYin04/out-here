@@ -38,7 +38,11 @@ data.stories.forEach((s, i) => jobs.push({ path: s.image, kind: "story", label: 
 for (const e of data.events) jobs.push({ path: e.cover, kind: "event", label: e.slug, prompt: `Realistic photo for a local event cover: ${eventHint[e.slug]} (${e.title}), a ${e.category} meetup for young adults at a small neighborhood spot. Warm, inviting, candid, ordinary fictional people. ${NO_TEXT}` });
 for (const l of data.listings) jobs.push({ path: l.image, kind: "listing", label: l.id, prompt: `Realistic Facebook Marketplace phone photo of a used ${listingHint[l.id]} for sale, sitting on a wood floor or table in an apartment, daylight, plain background. ${NO_TEXT}` });
 
-const SIZE = { portrait: [256, 256, 80], cover: [1200, 450, 78], post: [800, 600, 78], event: [800, 600, 78], story: [800, 1422, 78], listing: [600, 600, 78] };
+// Watch video posters (src/shared/seed/videos.json): fictional creators, no text.
+const VIDEOS = JSON.parse(readFileSync(join(ROOT, "src", "shared", "seed", "videos.json"), "utf8"));
+for (const v of VIDEOS) jobs.push({ path: `/seed/videos/${v.key}.webp`, kind: "video", label: v.key, prompt: `Realistic still frame from a casual phone video posted on social media: ${v.poster}. Natural light, candid, ordinary fictional people if any. ${NO_TEXT}` });
+
+const SIZE = { video: [800, 450, 78], portrait: [256, 256, 80], cover: [1200, 450, 78], post: [800, 600, 78], event: [800, 600, 78], story: [800, 1422, 78], listing: [600, 600, 78] };
 const sha = (s) => createHash("sha256").update(s).digest("hex");
 const abs = (p) => join(PUB, ...p.split("/").filter(Boolean));
 

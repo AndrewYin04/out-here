@@ -3,7 +3,7 @@
 import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
-  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, TogetherPlan, MuseWant,
+  Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, TogetherPlan, MuseWant, WatchEvent,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -66,6 +66,7 @@ export type Db = {
   togetherPlans: TogetherRow[];
   listingHolds: ListingHoldRow[];
   museWants: MuseWant[];
+  watchEvents: WatchEvent[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -81,7 +82,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   posts: 'posts', comments: 'comments', reactions: 'reactions', stories: 'stories', threads: 'threads',
   threadMembers: 'thread_members', messages: 'messages', notifications: 'notifications',
   listings: 'listings', reels: 'reels', locationShares: 'location_shares', togetherPlans: 'together_plans',
-  listingHolds: 'listing_holds', museWants: 'muse_wants',
+  listingHolds: 'listing_holds', museWants: 'muse_wants', watchEvents: 'watch_events',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -94,12 +95,12 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   eventRsvps: ['eventId', 'userId'], posts: ['id'], comments: ['id'], reactions: ['postId', 'userId'],
   stories: ['id'], threads: ['id'], threadMembers: ['threadId', 'userId'], messages: ['id'],
   notifications: ['id'], listings: ['id'], reels: ['id'], locationShares: ['userId'], togetherPlans: ['id'],
-  listingHolds: ['id'], museWants: ['id'],
+  listingHolds: ['id'], museWants: ['id'], watchEvents: ['id'],
 };
 
 /** Tables added by later migrations: a missing table reads as empty instead of failing every page. */
 /** Tables from later migrations: they read as empty until the migration is applied. */
-export const OPTIONAL_TABLES = new Set<TableKey>(['togetherPlans', 'questCheckins', 'questReports', 'listingHolds', 'museWants']);
+export const OPTIONAL_TABLES = new Set<TableKey>(['togetherPlans', 'questCheckins', 'questReports', 'listingHolds', 'museWants', 'watchEvents']);
 
 export function emptyDb(): Db {
   return Object.fromEntries(TABLE_KEYS.map((k) => [k, []])) as unknown as Db;
