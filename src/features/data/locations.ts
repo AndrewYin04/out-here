@@ -6,8 +6,9 @@
 //   expired shares are hidden.
 // - Approximate shares return the centre of an ~800 m grid cell, a city or neighbourhood label,
 //   and distance / walking time rounded to 0.5 km / 5 min, computed from that returned point.
-// - Realtime: an update sends user:<viewerId> {type:"location", id: ownerId} to every viewer in
-//   the old and the new audience (and the owner), never a public per-location channel.
+// - Realtime: an update sends location:<viewerId> {type:"location", id: ownerId} to every viewer
+//   in the old and the new audience (and the owner). The channel is per recipient, like user:, so
+//   it never says where anyone is; it is separate from user: so a move refetches only Find My.
 import {
   audienceListId, DEMO_CENTER, haversineMeters, now, snapToGrid, walkingMinutes,
   type Audience, type Availability, type FriendPin, type ID, type LatLng, type LocationPrecision,
@@ -17,6 +18,7 @@ import { SHARE_TTL_MIN } from '@/shared/seed/locations';
 import type { CoreStore } from './core';
 import { badRequest, notFound } from './errors';
 import { publish } from './realtime-server';
+import { TABLES } from './tables';
 import type { View } from './view';
 
 export const APPROX_CELL_M = 800;
@@ -107,7 +109,7 @@ export function audienceViewers(v: View, ownerId: ID, audience: Audience): ID[] 
 }
 
 export async function friendPins(store: CoreStore, viewerId: ID): Promise<FriendPin[]> {
-  const v = await store.view();
+  const v = await store.view(TABLES.locations);
   const at = now().toISOString();
   const shares = v.db.locationShares ?? [];
   const mine = shares.find((s) => s.userId === viewerId);
@@ -139,7 +141,7 @@ export async function friendPins(store: CoreStore, viewerId: ID): Promise<Friend
 }
 
 export async function myLocation(store: CoreStore, viewerId: ID): Promise<LocationShare | null> {
-  const v = await store.view();
+  const v = await store.view(TABLES.myLocation);
   return (v.db.locationShares ?? []).find((s) => s.userId === viewerId) ?? null;
 }
 
@@ -159,7 +161,7 @@ const clean = (s: string | null | undefined) => {
 };
 
 export async function updateMyLocation(store: CoreStore, viewerId: ID, patch: LocationPatch): Promise<LocationShare> {
-  const v = await store.view();
+  const v = await store.view(TABLES.locations);
   const old = (v.db.locationShares ?? []).find((s) => s.userId === viewerId) ?? null;
   if (patch.audience) {
     const listId = audienceListId(patch.audience);
@@ -195,7 +197,9 @@ export async function updateMyLocation(store: CoreStore, viewerId: ID, patch: Lo
   await store.backend.upsert('locationShares', [next]);
   const reach = new Set<ID>([viewerId, ...audienceViewers(v, viewerId, next.audience)]);
   if (old) for (const id of audienceViewers(v, viewerId, old.audience)) reach.add(id);
-  await Promise.all([...reach].map((id) => publish(`user:${id}`, { type: 'location', id: viewerId })));
+  // location:<viewer>, not user:<viewer>: a move refetches only Find My (pins and my share), not
+  // the other user: hooks (notifications, invites, Up next...). See docs/REALTIME.md.
+  await Promise.all([...reach].map((id) => publish(`location:${id}`, { type: 'location', id: viewerId })));
   return next;
 }
 
