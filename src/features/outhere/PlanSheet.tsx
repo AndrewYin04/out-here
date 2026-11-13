@@ -131,24 +131,6 @@ export function ImFreeButton({ className }: { className?: string }) {
   );
 }
 
-/**
- * "Checked with 6 friends · Maya's likely down". Names only friends who came back likely down;
- * everyone else stays unnamed, so nobody's no is shown.
- */
-function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Map<string, PersonCard> }) {
-  const checked = plan.meta?.friendsChecked ?? 0;
-  if (checked === 0) return null;
-  const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
-    .flatMap((id) => { const p = friends.get(id); return p ? [p.name.split(' ')[0]] : []; });
-  const who = down.length === 0 ? 'no one free for this yet'
-    : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
-  return (
-    <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
-      ✨ Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
-    </p>
-  );
-}
-
 function windowLabel(text: string): string {
   const m = text.match(/(\d+)\s*(min|minutes|m)\b/i);
   return m ? `${m[1]} minutes` : 'that time';
@@ -289,9 +271,9 @@ export function PlanSheet({ className }: { className?: string }) {
             className,
           )}
         >
-          <div className="relative flex shrink-0 justify-center pt-2">
+          <div className="relative flex h-9 shrink-0 justify-center pt-2">
             <div className="h-1 w-10 rounded-full bg-fb-divider" aria-hidden />
-            <IconButton label="Close" size="sm" className="!absolute right-2 top-1.5" onClick={() => setPlanOpen(false)}>
+            <IconButton label="Close" size="sm" className="!absolute right-2 top-1" onClick={() => setPlanOpen(false)}>
               <X size={18} aria-hidden />
             </IconButton>
           </div>
@@ -378,10 +360,9 @@ export function PlanSheet({ className }: { className?: string }) {
                     <div data-testid="plan-summary" className="mb-2 animate-step-in px-1">
                       {showMuse && <MuseLabel className="mb-1" />}
                       {offline && <OfflineLabel className="mb-1" />}
-                      <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
+                      <p className="line-clamp-2 text-[14px] leading-5 text-fb-text-2">{summary}</p>
                     </div>
                   )}
-                  <PrecheckLine plan={result.plan} friends={friendMap} />
                   {picks.length === 0 ? (
                     <div data-testid="plan-empty" className="animate-rise rounded-card bg-fb-surface p-4 text-center shadow-card">
                       <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
