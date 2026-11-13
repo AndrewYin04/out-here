@@ -45,3 +45,8 @@ export {
   mockWant, museFinds, parseWant, titleMatches, validateWant,
 } from './finds';
 export type { FindCandidate, ParsedWant, RawWant } from './finds';
+export {
+  MAX_PICKS, MAX_TOPICS, MIN_FRESH_SECONDS, MIN_TOPIC_SECONDS, NEW_WINDOW_MIN, checkReason, codeReason, marketplacePicks, mockPicks, mockTaste,
+  stems as watchStems, validateTaste,
+} from './watch-picks';
+export type { PicksInput } from './watch-picks';
