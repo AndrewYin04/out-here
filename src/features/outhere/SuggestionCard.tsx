@@ -58,9 +58,11 @@ type Props = {
   showMuse: boolean;
   onJoined?: () => void;
   approvalRequired?: boolean;
+  /** Other friends free in your window (not already matched to this plan): one tap invites them. */
+  alsoFree?: PersonCard[];
 };
 
-export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequired = false }: Props) {
+export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequired = false, alsoFree = [] }: Props) {
   const quest = useQuest(s.questId);
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
   const price = quest.data?.quest.priceMax;
@@ -183,7 +185,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
   };
 
   const venue = quest.data?.quest.venueName ?? null;
-  const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
+  const extra = alsoFree.filter((p) => !s.friendIds.includes(p.id) && !(quest.data?.quest.memberIds ?? []).includes(p.id));
+  const answered = [...people, ...extra].flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
+  const defaultInvite = `Want to come to ${s.title}? ${startsText(s.startsAt)}.`;
 
   return (
     <article data-testid="suggestion" data-quest-id={s.questId ?? ''} className="rounded-card bg-fb-surface p-3 shadow-card"
@@ -242,6 +246,27 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
             {people.map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={24} ring />)}
           </div>
           <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} {approvalRequired ? 'still needs to approve' : 'can make it'}</span>
+        </div>
+      )}
+
+      {s.questId && extra.length > 0 && !inviteFor && (
+        <div data-testid="also-free" className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[13px] text-fb-text-2">
+          <span className="mr-0.5 inline-flex items-center gap-1"><span aria-hidden className="size-2 rounded-full bg-fb-green" />Free now</span>
+          {extra.slice(0, 4).map((p) => {
+            const name = p.name.split(' ')[0];
+            const sent = sentTo.has(p.id);
+            const answer = outcomes.get(p.id);
+            return (
+              <button key={p.id} type="button" data-testid="also-free-invite" disabled={sent || busy !== null || (!isMember && seats === 0)}
+                aria-label={sent ? `${name} invited` : `Invite ${name}`}
+                onClick={() => void goWith(p, defaultInvite)}
+                className={cn('oh-press inline-flex h-8 items-center gap-1.5 rounded-full pl-0.5 pr-3 font-semibold disabled:cursor-default',
+                  sent ? 'bg-[#E7F3E8] text-fb-green' : 'bg-fb-blue-tint text-fb-blue hover:brightness-95')}>
+                <Avatar src={p.avatarUrl} name={p.name} size={28} decorative />
+                {sent ? <><Check size={14} aria-hidden />{answer ? (answer.status === 'accepted' ? `${name}’s in` : `${name} can’t`) : `${name} invited`}</> : <>+ {name}</>}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -315,7 +340,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequire
               </div>
             ) : (
               <Button block disabled={busy !== null || (!isMember && seats === 0)}
-                onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
+                onClick={() => void goWith(lead, s.inviteDraft ?? defaultInvite)}>
                 {busy === 'invite' ? `Sending to ${lead.name.split(' ')[0]}…` : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
               </Button>
             )}

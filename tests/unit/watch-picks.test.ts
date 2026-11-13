@@ -110,7 +110,7 @@ describe('Marketplace picks', () => {
     const r = await marketplacePicks({ ...ctx, origin: DEMO_CENTER, at: new Date(), exclude: [], userId: maya });
     const order = titles(r).filter((t) => /track jacket|denim shoulder bag/i.test(t));
     expect(order[0]).toBe('Y2K denim shoulder bag');
-    expect(r.picks.find((p) => p.listing.title === 'Y2K denim shoulder bag')!.reason).toMatch(/the Reel "5 ways to style one vintage denim jacket"/);
+    expect(r.picks.find((p) => p.listing.title === 'Y2K denim shoulder bag')!.reason).toMatch(/the Reel "Styling one Y2K denim shoulder bag 3 ways"/);
   });
 
   it('switching a topic off removes its items', async () => {

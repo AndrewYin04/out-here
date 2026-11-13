@@ -3,7 +3,7 @@
 // open, under budget, and walkable for both of you in time; Muse picks one and writes the title,
 // why, and the invite. Code checks the pick and sets the times. Muse never invents a place.
 import { z } from 'zod';
-import { walkingMinutes, type LatLng, type OpeningHours, type QuestCategory, type WeekdayKey } from '../../shared';
+import { haversineMeters, walkingMinutes, type LatLng, type OpeningHours, type QuestCategory, type WeekdayKey } from '../../shared';
 import type { MuseMessage } from './client';
 import { QUEST_CATEGORIES } from './create-quest';
 import { localLabel } from './time';
@@ -85,6 +85,26 @@ export function hangEnd(start: Date, until: Date): Date {
   return new Date(Math.min(start.getTime() + HANG_DEFAULT_MIN * 60_000, until.getTime()));
 }
 
+/** How many places survived each check, in order (the "How Muse drafted this" numbers). */
+export type HangFunnel = { checked: number; walkable: number; inBudget: number; timeFits: number; open: number };
+
+type HangCheck = 'no_location' | 'walk' | 'budget' | 'time' | 'closed' | 'ok';
+
+function checkPlace(
+  p: HangPlaceInput, me: LatLng, friend: LatLng, now: Date, until: Date, budgetMax: number | null, ignoreHours: boolean,
+): { check: HangCheck; myWalk: number; theirWalk: number } {
+  if (!p.location) return { check: 'no_location', myWalk: 0, theirWalk: 0 };
+  const myWalk = walkingMinutes(me, p.location);
+  const theirWalk = walkingMinutes(friend, p.location);
+  if (myWalk > HANG_MAX_WALK_MIN || theirWalk > HANG_MAX_WALK_MIN) return { check: 'walk', myWalk, theirWalk };
+  if (budgetMax !== null && p.typicalCostUsd > budgetMax) return { check: 'budget', myWalk, theirWalk };
+  const start = hangStart(now, myWalk, theirWalk);
+  const end = hangEnd(start, until);
+  if (end.getTime() - start.getTime() < HANG_MIN_TOGETHER_MIN * 60_000) return { check: 'time', myWalk, theirWalk };
+  if (!ignoreHours && !openThrough(p.hours, start, end)) return { check: 'closed', myWalk, theirWalk };
+  return { check: 'ok', myWalk, theirWalk };
+}
+
 /**
  * Real places both people can walk to, that are open for the hang, under budget, and leave at
  * least HANG_MIN_TOGETHER_MIN together. Nearest for the farther walker first.
@@ -94,17 +114,61 @@ export function hangPlaces(
   opts: { ignoreHours?: boolean } = {},
 ): HangPlace[] {
   return places.flatMap((p) => {
-    if (!p.location) return [];
-    const myWalk = walkingMinutes(me, p.location);
-    const theirWalk = walkingMinutes(friend, p.location);
-    if (myWalk > HANG_MAX_WALK_MIN || theirWalk > HANG_MAX_WALK_MIN) return [];
-    if (budgetMax !== null && p.typicalCostUsd > budgetMax) return [];
-    const start = hangStart(now, myWalk, theirWalk);
-    const end = hangEnd(start, until);
-    if (end.getTime() - start.getTime() < HANG_MIN_TOGETHER_MIN * 60_000) return [];
-    if (!opts.ignoreHours && !openThrough(p.hours, start, end)) return [];
+    const { check, myWalk, theirWalk } = checkPlace(p, me, friend, now, until, budgetMax, !!opts.ignoreHours);
+    if (check !== 'ok' || !p.location) return [];
     return [{ placeId: p.id, name: p.name, category: p.category, typicalCostUsd: p.typicalCostUsd, location: p.location, myWalk, theirWalk }];
   }).sort((a, b) => Math.max(a.myWalk, a.theirWalk) - Math.max(b.myWalk, b.theirWalk)).slice(0, MAX_PLACES);
+}
+
+/** The same checks as hangPlaces, counted stage by stage. */
+export function hangFunnel(
+  places: HangPlaceInput[], me: LatLng, friend: LatLng, now: Date, until: Date, budgetMax: number | null,
+  opts: { ignoreHours?: boolean } = {},
+): HangFunnel {
+  const f: HangFunnel = { checked: 0, walkable: 0, inBudget: 0, timeFits: 0, open: 0 };
+  for (const p of places) {
+    const { check } = checkPlace(p, me, friend, now, until, budgetMax, !!opts.ignoreHours);
+    if (check === 'no_location') continue;
+    f.checked++;
+    if (check === 'walk') continue;
+    f.walkable++;
+    if (check === 'budget') continue;
+    f.inBudget++;
+    if (check === 'time') continue;
+    f.timeFits++;
+    if (check === 'closed') continue;
+    f.open++;
+  }
+  return f;
+}
+
+/** Muse's work on a draft, as numbers only: no one's location leaves the server. */
+export type HangWork = HangFunnel & {
+  /** Straight-line meters between the two of you, and from each of you to the pick. */
+  apartM: number; myM: number; theirM: number;
+  /** Minutes together at the pick before the first window closes. */
+  togetherMin: number;
+  /** When the shared free time ends (ISO). */
+  until: string;
+  /** The next places that also fit, with each person's walk. */
+  alsoClose: { name: string; myWalk: number; theirWalk: number }[];
+};
+
+const round10 = (m: number) => Math.round(m / 10) * 10;
+
+export function hangWork(
+  funnel: HangFunnel, draft: HangDraft, ctx: HangContext,
+): HangWork {
+  return {
+    ...funnel,
+    apartM: round10(haversineMeters(ctx.me.location, ctx.friend.location)),
+    myM: round10(haversineMeters(ctx.me.location, draft.location)),
+    theirM: round10(haversineMeters(ctx.friend.location, draft.location)),
+    togetherMin: Math.max(0, Math.round((Date.parse(draft.endsAt) - Date.parse(draft.startsAt)) / 60_000)),
+    until: ctx.until.toISOString(),
+    alsoClose: ctx.places.filter((p) => p.placeId !== draft.placeId).slice(0, 2)
+      .map((p) => ({ name: p.name, myWalk: p.myWalk, theirWalk: p.theirWalk })),
+  };
 }
 
 // ---------- the model step ----------

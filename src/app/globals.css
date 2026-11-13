@@ -57,6 +57,28 @@
   --animate-ping-once: oh-ping 900ms cubic-bezier(0, 0, 0.2, 1) 2;
   --animate-step-in: oh-step-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-polaroid: oh-polaroid 700ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  /* Arrival: the veil fades up, "You made it." lands big, the countdown number punches in. */
+  --animate-veil: oh-veil 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-slam: oh-slam 640ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-count: oh-count 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes oh-veil {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes oh-slam {
+  0% { opacity: 0; transform: scale(1.35) translateY(10px); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes oh-count {
+  0% { opacity: 0; transform: scale(1.6); }
+  25% { opacity: 1; transform: scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0.15; transform: scale(0.92); }
 }
 
 @keyframes fb-shimmer {

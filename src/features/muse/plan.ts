@@ -54,8 +54,9 @@ export type PlanMeta = {
   candidateCount: number;
   /** Pre-check: how many friends' agents were asked (all friends; busy ones just answer nothing). */
   friendsChecked: number;
-  /** Friends free in the window: id (to find their pin), first name and end time only, from availability they shared with the viewer. */
-  friendsFree: { friendId: string; firstName: string; freeUntil: string }[];
+  /** Friends free in the window, from availability they shared with the viewer: id (to light their pin
+   *  and offer an invite), name and photo, first name and end time only. Never their location or text. */
+  friendsFree: { friendId: string; id: string; name: string; avatarUrl: string; firstName: string; freeUntil: string }[];
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -143,10 +144,14 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     friendAvailability: ctx.friendAvailability, quests: ctx.quests, location: ctx.location, now,
   });
   const t3 = Date.now();
-  const friendsFree = result.friendsFree.map((f) => ({ friendId: f.friendId, firstName: f.firstName, freeUntil: f.freeUntil }));
+  // ids light the friend's pin and let the sheet offer "invite"; only friends whose free time the viewer can see
+  const friendsFree = result.friendsFree.map((f) => {
+    const p = ctx.friends.find((x) => x.profile.id === f.friendId)?.profile;
+    return { friendId: f.friendId, id: f.friendId, name: p?.name ?? f.firstName, avatarUrl: p?.avatarUrl ?? '', firstName: f.firstName, freeUntil: f.freeUntil };
+  });
   stage({
     stage: 'candidates', ms: t3 - t2, fit: result.candidates.length, checked: result.candidates.length + result.dropped.length,
-    friendsFree, dropped: result.dropped.map((d) => ({ questId: d.questId, reason: d.reason })),
+    friendsFree: friendsFree.map((f) => ({ friendId: f.friendId, firstName: f.firstName, freeUntil: f.freeUntil })), dropped: result.dropped.map((d) => ({ questId: d.questId, reason: d.reason })),
   });
 
   if (result.candidates.length === 0) {

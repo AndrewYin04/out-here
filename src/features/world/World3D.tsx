@@ -1420,7 +1420,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <MapPin size={16} aria-hidden />{arrival.text}
           </button>
         )}
-        <ArrivalSelfie key={viewer.id} quest={selfieQuest} onClose={closeSelfie} />
 
         {canWalk && selected && !walk && (
           // Phones: an open plan card covers this spot, and its own Let's go does the same.

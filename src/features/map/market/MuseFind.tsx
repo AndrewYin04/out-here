@@ -7,56 +7,150 @@ import { createPortal } from 'react-dom';
 import { ApiFetchError, apiFetch, apiPost } from '@/features/data';
 import { MuseLabel } from '@/features/outhere';
 import { Button, cn, useToast } from '@/features/ui';
-import type { MuseFind, MuseWantsResponse } from '@/shared/api';
-import type { MuseWant } from '@/shared';
-import { listingEmoji, money } from './useMarket';
+import type { MuseWantsResponse } from '@/shared/api';
+import { formatDemoTime, type MuseWant } from '@/shared';
+import { listingEmoji, money, type ShownFind } from './useMarket';
+
+/** Up to this many minutes on foot the card says "walk" (same as Muse's line). */
+const WALKABLE_MIN = 15;
 
 /** "track jacket under $25": the watch a want find matched, as the card and the sheet name it. */
 export function watchLabel(w: Pick<MuseWant, 'item' | 'maxPrice'>): string {
   return w.maxPrice !== null ? `${w.item} under ${money(w.maxPrice)}` : w.item;
 }
 
-export function MuseFindCard({ find, watch = null, onView, onDismiss }: {
-  find: MuseFind;
+/** "2 min 25 s" / "40 s". */
+function watchedFor(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m === 0 ? `${s} s` : s === 0 ? `${m} min` : `${m} min ${s} s`;
+}
+
+/** "just now" / "12 min ago" / "3 h ago" / "yesterday". */
+function ago(iso: string): string {
+  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  if (min < 24 * 60) return `${Math.round(min / 60)} h ago`;
+  return min < 48 * 60 ? 'yesterday' : `${Math.round(min / (24 * 60))} days ago`;
+}
+
+/** One step of Muse's work: a dot on the rail, its name, and what happened. */
+function Step({ tone, label, delay, children }: { tone: 'noticed' | 'checked' | 'decided'; label: string; delay: number; children: React.ReactNode }) {
+  return (
+    <li className="relative animate-step-in" style={{ animationDelay: `${delay}ms` }}>
+      <span aria-hidden className={cn('absolute -left-[23px] top-[3px] flex size-3.5 items-center justify-center rounded-full',
+        tone === 'noticed' && 'border-[3px] border-fb-blue bg-fb-surface',
+        tone === 'checked' && 'bg-[#31A24C]',
+        tone === 'decided' && 'bg-fb-blue')} />
+      <p className="text-[13px] font-extrabold leading-4 text-fb-text">{label}</p>
+      <div className="mt-1">{children}</div>
+    </li>
+  );
+}
+
+/**
+ * Muse found a listing for you. The card shows its work, in order: what Muse noticed (the watch
+ * you set, or the videos and Reels you watched), what the app checked in code (price against your
+ * budget, the walk, the pickup window, how new it is), and what Muse decided, in its own words.
+ */
+export function MuseFindCard({ find, watch = null, want = null, walkMin = null, onView, onDismiss }: {
+  find: ShownFind;
   /** The watch this find matched ("track jacket under $25"); null for a find from what you watch. */
   watch?: string | null;
+  /** That watch, for when you set it. */
+  want?: MuseWant | null;
+  /** Minutes on foot from you to the pickup spot, when known. */
+  walkMin?: number | null;
   onView: () => void;
   onDismiss: () => void;
 }) {
   const [shown, setShown] = useState(false);
   useEffect(() => { const id = window.requestAnimationFrame(() => setShown(true)); return () => window.cancelAnimationFrame(id); }, []);
+  const budget = want?.maxPrice ?? null;
+  const checks = [
+    budget !== null ? `${money(find.priceUsd)}, under your ${money(budget)}` : `${money(find.priceUsd)} from ${find.sellerFirstName}`,
+    walkMin !== null && walkMin <= WALKABLE_MIN ? `${walkMin} min walk from you` : `${find.driveMin} min drive from you`,
+    `Pickup open until ${formatDemoTime(find.pickupUntil)}`,
+    find.listedMinAgo <= 15 ? (find.listedMinAgo < 1 ? 'Listed just now' : `Listed ${find.listedMinAgo} min ago`) : null,
+  ].filter((c): c is string => !!c);
+  const viewed = find.viewed ?? [];
+  const noticed = !!watch || viewed.length > 0;
+
   return (
     <div
       role="status"
       data-testid="muse-find"
       data-source={find.source}
       className={cn(
-        'pointer-events-auto w-full max-w-[420px] rounded-card bg-fb-surface p-3 shadow-popover transition-all duration-300 motion-reduce:transition-none',
+        'pointer-events-auto w-full max-w-[440px] rounded-card bg-fb-surface p-4 shadow-popover transition-all duration-300 motion-reduce:transition-none',
         shown ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0',
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-2">
+        {find.source === 'muse' ? (
+          <>
+            <MuseLabel className="shrink-0 py-0" />
+            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-fb-text-2">found this for you</span>
+          </>
+        ) : <span className="min-w-0 flex-1 whitespace-nowrap text-[14px] font-semibold text-fb-blue">✨ Found for you</span>}
+        <button type="button" aria-label="Dismiss" onClick={onDismiss} className="-mr-1 rounded-full p-1 text-fb-text-2 hover:bg-fb-hover">
+          <X size={18} aria-hidden />
+        </button>
+      </div>
+
+      <div className="mt-2 flex items-center gap-3">
         {find.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={find.imageUrl} alt="" className="size-14 shrink-0 rounded-card object-cover" />
+          <img src={find.imageUrl} alt="" className="size-16 shrink-0 rounded-card object-cover" />
         ) : (
-          <span className="flex size-14 shrink-0 items-center justify-center rounded-card bg-fb-input text-[28px]" aria-hidden>
+          <span className="flex size-16 shrink-0 items-center justify-center rounded-card bg-fb-input text-[30px]" aria-hidden>
             {listingEmoji(find.title, '')}
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex items-center gap-2">
-            {find.source === 'muse' ? <MuseLabel className="shrink-0 py-0" /> : <span className="shrink-0 whitespace-nowrap text-[12px] font-semibold text-fb-blue">✨ Found for you</span>}
-            <span className="min-w-0 truncate text-[13px] text-fb-text-2">{find.title} · {money(find.priceUsd)}</span>
-          </div>
-          {watch && <p data-testid="muse-find-watch" className="mb-0.5 text-[13px] font-semibold leading-4 text-fb-text">Fits the watch you set: {watch}</p>}
-          <p data-testid="muse-find-line" className="text-[15px] leading-5 text-fb-text">{find.line}</p>
+          <p className="line-clamp-2 text-[16px] font-bold leading-5 text-fb-text">{find.title}</p>
+          <p className="text-[18px] font-extrabold leading-6 text-fb-text">{money(find.priceUsd)}</p>
         </div>
-        <button type="button" aria-label="Dismiss" onClick={onDismiss} className="-mr-1 -mt-1 rounded-full p-1 text-fb-text-2 hover:bg-fb-hover">
-          <X size={18} aria-hidden />
-        </button>
       </div>
-      <div className="mt-2 flex gap-2">
+
+      <ol aria-label="How Muse found it" className="relative mt-3 flex flex-col gap-3 pl-[23px]">
+        <span aria-hidden className="absolute bottom-2 left-[6px] top-2 w-0.5 bg-fb-blue-tint" />
+        {noticed && (
+          <Step tone="noticed" label="Noticed" delay={120}>
+            {watch && (
+              <p data-testid="muse-find-watch" className="text-[14px] leading-[18px] text-fb-text">
+                You asked Muse to watch for <b>{watch}</b>
+                {want && <span className="text-fb-text-2">, {ago(want.createdAt)}</span>}
+              </p>
+            )}
+            {viewed.length > 0 && (
+              <ul data-testid="muse-find-viewed" className="flex flex-col gap-1.5">
+                {viewed.map((v) => (
+                  <li key={v.key} className="flex items-center gap-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={v.posterUrl} alt="" className={cn('shrink-0 rounded-[4px] bg-fb-input object-cover', v.format === 'reel' ? 'h-11 w-[25px]' : 'h-9 w-14')} />
+                    <span className="min-w-0 text-[14px] leading-[18px]">
+                      <b className="line-clamp-1 text-fb-text">{v.title}</b>
+                      <span className="text-fb-text-2">You watched this {v.format === 'reel' ? 'Reel' : 'video'} for {watchedFor(v.seconds)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Step>
+        )}
+        <Step tone="checked" label="Checked" delay={noticed ? 420 : 120}>
+          <ul data-testid="muse-find-checks" className="flex flex-col gap-0.5 text-[14px] leading-[18px] text-fb-text">
+            {checks.map((c) => <li key={c}>{c}</li>)}
+          </ul>
+        </Step>
+        <Step tone="decided" label="Decided" delay={noticed ? 720 : 420}>
+          <p data-testid="muse-find-line" className="text-[15px] leading-5 text-fb-text">{find.line}</p>
+        </Step>
+      </ol>
+
+      <div className="mt-3 flex gap-2">
         <Button data-testid="muse-find-view" size="sm" className="flex-1" onClick={onView}>View</Button>
         <Button size="sm" variant="secondary" onClick={onDismiss}>Not now</Button>
       </div>

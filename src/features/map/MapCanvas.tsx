@@ -50,6 +50,8 @@ export type MapCanvasProps = {
   selectedId: string | null;
   viewerId: string | null;
   origin: LatLng | null;
+  /** Hide the blue "you" dot: the Friends view draws you as your avatar pin at the same spot instead. */
+  hideMe?: boolean;
   /** Server-computed walking minutes per quest; the phone framing uses the nearest plans. */
   walkMinutes: Record<ID, number> | null;
   /** Friends mode: faces of the friends who joined each quest. */
@@ -200,7 +202,7 @@ function pulse(p: Pick<PinParts, 'badge' | 'circle'>) {
 }
 
 export default function MapCanvas({
-  quests, selectedId, viewerId, origin, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
+  quests, selectedId, viewerId, origin, hideMe = false, walkMinutes, friendFaces, picks, fitTo, now, testIdFor, onSelect, onMap, onUnsupported,
   onPickLocation, draft, onDraftMove,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -513,7 +515,7 @@ export default function MapCanvas({
   // The viewer's own dot (where walking times are measured from).
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !origin) return;
+    if (!map || !origin || hideMe) return;
     const el = document.createElement('div');
     el.setAttribute('data-map-marker', 'me');
     el.setAttribute('aria-label', 'You');
@@ -522,7 +524,7 @@ export default function MapCanvas({
     const marker = new Marker({ element: el, anchor: 'center' }).setLngLat([origin.lng, origin.lat]).addTo(map);
     me.current = marker;
     return () => { marker.remove(); if (me.current === marker) me.current = null; };
-  }, [origin]);
+  }, [origin, hideMe]);
 
   // Keep the selected pin in view beside the panel (desktop) or above the sheet (phones);
   // clear the padding when the panel closes.

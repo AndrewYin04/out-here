@@ -124,10 +124,10 @@ describe('E2: meta.source says who wrote the plan', () => {
     expect(out.meta.summarySource).toBe('muse');
     expect(out.plan.summary).toBe('Dumplings with Maya fit.');
     expect(runs.every((r) => r.ok)).toBe(true);
-    // "Muse's work" steps: free friends are id (so the map can light their pin; suggestions already
-    // carry friendIds), first name and end time only: never their text, place or location
+    // Free friends: who (id, name, photo: the map lights their pin and the sheet offers invites) and until
+    // when. Never their location or their status text.
     expect(out.meta.friendsFree.map((f) => f.firstName)).toContain('Maya');
-    expect(Object.keys(out.meta.friendsFree[0]).sort()).toEqual(['firstName', 'freeUntil', 'friendId']);
+    expect(Object.keys(out.meta.friendsFree[0]).sort()).toEqual(['avatarUrl', 'firstName', 'freeUntil', 'friendId', 'id', 'name']);
   });
 
   it('is "fallback" and logs a heuristic run when the model returns invented ids', async () => {

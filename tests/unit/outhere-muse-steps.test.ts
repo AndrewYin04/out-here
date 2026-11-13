@@ -49,7 +49,10 @@ describe('museSteps', () => {
   it('nothing fits: plans and rank steps are muted', () => {
     const steps = museSteps(make({ candidateCount: 0 }, []), 'muse', NOW);
     expect(steps[2]).toMatchObject({ text: 'Checked 7 plans: 0 fit · 3 too far · 2 over budget · 1 full · 1 other', tone: 'muted' });
-    expect(steps[3]).toMatchObject({ text: 'Nothing left to rank', tone: 'muted' });
+    // a friend is free, so the draft card takes over below
+    expect(steps[3]).toMatchObject({ text: 'Nothing posted fits, so Muse drafted a plan with a free friend', tone: 'ok' });
+    const alone = museSteps(make({ candidateCount: 0, friendsFree: [] }, []), 'muse', NOW);
+    expect(alone[3]).toMatchObject({ text: 'Nothing left to rank', tone: 'muted' });
   });
 
   it('not understood: one muted step only', () => {

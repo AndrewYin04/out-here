@@ -16,6 +16,7 @@ import { FallbackList } from './FallbackList';
 import { ListingSheet } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
 import { MarketPanel, MuseFindCard, watchLabel } from './market/MuseFind';
+import { SellerRequests } from './market/SellerRequests';
 import { CAMPUS_THRIFT_POPUP, SellSheet } from './market/SellSheet';
 import { useMapListings, useMuseFinds, useMuseWants, useWatchFinds } from './market/useMarket';
 import { MapAttribution } from './MapAttribution';
@@ -263,7 +264,7 @@ export function OutHereView() {
   const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
   const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
   // A want find ("track jacket under $25") first, then a pick from what the viewer watches.
-  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings);
+  const watchFinds = useWatchFinds(ctx?.origin ?? null, listingsApi.data?.listings, listingsApi.refetch);
   const allFinds = useMemo(() => [...(findsApi.data?.finds ?? []), ...watchFinds], [findsApi.data, watchFinds]);
   const find = allFinds.find((f) => !dismissedFinds.has(f.listingId)) ?? null;
   const watchFor = useCallback((listing: string | null) => {
@@ -455,6 +456,7 @@ export function OutHereView() {
           selectedId={selectedId}
           viewerId={persona.id}
           origin={ctx?.origin ?? null}
+          hideMe={mode === 'friends'}
           walkMinutes={ctx?.walkMinutes ?? null}
           friendFaces={friendFaces}
           picks={picks}
@@ -614,7 +616,7 @@ export function OutHereView() {
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} origin={ctx?.origin ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
           {!unsupported && ctx && questsApi.data && visible.length === 0 && (
             <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
               <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">
@@ -671,6 +673,11 @@ export function OutHereView() {
             key={find.listingId}
             find={find}
             watch={watchFor(find.listingId)}
+            want={wants.find((w) => w.id === find.wantId) ?? null}
+            walkMin={(() => {
+              const at = listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location;
+              return at && ctx?.origin ? walkingMinutes(ctx.origin, at) : null;
+            })()}
             onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
             onDismiss={() => setDismissedFinds((s) => new Set([...s, find.listingId]))}
           />

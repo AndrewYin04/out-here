@@ -76,6 +76,9 @@ function plansStep(plan: PlanResponse): MuseStep {
 
 function rankStep(plan: PlanResponse, source: PlanResult['museSource']): MuseStep {
   const fit = plan.meta.candidateCount ?? plan.suggestions.length;
+  if (fit === 0 && (plan.meta.friendsFree?.length ?? 0) > 0) {
+    return { key: 'rank', text: 'Nothing posted fits, so Muse drafted a plan with a free friend', tone: 'ok' };
+  }
   if (fit === 0) return { key: 'rank', text: 'Nothing left to rank', tone: 'muted' };
   const n = plan.suggestions.length;
   const ms = plan.meta.timings?.totalMs;

@@ -7,6 +7,8 @@ import { apiFetch, apiPost, currentPersona, useApi, useViewer } from '@/features
 import { AvatarStack, Button, Card, CategoryIcon, EmptyState, Skeleton } from '@/features/ui';
 import { formatDemoTime, type CompleteQuestResponse, type MyRating, type YourPlan, type YourPlansResponse } from '@/shared';
 
+// Deep import on purpose: lets-go.ts imports nothing from memories, so this avoids an outhere<->memories barrel cycle.
+import { useLetsGo } from '@/features/outhere/lets-go';
 import { MemoryCapture } from './MemoryCapture';
 import { MemoryThumb } from './MemoryThumb';
 import { RateHangoutDialog } from './RateHangout';
@@ -86,6 +88,8 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
   const showCapture = captureQuest === quest.id;
   const [completedCrew, setCompletedCrew] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Walk there = the in-app demo walk (the same as Let's go), not Google Maps.
+  const letsGo = useLetsGo();
   const [error, setError] = useState<string | null>(null);
   const crewId = completedCrew ?? plan.crewId;
   const starts = new Date(quest.startsAt);
@@ -135,10 +139,10 @@ function PlanCard({ plan, time, viewerId, refetch, finished, captureQuest, setCa
       </p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {!finished && <>
-          <a href={`https://www.google.com/maps/dir/?${new URLSearchParams({ api: '1', destination: `${quest.location.lat},${quest.location.lng}`, travelmode: 'walking' })}`}
-            target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center gap-1.5 rounded-btn bg-fb-blue px-3 text-sm font-semibold text-white">
+          <button type="button" onClick={() => letsGo(quest.id)}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-btn bg-fb-blue px-3 text-sm font-semibold text-white">
             <Footprints size={16} aria-hidden />Walk there
-          </a>
+          </button>
           <Link href={`/out-here?quest=${quest.id}`} className="rounded-btn px-3 py-2 text-sm font-semibold text-fb-blue hover:bg-fb-blue-tint">View on map</Link>
           {quest.hostId !== viewerId && <Button variant="secondary" disabled={busy} onClick={() => change('leave')}>Leave</Button>}
           {started && <Button variant="secondary" disabled={busy} onClick={() => change('complete')}>We’re done</Button>}
