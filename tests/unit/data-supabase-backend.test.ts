@@ -21,6 +21,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 class FakeSupabase {
   tables = new Map<string, Row[]>();
   rpcDelayMs = 0;
+  selectDelayMs = 0;
   selects = 0;
   constructor() {
     const db = buildMemoryDb(NOW);
@@ -41,7 +42,8 @@ class FakeSupabase {
       update(patch: Row) { op = { kind: 'update', patch }; return b; },
       delete() { op = { kind: 'delete' }; return b; },
       then: <R,>(res: (v: { data: Row[] | null; error: null }) => R) => {
-        return Promise.resolve().then(() => {
+        const wait = op.kind === 'select' ? this.selectDelayMs : 0;
+        return sleep(wait).then(() => {
           const rows = this.tables.get(table) ?? [];
           const hit = (r: Row) => filters.every((f) => f(r));
           if (op.kind === 'select') {
@@ -156,6 +158,26 @@ describe('SupabaseBackend partial refresh (plan routes)', () => {
       const scope = newScope(false, [...live]);
       const v = await runInScope(scope, () => store.view());
       expect(v.questMemberIds(dumplings)).toContain(maya);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('a stale cache keeps serving the old snapshot while the background reload runs', async () => {
+    const { fake, store } = setup();
+    const t0 = Date.now();
+    await store.view();
+    joinMaya(fake);
+    fake.selectDelayMs = 150;
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(t0 + 20_000);
+    try {
+      expect((await store.view()).questMemberIds(dumplings)).not.toContain(maya); // starts the reload
+      const started = performance.now();
+      const second = await store.view(); // must not wait for the reload in flight
+      expect(performance.now() - started).toBeLessThan(100);
+      expect(second.questMemberIds(dumplings)).not.toContain(maya);
+      await sleep(400);
+      expect((await store.view()).questMemberIds(dumplings)).toContain(maya); // reload landed
     } finally {
       spy.mockRestore();
     }

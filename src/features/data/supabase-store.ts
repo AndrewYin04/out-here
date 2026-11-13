@@ -112,9 +112,7 @@ export class SupabaseBackend implements Backend {
       // take the last snapshot and trigger one background reload. Writes bump `gen`, which skips
       // this branch, and realtime-triggered refetches are fresh, so cross-tab updates stay exact.
       if (startedAfter === -Infinity && age < SNAPSHOT_STALE_MS) {
-        if (!this.refreshing) {
-          this.refreshing = this.loadAndCache().catch(() => undefined).finally(() => { this.refreshing = null; });
-        }
+        if (!this.refreshing) this.revalidate();
         return c.db;
       }
     }
@@ -122,6 +120,22 @@ export class SupabaseBackend implements Backend {
   }
 
   private refreshing: Promise<unknown> | null = null;
+
+  /**
+   * The background reload behind stale-while-revalidate. The finished snapshot replaces the
+   * cache only once it has loaded (and only if no write happened meanwhile), so readers keep
+   * getting the previous snapshot at once instead of waiting on the reload in flight.
+   */
+  private revalidate(): void {
+    const gen = this.gen;
+    const at = Date.now();
+    this.refreshing = this.load()
+      .then((db) => {
+        if (this.gen === gen && (!this.cache || this.cache.at < at)) this.cache = { gen, at, db: Promise.resolve(db) };
+      })
+      .catch(() => undefined)
+      .finally(() => { this.refreshing = null; });
+  }
 
   /**
    * In a route: the request's working snapshot. It is loaded once and then kept current with the
