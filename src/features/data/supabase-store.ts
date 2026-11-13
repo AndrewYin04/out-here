@@ -183,6 +183,37 @@ export class SupabaseBackend implements Backend {
     }, (db) => applyUpdate(db, table, match, patch));
   }
 
+  async updateIf<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<boolean> {
+    const scope = currentScope();
+    const name = TABLE_NAMES[table];
+    const keyCols = PRIMARY_KEYS[table].map(snake);
+    let changed = false;
+    this.gen++;
+    try {
+      if (scope) scope.queries++;
+      const q = this.client.from(name).update(toRow(table, patch as Record<string, unknown>));
+      const { data, error } = await this.applyMatch(table, q, match as Record<string, unknown>).select(keyCols.join(','));
+      fail(name, error);
+      changed = (data ?? []).length > 0;
+    } finally {
+      this.gen++;
+    }
+    if (!scope?.working) return changed;
+    const db = await scope.working;
+    if (changed) { applyUpdate(db, table, match, patch); return true; }
+    // Lost the race: read the current rows (by primary key) into the working snapshot.
+    const keyMatch = Object.fromEntries(PRIMARY_KEYS[table].map((k) => [k, (match as Record<string, unknown>)[k]]));
+    scope.queries++;
+    type Filter = { eq: (c: string, v: unknown) => Filter; in: (c: string, v: unknown[]) => Filter };
+    const sel = this.client.from(name).select('*') as unknown as Filter;
+    const cur = await (this.applyMatch(table, sel, keyMatch) as unknown as PromiseLike<{ data: unknown[] | null; error: DbError }>);
+    fail(name, cur.error);
+    const rows = ((cur.data ?? []) as Record<string, unknown>[]).map((r) => fromRow(table, r));
+    applyRemove(db, table, keyMatch as Match<T>);
+    applyInsert(db, table, rows, false);
+    return false;
+  }
+
   async remove<T extends TableKey>(table: T, match: Match<T>): Promise<void> {
     await this.write(table, () => {
       const q = this.client.from(TABLE_NAMES[table]).delete();

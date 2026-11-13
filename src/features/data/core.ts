@@ -1220,6 +1220,13 @@ export class CoreStore {
   async saveIntroProfile(row: IntroProfile): Promise<void> { await this.backend.upsert('introProfiles', [row]); }
   async insertIntro(row: Intro): Promise<void> { await this.backend.insert('intros', [row]); }
   async updateIntro(id: ID, patch: Partial<Intro>): Promise<void> { await this.backend.update('intros', { id }, patch); }
+  /**
+   * Moves an intro from status `from` to the patch only if it is still `from` (one conditional
+   * UPDATE). True for the one caller that made the change; a loser re-reads the current row.
+   */
+  async transitionIntro(id: ID, from: Intro['status'], patch: Partial<Intro>): Promise<boolean> {
+    return this.backend.updateIf('intros', { id, status: from }, patch);
+  }
   /** An 'intro' notification ("Muse has an intro for you"); the row links to /intros#<id>. */
   async notifyIntro(recipientId: ID, actorId: ID, introId: ID, text: string): Promise<void> {
     await this.notify(await this.view(), recipientId, 'intro', actorId, 'intro', introId, text);

@@ -126,13 +126,15 @@ describe('mock Click round and double opt-in', () => {
     expect(ra).not.toMatch(/Alex/);
     expect(ra).not.toContain('gig nights');                     // jordan's private looking-for
     expect(ra).not.toContain('product people about design work');
-    expect(ra).toContain("You're looking for people to go to local shows with");
+    // The seeded pair share more as a coffee chat, so that is the kind, and only coffee-chat wants are used.
+    expect(a.kind).toBe('networking');
+    expect(ra).toContain("You're looking for product/design coffee chats");
+    expect(ra).not.toContain('people to go to local shows with');   // alex's friendship want
     expect(a.summary).toMatch(/^Your agents agree Jordan/);
     expect(a.summary).toMatch(/worth going to the .* together/);
     // One fact, one mention: the summary names the kind and step, and no two reasons share a topic.
     expect(a.summary).not.toMatch(/local bands|local shows|design/);
     expect(a.reasons.filter((r) => /local (bands|shows)/.test(r))).toHaveLength(1);
-    expect(a.reasons.some((r) => r.startsWith('You both love'))).toBe(false);
     expect(a.reasons.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -171,7 +173,10 @@ describe('mock Click round and double opt-in', () => {
     expect(msgs.at(-1)!.text.startsWith('✨ Muse: ')).toBe(true);
     expect(msgs.at(-1)!.kind).toBe('muse');
     expect(msgs.at(-1)!.text).toMatch(/^✨ Muse: Alex, meet Jordan\. Jordan, meet Alex\./);
-    expect(msgs.at(-1)!.text).toMatch(/First step idea: .+ \((Starts in \d+ min|Today|Tomorrow|Happening now)[^)]*\)\.$/);
+    // Muse ends with a concrete ask the pair can answer from the intro card.
+    expect(msgs.at(-1)!.text).toMatch(/Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at .+ \((Starts in \d+ min|Today|Tomorrow|Happening now)[^)]*\)\? Tap Hold seats or Pick another time on your intro\.$/);
+    const thread = (await store.threads(alex)).find((t) => t.id === threadId)!;
+    expect(thread.name).toBe('Alex, Jordan + Muse');
     expect((await listIntros(store, alex)).intros[0].state).toBe('connected');
   });
 

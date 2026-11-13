@@ -4,7 +4,7 @@
 import contentJson from '../../../supabase/seed-content.json';
 import placesJson from '../../../supabase/seed-places.json';
 import { floorToHour, floorToMinute, now, type ID } from '@/shared';
-import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match, type TogetherVoteResult } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, rowMatches, type Backend, type Match, type TogetherVoteResult } from './backend';
 import { CoreStore } from './core';
 import { emptyDb, fromRow, TABLE_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
 import { badRequest, conflict, notFound } from './errors';
@@ -53,6 +53,13 @@ export class MemoryBackend implements Backend {
 
   async remove<T extends TableKey>(table: T, match: Match<T>): Promise<void> {
     applyRemove(this.db, table, match);
+  }
+
+  // Check and write run synchronously, so only one of two concurrent callers sees the match.
+  async updateIf<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<boolean> {
+    const hit = (this.db[table] as RowOf<T>[]).some((r) => rowMatches(r as Record<string, unknown>, match as Record<string, unknown>));
+    if (hit) applyUpdate(this.db, table, match, patch);
+    return hit;
   }
 
   // Same rules as public.join_quest. JS runs this synchronously, so it is atomic in-process.

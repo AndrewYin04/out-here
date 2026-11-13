@@ -110,6 +110,7 @@ export interface DataStore {
   saveIntroProfile: CoreStore['saveIntroProfile'];
   insertIntro: CoreStore['insertIntro'];
   updateIntro: CoreStore['updateIntro'];
+  transitionIntro: CoreStore['transitionIntro'];
   removeIntros: CoreStore['removeIntros'];
   notifyIntro: CoreStore['notifyIntro'];
 }
