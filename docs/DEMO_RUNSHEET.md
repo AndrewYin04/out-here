@@ -11,7 +11,7 @@ One page for stage and rehearsals. Story: Alex and Maya both have a free 45 minu
    - Laptop A (projected): `<preview>/out-here?as=alex&view=map`
    - Laptop B or phone: `<preview>/out-here?as=maya&view=map`
    - Seller (a teammate, as Nina): `<preview>/out-here?as=nina&mode=explore&view=map`. Keep the jacket form ready: store icon → **Sell for pickup** → *Vintage track jacket*, $20, Clothing, a pickup spot, pin dropped right by Bobalicious Corner.
-   - Alex's jacket watch: on laptop A, store icon → type *track jacket under $25* → save. Do this before the reset only if the reset keeps it; otherwise right after.
+   - Alex's jacket watch: **after** the reset (reset clears watches people added), on laptop A: store icon → type *track jacket under $25* → save.
    - Load each page once and wait for the map, so the first request is warm.
 
 ## The run (5 minutes)
@@ -24,7 +24,7 @@ One page for stage and rehearsals. Story: Alex and Maya both have a free 45 minu
 | 1:10 | B | The invite arrives → **Accept**. | |
 | 1:30 | A | **Up next** → **Let's go**. Give the 3D walk 3 to 5 s. | |
 | 1:40 | Seller | While both avatars walk: post the prefilled jacket. | |
-| 1:50 | A | Within seconds a **✨ Muse** card appears on Alex's screen: "That $20 vintage track jacket was just listed. It's a 2-minute walk…" → **View** → **Reserve for pickup** → arrival time → **Send request**. (Seen live in the rehearsal: the card pops up during the 3D walk.) | "I asked Muse to watch for a track jacket under $25." |
+| 1:50 | A | Within seconds a **✨ Muse** card appears on Alex's screen: "That $20 vintage track jacket was just listed. It's an N-minute walk…" → **View** → **Reserve for pickup** → arrival time → **Send request**. (Seen live in the rehearsal: the card pops up during the 3D walk.) | "I asked Muse to watch for a track jacket under $25." |
 | 2:30 | Seller | Open the jacket → **Accept**. | |
 | 2:40 | A | Pause on **Held for you · N min left**. | |
 | 3:10 | A | Arrival → group selfie → save. | |
@@ -58,6 +58,6 @@ One page for stage and rehearsals. Story: Alex and Maya both have a free 45 minu
 | Marketplace pickup on the map (deleted by the #75 merge) | `fix/restore-map-marketplace` (Alex) | ⏳ needs a PR |
 | Reset also clears Marketplace, Memories, ratings, messages | `feat/reset-everything` (Alex) | ⏳ needs a PR |
 | Muse answer cache and warm-up | #76 (Andrew), migration 0009 | ✅ merged; the stage ask is added to the warm-up in `feat/reset-everything` |
-| Muse finds say "a 2-minute walk", not "a 1-minute drive" | `fix/restore-map-marketplace` (Alex) | ⏳ needs a PR |
+| Muse finds say "an N-minute walk" when walkable, not "a 1-minute drive" | `fix/restore-map-marketplace` (Alex) | ⏳ needs a PR |
 | Story seed: Maya's status "free after class · down for boba" (optional: the jacket and Alex's watch are posted live) | seed (Andrew) | ⏳ |
 | Demo database reseeded (`npm run seed:demo`) | Andrew's laptop, around 6 to 7 AM | ⏳ |
