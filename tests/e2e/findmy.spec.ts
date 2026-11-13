@@ -206,6 +206,9 @@ test.describe('quest pins stay tappable under friends', () => {
     try {
       expect((await put({ precision: 'approximate' })).ok()).toBe(true);
       await openMap(page, 'alex', 390);
+      // This checks friend pins and chips against quest pins. up-next.spec (parallel project) can
+      // give Alex an upcoming plan, and its Up Next card then sits over the pin; hide that card.
+      await page.addStyleTag({ content: '[data-testid="up-next"]{display:none !important}' });
       const pin = page.getByTestId('quest-pin-dumplings');
       await expect(pin).toBeVisible();
       await page.waitForTimeout(1500);
