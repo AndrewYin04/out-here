@@ -2,7 +2,7 @@
 
 The demo is Fri Nov 13, 10:30 AM PT: 5 minutes on stage, then 3 minutes of Q&A. This file is the plan for those 5 minutes. Any task that does not move one of the 11 scenes below waits until after the demo.
 
-Status was checked against `origin/main` on Thu Nov 12 (after PRs #10, #39, #42 and #43 merged). Update a scene's status line when your work changes it.
+Status was checked against `origin/main` on Thu Nov 12 (after PRs #10, #39, #42 and #43 merged). Muse Intros and Messenger are on `overnight` and reach main with #17. Update a scene's status line when your work changes it.
 
 ## The story
 
@@ -73,7 +73,7 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 - **The judge sees:** Muse vets candidates while he watches the reasoning: shared interests, past hangouts, who wants to meet new people. Muse offers 2 or 3 choices, each with a one-line why.
 - **✨ Muse:** this is the AI centerpiece. Agents vet each other, private hangout ratings count as signal, and every reason comes from real data.
 - **Status:** partly built.
-- **Exists on main:** Muse Intros with agent vetting, the score bar and the trust path; "who's free when you are" and plan together (PR #39). Private hang-again answers are in review (#18).
+- **Exists:** on main, "who's free when you are" and plan together (PR #39). On `overnight` only, until #17 merges it to main: Muse Intros with agent vetting, the score bar and the trust path. Private hang-again answers are in review (#18).
 - **Needs:** an intro anchored to this plan ("find me someone to go to this with"), and the choices shown in the 3D Muse panel.
 - **Owners:** Alex (matching), Andrew's agent (intros), Rishab (the plan).
 
@@ -83,7 +83,7 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 - **The judge sees:** a notification arrives on laptop B. Muse gives Jordan a rundown of Alex and why they would get along. Jordan says yes.
 - **✨ Muse:** double opt-in. Nothing is shared until both say yes.
 - **Status:** partly built.
-- **Exists on main:** the intro notification, the intro card and Accept, live on both screens in about 2 seconds.
+- **Exists on `overnight` (main gets it with #17):** the intro notification, the intro card and Accept, live on both screens in about 2 seconds.
 - **Needs:** the rundown and the Yes button in Jordan's Muse panel on the 3D map.
 - **Owners:** Alex (what Muse says), Alan (panel).
 
