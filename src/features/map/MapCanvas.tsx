@@ -9,7 +9,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 setWorkerUrl(new URL('maplibre-gl/dist/maplibre-gl-worker.mjs', import.meta.url).href);
 import { useEffect, useRef, useState } from 'react';
 import type { ID, LatLng, Quest } from '@/shared';
-import { bump, dropIn, squash } from '@/features/ui';
+import { CATEGORY_STYLE, bump, categorySvg, dropIn, markSvg, squash } from '@/features/ui';
 import { cluster, overlaps, shortTitle, type Box } from './cluster';
 import { isSoon, pinTime, seatBadge, seatsLeftOf } from './format';
 import type { FriendFace } from './types';
@@ -43,7 +43,7 @@ const LONG_PRESS_MS = 550;
 const LONG_PRESS_SLOP_PX = 10;
 /** Pop-up text bubbles show from this zoom (and always on the selected pin). */
 const BUBBLE_ZOOM = 16;
-const VIS_GLYPH: Record<string, string> = { group: '👥', open: '🤝', friends: '🔒' };
+const VIS_GLYPH: Record<string, string> = { group: markSvg('users', 11, '#65676B'), open: markSvg('handshake', 11, '#65676B'), friends: markSvg('lock', 11, '#65676B') };
 
 export type MapCanvasProps = {
   quests: Quest[];
@@ -66,8 +66,8 @@ export type MapCanvasProps = {
   onUnsupported: () => void;
   /** Long-press (touch) or right-click on the map: drop a new plan's pin there. */
   onPickLocation?: (at: LatLng) => void;
-  /** The plan being created: a draggable pin with its emoji. */
-  draft?: { at: LatLng; emoji: string } | null;
+  /** The plan being created: a draggable pin with its category's icon. */
+  draft?: { at: LatLng; category: string } | null;
   onDraftMove?: (at: LatLng) => void;
 };
 
@@ -103,8 +103,9 @@ function buildPin(q: Quest, testId: string): PinParts {
   button.style.cssText = `position:absolute;width:${PIN}px;height:${PIN + 8}px;left:${-PIN / 2}px;top:${-PIN / 2}px;padding:0;border:0;background:transparent;cursor:pointer;`;
 
   const circle = document.createElement('span');
-  circle.style.cssText = `display:flex;align-items:center;justify-content:center;width:${PIN}px;height:${PIN}px;border-radius:9999px;background:#fff;font-size:22px;line-height:1;transition:box-shadow .15s, transform .15s;`;
-  circle.textContent = q.emoji;
+  circle.style.cssText = `display:flex;align-items:center;justify-content:center;width:${PIN}px;height:${PIN}px;border-radius:9999px;background:${(CATEGORY_STYLE[q.category] ?? CATEGORY_STYLE.other).bg};line-height:1;transition:box-shadow .15s, transform .15s;`;
+  // The plan's category as a line icon on its tint (Facebook-style), not its emoji.
+  circle.innerHTML = categorySvg(q.category, 22);
 
   const badge = document.createElement('span');
   badge.style.cssText = 'position:absolute;left:50%;top:30px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 6px;font:700 11px/14px var(--font-sans);border:2px solid #fff;color:#fff;';
@@ -123,23 +124,23 @@ function buildPin(q: Quest, testId: string): PinParts {
   more.setAttribute('data-role', 'cluster');
   more.style.cssText = 'position:absolute;left:4px;top:-34px;min-width:24px;height:24px;padding:0 6px;border-radius:9999px;border:0;background:#fff;color:#080809;font:700 12px/24px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:pointer;display:none;';
 
-  // "✨ Muse pick" tag, attached only while this quest is in the plan on screen.
+  // "Muse pick" tag, attached only while this quest is in the plan on screen.
   const pick = document.createElement('span');
   pick.setAttribute('data-testid', 'muse-pick');
   pick.setAttribute('aria-hidden', 'true');
-  pick.textContent = '✨ Muse pick';
-  pick.style.cssText = 'position:absolute;left:50%;top:-22px;transform:translateX(-50%);white-space:nowrap;border-radius:9999px;padding:1px 7px;background:#0866FF;color:#fff;font:700 11px/16px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;';
+  pick.innerHTML = `${markSvg('sparkles', 11, '#fff')}<span>Muse pick</span>`;
+  pick.style.cssText = 'position:absolute;left:50%;top:-22px;transform:translateX(-50%);display:inline-flex;align-items:center;gap:3px;white-space:nowrap;border-radius:9999px;padding:1px 7px;background:#0866FF;color:#fff;font:700 11px/16px var(--font-sans);box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none;';
 
   // The plan's pop-up text bubble, above the pin (shown when zoomed in or selected; see layout).
   const bubble = document.createElement('span');
   bubble.setAttribute('data-role', 'pin-bubble');
   bubble.style.cssText = 'position:absolute;left:50%;bottom:46px;transform:translateX(-50%);display:none;max-width:180px;width:max-content;white-space:normal;text-align:center;border-radius:12px;padding:4px 8px;background:#fff;color:#080809;font:600 12px/15px var(--font-sans);box-shadow:0 1px 4px rgba(0,0,0,.3);pointer-events:none;';
 
-  // Who can see it, for plans that are not Community: 👥 Group, 🤝 friends of friends, 🔒 invite only.
+  // Who can see it, for plans that are not Community: a Group, friends of friends, or invite only.
   const vis = document.createElement('span');
   vis.setAttribute('aria-hidden', 'true');
   vis.setAttribute('data-role', 'pin-visibility');
-  vis.style.cssText = 'position:absolute;left:28px;top:-6px;display:none;width:18px;height:18px;border-radius:9999px;background:#fff;font-size:10px;line-height:18px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.3);pointer-events:none;';
+  vis.style.cssText = 'position:absolute;left:28px;top:-6px;display:none;width:18px;height:18px;border-radius:9999px;background:#fff;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.3);pointer-events:none;';
 
   button.append(circle, badge, label, faces, vis);
   root.append(bubble, button, more);
@@ -173,8 +174,8 @@ function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: Fri
   p.root.toggleAttribute('data-mine', mine);
   p.bubble.textContent = q.bubbleText ?? '';
   const glyph = VIS_GLYPH[q.visibility ?? 'community'];
-  p.vis.textContent = glyph ?? '';
-  p.vis.style.display = glyph ? 'block' : 'none';
+  p.vis.innerHTML = glyph ?? '';
+  p.vis.style.display = glyph ? 'flex' : 'none';
   const who = faces.length ? `, ${faces.map((f) => f.name.split(' ')[0]).join(' and ')} going` : '';
   p.button.setAttribute('aria-label', `${mine ? 'You’re going: ' : ''}${picked ? 'Muse pick: ' : ''}${q.title}, ${time === 'Now' ? 'happening now' : `starts ${time}`}, ${seatText}${who}`);
   p.button.setAttribute('aria-pressed', selected ? 'true' : 'false');
@@ -485,7 +486,7 @@ export default function MapCanvas({
     el.setAttribute('data-map-marker', 'draft');
     el.setAttribute('aria-label', 'New plan pin. Drag to move');
     el.setAttribute('role', 'img');
-    el.style.cssText = 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:9999px;background:#fff;font-size:26px;line-height:1;cursor:grab;box-shadow:0 0 0 3px #0866FF,0 4px 10px rgba(0,0,0,.35);';
+    el.style.cssText = 'display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:9999px;background:#fff;line-height:1;cursor:grab;box-shadow:0 0 0 3px #0866FF,0 4px 10px rgba(0,0,0,.35);';
     const marker = new Marker({ element: el, anchor: 'center', draggable: true }).setLngLat([0, 0]).addTo(map);
     marker.on('dragend', () => {
       const ll = marker.getLngLat();
@@ -497,16 +498,18 @@ export default function MapCanvas({
   useEffect(() => {
     const d = draftMarker.current;
     if (!d || !draft) return;
-    d.el.textContent = draft.emoji || '📍';
+    d.el.innerHTML = categorySvg(draft.category, 26);
+    d.el.dataset.category = draft.category;
+    d.el.style.background = (CATEGORY_STYLE[draft.category as keyof typeof CATEGORY_STYLE] ?? CATEGORY_STYLE.other).bg;
     const cur = d.marker.getLngLat();
     if (Math.abs(cur.lat - draft.at.lat) > 1e-7 || Math.abs(cur.lng - draft.at.lng) > 1e-7) {
       d.marker.setLngLat([draft.at.lng, draft.at.lat]);
       const map = mapRef.current;
       if (map && !map.getBounds().contains([draft.at.lng, draft.at.lat])) map.easeTo({ center: [draft.at.lng, draft.at.lat], duration: 400 });
     }
-    // draft is read through draftKey and its emoji.
+    // draft is read through draftKey and its category.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey, draft?.emoji, hasDraft]);
+  }, [draftKey, draft?.category, hasDraft]);
 
   // The viewer's own dot (where walking times are measured from).
   useEffect(() => {

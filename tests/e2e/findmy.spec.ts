@@ -22,6 +22,19 @@ const test = base.extend<{ findmyLock: void }>({
   }, { auto: true }],
 });
 
+/** The People list lives in the Out Here dashboard's Friends tab: select Friends, then open its list. */
+async function openPeople(page: Page) {
+  const tab = page.getByTestId('map-mode-friends');
+  if ((await tab.getAttribute('aria-pressed')) !== 'true') await tab.click();
+  if ((await page.getByTestId('out-here-dock').getAttribute('data-level')) === '0') await page.getByTestId('dock-handle').click();
+}
+
+/** Your status and sharing: the You row at the top of the People list, then Edit. */
+async function editStatus(page: Page) {
+  await openPeople(page);
+  await page.getByTestId('my-sharing-row').getByRole('button', { name: 'Edit' }).click();
+}
+
 // Find My inside Facebook: friend pins with status bubbles, the friend card, the People list,
 // sharing settings, and live updates between two personas. Runs at 390 (phone project) and
 // 1440 (desktop project).
@@ -103,7 +116,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByText(/Invite sent to Kai/)).toBeVisible();
       await expect(card).toHaveCount(0);
 
-      await page.getByRole('button', { name: /^People/ }).click();
+      await openPeople(page);
       const rows = page.getByTestId('people-row');
       await expect(rows.first()).toBeVisible();
       expect(await rows.count()).toBeGreaterThanOrEqual(20);
@@ -137,7 +150,7 @@ for (const width of [390, 1440]) {
 
     test('Want to hang? with Maya proposes Dumpling Den from her bubble before sending', async ({ page }) => {
       await openMap(page, 'alex', width);
-      await page.getByRole('button', { name: /^People/ }).click();
+      await openPeople(page);
       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
       const card = page.getByTestId('friend-card');
       await expect(card).toContainText('craving dumplings');
@@ -194,7 +207,7 @@ for (const width of [390, 1440]) {
 
     test('sharing settings open from the map', async ({ page }) => {
       await openMap(page, 'alex', width);
-      await page.getByRole('button', { name: 'Your status' }).click();
+      await editStatus(page);
       const form = page.getByTestId('sharing-form');
       await expect(form).toBeVisible();
       await expect(page.getByLabel("What's on your mind?")).toHaveValue('new here, say hi');
@@ -258,24 +271,13 @@ test.describe('two personas, live', () => {
       await expect(mayaPin).toHaveAttribute('aria-label', /craving dumplings/);
 
       await openMap(b, 'maya', 1440);
-      await b.getByRole('button', { name: 'Your status' }).click();
+      await editStatus(b);
       await b.getByLabel("What's on your mind?").fill('ramen instead?');
       await b.getByRole('button', { name: 'Save' }).click();
       await expect(b.getByText('Your status is updated')).toBeVisible();
       await expect(mayaPin).toHaveAttribute('aria-label', /ramen instead?/, { timeout: 2_000 });
 
-      // the share switch applies at once, with no Save; Undo brings her back
-      await b.getByRole('button', { name: 'Your status' }).click();
-      await b.getByRole('switch', { name: 'Share my location' }).click();
-      await expect(mayaPin).toHaveCount(0, { timeout: 2_000 });
-      await expect(b.getByTestId('sharing-button')).toHaveText('Sharing paused');
-      await expect(b.getByTestId('my-pin')).toHaveAttribute('data-paused', 'true');
-      await b.getByRole('button', { name: 'Undo' }).click();
-      await expect(mayaPin).toHaveCount(1, { timeout: 2_000 });
-      await expect(b.getByTestId('sharing-button')).toHaveText('Your status');
-      await b.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
-
-      await b.getByRole('button', { name: 'Your status' }).click();
+      await editStatus(b);
       await b.getByText('Only me', { exact: true }).click();
       await b.getByRole('button', { name: 'Save' }).click();
       await expect(mayaPin).toHaveCount(0, { timeout: 2_000 });

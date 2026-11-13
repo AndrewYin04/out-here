@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Images, Search, Sparkles, Star } from 'lucide-react';
+import { ArrowLeft, Images, Search, Sparkles, Star } from 'lucide-react';
 import type { Crew, HangoutRating, Memory, PersonCard, Quest } from '@/shared';
+
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, LinkButton, Skeleton } from '@/features/ui';
@@ -39,6 +40,8 @@ function MemoriesView({ handle }: { handle: string | null }) {
   const [refresh, setRefresh] = useState(0);
   const [ratings, setRatings] = useState<Map<string, HangoutRating>>(new Map());
   const [rateQuest, setRateQuest] = useState<{ questId: string; crewId: string | null } | null>(null);
+    useEffect(()=>{const saved=()=>setRefresh(n=>n+1);window.addEventListener('outhere:memory-saved',saved);return()=>window.removeEventListener('outhere:memory-saved',saved);},[]);
+
   useChannel([`user:${viewer.id}`], (_channel, payload) => {
     if (payload.type === 'memory' || payload.type === 'rating' || payload.resync) setRefresh((value) => value + 1);
   });
@@ -104,9 +107,16 @@ function MemoriesView({ handle }: { handle: string | null }) {
 
   return (
     <div className="mx-auto w-full max-w-[680px] px-0 pb-6 md:px-4 md:pt-4">
-      <div className="px-4 py-3 md:px-0">
-        <h1 className="text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
-        <p className="mt-1 text-[15px] text-fb-text-2">Crews from your Out Here hangouts, their albums, and the next plan.</p>
+      <div className="flex items-center gap-2 px-2 py-3 md:px-0">
+        {/* Memories is part of Out Here: the way back is the map, whichever way you came in. */}
+        <Link href="/out-here" aria-label="Back to the map" title="Back to the map" data-testid="memories-back"
+          className="flex size-10 shrink-0 items-center justify-center rounded-full text-fb-text hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue">
+          <ArrowLeft size={22} aria-hidden />
+        </Link>
+        <div className="min-w-0">
+          <h1 className="text-[24px] font-bold leading-[30px] text-fb-text">Memories</h1>
+          <p className="text-[15px] text-fb-text-2">Your crews, their albums, and the next plan.</p>
+        </div>
       </div>
       {error && <Card padded className="text-fb-text-2" role="alert">Could not load memories: {error}</Card>}
       {!error && crews === null && (
@@ -263,8 +273,8 @@ function CrewCard({ crew, handle, rating, onRate }: {
 
         {result && (
           <div className="mt-3 rounded-card border border-fb-divider bg-fb-bg p-3" data-testid="regroup-suggestion">
-            <p className="text-[12px] font-semibold text-fb-blue">
-              ✨ Muse{result.mock && <span className="ml-1 font-normal text-fb-text-2">(offline)</span>}
+            <p className="inline-flex items-center gap-1 text-[12px] font-semibold text-fb-blue">
+              <Sparkles size={12} aria-hidden />Muse{result.mock && <span className="ml-1 font-normal text-fb-text-2">(offline)</span>}
             </p>
             <p className="mt-1 text-[15px] font-semibold text-fb-text">{result.suggestion.title}</p>
             <p className="text-[13px] text-fb-text-2">{result.suggestion.whenText}</p>

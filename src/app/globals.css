@@ -70,6 +70,28 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Out Here map: the marker under the pointer (or keyboard focus) comes to the front, so its
+   label is never covered. On the Friends map, plan labels show only on hover or focus too. */
+.maplibregl-marker:has(:hover), .maplibregl-marker:has(:focus-visible) { z-index: 30 !important; } /* beats the markers' inline z-index */
+[data-mode="friends"] .oh-quest-pin [data-role="pin-label"] { visibility: hidden; }
+[data-mode="friends"] .oh-quest-pin:hover [data-role="pin-label"],
+[data-mode="friends"] .oh-quest-pin:focus-visible [data-role="pin-label"] { visibility: visible; }
+
+/* The 3D loading screen: Jolly bobs while thinking, and the bubble's dots pulse. */
+@keyframes oh-jolly-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes oh-think-dot {
+  0%, 80%, 100% { opacity: .25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* The Out Here dashboard's selected tab: its label fades in while the pill widens. */
+@keyframes oh-tab-label {
+  0%, 30% { opacity: 0; }
+  100% { opacity: 1; }
+}
 @keyframes oh-sheet-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }

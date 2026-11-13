@@ -17,6 +17,10 @@ import { candidatesFor, introProfileOf } from '@/features/intros/server/rules';
 import { privacyGuard, privateTexts } from '@/features/intros/server/privacy';
 import { listIntros, requestIntro, respondIntro, runIntroRound } from '@/features/intros/server/service';
 
+/** A user message can carry image parts since the 3D merge; these prompts are text only. */
+const textOf = (c: string | { type: string; text?: string }[]): string =>
+  typeof c === 'string' ? c : c.map((p) => p.text ?? '').join(" ");
+
 const alex = profileId('alex');
 const jordan = profileId('jordan');
 const saved = { ...process.env };
@@ -67,7 +71,7 @@ function fakeMuse(opts: {
     calls.n++;
     const err = opts.failWhen?.(req, calls.n);
     if (err) throw err;
-    const content = req.messages.at(-1)!.content;
+    const content = textOf(req.messages.at(-1)!.content);
     if (req.schemaName === 'intro_judge') {
       const factsA = numberedLines(content, 'factsForA');
       const factsB = numberedLines(content, 'factsForB');
@@ -147,7 +151,7 @@ describe('timeouts and retries (live Muse, fake transport)', () => {
   it('one candidate that always fails never sinks the round', async () => {
     live();
     // Every call that is not about Jordan times out, twice (so the retry fails too).
-    fakeMuse({ failWhen: (req) => (req.messages.at(-1)!.content.includes('Jordan') ? null : new MuseTimeoutError(8000)) });
+    fakeMuse({ failWhen: (req) => (textOf(req.messages.at(-1)!.content).includes('Jordan') ? null : new MuseTimeoutError(8000)) });
     const r = await runIntroRound(createMemoryStore(), alex);
     expect(r.intro?.other.handle).toBe('jordan');
     expect(r.considered).toBe(1);

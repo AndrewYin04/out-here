@@ -11,6 +11,7 @@ import {
 } from '../../shared/seed/story';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
 import { SEED_INTRO_PROFILES } from '../../shared/seed/intros';
+import { ALEX_WATCH_HISTORY } from '../../shared/seed/videos';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -121,7 +122,7 @@ export const TABLE_ORDER = [
   'hangout_ratings', 'hang_again', 'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
   'intro_profiles', 'intros',
-  'listing_holds', 'muse_wants',
+  'listing_holds', 'muse_wants', 'watch_events',
 ] as const;
 
 const DEFAULT_VISIBILITY: Partial<Record<ProfileField, Audience>> = {
@@ -610,6 +611,16 @@ export function buildSeed(
       id: seedId('want', 'alex-desk-chair'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
       keywords: ALEX_WANT.keywords, max_price: ALEX_WANT.maxPrice, max_drive_min: ALEX_WANT.maxDriveMin,
       active: true, created_at: iso(addMin(demoNow, -26 * 60)),
+    });
+  }
+
+  // Watch history: what Alex watched this week (Muse picks Marketplace items from it).
+  if (has('alex')) {
+    ALEX_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
+      t.watch_events.push({
+        id: seedId('watch', `alex-${i}-${key}`), user_id: pid('alex'), video_key: key, seconds,
+        created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
+      });
     });
   }
 

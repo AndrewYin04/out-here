@@ -10,7 +10,7 @@ const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width &
 const questPins = (page: Page) => page.locator('[data-map-marker="quest"]');
 
 async function openMap(page: Page, extra = '') {
-  await page.goto(`/out-here?as=alex${extra}`);
+  await page.goto(`/out-here?as=alex${extra.includes('mode=') ? '' : '&mode=explore'}${extra}`);
   await expect(page.getByTestId('out-here-map')).toBeVisible();
   await expect.poll(() => questPins(page).count(), { timeout: 20_000 }).toBeGreaterThan(5);
 }
@@ -91,7 +91,7 @@ test.describe('Muse filter', () => {
   });
 
   test('Maya: the filter never empties her map', async ({ page }) => {
-    await page.goto('/out-here?as=maya');
+    await page.goto('/out-here?as=maya&mode=explore');
     await expect.poll(() => questPins(page).count(), { timeout: 20_000 }).toBeGreaterThan(3);
     await page.getByTestId('muse-filter-toggle').click();
     const status = page.getByTestId('muse-filter-status');

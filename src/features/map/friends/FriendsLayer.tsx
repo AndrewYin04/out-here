@@ -386,17 +386,7 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       )}>
         <Avatar src={pin.friend.avatarUrl} name={pin.friend.name} size={36} decorative />
       </span>
-      {free.kind !== 'busy' && (
-        <span
-          data-testid="friend-free"
-          className={cn(
-            '-mt-1.5 whitespace-nowrap rounded-full px-1.5 text-[11px] font-semibold leading-4 shadow-card',
-            free.kind === 'free' ? 'bg-fb-green text-white' : 'bg-white text-fb-text-2',
-          )}
-        >
-          {freeStatusLabel(free).replace(/^Free/, 'free')}
-        </span>
-      )}
+      {/* "Free till …" lives in the friend's card; on the map the green ring says they're free. */}
     </button>
   );
 }

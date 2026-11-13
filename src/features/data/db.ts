@@ -4,6 +4,7 @@ import type {
   Audience, Availability, Comment, DailyEntry, DailyQuest, Event, EventRsvp, FriendList, Friendship,
   Group, GroupMember, ID, Invite, Listing, Memory, Message, Notification, Place, Post, Profile,
   Quest, Reaction, Reel, Story, Thread, Crew, LocationShare, Intro, IntroProfile, HangoutRating, HangAgain, TogetherPlan, MuseWant,
+  WatchEvent,
 } from '@/shared';
 
 export type QuestRow = Omit<Quest, 'memberIds'>;
@@ -70,6 +71,7 @@ export type Db = {
   togetherPlans: TogetherRow[];
   listingHolds: ListingHoldRow[];
   museWants: MuseWant[];
+  watchEvents: WatchEvent[];
 };
 export type TableKey = keyof Db;
 export type RowOf<T extends TableKey> = Db[T][number];
@@ -87,6 +89,7 @@ export const TABLE_NAMES: Record<TableKey, string> = {
   listings: 'listings', reels: 'reels', locationShares: 'location_shares', togetherPlans: 'together_plans',
   introProfiles: 'intro_profiles', intros: 'intros',
   hangoutRatings: 'hangout_ratings', hangAgain: 'hang_again', listingHolds: 'listing_holds', museWants: 'muse_wants',
+  watchEvents: 'watch_events',
 };
 export const TABLE_KEYS = Object.keys(TABLE_NAMES) as TableKey[];
 
@@ -102,11 +105,11 @@ export const PRIMARY_KEYS: Record<TableKey, string[]> = {
   introProfiles: ['userId'], intros: ['id'],
   // hangout_ratings' key is id, but (quest_id, rater_id) is unique and is what an upsert replaces.
   hangoutRatings: ['questId', 'raterId'], hangAgain: ['questId', 'raterId', 'subjectId'],
-  listingHolds: ['id'], museWants: ['id'],
+  listingHolds: ['id'], museWants: ['id'], watchEvents: ['id'],
 };
 
 /** Tables from later migrations (0003 and up): they read as empty until the migration is applied. */
-export const OPTIONAL_TABLES = new Set<TableKey>(['introProfiles', 'intros', 'togetherPlans', 'questCheckins', 'questReports', 'hangoutRatings', 'hangAgain', 'listingHolds', 'museWants']);
+export const OPTIONAL_TABLES = new Set<TableKey>(['introProfiles', 'intros', 'togetherPlans', 'questCheckins', 'questReports', 'hangoutRatings', 'hangAgain', 'listingHolds', 'museWants', 'watchEvents']);
 
 export function emptyDb(): Db {
   return Object.fromEntries(TABLE_KEYS.map((k) => [k, []])) as unknown as Db;

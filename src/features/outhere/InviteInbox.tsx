@@ -21,13 +21,6 @@ function useSheetOpen(): boolean {
   return open;
 }
 
-/** The title without its leading emoji when the card already shows the quest's emoji ("🥟 Dumplings" -> "Dumplings"). */
-function titleWithoutEmoji(title: string, emoji: string | null | undefined): string {
-  const t = title.trim();
-  if (!emoji) return t;
-  return t.replace(/^\p{Extended_Pictographic}[\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0f]*\s*/u, '') || t;
-}
-
 /** Invites older than this are left to Notifications and Messenger. */
 const RECENT_MS = 3 * 60 * 60_000;
 
@@ -89,7 +82,7 @@ export function InviteInbox() {
     try {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
         `/api/invites/${inv.id}/respond`, { status });
-      if (status === 'accepted' && out.quest) celebrateJoin(from, out.quest.id, viewer.avatarUrl, out.quest.emoji ?? '✨');
+      if (status === 'accepted' && out.quest) celebrateJoin(from, out.quest.id, viewer.avatarUrl);
       const who = inv.from?.name.split(' ')[0] ?? 'your friend';
       const result = status === 'declined'
         ? 'Declined.'
@@ -154,7 +147,7 @@ function InviteCard({ inv, onRespond, onDismiss }: {
         <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={40} />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] leading-5 text-fb-text">
-            <span className="font-semibold">{from} invited you:</span> {q?.emoji ? `${q.emoji} ` : ''}{titleWithoutEmoji(inv.suggestionTitle, q?.emoji)}
+            <span className="font-semibold">{from} invited you:</span> {inv.suggestionTitle.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '')}
           </p>
           {inv.message && <p className="mt-1 line-clamp-3 text-[13px] text-fb-text-2">“{inv.message}”</p>}
           {q && (

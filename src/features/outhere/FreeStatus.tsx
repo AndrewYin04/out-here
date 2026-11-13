@@ -273,7 +273,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
         {!expanded && (
           <button type="button" onClick={() => plan(lead)} disabled={starting} data-testid="free-see-plans"
             className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
-            {starting ? '✨ Asking…' : 'See plans'}
+            {starting ? 'Asking…' : 'See plans'}
           </button>
         )}
         <button type="button" aria-label="Hide" onClick={dismiss}
@@ -323,7 +323,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
           <div className="border-t border-fb-divider-soft p-2.5">
             <button type="button" disabled={chosen.length === 0 || starting} onClick={() => plan(chosen)} data-testid="free-make-plan"
               className="h-10 w-full rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-50">
-              {starting ? '✨ Muse is asking everyone…' : chosen.length === 0 ? 'Pick who to plan with' : `See plans with ${names(chosen.map((c) => first(c.friend.name)))}`}
+              {starting ? 'Muse is asking everyone…' : chosen.length === 0 ? 'Pick who to plan with' : `See plans with ${names(chosen.map((c) => first(c.friend.name)))}`}
             </button>
           </div>
         </div>
@@ -344,13 +344,13 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
   const starter = plan.members.find((m) => m.id === plan.startedBy);
   const confirmed = plan.status === 'confirmed' ? plan.options.find((o) => o.questId === plan.confirmedQuestId) : null;
   const title = confirmed
-    ? `It’s a plan: ${confirmed.emoji} ${confirmed.title}`
+    ? `It’s a plan: ${confirmed.title}`
     : plan.startedBy !== viewerId && !iVoted && starter
       ? `${first(starter.name)} started a plan for you ${others.length === 1 ? 'two' : 'all'}`
       : iVoted ? `Waiting on ${who}…` : `Your plan with ${who}`;
   const sub = confirmed
     ? `With ${who} · ${confirmed.venueName} · ${formatDemoTime(confirmed.startsAt)}`
-    : `✨ Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
+    : `Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
   return (
     <div role="region" aria-label="Your shared plan" data-testid="shared-banner"
       className={cn('flex animate-drop-in items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>

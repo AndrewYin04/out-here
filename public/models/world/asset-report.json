@@ -1,0 +1,42 @@
+[
+  {
+    "source": "kenney_city-kit-roads.zip",
+    "asset": "light-curved",
+    "sha256": "154dcce9d58ec2cd165e26c91a89c97bdd2838cf06d255099b3570df84f82ec6",
+    "sourceDimensionsBlenderZUp": [
+      0.05000000074505806,
+      0.22500000894069672,
+      0.6749999523162842
+    ],
+    "runtimeHeight": 1,
+    "runtimeDimensions": [
+      0.07407408041064513,
+      1,
+      0.3333333618479031
+    ],
+    "vertices": 156,
+    "triangles": 92,
+    "bytes": 8704,
+    "file": "streetlight-v1.glb"
+  },
+  {
+    "source": "kenney_city-kit-suburban_20.zip",
+    "asset": "tree-large",
+    "sha256": "16d1f95c149bc727a953a473cf20bf21de9bf1a88747c4f9d2eeb4ac7d43e291",
+    "sourceDimensionsBlenderZUp": [
+      0.21044418215751648,
+      0.24299998581409454,
+      0.7669999599456787
+    ],
+    "runtimeHeight": 1,
+    "runtimeDimensions": [
+      0.27437313317776546,
+      1,
+      0.31681877249550905
+    ],
+    "vertices": 80,
+    "triangles": 42,
+    "bytes": 5048,
+    "file": "evergreen-v1.glb"
+  }
+]
