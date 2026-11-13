@@ -801,8 +801,13 @@ export class CoreStore {
     return row;
   }
 
-  /** The group's open shared plan (viewer + friendIds), or null. */
-  async openTogether(viewerId: ID, friendIds: ID[]): Promise<TogetherView | null> {
+  /**
+   * The group's open shared plan (viewer + friendIds), or null. `fresh` re-reads the plans table
+   * first, so a plan another member created during this request is found (Supabase snapshots
+   * are loaded once per request).
+   */
+  async openTogether(viewerId: ID, friendIds: ID[], opts: { fresh?: boolean } = {}): Promise<TogetherView | null> {
+    if (opts.fresh) await this.backend.reload('togetherPlans');
     const v = await this.view();
     const key = [...new Set([viewerId, ...friendIds])].sort().join(',');
     const t = iso();
@@ -820,7 +825,7 @@ export class CoreStore {
     const memberIds = [...new Set([viewerId, ...body.friendIds])].sort();
     if (memberIds.length < 2) throw badRequest('pick at least one friend');
     for (const id of memberIds) if (id !== viewerId && !v.areFriends(viewerId, id)) throw badRequest('everyone must be your friend');
-    const existing = await this.openTogether(viewerId, body.friendIds);
+    const existing = await this.openTogether(viewerId, body.friendIds, { fresh: true });
     if (existing) return existing;
     const row: TogetherRow = {
       id: uuid(), memberKey: memberIds.join(','), memberIds, startedBy: viewerId,
@@ -830,7 +835,7 @@ export class CoreStore {
     try {
       await this.backend.insert('togetherPlans', [row]);
     } catch (e) {
-      const theirs = await this.openTogether(viewerId, body.friendIds);
+      const theirs = await this.openTogether(viewerId, body.friendIds, { fresh: true });
       if (theirs) return theirs;
       throw e;
     }
@@ -856,34 +861,29 @@ export class CoreStore {
   }
 
   /**
-   * "I'm in" (or not) on one option. When every member is in on the same option, the plan
-   * locks: everyone joins that quest (atomic join; a full quest marks the option and keeps
-   * proposing) and all members get the update.
+   * "I'm in" (or not) on one option. The backend does the vote and, when every member is in on
+   * one option, the seat check and the whole group's join in one transaction (vote_together):
+   * two people tapping at once never lose a vote, and a group is never split by the last seat.
    */
   async voteTogether(viewerId: ID, id: ID, questId: ID, isIn: boolean): Promise<TogetherView> {
     const v = await this.view();
     const row = this.togetherRow(v, viewerId, id);
     if (row.status !== 'proposing' || row.expiresAt <= iso()) return this.togetherView(v, viewerId, row);
-    if (!row.options.some((o) => o.questId === questId)) throw badRequest('not an option in this plan');
-    const mine = new Set(row.votes[viewerId] ?? []);
-    if (isIn) mine.add(questId); else mine.delete(questId);
-    const votes = { ...row.votes, [viewerId]: [...mine] };
-    let patch: Partial<TogetherRow> = { votes };
-    const agreed = row.options.find((o) => row.memberIds.every((m) => (votes[m] ?? []).includes(o.questId)));
-    if (agreed) {
-      try {
-        for (const m of row.memberIds) {
-          if (!(await this.view()).questMemberIds(agreed.questId).includes(m)) await this.joinQuest(m, agreed.questId);
+    const before = row.options.some((o) => o.questId === questId) ? v.questMemberIds(questId) : [];
+    const r = await this.backend.voteTogether(id, viewerId, questId, isIn);
+    const after = await this.view();
+    if (r.status === 'confirmed' && r.questId) {
+      const q = after.questById.get(r.questId);
+      const memberIds = after.questMemberIds(r.questId);
+      await publish(`quest:${r.questId}`, { seatsLeft: r.seatsLeft ?? 0, memberCount: memberIds.length });
+      for (const m of row.memberIds) {
+        await publish(`user:${m}`, { type: 'quest', id: r.questId });
+        if (q && r.questId === questId && !before.includes(m)) {
+          await this.notify(after, q.hostId, 'quest_join', m, 'quest', r.questId, `${firstName(after.profileById.get(m))} joined ${q.title}.`);
         }
-        patch = { votes, status: 'confirmed', confirmedQuestId: agreed.questId };
-      } catch {
-        // full (or gone): drop the option so nobody keeps waiting on it
-        patch = { votes, options: row.options.map((o) => (o.questId === agreed.questId ? { ...o, seatsLeft: 0 } : o)) };
       }
     }
-    await this.backend.update('togetherPlans', { id }, patch);
-    const after = await this.view();
-    const updated = after.db.togetherPlans.find((p) => p.id === id)!;
+    const updated = after.db.togetherPlans.find((p) => p.id === id) ?? row;
     await publish(`together:${id}`, { status: updated.status });
     for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
     return this.togetherView(after, viewerId, updated);

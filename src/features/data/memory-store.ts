@@ -4,10 +4,10 @@
 import contentJson from '../../../supabase/seed-content.json';
 import placesJson from '../../../supabase/seed-places.json';
 import { floorToHour, floorToMinute, now, type ID } from '@/shared';
-import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match, type TogetherVoteResult } from './backend';
 import { CoreStore } from './core';
 import { emptyDb, fromRow, TABLE_KEYS, TABLE_NAMES, type Db, type RowOf, type TableKey } from './db';
-import { conflict, notFound } from './errors';
+import { badRequest, conflict, notFound } from './errors';
 import { buildSeed, PlacesZ, SeedContentZ } from './seed-build';
 
 /** Builds a fresh Db from the committed seed content, with times relative to `at`. */
@@ -86,6 +86,43 @@ export class MemoryBackend implements Backend {
       this.db.quests = this.db.quests.map((x) => (x.id === questId ? { ...x, status: 'open' } : x));
     }
     return Math.max(q.capacity - count, 0);
+  }
+
+  async reload(): Promise<void> { /* the in-process tables are always current */ }
+
+  // Same rules as public.vote_together. No await between reading and writing, so two votes
+  // in this process are applied one after the other and the group joins all-or-nothing.
+  async voteTogether(planId: ID, userId: ID, questId: ID, isIn: boolean): Promise<TogetherVoteResult> {
+    const p = this.db.togetherPlans.find((x) => x.id === planId);
+    if (!p || !p.memberIds.includes(userId)) throw notFound('plan_not_found');
+    const at = now().toISOString();
+    if (p.status !== 'proposing' || p.expiresAt <= at) {
+      return { status: p.status === 'proposing' ? 'expired' : p.status, questId: p.confirmedQuestId, seatsLeft: null };
+    }
+    if (!p.options.some((o) => o.questId === questId)) throw badRequest('not_an_option');
+    const mine = (p.votes[userId] ?? []).filter((q) => q !== questId);
+    if (isIn) mine.push(questId);
+    const votes = { ...p.votes, [userId]: mine };
+    const setPlan = (patch: Partial<typeof p>) => {
+      this.db.togetherPlans = this.db.togetherPlans.map((x) => (x.id === planId ? { ...x, ...patch } : x));
+    };
+    setPlan({ votes });
+    const agreed = p.options.find((o) => o.seatsLeft > 0 && p.memberIds.every((m) => (votes[m] ?? []).includes(o.questId)));
+    if (!agreed) return { status: 'proposing', questId: null, seatsLeft: null };
+    const q = this.db.quests.find((x) => x.id === agreed.questId);
+    const members = this.db.questMembers.filter((m) => m.questId === agreed.questId);
+    const joining = p.memberIds.filter((m) => !members.some((x) => x.userId === m));
+    if (!q || q.status === 'done' || members.length + joining.length > q.capacity) {
+      setPlan({ votes, options: p.options.map((o) => (o.questId === agreed.questId ? { ...o, seatsLeft: 0 } : o)) });
+      return { status: 'proposing', questId: agreed.questId, seatsLeft: q ? Math.max(q.capacity - members.length, 0) : 0 };
+    }
+    this.db.questMembers = [...this.db.questMembers, ...joining.map((userId) => ({ questId: q.id, userId, joinedAt: at, viaFriendId: null }))];
+    const count = members.length + joining.length;
+    if (count >= q.capacity && q.status === 'open') {
+      this.db.quests = this.db.quests.map((x) => (x.id === q.id ? { ...x, status: 'full' } : x));
+    }
+    setPlan({ votes, status: 'confirmed', confirmedQuestId: q.id });
+    return { status: 'confirmed', questId: q.id, seatsLeft: q.capacity - count };
   }
 
   async uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string> {

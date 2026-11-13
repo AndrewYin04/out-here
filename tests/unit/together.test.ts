@@ -48,6 +48,40 @@ describe('plan together', () => {
     expect(quest.members.map((p) => p.id)).toEqual(expect.arrayContaining([alex, maya]));
   });
 
+  it('two people tapping "I\'m in" at the same moment: no vote is lost, and it locks (review blocker 1)', async () => {
+    const a = await create(alex, maya);
+    await Promise.all([
+      store.voteTogether(alex, a.id, dumplings, true),
+      store.voteTogether(maya, a.id, dumplings, true),
+    ]);
+    const after = await store.together(alex, a.id);
+    expect(after.votes[alex]).toEqual([dumplings]);
+    expect(after.votes[maya]).toEqual([dumplings]);
+    expect(after.status).toBe('confirmed');
+    const quest = await store.quest(alex, dumplings);
+    expect(quest.members.map((p) => p.id)).toEqual(expect.arrayContaining([alex, maya]));
+  });
+
+  it('one seat left for two people: nobody joins, the option shows full, the plan stays open (review blocker 2)', async () => {
+    const a = await create(alex, maya);
+    const v = await store.view();
+    const left = (await store.quest(alex, dumplings)).seatsLeft;
+    const others = v.db.profiles.filter((p) => ![alex, maya].includes(p.id) && !v.questMemberIds(dumplings).includes(p.id));
+    for (const p of others.slice(0, left - 1)) await store.joinQuest(p.id, dumplings);
+    expect((await store.quest(alex, dumplings)).seatsLeft).toBe(1);
+    await Promise.all([
+      store.voteTogether(alex, a.id, dumplings, true),
+      store.voteTogether(maya, a.id, dumplings, true),
+    ]);
+    const after = await store.together(alex, a.id);
+    expect(after.status).toBe('proposing');
+    expect(after.options.find((o) => o.questId === dumplings)!.seatsLeft).toBe(0);
+    const members = (await store.quest(alex, dumplings)).members.map((p) => p.id);
+    expect(members).not.toContain(alex);
+    expect(members).not.toContain(maya);
+    expect((await store.quest(alex, dumplings)).seatsLeft).toBe(1);
+  });
+
   it('taking back "I\'m in" keeps it open', async () => {
     const a = await create(alex, maya);
     await store.voteTogether(alex, a.id, dumplings, true);

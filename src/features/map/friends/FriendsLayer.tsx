@@ -272,7 +272,7 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       {chip !== 'none' && (
         <span
           className={cn(
-            'absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            'pointer-events-none absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
             side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
           style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}

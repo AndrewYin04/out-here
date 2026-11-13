@@ -5,11 +5,11 @@
 // share an 800 ms cache. Seats only move through the join_quest/leave_quest RPCs.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ID } from '@/shared';
-import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match } from './backend';
+import { applyInsert, applyRemove, applyUpdate, applyUpsert, type Backend, type Match, type TogetherVoteResult } from './backend';
 import { CoreStore } from './core';
 import { emptyDb, fromRow, OPTIONAL_TABLES, PRIMARY_KEYS, TABLE_KEYS, TABLE_NAMES, toRow, type Db, type RowOf, type TableKey } from './db';
 import type { SupabaseEnv } from './env';
-import { conflict, HttpError, notFound } from './errors';
+import { badRequest, conflict, HttpError, notFound } from './errors';
 import { currentScope } from './request-scope';
 
 const PAGE = 1000;
@@ -225,6 +225,57 @@ export class SupabaseBackend implements Backend {
 
   async leaveQuest(questId: ID, userId: ID): Promise<number> {
     return this.seatRpc('leave_quest', { p_quest: questId, p_user: userId }, questId);
+  }
+
+  /** Re-reads one table into this request's working snapshot (e.g. a row another request just inserted). */
+  async reload(table: TableKey): Promise<void> {
+    const scope = currentScope();
+    if (!scope?.working) return;
+    const rows = await this.loadTable(table);
+    const db = await scope.working;
+    (db[table] as unknown[]) = rows;
+  }
+
+  /** public.vote_together (0006), then the plan and the quest it touched are read back into the working snapshot. */
+  async voteTogether(planId: ID, userId: ID, questId: ID, isIn: boolean): Promise<TogetherVoteResult> {
+    const scope = currentScope();
+    this.gen++;
+    let result: TogetherVoteResult;
+    try {
+      if (scope) scope.queries++;
+      const { data, error } = await this.client.rpc('vote_together', { p_plan: planId, p_user: userId, p_quest: questId, p_in: isIn });
+      if (error) {
+        const m = error.message ?? '';
+        if (m.includes('plan_not_found')) throw notFound('plan_not_found');
+        if (m.includes('not_an_option')) throw badRequest('not_an_option');
+        this.rpcError(error);
+      }
+      const row = (Array.isArray(data) ? data[0] : data) as { out_status: TogetherVoteResult['status']; out_quest: string | null; out_seats: number | null } | undefined;
+      result = { status: row?.out_status ?? 'proposing', questId: row?.out_quest ?? null, seatsLeft: row?.out_seats ?? null };
+    } finally {
+      this.gen++;
+    }
+    if (scope?.working) {
+      scope.queries += result.questId ? 3 : 1;
+      const [pl, q, m] = await Promise.all([
+        this.client.from(TABLE_NAMES.togetherPlans).select('*').eq('id', planId),
+        result.questId ? this.client.from(TABLE_NAMES.quests).select('*').eq('id', result.questId) : Promise.resolve({ data: null, error: null }),
+        result.questId ? this.client.from(TABLE_NAMES.questMembers).select('*').eq('quest_id', result.questId) : Promise.resolve({ data: null, error: null }),
+      ]);
+      fail(TABLE_NAMES.togetherPlans, pl.error);
+      const db = await scope.working;
+      const plans = ((pl.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('togetherPlans', r));
+      db.togetherPlans = [...db.togetherPlans.filter((x) => x.id !== planId), ...plans];
+      if (result.questId) {
+        fail(TABLE_NAMES.quests, q.error);
+        fail(TABLE_NAMES.questMembers, m.error);
+        const quests = ((q.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('quests', r));
+        const members = ((m.data ?? []) as Record<string, unknown>[]).map((r) => fromRow('questMembers', r));
+        db.quests = [...db.quests.filter((x) => x.id !== result.questId), ...quests];
+        db.questMembers = [...db.questMembers.filter((x) => x.questId !== result.questId), ...members];
+      }
+    }
+    return result;
   }
 
   async uploadFile(bucket: 'uploads' | 'memories' | 'crew-photos', path: string, bytes: Uint8Array, contentType: string): Promise<string> {
