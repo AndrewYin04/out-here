@@ -6,6 +6,10 @@ The 5-minute slot is 1:00 of intro, this 3:00 demo, and a 1:00 close and buffer.
 
 ### Who drives what
 
+**Production:** https://out-here-three.vercel.app (demo database, live Muse; main 0fc43a0, promoted 8:27 AM PT Fri).
+
+**Opening hours are real on production.** Bobalicious Corner opens at 10:00 AM, so before 10:00 Muse answers "no place fits" on production. Rehearse before 10:00 on a preview (previews ignore opening hours); at 11:15 production works.
+
 | Screen | Persona | URL (production, or the verified preview) | Size |
 |---|---|---|---|
 | Laptop A, projected | Alex (demo driver) | `/out-here?as=alex` | 1440 x 900 |
@@ -21,6 +25,7 @@ Each tab keeps its own persona (`?as=` is stored per tab), so all three can be t
 3. Warm Muse's cache from Andrew's laptop: `npm run warm:demo -- --base https://<production or preview URL>`. Its first step is the exact stage ask below, then it resets again.
 4. Open the three tabs above and reload each once after the reset. Check on Alex's map that Maya's avatar has a green ring and that Up next shows nothing.
 5. Close every other tab. Turn off notifications on the presenting laptop.
+6. **Grant camera access** for the site in Chrome on the laptop that takes the beat 4 photo (address bar → site settings → Camera → Allow). Otherwise the permission prompt shows on the projector and, after 3.5 s, the app shoots a sample image instead of you two.
 
 What must be on screen at 0:00: Alex's Out Here map (Friends tab), Maya's phone on her Out Here map, Leo's laptop on the open pop-up sheet.
 
@@ -61,7 +66,7 @@ What must be on screen at 0:00: Alex's Out Here map (Friends tab), Maya's phone 
 | | |
 |---|---|
 | Screen | Alex, then Maya |
-| Click | Alex: close the jacket's sheet (X), tap **Let's go** on Up next (the walk resumes in 3D and arrives in about 10 s). When "You made it" opens, tap **Take a photo together** (or **Choose a photo**), then **Save to crew album**, then **Ask Muse for a caption** → **Use suggested caption** → **Save caption**. Then Maya's phone: Menu → **Memories**. |
+| Click | Alex: close the jacket's sheet (X), tap **Let's go** on Up next (the walk resumes in 3D and arrives in about 10 s). "You made it" opens full screen: tap **Take the photo**, then the round shutter (the camera also counts 3-2-1 by itself). The print saves to the album at once ("Saved to your memories"); Muse's caption appears on it a few seconds later ("Muse is looking at your photo…" first, about 7 s). Tap **Done**. Then Menu → **Memories** on both screens (on Alex's laptop, scroll once to show **Get this group together again**; it answers in about 4 s). |
 | Type | nothing |
 | Say | "They made it. One fit check, the jacket and the drinks, saved to their shared album. Muse writes the caption, and offers to get the group together again." |
 | Audience sees | The photo in the shared album on both screens, the ✨ Muse caption on it, and "Get this group together again". |
@@ -77,6 +82,9 @@ Say: "Forty-five minutes, one sentence to Muse, a friend, a find, and a memory. 
 - **No Muse card about the jacket or the bag (beat 3):** the team's fallback. On Alex, switch the dashboard to Explore, tap the jacket's pin, and run **Reserve for pickup** on it as a single listing. Say Muse's reason yourself.
 - **The walking view stalls or renders blank:** tap the **3D** button to return to the map and continue there; the plan, the pop-up and the photo all work on the flat map.
 - **The photo prompt does not open on arrival:** tap **Take a photo together** on Up next, or open the plan's pin and tap **Add a moment**.
+- **No caption on the print:** the photo is still in the album; say the caption yourself and move on.
+- **Maya's denim-bag card does not appear within about 20 s:** on Maya's phone tap Explore, tap the $15 pin, and say "Muse matched it to the Reel she saved."
+- **Walk there** (Your plans) now starts the same in-app 3D walk as **Let's go**; it no longer opens Google Maps.
 - **The find card covers the walk:** tapping **View** on a Muse card leaves the 3D walk for the map. That is expected; beat 4 starts with **Let's go** on Up next, which resumes the walk.
 - **Leo's tab shows no request after Alex sends it:** Leo taps the $20 pin (Explore) to open its sheet; the request is there with Accept.
 - **Invite does not arrive on Maya's phone within 3 s:** pull down or reload Maya's tab; the invite is in Out Here and in Notifications.
