@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { body, IdZ, route } from '@/lib/api';
+import { body, IdZ, LIVE_TABLES, route } from '@/lib/api';
 
 const VoteZ = z.object({ questId: IdZ, in: z.boolean() });
 
@@ -7,4 +7,4 @@ const VoteZ = z.object({ questId: IdZ, in: z.boolean() });
 export const POST = route<{ id: string }>(async ({ store, viewer, params, req }) => {
   const b = await body(req, VoteZ);
   return { plan: await store.voteTogether(viewer.id, params.id, b.questId, b.in) };
-});
+}, { refresh: LIVE_TABLES });
