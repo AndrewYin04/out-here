@@ -130,6 +130,46 @@ describe('SupabaseBackend snapshot cache (E2)', () => {
   });
 });
 
+describe('SupabaseBackend partial refresh (plan routes)', () => {
+  const live = ['availability', 'quests', 'questMembers', 'togetherPlans', 'locationShares'] as const;
+  const joinMaya = (fake: FakeSupabase) =>
+    fake.tables.get('quest_members')!.push({ quest_id: dumplings, user_id: maya, joined_at: NOW.toISOString(), via_friend_id: null });
+
+  it('reuses the warm snapshot but re-reads the live tables', async () => {
+    const { fake, store } = setup();
+    await store.view();
+    joinMaya(fake); // another instance commits a join
+    const scope = newScope(false, [...live]);
+    const v = await runInScope(scope, () => store.view());
+    expect(v.questMemberIds(dumplings)).toContain(maya);
+    expect(scope.loads).toBe(0);
+    expect(scope.queries).toBe(live.length);
+  });
+
+  it('still re-reads them when the cache is past its TTL and a background reload starts', async () => {
+    const { fake, store } = setup();
+    const t0 = Date.now();
+    await store.view();
+    joinMaya(fake);
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(t0 + 20_000); // stale, inside the stale window
+    try {
+      const scope = newScope(false, [...live]);
+      const v = await runInScope(scope, () => store.view());
+      expect(v.questMemberIds(dumplings)).toContain(maya);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('a cold cache loads once and skips the extra re-read', async () => {
+    const { store } = setup();
+    const scope = newScope(false, [...live]);
+    await runInScope(scope, () => store.view());
+    expect(scope.loads).toBe(1);
+    expect(scope.queries).toBe(TABLE_KEYS.length);
+  });
+});
+
 describe('SupabaseBackend request cost (E3)', () => {
   it('createInvite + respondInvite each load the tables once, and their Broadcasts go out in one call', async () => {
     vi.stubEnv('OUTHERE_STORE', '');

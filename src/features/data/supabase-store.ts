@@ -126,13 +126,27 @@ export class SupabaseBackend implements Backend {
   /**
    * In a route: the request's working snapshot. It is loaded once and then kept current with the
    * request's own writes. A fresh request only takes a load that began after it arrived (so it
-   * sees every write committed before it was sent); other requests may take any cached load.
+   * sees every write committed before it was sent); other requests may take any cached load,
+   * then re-read the tables in scope.refresh.
    * Outside a route: the shared cache.
    */
   async snapshot(): Promise<Db> {
     const scope = currentScope();
     if (!scope) return { ...(await this.shared()) };
-    scope.working ??= this.shared(scope.fresh ? scope.since : -Infinity).then((db) => ({ ...db }));
+    if (!scope.working) {
+      const base = this.shared(scope.fresh ? scope.since : -Infinity);
+      // A load this request started itself is already current (a stale-while-revalidate
+      // background reload does not count: `base` is then the older snapshot).
+      const ownLoad = this.cache?.db === base && this.cache.at >= scope.since;
+      scope.working = base.then(async (cached) => {
+        const db = { ...cached };
+        if (!scope.fresh && !ownLoad && scope.refresh.length > 0) {
+          const rows = await Promise.all(scope.refresh.map((k) => this.loadTable(k)));
+          scope.refresh.forEach((k, i) => { (db[k] as unknown[]) = rows[i]; });
+        }
+        return db;
+      });
+    }
     return { ...(await scope.working) };
   }
 
