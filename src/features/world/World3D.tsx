@@ -7,6 +7,7 @@
 // GPS. Neither writes a position to the server; Find My keeps doing location sharing.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import { ArrivalSelfie } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
@@ -655,6 +656,34 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const t = window.setTimeout(() => setArrival(null), 5000);
     return () => window.clearTimeout(t);
   }, [arrival]);
+  // Arriving at a plan you joined opens the selfie (#47), once per plan in this visit.
+  // A snapshot, not a live lookup: saving the photo completes the plan, which drops it from the map.
+  const [selfieQuest, setSelfieQuest] = useState<Quest | null>(null);
+  const selfieShown = useRef(new Set<string>());
+  useEffect(() => {
+    if (!arrival || selfieShown.current.has(arrival.id)) return;
+    const q = questsRef.current.find((x) => x.id === arrival.id);
+    if (!q?.memberIds.includes(viewer.id)) return;
+    selfieShown.current.add(q.id);
+    setSelfieQuest(q);
+  }, [arrival, viewer.id]);
+  // Closed while early: the selfie comes back when the plan starts, if you're still there.
+  const selfieWaiting = useRef<Quest | null>(null);
+  const closeSelfie = useCallback(() => {
+    setSelfieQuest((q) => {
+      selfieWaiting.current = q && new Date(q.startsAt).getTime() > Date.now() ? q : null;
+      return null;
+    });
+  }, []);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const q = selfieWaiting.current;
+      if (!q || new Date(q.startsAt).getTime() > Date.now()) return;
+      selfieWaiting.current = null;
+      if (haversineMeters(pos.current, q.location) <= ARRIVE_METERS * 3) setSelfieQuest(q);
+    }, 5000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);
@@ -748,11 +777,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <button type="button" onClick={() => setWalk(null)} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
           </div>
         )}
-        {arrival && !walk && (
+        {arrival && !walk && !selfieQuest && (
           <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
             📍 {arrival.text}
           </div>
         )}
+        <ArrivalSelfie quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
             🚶 Walk there · {selectedMin} min
