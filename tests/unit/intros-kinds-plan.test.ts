@@ -86,7 +86,7 @@ describe('P1: scrubbed reasons are real sentences', () => {
       }
     }
     expect(made).toBeGreaterThanOrEqual(4);
-  });
+  }, 20_000); // 1.6 s alone; 18 fresh stores, slow under a full parallel run
 
   it('guard unit: a leaking reason becomes the kind\'s template, or is dropped when nothing is shared', () => {
     const viewer = { interests: ['vinyl'], bio: '', job: null } as never;
