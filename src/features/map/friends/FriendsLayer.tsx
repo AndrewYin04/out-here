@@ -305,7 +305,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, qu
       {layout.singles.map(({ pin, offset, chip, side, dx, over }) => (
         // A must-show chip lying over a quest label draws above the quest markers (z 6) so it stays readable.
         <MapMarker key={pin.friend.id} map={map} lib={lib} at={pin.location} offset={offset} z={over ? 7 : openId === pin.friend.id ? 5 : 3}>
-          <FriendPinView pin={pin} chip={chip} side={side} dx={dx} onOpen={() => openFromPin(pin)} />
+          <FriendPinView pin={pin} chip={chip} side={side} dx={dx} over={over} onOpen={() => openFromPin(pin)} />
         </MapMarker>
       ))}
       {layout.clusters.map((g) => (
@@ -339,7 +339,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null, qu
   );
 }
 
-function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: ChipMode; side: ChipSide; dx: number; onOpen: () => void }) {
+function FriendPinView({ pin, chip, side, dx, over = false, onOpen }: { pin: FriendPin; chip: ChipMode; side: ChipSide; dx: number; over?: boolean; onOpen: () => void }) {
   const b = pin.bubble;
   const text = chipText(pin);
   const shown = thoughtFor(b.thought, chip);
@@ -359,8 +359,10 @@ function FriendPinView({ pin, chip, side, dx, onOpen }: { pin: FriendPin; chip: 
       {chip !== 'none' && (
         <span
           className={cn(
-            // The chip opens the card like the avatar; the layout never places one over a quest pin.
+            // The chip opens the card like the avatar. A must-show chip with no clear spot lies over a
+            // quest pin or label; it stays readable but lets taps through, so the quest pin still opens.
             'absolute left-1/2 flex w-max flex-col items-center rounded-[12px] bg-white px-2 py-1 text-center shadow-popover',
+            over && 'pointer-events-none',
             side === 'above' ? 'bottom-full mb-1' : 'top-full mt-1',
           )}
           style={{ maxWidth: CHIP_WRAP_W, transform: `translateX(calc(-50% + ${dx}px))` }}
