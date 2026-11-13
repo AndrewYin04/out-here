@@ -66,9 +66,10 @@ describe('buildCandidates: "hungry, got like 40 min, under $15"', () => {
     expect(d.friendOverlap[0].sharedWithQuest).toContain('dumplings');
   });
 
-  it('counts the boba quest as food-compatible (snack/drinks tags)', () => {
+  it('counts the boba quest as food-compatible (snack/drinks tags); it starts after the window', () => {
     const r = run(intent(40));
-    expect(r.candidates.map((c) => c.questId)).toContain(qid('boba'));
+    expect(r.candidates.map((c) => c.questId)).not.toContain(qid('boba'));
+    expect(r.dropped.find((d) => d.questId === qid('boba'))?.reason).toBe('window');
     const boba = ctx.quests.find((q) => q.id === qid('boba'))!;
     expect(boba.category).toBe('art');
     expect(isFoodCompatible(boba)).toBe(true);
@@ -82,11 +83,11 @@ describe('buildCandidates: "hungry, got like 40 min, under $15"', () => {
 });
 
 describe('buildCandidates: "hungry, 15 min"', () => {
-  it('leaves only the boba quest; dumplings start after the window', () => {
+  it('leaves nothing: dumplings and the afternoon boba quest start after the window', () => {
     const r = run(intent(15, { budgetMax: null }));
-    expect(r.candidates.map((c) => c.questId)).toEqual([qid('boba')]);
+    expect(r.candidates.map((c) => c.questId)).toEqual([]);
     expect(r.dropped.find((d) => d.questId === qid('dumplings'))?.reason).toBe('window');
-    expect(r.candidates[0].travelMinutes).toBe(4);
+    expect(r.dropped.find((d) => d.questId === qid('boba'))?.reason).toBe('window');
   });
 });
 

@@ -935,6 +935,36 @@ export class CoreStore {
     if (fresh.availability.length) await this.backend.insert('availability', fresh.availability);
     if (fresh.invites.length) await this.backend.insert('invites', fresh.invites);
     if (fresh.locationShares.length) await this.backend.upsert('locationShares', fresh.locationShares);
+    // "45 Minutes to Thrift": the pop-up back to a draft, no holds, the seeded watch and Reels, and
+    // nothing left over from a rehearsal (its album photos, crew, ratings and notifications).
+    const notSeeded = <K extends 'listings' | 'museWants' | 'watchEvents' | 'memories' | 'crews' | 'notifications' | 'messages'>(k: K) => {
+      const keep = new Set((fresh[k] as { id: string }[]).map((r) => r.id));
+      return (db[k] as { id: string }[]).filter((r) => !keep.has(r.id)).map((r) => r.id);
+    };
+    if (db.listingHolds.length) await this.backend.remove('listingHolds', { id: ids(db.listingHolds, (h) => h.id) });
+    const extraListings = notSeeded('listings');
+    if (extraListings.length) await this.backend.remove('listings', { id: extraListings });
+    if (fresh.listings.length) await this.backend.upsert('listings', fresh.listings);
+    const extraWants = notSeeded('museWants');
+    if (extraWants.length) await this.backend.remove('museWants', { id: extraWants });
+    if (fresh.museWants.length) await this.backend.upsert('museWants', fresh.museWants);
+    const extraWatch = notSeeded('watchEvents');
+    if (extraWatch.length) await this.backend.remove('watchEvents', { id: extraWatch });
+    if (fresh.watchEvents.length) await this.backend.upsert('watchEvents', fresh.watchEvents);
+    const extraMemories = notSeeded('memories');
+    if (extraMemories.length) await this.backend.remove('memories', { id: extraMemories });
+    const extraCrews = notSeeded('crews');
+    if (extraCrews.length) {
+      await this.backend.remove('crewMembers', { crewId: extraCrews });
+      await this.backend.remove('crews', { id: extraCrews });
+    }
+    const seededQuests = new Set(fresh.quests.map((q) => q.id));
+    const extraRatings = db.hangoutRatings.filter((r) => !seededQuests.has(r.questId)).map((r) => r.questId);
+    if (extraRatings.length) await this.backend.remove('hangoutRatings', { questId: [...new Set(extraRatings)] });
+    const extraNotes = notSeeded('notifications');
+    if (extraNotes.length) await this.backend.remove('notifications', { id: extraNotes });
+    const extraMessages = notSeeded('messages');
+    if (extraMessages.length) await this.backend.remove('messages', { id: extraMessages });
     await publish('demo:reset', { at: iso() });
     return { quests: fresh.quests.length, members: fresh.questMembers.length };
   }

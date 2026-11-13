@@ -60,7 +60,8 @@ export const DEMO_QUESTS: QuestSpec[] = [
   {
     key: 'boba', title: 'Boba + sketching', emoji: '🧋', category: 'art',
     description: 'Bring a pen, grab a boba, draw whatever is on the table. No skill needed.',
-    placeName: 'Bobalicious Corner', startsInMin: 10, durationMin: 60, capacity: 6, memberCount: 3,
+    // Afternoon, so nothing posted fits "45 minutes, boba": Muse drafts boba for Alex and Maya.
+    placeName: 'Bobalicious Corner', startsInMin: 150, durationMin: 60, capacity: 6, memberCount: 3,
     priceMax: 7, tags: ['boba', 'drinks', 'snack', 'sketching'], groupSlug: 'boba-and-sketch',
     preferredMembers: ['nina'],
   },
@@ -173,13 +174,18 @@ export type AvailabilitySpec = {
   endsInMin: number;
   /** Where they are: a place name from seed-places.json, or null for their home. */
   nearPlace: string | null;
+  /** Optional offset from nearPlace. */
+  offsetM?: number;
+  bearingDeg?: number;
 };
 
 export const DEMO_AVAILABILITY: AvailabilitySpec[] = [
-  { handle: 'maya', text: 'on a long lunch break, free for the next 45 min', startsInMin: 0, endsInMin: 50, nearPlace: 'El Camino Coffee Works' },
+  // "45 Minutes to Thrift": Maya is free after class and down for boba, a short walk from Alex.
+  { handle: 'maya', text: 'Free after class · down for boba', startsInMin: 0, endsInMin: 90, nearPlace: 'Bobalicious Corner', offsetM: 520, bearingDeg: 160 },
   { handle: null, friendSlot: 0, text: 'down for boba or a walk later', startsInMin: 60, endsInMin: 180, nearPlace: 'Gallery 1600' },
   { handle: null, friendSlot: 1, text: 'board games tonight?', startsInMin: 150, endsInMin: 300, nearPlace: 'Ravenswood Board Game Cafe' },
-  { handle: null, friendSlot: 2, text: 'working from the coffee place, can take a food break', startsInMin: -30, endsInMin: 90, nearPlace: 'El Camino Coffee Works' },
+  // Starts after Alex's 45 minutes, so Maya is the one friend free with him.
+  { handle: null, friendSlot: 2, text: 'working from the coffee place, can take a food break', startsInMin: 120, endsInMin: 220, nearPlace: 'El Camino Coffee Works' },
 ];
 
 export type PastHangoutSpec = {
