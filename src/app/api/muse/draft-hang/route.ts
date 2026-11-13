@@ -32,9 +32,9 @@ export const POST = route(async ({ store, viewer, req }) => {
   const b = await body(req, BodyZ);
   const at = b.now ? new Date(b.now) : demoNow();
   const free = await store.freeWithMe(viewer.id);
-  const item = b.friendId ? free.items.find((i) => i.friend.id === b.friendId) : free.items[0];
-  if (!item) return { draft: null, friend: null, others: [], reason: 'no_friend_free' };
-  const others = free.items.filter((i) => i.friend.id !== item.friend.id).slice(0, 3).map((i) => i.friend);
+  // A friend the viewer picked, or every free friend in order (the first one whose window still fits wins).
+  const tryFriends = b.friendId ? free.items.filter((i) => i.friend.id === b.friendId) : free.items;
+  if (tryFriends.length === 0) return { draft: null, friend: null, others: [], reason: 'no_friend_free' };
 
   const { db } = await store.museContext();
   const t = at.toISOString();
@@ -43,13 +43,25 @@ export const POST = route(async ({ store, viewer, req }) => {
     ?? db.locationShares?.find((s) => s.userId === userId)?.location
     ?? null;
   const meAt = locOf(viewer.id) ?? DEMO_CENTER;
-  const friendAt = locOf(item.friend.id) ?? DEMO_CENTER;
-  const until = new Date(item.until);
   const excluded = new Set(b.excludePlaceIds);
   // Local testing at night only: OUTHERE_IGNORE_HOURS=1 skips opening hours (never set on Vercel).
   const ignoreHours = process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1';
-  const places = hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, friendAt, at, until, b.budgetMax ?? null, { ignoreHours });
+  const fitsFor = (i: (typeof tryFriends)[number]) =>
+    hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, locOf(i.friend.id) ?? DEMO_CENTER, at, new Date(i.until), b.budgetMax ?? null, { ignoreHours });
+  // The first free friend may have only a few minutes left (say Maya's window ends in 25 min): try the next one
+  // instead of showing "nothing fits" while Kai is free for an hour.
+  let item = tryFriends[0];
+  let places = fitsFor(item);
+  for (const i of tryFriends.slice(1)) {
+    if (places.length > 0) break;
+    const p = fitsFor(i);
+    if (p.length > 0) { item = i; places = p; }
+  }
+  const picked = item;
+  const others = free.items.filter((i) => i.friend.id !== picked.friend.id).slice(0, 3).map((i) => i.friend);
   if (places.length === 0) return { draft: null, friend: item.friend, others, reason: 'no_place_fits' };
+  const friendAt = locOf(item.friend.id) ?? DEMO_CENTER;
+  const until = new Date(item.until);
 
   const ctx: HangContext = {
     text: b.text, now: at, until, budgetMax: b.budgetMax ?? null, places,
