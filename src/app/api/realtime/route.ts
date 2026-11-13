@@ -4,7 +4,7 @@ import { json } from '@/lib/api';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const CHANNEL = /^(quest|user|thread|post|event|together):[A-Za-z0-9-]{1,64}$|^presence:online$|^quests:new$|^demo:reset$/;
+const CHANNEL = /^(quest|user|thread|post|event|together|listing):[A-Za-z0-9-]{1,64}$|^presence:online$|^quests:new$|^listings:new$|^demo:reset$/;
 
 // GET /api/realtime?channels=a,b&as=<handle> -> text/event-stream of { channel, event, payload }
 // The in-process fallback for Supabase Broadcast (MemoryStore mode). Payloads carry ids and counts only.
