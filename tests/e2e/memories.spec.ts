@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { declineTracked, trackInvites } from "./invites";
 
 // Memories: crews with albums, and "Get this group together again" (Muse regroup, mock in builders).
 test.describe("Memories", () => {
@@ -29,13 +30,16 @@ test.describe("Memories", () => {
     expect(bad.status()).toBe(400);
   });
 
-  test("Send to crew delivers invites", async ({ page }, info) => {
+  test("Send to crew delivers invites", async ({ page, request }, info) => {
     test.skip(info.project.name !== "desktop", "sends once per server; desktop only");
+    const sent = trackInvites(page);
     await page.goto("/memories?as=alex");
     const card = page.getByTestId("crew-card").first();
     await card.getByRole("button", { name: "Get this group together again" }).click();
     await card.getByRole("button", { name: "Send to crew" }).click();
     await expect(card.getByText(/Sent to the crew chat|Invite sent to/)).toBeVisible({ timeout: 10_000 });
+    // the crew's invites would otherwise stay pending and cover buttons in later specs
+    await declineTracked(request, sent);
   });
 
   test("a persona with no crews sees the empty state", async ({ page }) => {

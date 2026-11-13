@@ -250,7 +250,8 @@ export type Thread = {
   createdAt: string; lastMessageAt: string | null;
 };
 
-export type MessageKind = 'text' | 'invite';
+/** 'muse' is a note Muse posts into a thread (the intro message), shown as Muse, not as the sender. */
+export type MessageKind = 'text' | 'invite' | 'muse';
 export type Message = {
   id: ID; threadId: ID; fromId: ID; text: string;
   kind: MessageKind; inviteId: ID | null; createdAt: string;
@@ -260,11 +261,11 @@ export type NotificationType =
   | 'friend_request' | 'friend_accept'
   | 'comment' | 'reply' | 'reaction'
   | 'group_post' | 'event_invite'
-  | 'quest_invite' | 'quest_join' | 'message'
+  | 'quest_invite' | 'quest_join' | 'message' | 'intro'
   | 'listing_hold' | 'listing_update'
   | 'hangout_rate';   // "How was Dumpling Den?" after a hangout ends
 export type NotificationObjectType =
-  'post' | 'comment' | 'profile' | 'group' | 'event' | 'quest' | 'invite' | 'thread' | 'listing';
+  'post' | 'comment' | 'profile' | 'group' | 'event' | 'quest' | 'invite' | 'thread' | 'intro' | 'listing';
 export type Notification = {
   id: ID; recipientId: ID; type: NotificationType; actorId: ID | null;
   objectType: NotificationObjectType; objectId: ID; text: string;
@@ -313,6 +314,66 @@ export type MuseRun = {
   ok: boolean; error: string | null; createdAt: string;
 };
 
+// ---- Muse Intros (Boardy-style warm intros, vetted by two "Click" agents) ----
+export const INTRO_KINDS = ['friendship', 'networking', 'dating'] as const;
+export type IntroKind = (typeof INTRO_KINDS)[number];
+export type IntroGender = 'man' | 'woman' | 'nonbinary';
+export type IntroKindSetting = { on: boolean; lookingFor: string };
+export type DatingPrefs = { ageMin: number; ageMax: number; genders: IntroGender[] };
+/** One person's Intro settings. Private to that person; agents read it server-side only. */
+export type IntroProfile = {
+  userId: ID;
+  kinds: Record<IntroKind, IntroKindSetting>;
+  datingPrefs: DatingPrefs | null;
+  maxKm: number;
+  paused: boolean;
+};
+/** Why the two people are not strangers: shared friends and/or shared Groups. */
+export type TrustPath = { mutualIds: ID[]; groupIds: ID[]; label: string };
+/**
+ * One turn of the agent-to-agent conversation, as stored for one side. The other agent's turns
+ * are stored with text '' and only `outcome`, a one-line result that side may see.
+ */
+export type AgentTurn = { agent: 'a' | 'b'; text: string; outcome?: string };
+export type FirstStep = { text: string; questId: ID | null; placeId: ID | null };
+export type IntroStatus = 'proposed' | 'a_accepted' | 'b_accepted' | 'accepted' | 'declined' | 'expired';
+export type IntroSource = 'auto' | 'request';
+/**
+ * Stored intro (server-only shape). agentLogA is shown only to A, agentLogB only to B.
+ * reasons and noteA are written to A ("you" = A), reasonsB and noteB to B; neither quotes the
+ * other person's private Intro settings. B sees the intro only after A accepts.
+ */
+export type Intro = {
+  id: ID; kind: IntroKind; source: IntroSource; aId: ID; bId: ID;
+  trustPath: TrustPath; score: number; reasons: string[]; reasonsB: string[]; summary: string;
+  noteA: string; noteB: string; firstStep: FirstStep;
+  agentLogA: AgentTurn[]; agentLogB: AgentTurn[];
+  status: IntroStatus; declinedBy: ID | null; threadId: ID | null;
+  createdAt: string; decidedAt: string | null;
+};
+/** The suggested first step on a card: a real quest with a relative time and a map link, or a fallback. */
+export type IntroStepView = { label: string; when: string | null; href: string | null; seatsLeft: number | null };
+/** What one side sees: the other person's card plus only their own agent's turns. */
+export type IntroCardView = {
+  id: ID; kind: IntroKind; score: number;
+  other: { id: ID; handle: string; firstName: string; avatarUrl: string };
+  trustPath: string[];
+  /** Mutual friends for the avatar stack (at most 3). */
+  mutuals: { id: ID; firstName: string; avatarUrl: string }[];
+  /** This viewer's "why you'd click" line and reasons, addressed to them as "you". */
+  summary: string; reasons: string[];
+  step: IntroStepView;
+  /** This side's agent turns in full; the other agent's turns as one-line outcomes only. */
+  myAgentLog: { mine: boolean; text: string }[];
+  /** e.g. "Muse judge: 91/100, above the 85 bar". */
+  judgeLine: string;
+  /** The other person already said yes (only ever true on B's card). */
+  otherAccepted: boolean;
+  /** new: waiting on you; waiting: you accepted; connected: both accepted; closed: declined or expired. */
+  state: 'new' | 'waiting' | 'connected' | 'closed';
+  closedText: string | null;
+  threadId: ID | null; createdAt: string;
+};
 // ---- Post-hangout rating (spec: docs/HANGOUT_RATINGS.md) ----
 // Beli-style: pick a bucket, then place the hangout against your past ones to get a 0-10 score.
 // A hangout is rated, never a person. The per-person "hang again?" answer is private: only the

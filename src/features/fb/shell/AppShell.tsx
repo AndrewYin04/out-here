@@ -66,7 +66,8 @@ export function AppShell({ children, layout }: { children: ReactNode; layout?: S
           </main>
         )}
       </div>
-      <InviteInbox />
+      {/* In Messenger the invite arrives as a card in the chat, so the toast would show it twice. */}
+      {pathname !== ROUTES.messages && <InviteInbox />}
       <RateHangoutListener />
       <MobileTabBar />
     </ToastProvider>

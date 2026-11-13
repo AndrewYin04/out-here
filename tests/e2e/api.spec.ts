@@ -5,7 +5,7 @@ import { profileId, seedId } from '../../src/shared/seed/ids';
 // They share server state, so they run once (desktop project) and in order.
 test.describe.configure({ mode: 'serial' });
 test.beforeEach(async ({}, info) => {
-  test.skip(info.project.name !== 'desktop', 'API spec runs once, on the desktop project');
+  test.skip(!info.project.name.startsWith('desktop'), 'API spec runs once, on the desktop project');
 });
 
 const alex = { 'x-persona': 'alex' };

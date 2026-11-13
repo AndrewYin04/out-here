@@ -23,6 +23,12 @@ export interface Backend {
   insert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void>;
   upsert<T extends TableKey>(table: T, rows: RowOf<T>[]): Promise<void>;
   update<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<void>;
+  /**
+   * Conditional update (UPDATE ... WHERE <match> RETURNING): true when at least one row changed.
+   * On false the request's view of the rows named by the match's primary key is refreshed, so
+   * the caller re-reads the current row (the one another request changed).
+   */
+  updateIf<T extends TableKey>(table: T, match: Match<T>, patch: Partial<RowOf<T>>): Promise<boolean>;
   remove<T extends TableKey>(table: T, match: Match<T>): Promise<void>;
   /** join_quest semantics: atomic, idempotent, both-or-neither with a friend; throws HttpError 409 quest_full. Returns seats left. */
   joinQuest(questId: ID, userId: ID, withFriendId: ID | null): Promise<number>;

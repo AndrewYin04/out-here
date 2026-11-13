@@ -21,6 +21,8 @@ export const ROUTES = {
   saved: '/saved',
   /** Memories: crew albums and 'Get this group together again' (memories area). */
   memories: '/memories',
+  /** Muse Intros: warm intros vetted by two agents (intros area). */
+  intros: '/intros',
 } as const;
 
 export type CenterTabId = 'home' | 'friends' | 'out-here' | 'groups' | 'marketplace';

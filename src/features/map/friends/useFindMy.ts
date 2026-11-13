@@ -59,7 +59,8 @@ export function panelPadding(side: 'left' | 'right' | null): { top: number; bott
   const zero = { top: 0, bottom: 0, left: 0, right: 0 };
   if (!side) return zero;
   if (isDesktop()) return { ...zero, [side]: PANEL_PX };
-  return { ...zero, bottom: Math.round(window.innerHeight * 0.45) };
+  // Phones: the card covers the bottom; the Explore / Friends row covers the top 72 px.
+  return { ...zero, top: 72, bottom: Math.round(window.innerHeight * 0.45) };
 }
 
 /** Desktop: a floating card 16 px in from the map edges with a 12 px radius, sized to its content. */

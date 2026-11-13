@@ -1,6 +1,6 @@
 'use client';
-// Find My-style People list: friends sharing with you, nearest first. Tapping a row flies the
-// map to them and opens their card. The top row is your own sharing, with an Edit button.
+// Find My-style People list: friends sharing with you, nearest first. Tapping a row opens their
+// card and flies the map to a nearby friend (a friend in another city opens in place). The top row is your own sharing, with an Edit button.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { Users } from 'lucide-react';
 import { useState } from 'react';
@@ -10,9 +10,9 @@ import type { FriendPin } from '@/shared/types';
 import { SharingSheet, audienceLabel } from './SharingSheet';
 import { distanceLine, floatingPanel, panelPadding, updatedAgo, useFriendPins, useMyShare } from './useFindMy';
 
-/** Opens the friend's card; FriendsLayer flies the map to them, clear of the card. */
+/** Opens the friend's card; FriendsLayer flies the map to a nearby friend, clear of the card (a far one opens in place). */
 export function flyToPin(_map: MapLibreMap | null | undefined, pin: FriendPin) {
-  const zoom = pin.walkingMinutes === null ? 11 : pin.precision === 'approximate' ? 14 : 16;
+  const zoom = pin.precision === 'approximate' ? 14 : 16;
   window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id: pin.friend.id, zoom } }));
 }
 
@@ -102,6 +102,7 @@ export function PeopleButton({ map, className }: { map?: MapLibreMap | null; cla
     <>
       <button
         type="button"
+        aria-label={count > 0 ? `People, ${count}` : 'People'}
         onClick={() => {
           setOpen(true);
           // keep pins clear of the desktop People panel
@@ -110,7 +111,8 @@ export function PeopleButton({ map, className }: { map?: MapLibreMap | null; cla
         className={className ?? 'flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]'}
       >
         <Users size={18} aria-hidden />
-        People
+        {/* phones: the icon and count only, so the row fits beside the Map / 3D toggle */}
+        <span className="max-md:sr-only">People</span>
         {count > 0 && <span className="rounded-full bg-fb-blue-tint px-1.5 text-[13px] text-fb-blue">{count}</span>}
       </button>
       <PeopleSheet open={open} onClose={() => setOpen(false)} map={map} />

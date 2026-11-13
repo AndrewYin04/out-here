@@ -3,7 +3,8 @@ import { haversineMeters, profileId, seedId, setNow, snapToGrid } from '@/shared
 import { createMemoryStore } from '@/features/data/memory-store';
 import { subscribe, type RealtimeMessage } from '@/features/data/realtime-server';
 import type { CoreStore } from '@/features/data/core';
-import { placeChips, type ChipItem } from '@/features/map/friends/chips';
+import { hangCopyIssue, writeHangCopy } from '@/features/muse';
+import { clearOfQuests, placeChips, placeChipsSided, questBox, type ChipItem } from '@/features/map/friends/chips';
 import { myShareSkip } from '@/features/map/friends/useFindMy';
 
 const id = (h: string) => profileId(h);
@@ -124,13 +125,104 @@ describe('Find My: editing my share', () => {
     const s = await store.hangSuggestion(id('alex'), id('maya'));
     expect(s?.kind).toBe('quest');
     expect(s?.venueName).toBe('Dumpling Den');
-    expect(s?.reason).toContain("Maya's craving dumplings");
-    expect(s?.draft).toContain('Dumpling Den');
+    expect(s?.reason).toContain("Maya's status: “craving dumplings”");
+    // a clock time, not "in 117 min", and the bubble quoted, not stitched into a sentence
+    expect(s?.draft).toMatch(/^Dumpling Den (at \d{1,2}:\d\d [AP]M|now)\? Saw your “craving dumplings”\./);
+    expect(s?.draft).not.toMatch(/You said you're|in \d+ min/);
     const { invite, suggestion } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
     expect(invite.questId).toBe(s!.questId);
     expect(suggestion).toContain('Dumplings');
     // a hidden friend gets no suggestion
     expect(await store.hangSuggestion(id('alex'), id('olivia'))).toBeNull();
+  });
+
+  it('generic words do not match: Ethan\'s "walk somewhere after" never picks the art walk', async () => {
+    const s = await store.hangSuggestion(id('alex'), id('ethan'));
+    expect(s?.title ?? '').not.toMatch(/Art walk/);
+    expect(s?.reason ?? '').not.toMatch(/Ethan's need/);
+    expect(s?.draft ?? '').not.toMatch(/You said you're/);
+  });
+
+  it('leans toward right now: Ethan\'s "need a second coffee" picks a coffee place, not board games at 1 PM', async () => {
+    const s = await store.hangSuggestion(id('alex'), id('ethan'));
+    expect(s?.kind).toBe('place');
+    expect(s?.venueName).toBe('El Camino Coffee Works');
+    expect(s?.reason).toContain("Ethan's status: “need a second coffee”");
+    expect(s?.facts.theirWalkMinutes).toBeLessThanOrEqual(25);
+  });
+
+  it('a later quest must overlap the friend\'s free window: 3 PM against a 5:15 to 6 PM window is rejected', async () => {
+    const noon = new Date('2026-11-12T20:00:00Z'); // 12:00 PT
+    setNow(noon);
+    store = createMemoryStore(noon);
+    const v = await store.view();
+    const maya = id('maya');
+    const a = v.db.availability.find((x) => x.userId === maya)!;
+    await store.backend.remove('availability', { userId: maya });
+    await store.backend.upsert('availability', [{ ...a, startsAt: '2026-11-13T01:15:00Z', endsAt: '2026-11-13T02:00:00Z', text: 'free after work' }]);
+    const q = v.db.quests.find((x) => x.title === 'Dumplings before the rush')!;
+    // 3:00 to 4:00 PM: 180 min out, before her window opens
+    await store.backend.update('quests', { id: q.id }, { startsAt: '2026-11-12T23:00:00Z', endsAt: '2026-11-13T00:00:00Z' });
+    expect((await store.hangSuggestion(id('alex'), maya))?.questId ?? null).not.toBe(q.id);
+    // 5:00 to 6:00 PM overlaps it, and she can arrive before 6
+    await store.backend.update('quests', { id: q.id }, { startsAt: '2026-11-13T01:00:00Z', endsAt: '2026-11-13T02:00:00Z' });
+    for (const other of v.db.quests.filter((x) => x.id !== q.id)) await store.backend.update('quests', { id: other.id }, { isPublic: false });
+    // an empty bubble, so a matching meet-now place does not outrank it
+    await store.backend.update('locationShares', { userId: maya }, { bubble: { emoji: null, thought: null, doing: null, wantsTo: null } });
+    expect((await store.hangSuggestion(id('alex'), maya))?.questId).toBe(q.id);
+  });
+
+  it('a friend in another city gets no hang suggestion and never a walk time', async () => {
+    expect(await store.hangSuggestion(id('alex'), id('ben'))).toBeNull();
+    const ben = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('ben'));
+    expect(ben?.walkingMinutes).toBeNull();
+  });
+});
+
+describe('Find My: Muse writes the hang copy', () => {
+  it('mock mode writes the reason and draft from the picked facts, and the copy passes the checks', async () => {
+    const s = (await store.hangSuggestion(id('alex'), id('maya')))!;
+    const copy = await writeHangCopy(s, { senderName: 'Alex Rivera' });
+    expect(copy.writtenBy).toBe('muse');
+    expect(copy.mock).toBe(true);
+    expect(copy.reason).toContain("Maya's status: “craving dumplings”");
+    expect(copy.draft).toMatch(/^Maya, Dumpling Den at \d{1,2}:\d\d [AP]M\? \d+-min walk for you, 2 seats left\./);
+    expect(hangCopyIssue(s, copy)).toBeNull();
+  });
+
+  it('rejects text that drops the venue or invents a number, so the template is kept', async () => {
+    const s = (await store.hangSuggestion(id('alex'), id('maya')))!;
+    expect(hangCopyIssue(s, { reason: 'Maya loves dumplings.', draft: 'Maya, dumplings later?' })).toMatch(/venue/);
+    expect(hangCopyIssue(s, { reason: 'Only $3 each.', draft: 'Maya, Dumpling Den? $3 each.' })).toMatch(/number 3/);
+  });
+});
+
+describe('Find My: chip limits', () => {
+  const at = (h: string, x: number, y: number, km: number): ChipItem => ({
+    pin: { friend: { id: h } as ChipItem['pin']['friend'], bubble: { emoji: '🥟', thought: 'craving dumplings', doing: null, wantsTo: null }, distanceKm: km, updatedAt: '2026-11-12T18:00:00Z' },
+    x, y,
+  });
+  it('only the allowed friends get a chip, and a chip never covers a quest label (hidden, not cut short)', () => {
+    const items = [at('a', 100, 200, 0.2), at('b', 300, 200, 0.4), at('c', 200, 400, 0.6)];
+    const label = { x0: 0, y0: 100, x1: 400, y1: 160 }; // a label band right above a's and b's avatars
+    const out = placeChipsSided(items, null, { w: 400, h: 600 }, false,
+      { maxW: 200, lines: 2, modes: ['full'], sides: ['above'], shift: true, only: new Set(['a', 'c']), hard: [label] });
+    expect(out.get('b')?.mode).toBe('none'); // not allowed
+    expect(out.get('a')?.mode).toBe('none'); // its only spot is under the label
+    expect(out.get('c')?.mode).toBe('full');
+  });
+
+  it('a must-show chip (nearest friend) still shows in full when its only spots are under quest labels and pins', () => {
+    const items = [at('maya', 100, 300, 0.8), at('ethan', 120, 180, 0.3)];
+    const labels = [{ x0: 0, y0: 200, x1: 400, y1: 256 }, { x0: 0, y0: 310, x1: 400, y1: 360 }];
+    const pins = [questBox({ x: 150, y: 330 })];
+    const out = placeChipsSided(items, null, { w: 390, h: 700 }, false, {
+      maxW: 200, lines: 2, modes: ['full'], sides: ['above', 'below'], shift: true,
+      only: new Set(['maya', 'ethan']), must: new Set(['maya', 'ethan']), hard: labels, obstacles: pins, top: 56,
+    });
+    expect(out.get('maya')?.mode).toBe('full');
+    expect(out.get('maya')?.over).toBe(true);
+    expect(out.get('ethan')?.mode).toBe('full');
   });
 });
 
@@ -157,5 +249,47 @@ describe('Find My: chip placement', () => {
   it('shows emoji only when asked (phones zoomed out)', () => {
     const m = placeChips([item('a', 100, 300, 1)], null, view, true);
     expect(m.get('a')).toBe('emoji');
+  });
+});
+
+describe('Find My: quest pins stay tappable', () => {
+  const view = { w: 390, h: 700 };
+  const item = (id: string, x: number, y: number): ChipItem => ({
+    pin: { friend: { id } as ChipItem['pin']['friend'], bubble: { emoji: '🥟', thought: 'craving dumplings', doing: null, wantsTo: null }, distanceKm: 1, updatedAt: '2026-11-12T10:00:00Z' },
+    x, y,
+  });
+
+  it('an avatar on a quest pin steps off it, and stays on the map', () => {
+    const q = questBox({ x: 200, y: 300 });
+    const avatar = (x: number, y: number) => ({ x0: x - 21, y0: y - 42, x1: x + 21, y1: y });
+    const clear = (x: number, y: number) => { const a = avatar(x, y); return !(a.x0 < q.x1 && q.x0 < a.x1 && a.y0 < q.y1 && q.y0 < a.y1); };
+    // avatar bottom centre just below the quest circle centre: it covers the pin
+    const [dx, dy] = clearOfQuests(205, 310, [q], view);
+    expect(clear(205 + dx, 310 + dy)).toBe(true);
+    // at the left edge it never leaves the map
+    const edge = questBox({ x: 30, y: 300 });
+    const [ex, ey] = clearOfQuests(25, 310, [edge], view);
+    expect(25 + ex - 21).toBeGreaterThanOrEqual(4);
+    expect(ey === 0 ? ex > 0 : true).toBe(true);
+    // a move that would land on another friend is skipped when another one is free
+    const [ox] = clearOfQuests(205, 310, [q], view, [{ x: 245, y: 310 }]);
+    expect(ox).toBeLessThanOrEqual(0);
+    // clear already: no move
+    expect(clearOfQuests(100, 310, [q], view)).toEqual([0, 0]);
+  });
+
+  it('no chip is placed over a quest pin', () => {
+    const q = questBox({ x: 200, y: 240 });
+    const placed = placeChipsSided([item('a', 200, 300)], null, view, false, { obstacles: [q], sides: ['above', 'below'] });
+    const p = placed.get('a')!;
+    // the chip above would cover the quest pin, so it goes below the avatar
+    expect(p.mode).not.toBe('none');
+    expect(p.side).toBe('below');
+  });
+
+  it('a chip with no spot clear of quest pins still shows, under one, instead of hiding', () => {
+    const obstacles = [questBox({ x: 200, y: 240 }), questBox({ x: 200, y: 330 })];
+    const placed = placeChipsSided([item('a', 200, 300)], null, view, false, { obstacles, sides: ['above', 'below'], modes: ['short'] });
+    expect(placed.get('a')!.mode).toBe('short');
   });
 });

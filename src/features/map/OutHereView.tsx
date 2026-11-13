@@ -68,7 +68,16 @@ export function OutHereView() {
   const questsApi = useQuests(DEMO_CENTER, 5000);
   const ctxApi = useApi<MapContext>('/out-here/context', [], (d) => Object.keys(d.walkMinutes).map((id) => `quest:${id}`));
   // Out Here opens on Friends (who's around), then Explore (every plan). ?mode=explore opens Explore.
-  const [mode, setMode] = useState<MapMode>('friends');
+  const [mode, setModeState] = useState<MapMode>('friends');
+  // The toggle is kept in ?mode=, so Back from Messenger or a profile returns to the same view.
+  // Explore has no friend card, so ?friend= goes with it.
+  const setMode = useCallback((m: MapMode) => {
+    setModeState(m);
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', m);
+    if (m !== 'friends') url.searchParams.delete('friend');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [unsupported, setUnsupported] = useState(false);
@@ -92,7 +101,7 @@ export function OutHereView() {
     const id = params.get('quest');
     if (id) setSelectedId(id);
     const m = params.get('mode');
-    if (m === 'friends' || m === 'explore') setMode(m);
+    if (m === 'friends' || m === 'explore') setModeState(m);
     // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
     setViewState(initialView(params.get('view'), readSavedView(), navigator.webdriver === true));
   }, []);
@@ -122,6 +131,8 @@ export function OutHereView() {
   }, [mode, visible, filter.keep, persona.id, selectedId]);
   const friendKeep = mode === 'friends' ? filter.keep : null;
   const allFriendPins = useMemo(() => friendPins.data?.pins ?? [], [friendPins.data]);
+  // Friend chips are placed clear of these quest pins.
+  const questPoints = useMemo(() => shown.map((q) => q.location), [shown]);
   const shownFriends = friendKeep ? allFriendPins.filter((p) => friendKeep.has(p.friend.id)).length : allFriendPins.length;
   const shownCount = mode === 'explore' ? shown.length : shownFriends;
   // The label on each kept item's reason: "✨ Muse" for a live model pick, otherwise what answered.
@@ -221,7 +232,7 @@ export function OutHereView() {
     const on = (e: Event) => { setMode('explore'); select((e as CustomEvent<string>).detail); };
     window.addEventListener('muse:select-quest', on);
     return () => window.removeEventListener('muse:select-quest', on);
-  }, [select]);
+  }, [select, setMode]);
   // "See it on the map" from a confirmed shared plan opens that quest's panel here.
   useEffect(() => {
     const on = (e: Event) => select((e as CustomEvent<string>).detail);
@@ -245,7 +256,7 @@ export function OutHereView() {
     void questsApi.refetch();
     select(q.id);
     toast.show('Your plan is live on the map.');
-  }, [questsApi, select, toast]);
+  }, [questsApi, select, setMode, toast]);
   const onUnsupported = useCallback(() => setUnsupported(true), []);
   // While a plan is being created, tapping other pins does nothing (the create sheet owns the panel).
   const noSelect = useCallback(() => {}, []);
@@ -254,7 +265,7 @@ export function OutHereView() {
   const openFriend = useCallback((id: string) => {
     setMode('friends');
     window.setTimeout(() => window.dispatchEvent(new CustomEvent('findmy:open', { detail: { id } })), 60);
-  }, []);
+  }, [setMode]);
   const exit3d = useCallback(() => {
     setView('map');
     setViewNote('3D was running slowly on this device, so you’re back on the map.');
@@ -321,7 +332,7 @@ export function OutHereView() {
     window.history.replaceState(window.history.state, '', url.toString());
     setMode('explore');
     letsGo(id);
-  }, [letsGo]);
+  }, [letsGo, setMode]);
   /** Walking to a plan in 3D: the screen is just the street and the top capsule. */
   const walkingNow = show3d && !!walkQuest && walkQuest.id !== arrivedId;
   // Back to you: the 3D view brings the camera behind your avatar; the flat map flies to you.
@@ -503,7 +514,7 @@ export function OutHereView() {
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} questPoints={questPoints} />
           {!unsupported && ctx && questsApi.data && visible.length === 0 && (
             <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
               <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">

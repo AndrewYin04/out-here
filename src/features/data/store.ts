@@ -127,6 +127,13 @@ export interface DataStore {
   postWalkStep: CoreStore['postWalkStep'];
   hangInvite: CoreStore['hangInvite'];
   hangSuggestion: CoreStore['hangSuggestion'];
+  // Muse Intros storage (features/intros applies the rules and per-side visibility)
+  saveIntroProfile: CoreStore['saveIntroProfile'];
+  insertIntro: CoreStore['insertIntro'];
+  updateIntro: CoreStore['updateIntro'];
+  transitionIntro: CoreStore['transitionIntro'];
+  removeIntros: CoreStore['removeIntros'];
+  notifyIntro: CoreStore['notifyIntro'];
   // post-hangout rating (docs/HANGOUT_RATINGS.md)
   ratingState: CoreStore['ratingState'];
   rateHangout: CoreStore['rateHangout'];

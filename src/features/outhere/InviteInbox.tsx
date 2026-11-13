@@ -8,6 +8,19 @@ import { useLetsGo } from './lets-go';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
 
+/** True while a modal sheet or dialog is open (they portal into document.body). */
+function useSheetOpen(): boolean {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(!!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.body, { childList: true, subtree: false });
+    return () => obs.disconnect();
+  }, []);
+  return open;
+}
+
 /** Invites older than this are left to Notifications and Messenger. */
 const RECENT_MS = 3 * 60 * 60_000;
 
@@ -22,6 +35,11 @@ export function InviteInbox() {
   const { viewer } = useViewer();
   const [items, setItems] = useState<Shown[]>([]);
   const dismissed = useRef<Set<string>>(new Set());
+  // While a sheet is open the cards fold into one pill under the top bar, so they never cover the
+  // sheet's header or controls; tapping the pill shows them again.
+  const sheetOpen = useSheetOpen();
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { if (!sheetOpen) setExpanded(false); }, [sheetOpen]);
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +75,9 @@ export function InviteInbox() {
 
   const respond = async (inv: Shown, status: 'accepted' | 'declined', from: HTMLElement | null = null) => {
     if (inv.busy) return;
+    // Keep the cards open after a tap, so a sheet or dialog that opens next (the join, a rating
+    // prompt) does not fold away the answer the viewer is waiting for.
+    setExpanded(true);
     patch(inv.id, { busy: true, error: undefined });
     try {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
@@ -76,6 +97,25 @@ export function InviteInbox() {
   };
 
   if (items.length === 0) return null;
+  const waiting = items.filter((i) => !i.result);
+  if (sheetOpen && !expanded) {
+    if (waiting.length === 0) return null;
+    const first = waiting[0].from?.name.split(' ')[0] ?? 'A friend';
+    return (
+      <div className="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex justify-center md:inset-x-auto md:right-4 md:w-[360px] md:justify-end">
+        <button
+          type="button"
+          data-testid="invite-pill"
+          onClick={() => setExpanded(true)}
+          className="pointer-events-auto flex h-9 items-center gap-2 rounded-full bg-fb-surface py-1 pl-1 pr-3 text-[13px] font-semibold text-fb-text shadow-popover"
+        >
+          <Avatar src={waiting[0].from?.avatarUrl} name={waiting[0].from?.name ?? first} size={28} decorative />
+          {waiting.length > 1 ? `${first} and ${waiting.length - 1} more invited you` : `${first} invited you`}
+          <span className="text-fb-blue">View</span>
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">
       {items.map((inv) => (

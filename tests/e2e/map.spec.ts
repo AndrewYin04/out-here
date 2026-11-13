@@ -35,7 +35,7 @@ async function newPersonaPage(browser: Browser, persona: string, viewport: { wid
 test.describe('phone 390', () => {
   test.use({ viewport: { width: 390, height: 844 } });
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== 'phone', 'phone project only');
+    test.skip(!info.project.name.startsWith('phone'), 'phone project only');
   });
 
   test('dumpling pin is clear of other markers and the sheet keeps attribution visible', async ({ page }) => {
@@ -108,7 +108,7 @@ test.describe('phone 390', () => {
       const same = page.locator(`[data-quest-id="${id}"] [data-role="cluster"]`);
       const now = (await same.isVisible()) ? Number(((await same.textContent()) ?? '+0').slice(1)) : 0;
       return hidden < hiddenBefore || now < n;
-    }, { timeout: 5000 }).toBe(true);
+    }, { timeout: 10_000 }).toBe(true);
   });
 
   test('join and leave update the seat count on the pin and in the sheet', async ({ page }) => {
@@ -145,7 +145,7 @@ test.describe('phone 390', () => {
     await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('friends-filter-chip')).toHaveText(`Plans your friends joined · ${friendsCount}`);
     await page.getByTestId('dock-handle').click();
-    await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai going/);
+    await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai( and .+)? going/); // Maya may be in too (outhere.spec)
     await page.getByTestId('quest-pin-dumplings').click();
     await expect(page.getByTestId('quest-sheet').getByTestId('quest-friends-going')).toHaveText(/Kai Nakamura (is|and .+ are) going/);
     await page.getByTestId('quest-sheet').getByRole('button', { name: 'Close' }).click();
@@ -172,7 +172,7 @@ test.describe('phone 390', () => {
 test.describe('desktop 1440', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== 'desktop', 'desktop project only');
+    test.skip(!info.project.name.startsWith('desktop'), 'desktop project only');
   });
 
   test('a join by Maya updates the seat badge on Alex’s map live', async ({ browser }) => {

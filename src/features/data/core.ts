@@ -7,7 +7,7 @@ import {
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite, type TogetherOption, type QuestVisibility,
+  type Story, type Invite, type Intro, type IntroProfile, type TogetherOption, type QuestVisibility,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
@@ -1320,6 +1320,28 @@ export class CoreStore {
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
 
+  // ---------- Muse Intros: storage primitives (rules and visibility live in features/intros) ----------
+  async saveIntroProfile(row: IntroProfile): Promise<void> { await this.backend.upsert('introProfiles', [row]); }
+  async insertIntro(row: Intro): Promise<void> { await this.backend.insert('intros', [row]); }
+  async updateIntro(id: ID, patch: Partial<Intro>): Promise<void> { await this.backend.update('intros', { id }, patch); }
+  /**
+   * Moves an intro from status `from` to the patch only if it is still `from` (one conditional
+   * UPDATE). True for the one caller that made the change; a loser re-reads the current row.
+   */
+  async transitionIntro(id: ID, from: Intro['status'], patch: Partial<Intro>): Promise<boolean> {
+    return this.backend.updateIf('intros', { id, status: from }, patch);
+  }
+  /** An 'intro' notification ("Muse has an intro for you"); the row links to /intros#<id>. */
+  async notifyIntro(recipientId: ID, actorId: ID, introId: ID, text: string): Promise<void> {
+    await this.notify(await this.view(), recipientId, 'intro', actorId, 'intro', introId, text);
+  }
+  /** Demo reset: the intros, their 'intro' notifications, and Muse's note in each pair's thread. */
+  async removeIntros(ids: ID[], threadIds: ID[] = []): Promise<void> {
+    if (!ids.length) return;
+    await this.backend.remove('notifications', { objectType: 'intro', objectId: ids });
+    if (threadIds.length) await this.backend.remove('messages', { threadId: threadIds, kind: 'muse' });
+    await this.backend.remove('intros', { id: ids });
+  }
   // ---------- Out Here: post-hangout rating (logic in ratings.ts) ----------
   ratingState(viewerId: ID, questId: ID) { return ratingState(this, viewerId, questId); }
   rateHangout(viewerId: ID, questId: ID, body: RateHangoutBody) { return rateHangout(this, viewerId, questId, body); }

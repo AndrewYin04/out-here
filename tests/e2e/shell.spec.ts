@@ -36,7 +36,7 @@ function watchErrors(page: Page): string[] {
 
 test.describe('desktop 1440', () => {
   test.beforeEach(({}, info) => {
-    test.skip(info.project.name !== 'desktop', 'desktop project only');
+    test.skip(!info.project.name.startsWith('desktop'), 'desktop project only');
   });
 
   test('top bar, left nav and right rail render', async ({ page }) => {
@@ -75,7 +75,8 @@ test.describe('desktop 1440', () => {
       await expect(page).toHaveURL((u) => u.pathname === path);
       await expect(page.getByTestId(`tab-${id}`)).toHaveAttribute('aria-current', 'page');
     }
-    await page.getByRole('link', { name: 'Messenger' }).first().click();
+    await page.getByTestId('messenger-button').click();
+    await page.getByTestId('see-all-messenger').click();
     await expect(page).toHaveURL(/\/messages$/);
     await page.getByTestId('notifications-bell').click();
     await page.getByTestId('notifications-panel').getByRole('link', { name: 'See all' }).click();
@@ -161,12 +162,12 @@ test.describe('desktop 1440', () => {
     await expect(page.getByTestId('right-rail')).toHaveCount(0);
     await expect(page.getByTestId('section-chips')).toBeHidden();
     const friendsNav = sidebar.getByRole('navigation', { name: 'Friends sections' });
-    await expect(friendsNav.getByRole('link')).toHaveText(['Home', 'Friend requests', 'Suggestions', 'All friends', 'Birthdays']);
+    await expect(friendsNav.getByRole('link')).toHaveText(['Home', 'Friend requests', 'Suggestions', 'All friends', 'Birthdays', 'Custom lists']);
     await expect(friendsNav.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     await friendsNav.getByRole('link', { name: 'Friend requests' }).click();
     await expect(page).toHaveURL(/\/friends\?tab=requests$/);
     await expect(friendsNav.getByRole('link', { name: 'Friend requests' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('heading', { level: 1, name: 'Friend requests' })).toBeVisible();
+    await expect(page.getByTestId('friends-requests').getByRole('heading', { level: 2, name: 'Friend requests' })).toBeVisible();
 
     await page.getByTestId('tab-groups').click();
     await expect(page).toHaveURL(/\/groups$/);
@@ -214,7 +215,7 @@ test.describe('desktop 1440', () => {
 
 test.describe('mobile 390', () => {
   test.beforeEach(async ({ page }, info) => {
-    test.skip(info.project.name !== 'phone', 'phone project only');
+    test.skip(!info.project.name.startsWith('phone'), 'phone project only');
     await page.setViewportSize({ width: 390, height: 844 });
   });
 
@@ -253,7 +254,8 @@ test.describe('mobile 390', () => {
     }
     await page.getByRole('link', { name: 'Search' }).click();
     await expect(page).toHaveURL(/\/search$/);
-    await page.getByRole('link', { name: 'Messenger' }).click();
+    await page.getByTestId('messenger-button').click();
+    await page.getByTestId('see-all-messenger').click();
     await expect(page).toHaveURL(/\/messages$/);
     expect(errors).toEqual([]);
   });

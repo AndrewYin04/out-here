@@ -36,6 +36,8 @@ export {
   QUEST_CATEGORIES, RAW_DRAFT_JSON_SCHEMA, RawDraftZ, draftCacheKey, draftMessages, mockDraft, nearbyPlaces, validateDraft,
 } from './create-quest';
 export type { CreateQuestContext, DraftPlace, RawDraft } from './create-quest';
+export { HANG_BUDGET_MS, hangCopyIssue, mockHangCopy, writeHangCopy } from './hang';
+export type { HangCopy, HangCopyInput } from './hang';
 export {
   HANG_MAX_WALK_MIN, RAW_HANG_JSON_SCHEMA, RawHangZ, hangMessages, hangPlaces, laClock, mockHang, openThrough, validateHang,
 } from './draft-hang';
