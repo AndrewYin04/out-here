@@ -6,6 +6,7 @@ import { haversineMeters, walkingMinutes, type LatLng, type QuestCategory } from
 import type { MuseQuestDraft } from '../../shared/api';
 import { createQuestMessages } from './prompts/create-quest';
 import { localLabel, nextClock, parseClock } from './time';
+import { normalizeText } from './cache-key';
 import type { MuseMessage } from './client';
 
 export const QUEST_CATEGORIES: readonly QuestCategory[] = ['food', 'music', 'sports', 'study', 'thrift', 'art', 'outdoors', 'games', 'other'];
@@ -95,6 +96,39 @@ function firstGrapheme(s: string): string {
 }
 const roundTo5 = (ms: number) => Math.ceil(ms / (5 * 60_000)) * 5 * 60_000;
 
+/**
+ * Muse cache key for a draft: persona and prompt template are added by museCacheKey; this adds
+ * the normalized sentence and the ORDERED ids of the places Muse chose from, so a pin with a
+ * different set of nearby places misses the cache and goes live.
+ */
+export function draftCacheKey(ctx: Pick<CreateQuestContext, 'text' | 'places'>): { text: string; places: string[] } {
+  return { text: normalizeText(ctx.text), places: ctx.places.map((p) => p.placeId) };
+}
+
+// "9 min walk", "2 min from your pin", "3 minutes away": walk claims, not start times.
+const WALK_MIN_RE = /(\d+)\s*-?\s*min(?:ute)?s?\s+(?:walk|away|from)\b/gi;
+
+/**
+ * The model's pitch, unless it no longer fits the checked place: its place id is not near this
+ * pin, it names a different nearby place, or its walk minutes differ. Then the code pitch.
+ */
+function checkedPitch(raw: RawDraft, place: DraftPlace | null, ctx: CreateQuestContext): string {
+  const code = place ? `I picked ${place.name}, ${place.walkMin} min from your pin.` : 'I kept your pin as the spot.';
+  const pitch = clean(raw.pitch);
+  if (!pitch) return code;
+  if (raw.placeId && !place) return code;
+  const lower = pitch.toLowerCase();
+  const mine = place?.name.toLowerCase() ?? '';
+  const namesOther = ctx.places.some((o) => {
+    const name = o.name.toLowerCase();
+    return o.placeId !== place?.placeId && name.length >= 3 && !mine.includes(name) && lower.includes(name);
+  });
+  if (namesOther) return code;
+  const walks = [...pitch.matchAll(WALK_MIN_RE)].map((m) => Number(m[1]));
+  if (walks.some((n) => !place || n !== place.walkMin)) return code;
+  return pitch;
+}
+
 /** Turns a model (or mock) draft into a safe plan draft. Never throws. */
 export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: MuseQuestDraft; pitch: string } {
   const nowMs = ctx.now.getTime();
@@ -129,7 +163,7 @@ export function validateDraft(raw: RawDraft, ctx: CreateQuestContext): { draft: 
     tags,
     bubbleText: bubble || null,
   };
-  const pitch = clean(raw.pitch) || (place ? `I picked ${place.name}, ${place.walkMin} min from your pin.` : 'I kept your pin as the spot.');
+  const pitch = checkedPitch(raw, place, ctx);
   return { draft, pitch };
 }
 

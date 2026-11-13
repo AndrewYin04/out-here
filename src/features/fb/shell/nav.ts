@@ -8,6 +8,8 @@ export const ROUTES = {
   groups: '/groups',
   group: (slug: string) => `/groups/${slug}`,
   marketplace: '/marketplace',
+  /** Video (Watch): the viewer's videos; Muse picks Marketplace items from what they watch. */
+  watch: '/watch',
   events: '/events',
   messages: '/messages',
   thread: (id: string) => `/messages?thread=${encodeURIComponent(id)}`,
