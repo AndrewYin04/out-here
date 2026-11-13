@@ -103,7 +103,7 @@ export function PlanCard({
   const moments = (posts ?? []).filter((p) => p.media.length > 0).slice(0, 6);
 
   const tiles: { icon: string; value: string; sub: string; srOnly?: ReactNode }[] = [
-    { icon: '🕐', value: formatDemoTime(q.startsAt).replace(/\s?[AP]M$/i, ''), sub: startsText.replace(/^Starts /, ''),
+    { icon: '🕐', value: formatDemoTime(q.startsAt).replace(/\s?[AP]M$/i, ''), sub: /^Happening/i.test(startsText) ? 'now' : startsText.replace(/^Starts /, ''),
       srOnly: <span data-testid={`${prefix}-starts`} className="sr-only">{startsText}</span> },
     ...(walkMinutes != null ? [{ icon: '🚶', value: `${walkMinutes}m`, sub: 'walk',
       srOnly: <span data-testid="quest-walk" className="sr-only">{walkMinutes} min walk</span> }] : []),
