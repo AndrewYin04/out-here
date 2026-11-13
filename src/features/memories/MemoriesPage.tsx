@@ -7,6 +7,7 @@ import type { Crew, Memory, PersonCard } from '@/shared';
 import { apiFetch, apiPost, ApiFetchError, currentPersona, useChannel, useViewer } from '@/features/data';
 import { usePersonaHandle } from '@/features/fb/shell';
 import { AvatarStack, Button, Card, EmptyState, Skeleton } from '@/features/ui';
+import { MEMORY_SAVED } from './arrival';
 import { stripLeadingEmoji, type RegroupResult } from './regroup';
 
 type CrewMeta = { crewId: string; members: PersonCard[]; originTitle: string | null; threadId: string | null };
@@ -27,6 +28,12 @@ function MemoriesView({ handle }: { handle: string | null }) {
   useChannel([`user:${viewer.id}`], (_channel, payload) => {
     if (payload.type === 'memory' || payload.resync) setRefresh((value) => value + 1);
   });
+  // Your own new photo (the arrival selfie, #47): the server's broadcast only reaches the others.
+  useEffect(() => {
+    const bump = () => setRefresh((value) => value + 1);
+    window.addEventListener(MEMORY_SAVED, bump);
+    return () => window.removeEventListener(MEMORY_SAVED, bump);
+  }, []);
 
   useEffect(() => {
     if (!handle) return;
