@@ -6,7 +6,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, type LatLng, type Quest } from '@/shared';
 import type { MapListing } from '@/shared/api';
@@ -363,6 +363,7 @@ export function OutHereView() {
   // Keep the next plan reachable even when its pin is filtered out of the map.
   const upNext = useUpNext();
   const nextQuest = upNext?.quest;
+  const [upNextClosed, closeUpNext] = useUpNextDismissed(nextQuest && `${nextQuest.id}@${nextQuest.startsAt}`);
   // Let's go can come from any plan you joined (a plan's panel, an accepted invite), not only Up next.
   const walkQuest = !walkTo ? null
     : nextQuest?.id === walkTo.questId ? nextQuest
@@ -592,9 +593,11 @@ export function OutHereView() {
 
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
-      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && (
-        // Below the Muse filter status and the Friends chip, so neither is ever covered.
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
+      {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
+        // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
+        // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
+        // at this height and covered Let's go.
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center max-md:right-[68px]',
           filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}
@@ -603,6 +606,7 @@ export function OutHereView() {
             walking={show3d && walkQuest?.id === upNext.quest.id}
             onGo={letsGo}
             onSee={select}
+            onDismiss={closeUpNext}
             className="pointer-events-auto w-full max-w-[440px]"
           />
         </div>
