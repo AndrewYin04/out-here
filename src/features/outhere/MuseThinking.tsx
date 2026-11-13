@@ -1,4 +1,5 @@
 'use client';
+import { Sparkles } from 'lucide-react';
 // While Muse works (several seconds), say what it is doing, step by step, so the wait reads as
 // work rather than lag (Doherty threshold: something visibly changes well under 400 ms).
 // The steps name the real pipeline stages; the last one holds until the answer arrives.
@@ -19,7 +20,7 @@ export function MuseThinking({ steps, everyMs = 1300 }: { steps: readonly string
   }, [steps, everyMs]);
   return (
     <p className="mb-3 flex items-center gap-2 px-1 text-[15px] font-semibold text-fb-text" data-testid="muse-thinking">
-      <span aria-hidden className="inline-block animate-shimmer">✨</span>
+      <Sparkles size={16} aria-hidden className="shrink-0 animate-shimmer text-fb-blue" />
       <span key={i} className="animate-step-in">{steps[i]}</span>
     </p>
   );

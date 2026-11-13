@@ -15,7 +15,7 @@ type Box = { x: number; y: number; width: number; height: number };
 const overlap = (a: Box, b: Box) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
 async function openMap(page: Page, persona: string, extra = '') {
-  await page.goto(`/out-here?as=${persona}${extra}`);
+  await page.goto(`/out-here?as=${persona}${extra.includes('mode=') ? '' : '&mode=explore'}${extra}`);
   await expect(page.getByTestId('out-here-map')).toBeVisible();
 }
 
@@ -72,6 +72,7 @@ test.describe('phone 390', () => {
     await expect(sheet.getByTestId('quest-going')).toContainText('Kai Nakamura');
     await expect(page).toHaveURL(new RegExp(`quest=${DUMPLINGS}`));
 
+    await sheet.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // the sheet has slid up
     const attribution = page.getByTestId('map-attribution').filter({ visible: true });
     await expect(attribution).toHaveCount(1);
     await expect(attribution).toContainText('OpenFreeMap © OpenMapTiles Data from OpenStreetMap');
@@ -140,7 +141,10 @@ test.describe('phone 390', () => {
     const friendsCount = await page.locator('[data-map-marker="quest"]').count();
     expect(friendsCount).toBeLessThanOrEqual(all);
     // The filter says what it shows, and each pin names the friends going.
+    // The Friends tab's list says what the map shows.
+    await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('friends-filter-chip')).toHaveText(`Plans your friends joined · ${friendsCount}`);
+    await page.getByTestId('dock-handle').click();
     await expect(page.getByTestId('quest-pin-dumplings')).toHaveAttribute('aria-label', /Kai going/);
     await page.getByTestId('quest-pin-dumplings').click();
     await expect(page.getByTestId('quest-sheet').getByTestId('quest-friends-going')).toHaveText(/Kai Nakamura (is|and .+ are) going/);
@@ -208,10 +212,12 @@ test.describe('desktop 1440', () => {
     await expect(sheet.getByTestId('quest-walk')).toHaveText(/\d+ min walk/);
     await expect(page.getByTestId('map-attribution').filter({ visible: true })).toHaveCount(1);
     // The panel is only as tall as its content, and the map moves the pin out from under it.
+    await sheet.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // the sheet has slid up
     const s = (await sheet.boundingBox())!;
     expect(s.height).toBeLessThan(700);
-    const join = (await sheet.getByRole('button', { name: 'Report' }).boundingBox())!;
-    expect(s.y + s.height - (join.y + join.height)).toBeLessThan(30);
+    // The plan card's one action (Join) is on screen inside the panel, no scrolling needed.
+    const join = (await sheet.getByRole('button', { name: /^(Join|Full)$/ }).boundingBox())!;
+    expect(join.y + join.height).toBeLessThanOrEqual(s.y + s.height);
     await expect.poll(async () => (await page.getByTestId('quest-pin-dumplings').boundingBox())?.x ?? 0, { timeout: 5000 }).toBeGreaterThan(s.x + s.width);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);

@@ -20,6 +20,8 @@ export interface Character {
   readonly height: number;
   setState(state: string): void;
   update(dt: number, t: number): void;
+  /** Current animated plush-body centre for effects, excluding bubble and headphone bounds. */
+  getEffectCenter?(out: THREE.Vector3): void;
   dispose(): void;
 }
 
@@ -308,6 +310,7 @@ class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
   private hop = new THREE.Group();
+  private effectBody: THREE.Mesh | null = null;
   private mixer: THREE.AnimationMixer;
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
@@ -357,6 +360,9 @@ class GltfCharacter implements Character {
       mesh.material = Array.isArray(mesh.material) ? next : next[0];
     });
 
+    this.effectBody = model.getObjectByName('Muse_Body') as THREE.Mesh | undefined ?? null;
+    if (this.effectBody?.isMesh) this.effectBody.geometry.computeBoundingBox();
+    else this.effectBody = null;
     this.hop.add(model);
     this.root.add(this.hop);
     const box = new THREE.Box3().setFromObject(model);
@@ -414,7 +420,15 @@ class GltfCharacter implements Character {
     } else this.hop.position.y = 0;
   }
 
-  dispose() { this.mixer.stopAllAction(); this.owned.forEach((m) => m.dispose()); }
+  getEffectCenter(out: THREE.Vector3): void {
+    if(this.effectBody)this.effectBody.updateWorldMatrix(true,false);
+    else this.root.updateWorldMatrix(true,false);
+    if (this.effectBody?.geometry.boundingBox) {
+      this.effectBody.geometry.boundingBox.getCenter(out).applyMatrix4(this.effectBody.matrixWorld);
+    } else out.set(0, this.height / 2, 0).applyMatrix4(this.root.matrixWorld);
+  }
+
+  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); }
 }
 
 // ---- Loading ----

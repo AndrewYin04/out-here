@@ -6,31 +6,59 @@ import { expect, test, type Page } from "@playwright/test";
 // The two-persona flow runs in the desktop project only; the phone project checks the sheet.
 
 async function openMap(page: Page, persona: string) {
-  await page.goto(`/out-here?as=${persona}`);
+  await page.goto(`/out-here?as=${persona}&mode=explore`);
   await expect(page.getByTestId("out-here-map")).toBeVisible();
   await expect(page.getByTestId("map-canvas")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('[data-map-marker="quest"]').first()).toBeAttached({ timeout: 20_000 });
 }
 
 test.describe("Post a plan", () => {
-  test("＋ opens the sheet with a draft pin, and Muse drafts from one line", async ({ page }) => {
+  test("＋ from the 3D view lands on the map in pick-a-spot mode; Esc and Cancel leave it", async ({ page }) => {
+    await page.goto(`/out-here?as=jordan&view=3d`);
+    const root = page.getByTestId("out-here-map");
+    await expect(page.getByTestId("map-canvas")).toBeVisible({ timeout: 20_000 });
+    await expect(root).toHaveAttribute("data-view", "3d", { timeout: 20_000 });
+    await page.getByTestId("create-plan-btn").click();
+    await expect(root).toHaveAttribute("data-view", "map");
+    await expect(page.getByTestId("place-hint")).toBeVisible();
+    await expect(page.getByTestId("host-picker")).toHaveCount(0);
+    await expect(page.getByTestId("create-plan-sheet")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await page.getByTestId("create-plan-btn").click();
+    await page.getByTestId("place-cancel").click();
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await expect(page.getByTestId("create-plan-btn")).toBeVisible();
+  });
+
+  test("＋ then a click on the map opens the host picker there, then the sheet with a draft pin, and Muse fills it in", async ({ page }) => {
     await openMap(page, "jordan");
     await page.getByTestId("create-plan-btn").click();
+    await expect(page.getByTestId("place-hint")).toBeVisible();
+    const canvas = page.getByTestId("map-canvas");
+    const box = (await canvas.boundingBox())!;
+    // A tap on the phone project, a click on desktop: both open the picker in this mode.
+    await canvas.click({ position: { x: box.width * 0.35, y: box.height * 0.55 } });
+    await expect(page.getByTestId("host-picker")).toBeVisible();
+    await expect(page.getByTestId("place-hint")).toHaveCount(0);
+    await page.getByTestId("host-pick-custom").click();
     const sheet = page.getByTestId("create-plan-sheet");
     await expect(sheet).toBeVisible();
     await expect(page.getByTestId("draft-pin")).toBeVisible();
-    await expect(page.getByTestId("create-post")).toHaveText("Add a title");
-
-    await page.getByTestId("create-muse-input").fill("boba after class at 4");
+    // Step 1: What · When · Where. The title is the one line Muse fills the rest in from.
+    await expect(page.getByTestId("create-next")).toHaveText(/Add a title/);
+    await page.getByTestId("create-title").fill("boba after class at 4");
     await page.getByTestId("create-muse-btn").click();
     await expect(page.getByTestId("create-muse-pitch")).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId("create-title")).not.toHaveValue("");
-    await expect(page.getByTestId("draft-pin")).toHaveText("🧋");
+    await expect(page.getByTestId("draft-pin")).toHaveAttribute("data-category", "food");
     await expect(page.getByTestId("create-post")).toHaveText("Post");
 
-    // Friends (invite only) needs at least one friend picked before Post.
+
+    // Step 2: Friends (invite only) needs at least one friend picked before going on.
+    await page.getByTestId("create-next").click();
     await page.getByTestId("visibility-friends").click();
-    await expect(page.getByTestId("create-post")).toHaveText("Pick at least one friend");
+    await expect(page.getByTestId("create-next")).toHaveText(/Pick at least one friend/);
 
     await page.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toHaveCount(0);
@@ -49,11 +77,14 @@ test.describe("Post a plan", () => {
       await Promise.all([openMap(sam, "sam"), openMap(nina, "nina"), openMap(maya, "maya")]);
       const title = `Game night ${Date.now() % 100000}`;
 
-      // Right-click drops the pin (long-press on touch).
+      // Right-click (long-press on touch) fans out the host picker; 🎮 starts a game night.
       const canvas = sam.getByTestId("map-canvas");
       const box = (await canvas.boundingBox())!;
       await canvas.click({ button: "right", position: { x: box.width * 0.6, y: box.height * 0.5 } });
+      await expect(sam.getByTestId("host-picker")).toBeVisible();
+      await sam.getByTestId("host-pick-games").click();
       await expect(sam.getByTestId("create-plan-sheet")).toBeVisible();
+      await expect(sam.getByTestId("create-title")).toHaveValue("Game night");
       await expect(sam.getByTestId("draft-pin")).toBeVisible();
 
       await sam.getByTestId("create-title").fill(title);
@@ -63,6 +94,8 @@ test.describe("Post a plan", () => {
       const group = sam.getByTestId("create-group-select");
       await expect(group).toBeVisible();
       await group.selectOption({ label: "Peninsula Board Game Night" });
+      await sam.getByTestId("create-more").click(); // the optional extras are folded
+
       await sam.getByTestId("create-bubble").fill("Bringing Wingspan 🐦");
       await sam.getByTestId("create-post").click();
 

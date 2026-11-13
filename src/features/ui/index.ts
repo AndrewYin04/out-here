@@ -29,4 +29,6 @@ export { ToastProvider, useToast } from './Toast';
 export type { ToastOptions } from './Toast';
 export { useMounted } from './useOverlay';
 export { EASE, bump, burst, celebrateJoin, dropIn, flash, flyAvatar, questPin, reducedMotion, squash } from './motion';
+export { useSheetDrag, type SheetSnap } from './useSheetDrag';
 export { demoToolsOn, useDemoTools } from './tools';
+export { CATEGORY_STYLE, CategoryGlyph, CategoryIcon, categoryOf, categorySvg, markSvg, rememberCategories } from './CategoryIcon';
