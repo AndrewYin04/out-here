@@ -43,6 +43,10 @@ type Step =
 // taps (notes 'free') and again after the hungry asks (notes 'hungry').
 export const STEPS: Step[] = [
   { kind: 'reset', label: 'presenter reset' },
+  // 45 Minutes to Thrift (docs/DEMO_RUNSHEET.md): the exact stage ask, typed with no time chip,
+  // right after a reset, as on stage (Maya's seeded free window is the only friend change).
+  { kind: 'plan', label: 'Thrift: Alex boba ask (stage words)', as: 'alex', typed: "I've got 45 minutes. Can I grab boba with someone nearby?" },
+  { kind: 'reset', label: 'presenter reset (after the thrift ask)' },
   // Scene 4: Alex's "I'm free", before anyone else is free.
   { kind: 'plan', label: "Alex: I'm free (typed)", as: 'alex', typed: 'free for an hour, want to try something new, under $20' },
   { kind: 'plan', label: 'Alex: hungry 30 min', as: 'alex', moods: ['hungry'], chip: '30 min' },

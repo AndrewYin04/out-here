@@ -14,9 +14,9 @@ import type {
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
   RateHangoutBody, ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
-import type { Backend } from './backend';
+import { rowKey, type Backend } from './backend';
 import { pairSignals } from './matching';
-import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow, TogetherRow } from './db';
+import { PRIMARY_KEYS, type AvailabilityRow, type CrewRow, type Db, type InviteRow, type QuestRow, type TableKey, type TogetherRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
@@ -74,6 +74,8 @@ function decodeCursor(c: string | null | undefined): FeedCursor | null {
 }
 const olderThan = (p: Post, c: FeedCursor | null) => !c || p.createdAt < c.at || (p.createdAt === c.at && p.id < c.id);
 const postOrder = (a: Post, b: Post) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id);
+
+type RowOf = Record<string, unknown>;
 
 export class CoreStore {
   constructor(readonly backend: Backend) {}
@@ -917,14 +919,38 @@ export class CoreStore {
 
   // ---------- Demo reset ----------
   /**
+   * The other tables a rehearsal writes to (Marketplace holds and watches, photos and crews,
+   * ratings, Messenger, notifications, check-ins), children before parents: rows the seed does
+   * not have are removed in this order, and the seed's rows come back in the reverse order.
+   */
+  private static readonly RESET_TABLES: readonly TableKey[] = [
+    'listingHolds', 'watchEvents', 'museWants', 'listings',
+    'memories', 'hangAgain', 'hangoutRatings', 'crewMembers', 'crews',
+    'messages', 'threadMembers', 'threads', 'notifications', 'questCheckins',
+  ];
+
+  /**
    * Puts the live demo story back to `fresh` (the seed built for now): every plan's times and
-   * seats, who's in them, free windows, invites, shared plans and location sharing. Plans people
-   * created are removed. Posts, profiles, friends, crews and past memories are left alone.
+   * seats, who's in them, free windows, invites, shared plans and location sharing, plus
+   * RESET_TABLES (listings, holds and watches, photos and crews, ratings, Messenger,
+   * notifications). Rows people created are removed and the seed's rows come back, timed from now
+   * (seed ids are the same at any time). Posts, profiles and friends are left alone.
    * Every open tab gets demo:reset and reloads.
    */
-  async resetStory(fresh: Db): Promise<{ quests: number; members: number }> {
+  async resetStory(fresh: Db): Promise<{ quests: number; members: number; cleared: number }> {
     const db = (await this.view()).db;
     const ids = <T,>(rows: T[], key: (r: T) => string) => [...new Set(rows.map(key))];
+    // Rehearsal rows first (they point at plans and listings), children before parents.
+    let cleared = 0;
+    for (const k of CoreStore.RESET_TABLES) {
+      const keep = new Set((fresh[k] as RowOf[]).map((r) => rowKey(k, r as never)));
+      const gone = (db[k] as RowOf[]).filter((r) => !keep.has(rowKey(k, r as never)));
+      if (gone.length === 0) continue;
+      cleared += gone.length;
+      // Match on every key column; a seed row caught by the wider match comes back below.
+      const match = Object.fromEntries(PRIMARY_KEYS[k].map((c) => [c, [...new Set(gone.map((r) => r[c]))]]));
+      await this.backend.remove(k, match as never);
+    }
     if (db.togetherPlans.length) await this.backend.remove('togetherPlans', { id: ids(db.togetherPlans, (p) => p.id) });
     if (db.invites.length) await this.backend.remove('invites', { id: ids(db.invites, (i) => i.id) });
     if (db.availability.length) await this.backend.remove('availability', { id: ids(db.availability, (a) => a.id) });
@@ -937,8 +963,11 @@ export class CoreStore {
     if (fresh.availability.length) await this.backend.insert('availability', fresh.availability);
     if (fresh.invites.length) await this.backend.insert('invites', fresh.invites);
     if (fresh.locationShares.length) await this.backend.upsert('locationShares', fresh.locationShares);
+    for (const k of [...CoreStore.RESET_TABLES].reverse()) {
+      if ((fresh[k] as RowOf[]).length) await this.backend.upsert(k, fresh[k] as never);
+    }
     await publish('demo:reset', { at: iso() });
-    return { quests: fresh.quests.length, members: fresh.questMembers.length };
+    return { quests: fresh.quests.length, members: fresh.questMembers.length, cleared };
   }
 
   // ---------- Out Here: plan together ----------
