@@ -27,7 +27,7 @@ type Common = {
 
 export function buttonClass({ variant = 'primary', size = 'md', block = false }: Omit<Common, 'icon'> = {}): string {
   return cn(
-    'inline-flex select-none items-center justify-center rounded-btn font-semibold transition-colors',
+    'oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold',
     'disabled:cursor-not-allowed disabled:opacity-50',
     VARIANTS[variant],
     SIZES[size],

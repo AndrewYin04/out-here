@@ -2,11 +2,11 @@
 // "Am I free?" and who's free with you:
 // - useMyStatus: the viewer's status (Free till X / Free at X / Busy) and actions to change it.
 //   Free creates an availability window friends can see; Busy ends them and gives no reason.
-// - StatusRow: that status at the top of the "I'm free" composer, so status and Muse are one place.
+// - StatusCard: that status at the top of the "I'm free" composer (+30 min, Busy), updated at once.
 // - BothFreeNudge: who's free when you are, the suggested group, and the shared plan once
 //   someone in the group started one.
 import { ChevronDown, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { apiFetch, apiPost, useApi, useViewer } from '@/features/data';
 import { Avatar, cn } from '@/features/ui';
 import {
@@ -40,17 +40,44 @@ function useNowTick(ms = 30_000): number {
   return tick;
 }
 
-/** The viewer's status and the actions that change it. */
+// ---- Optimistic status ----
+// A tap on Free / Busy / +30 min changes every status UI on the page at once (the I'm free
+// button, the composer's status card), then the server write catches up in the background.
+// The local value wins until the server says the same thing (or 20 s pass, or the write fails).
+type Local = { items: Availability[]; at: number } | null;
+let local: Local = null;
+const localListeners = new Set<() => void>();
+function setLocal(next: Local) { local = next; for (const l of localListeners) l(); }
+function useLocal(): Local {
+  return useSyncExternalStore((l) => { localListeners.add(l); return () => { localListeners.delete(l); }; }, () => local, () => null);
+}
+const LOCAL_TTL_MS = 20_000;
+
+function windowOf(start: Date, end: Date, text: string, where: LatLng): Availability {
+  return { id: 'local', userId: 'me', text, startsAt: start.toISOString(), endsAt: end.toISOString(), location: where, intent: null, createdAt: new Date().toISOString() };
+}
+
+/** The viewer's status and the actions that change it (optimistic). */
 export function useMyStatus() {
   useNowTick();
   const mine = useMyAvailability();
   const share = useApi<{ share: LocationShare | null }>('/api/locations/me');
-  const status = freeStatus(mine.data?.items ?? [], new Date());
+  const override = useLocal();
+  const server = mine.data?.items ?? [];
+  const serverStatus = freeStatus(server, new Date());
+  const localStatus = override ? freeStatus(override.items, new Date()) : null;
+  const sameAsServer = !!localStatus && localStatus.kind === serverStatus.kind
+    && (localStatus.kind !== 'free' || serverStatus.kind !== 'free' || Math.abs(Date.parse(localStatus.until) - Date.parse(serverStatus.until)) < 90_000);
+  const useOverride = !!override && !sameAsServer && Date.now() - override.at < LOCAL_TTL_MS;
+  const items = useOverride ? override!.items : server;
+  const status = useOverride ? localStatus! : serverStatus;
+  const note = items.find((a) => Date.parse(a.endsAt) > Date.now())?.text ?? null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const where: LatLng = share.data?.share?.location ?? DEMO_CENTER;
 
-  const run = useCallback(async (action: () => Promise<unknown>) => {
+  const run = useCallback(async (optimistic: Availability[], action: () => Promise<unknown>) => {
+    setLocal({ items: optimistic, at: Date.now() });
     setBusy(true);
     setError(null);
     try {
@@ -58,20 +85,33 @@ export function useMyStatus() {
       availabilityChanged();
       await mine.refetch();
     } catch {
+      setLocal(null);
       setError('Couldn’t update your status. Try again.');
     } finally {
       setBusy(false);
     }
   }, [mine]);
 
-  const setFree = (startMin: number, lengthMin: number, note = 'free') => run(() => {
+  /** Free from now (or from startMin) for lengthMin minutes, with a note ("hungry"). */
+  const setFree = (startMin: number, lengthMin: number, text = 'free') => {
     // "Now" starts a few seconds back so client/server clock skew can't make it "later".
     const start = new Date(Date.now() + (startMin === 0 ? -5_000 : startMin * 60_000));
     const end = new Date(Date.now() + (startMin + lengthMin) * 60_000);
-    return apiPost('/api/availability', { text: note.trim() || 'free', startsAt: start.toISOString(), endsAt: end.toISOString(), location: where });
-  });
-  const setBusyStatus = () => run(() => apiFetch('/api/availability', { method: 'DELETE' }));
-  return { status, busy, error, setFree, setBusy: setBusyStatus };
+    const t = text.trim() || 'free';
+    return run([windowOf(start, end, t, where)], () =>
+      apiPost('/api/availability', { text: t, startsAt: start.toISOString(), endsAt: end.toISOString(), location: where }));
+  };
+  /** +30 min on the current free time, keeping the note. */
+  const extend = (minutes = 30) => {
+    if (status.kind === 'busy') return setFree(0, minutes, note ?? 'free');
+    const start = status.kind === 'free' ? new Date(Date.now() - 5_000) : new Date(status.from);
+    const end = new Date(Date.parse(status.until) + minutes * 60_000);
+    const t = note ?? 'free';
+    return run([windowOf(start, end, t, where)], () =>
+      apiPost('/api/availability', { text: t, startsAt: start.toISOString(), endsAt: end.toISOString(), location: where }));
+  };
+  const setBusyStatus = () => run([], () => apiFetch('/api/availability', { method: 'DELETE' }));
+  return { status, note, busy, error, setFree, extend, setBusy: setBusyStatus };
 }
 
 export function StatusDot({ s, className }: { s: FreeStatus; className?: string }) {
@@ -84,37 +124,41 @@ export function StatusDot({ s, className }: { s: FreeStatus; className?: string 
   );
 }
 
-const QUICK = [{ label: '30 min', min: 30 }, { label: '1 hr', min: 60 }, { label: '2 hr', min: 120 }] as const;
-
 /**
- * Top of the composer. Free: "You're free till 3:49 · friends can see it · Set busy".
- * Busy: "Just show friends you're free" with 30 min / 1 hr / 2 hr (no Muse needed).
- * Sending the composer also marks you free for the window Muse understood.
+ * Top of the composer when you're free: "● Free till 5:08 PM · hungry", with +30 min and Busy.
+ * Busy shows right away and the card goes, so it's clear you're busy. To change your time or
+ * note, use the pickers below and "Update status".
  */
-export function StatusRow({ note }: { note?: string }) {
-  const { status, busy, error, setFree, setBusy } = useMyStatus();
+export function StatusCard() {
+  const { status, note, busy, error, extend, setBusy } = useMyStatus();
+  if (status.kind === 'busy') {
+    return (
+      <div className="px-4 pb-2" data-testid="status-row" data-status="busy">
+        <p className="flex items-center gap-2 text-[13px] text-fb-text-2">
+          <StatusDot s={status} />
+          <span><span className="font-semibold text-fb-text">You’re busy</span> · friends don’t see you as free</span>
+        </p>
+        {error && <p role="alert" className="mt-1 text-[13px] text-fb-red">{error}</p>}
+      </div>
+    );
+  }
   return (
     <div className="px-4 pb-2" data-testid="status-row" data-status={status.kind}>
-      {status.kind === 'busy' ? (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <span className="text-[13px] text-fb-text-2">Or just show friends you’re free:</span>
-          {QUICK.map((o) => (
-            <button key={o.min} type="button" disabled={busy} aria-label={`Free now for ${o.label}`}
-              onClick={() => void setFree(0, o.min, note)}
-              className="h-7 rounded-pill bg-fb-blue-tint px-2.5 text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50">
-              {o.label}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="flex flex-wrap items-center gap-2 text-[13px] text-fb-text-2">
-          <StatusDot s={status} />
-          <span><span className="font-semibold text-fb-text">You’re {freeStatusLabel(status).replace(/^Free/, 'free')}</span> · friends can see it</span>
-          <button type="button" disabled={busy} onClick={() => void setBusy()} className="font-semibold text-fb-blue hover:underline disabled:opacity-50">
-            Set busy
-          </button>
+      <div className="flex items-center gap-2 rounded-card bg-[#E7F3E8] px-3 py-2">
+        <StatusDot key={status.kind} s={status} className={status.kind === 'free' ? 'animate-ping-once' : undefined} />
+        <p className="min-w-0 flex-1 text-[14px] leading-5 text-fb-text">
+          <span className="block font-semibold">{freeStatusLabel(status)}</span>
+          <span className="block truncate text-[12px] text-fb-text-2">{note && note !== 'free' ? `${note} · ` : ''}friends can see it</span>
         </p>
-      )}
+        <button type="button" disabled={busy} onClick={() => void extend(30)}
+          className="oh-press h-8 shrink-0 rounded-pill bg-fb-surface px-3 text-[13px] font-semibold text-fb-text shadow-card disabled:opacity-50">
+          +30 min
+        </button>
+        <button type="button" disabled={busy} onClick={() => void setBusy()} data-testid="set-busy"
+          className="oh-press h-8 shrink-0 rounded-pill bg-fb-surface px-3 text-[13px] font-semibold text-fb-text shadow-card disabled:opacity-50">
+          Busy
+        </button>
+      </div>
       {error && <p role="alert" className="mt-1 text-[13px] text-fb-red">{error}</p>}
     </div>
   );
@@ -177,8 +221,8 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const live = shared.data?.plans ?? [];
   const pending = live.find((p) => p.status === 'proposing');
   const done = live.find((p) => p.status === 'confirmed');
-  if (pending) return <SharedBanner plan={pending} viewerId={viewer.id} className={className} />;
-  if (done && hidden !== done.id) return <SharedBanner plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
+  if (pending) return <SharedBanner key={`${pending.id}:${(pending.votes[viewer.id] ?? []).length > 0}`} plan={pending} viewerId={viewer.id} className={className} />;
+  if (done && hidden !== done.id) return <SharedBanner key={`${done.id}:confirmed`} plan={done} viewerId={viewer.id} className={className} onHide={() => setHidden(done.id)} />;
   if (items.length === 0 || hidden === groupKey) return null;
   const byId = new Map(items.map((i) => [i.friend.id, i]));
   const group = (api.data?.group ?? []).flatMap((id) => byId.get(id) ?? []);
@@ -198,7 +242,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
   const toggle = (id: string) => setPicked((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
-    <div role="region" aria-label="Friends free when you are" data-testid="both-free" className={cn('rounded-card bg-fb-surface shadow-popover', className)}>
+    <div role="region" aria-label="Friends free when you are" data-testid="both-free" className={cn('animate-drop-in rounded-card bg-fb-surface shadow-popover', className)}>
       <div className="flex items-center gap-3 p-2.5 pr-2">
         <span className="flex shrink-0 -space-x-3">
           {lead.slice(0, 3).map((g) => (
@@ -213,7 +257,7 @@ export function BothFreeNudge({ className }: { className?: string }) {
         </div>
         {!expanded && (
           <button type="button" onClick={() => plan(lead)} disabled={starting} data-testid="free-see-plans"
-            className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
+            className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-70">
             {starting ? '✨ Asking…' : 'See plans'}
           </button>
         )}
@@ -294,7 +338,7 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
     : `✨ Muse picked ${plan.options.length} ${plan.options.length === 1 ? 'option' : 'options'} that fit ${others.length === 1 ? 'both of you' : 'all of you'}`;
   return (
     <div role="region" aria-label="Your shared plan" data-testid="shared-banner"
-      className={cn('flex items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>
+      className={cn('flex animate-drop-in items-center gap-3 rounded-card bg-fb-surface p-2.5 pr-2 shadow-popover', className)}>
       <span className="flex shrink-0 -space-x-3">
         {others.slice(0, 3).map((m) => (
           <span key={m.id} className="rounded-full ring-[3px] ring-fb-green">
@@ -307,7 +351,7 @@ function SharedBanner({ plan, viewerId, className, onHide }: { plan: TogetherVie
         <p className="truncate text-[12px] text-fb-text-2">{sub}</p>
       </div>
       <button type="button" onClick={() => openTogether(plan.id)}
-        className="h-9 shrink-0 rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+        className="h-9 shrink-0 oh-press rounded-btn bg-fb-blue px-3 text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
         {confirmed ? 'Open' : iVoted ? 'Open' : 'See plans'}
       </button>
       {onHide && (

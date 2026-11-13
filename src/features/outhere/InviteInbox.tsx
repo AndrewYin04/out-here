@@ -3,7 +3,7 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
-import { Avatar, Button, IconButton } from '@/features/ui';
+import { Avatar, Button, IconButton, celebrateJoin } from '@/features/ui';
 import { errorText } from './plan-api';
 import { SeatsBadge } from './SuggestionCard';
 
@@ -54,18 +54,19 @@ export function InviteInbox() {
     setItems((all) => all.filter((i) => i.id !== id));
   };
 
-  const respond = async (inv: Shown, status: 'accepted' | 'declined') => {
+  const respond = async (inv: Shown, status: 'accepted' | 'declined', from: HTMLElement | null = null) => {
     if (inv.busy) return;
     patch(inv.id, { busy: true, error: undefined });
     try {
       const out = await apiPost<{ quest?: InviteView['quest']; joinedAlone?: boolean }>(
         `/api/invites/${inv.id}/respond`, { status });
-      const from = inv.from?.name.split(' ')[0] ?? 'your friend';
+      if (status === 'accepted' && out.quest) celebrateJoin(from, out.quest.id, viewer.avatarUrl, out.quest.emoji ?? '✨');
+      const who = inv.from?.name.split(' ')[0] ?? 'your friend';
       const result = status === 'declined'
         ? 'Declined.'
         : out.quest
-          ? out.joinedAlone ? `You're in. ${from} didn't fit, only one seat was left.` : `You're in with ${from}.`
-          : `Accepted. ${from} will see it.`;
+          ? out.joinedAlone ? `You're in. ${who} didn't fit, only one seat was left.` : `You're in with ${who}.`
+          : `Accepted. ${who} will see it.`;
       patch(inv.id, { busy: false, result, status, quest: out.quest ?? inv.quest });
       if (status === 'declined') setTimeout(() => dismiss(inv.id), 1500);
     } catch (e) {
@@ -84,7 +85,7 @@ export function InviteInbox() {
 }
 
 function InviteCard({ inv, onRespond, onDismiss }: {
-  inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined') => void; onDismiss: (id: string) => void;
+  inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined', from?: HTMLElement | null) => void; onDismiss: (id: string) => void;
 }) {
   const from = inv.from?.name.split(' ')[0] ?? 'A friend';
   // Live seats: the quest channel updates this card when someone else takes a seat.
@@ -98,7 +99,7 @@ function InviteCard({ inv, onRespond, onDismiss }: {
     <section
       data-testid="invite-card"
       aria-label={`Invite from ${from}`}
-      className="pointer-events-auto animate-toast-in rounded-card bg-fb-surface p-3 shadow-popover"
+      className="pointer-events-auto animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover"
     >
       <div className="flex items-start gap-3">
         <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={40} />
@@ -124,10 +125,10 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       )}
       {inv.error && <p role="alert" className="mt-2 text-[13px] text-fb-red">{inv.error}</p>}
       {inv.result ? (
-        <p data-testid="invite-result" className="mt-2 text-[13px] font-semibold text-fb-text">{inv.result}</p>
+        <p data-testid="invite-result" className="mt-2 animate-step-in text-[13px] font-semibold text-fb-text">{inv.result}</p>
       ) : (
         <div className="mt-3 flex gap-2">
-          <Button block disabled={inv.busy || seats === 0} onClick={() => onRespond(inv, 'accepted')}>
+          <Button block disabled={inv.busy || seats === 0} onClick={(e) => onRespond(inv, 'accepted', e.currentTarget)}>
             {seats === 0 ? 'Full' : alone ? `Join without ${from}` : 'Accept'}
           </Button>
           <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Decline</Button>

@@ -3,9 +3,9 @@
 // Non-modal, so the map, its attribution and the other Out Here controls stay usable.
 import { ChevronRight, Clock, Footprints, MapPin, Users, Wallet, X } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { ApiFetchError, apiPost, useApi, type QuestDetail } from '@/features/data';
-import { Avatar, Button, IconButton, Skeleton, useToast } from '@/features/ui';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
+import { Avatar, Button, IconButton, Skeleton, bump, celebrateJoin, cn, useToast } from '@/features/ui';
 import type { PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
 import { friendsGoingLine, priceLabel, startsLabel, walkLabel } from './format';
@@ -32,9 +32,15 @@ function friendsFirst(members: PersonCard[], hostId: string | undefined, viewerI
 export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onChanged, museReason = null }: QuestPanelProps) {
   const { data, error, loading, refetch } = useApi<QuestDetail>(`/api/quests/${questId}`, [`quest:${questId}`]);
   const toast = useToast();
-  const [busy, setBusy] = useState(false);
+  const { viewer } = useViewer();
+  /** Join/leave shown at once (optimistic); cleared when the server answers. */
+  const [pending, setPending] = useState<'join' | 'leave' | null>(null);
+  const busy = pending !== null;
   const seatsRef = useRef<HTMLSpanElement>(null);
   const prevSeats = useRef<number | null>(null);
+  const prevMembers = useRef<Set<string> | null>(null);
+  /** People who joined while this panel was open: their row slides in. */
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
   const shown = data && data.quest.id === questId ? data : null;
 
   useEffect(() => {
@@ -43,32 +49,47 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Pulse the live seat count when another person joins or leaves.
+  // Live: bump the seat count when someone joins or leaves, and say who just joined.
   useEffect(() => {
     if (!shown) return;
-    if (prevSeats.current !== null && prevSeats.current !== shown.seatsLeft) {
-      seatsRef.current?.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 500, iterations: 2 });
-    }
+    if (prevSeats.current !== null && prevSeats.current !== shown.seatsLeft) bump(seatsRef.current, '', 1.2);
     prevSeats.current = shown.seatsLeft;
-  }, [shown]);
+    const ids = new Set(shown.members.map((m) => m.id));
+    const before = prevMembers.current;
+    prevMembers.current = ids;
+    if (!before) return;
+    const joined = shown.members.filter((m) => !before.has(m.id));
+    if (joined.length === 0) return;
+    setFresh(new Set(joined.map((m) => m.id)));
+    const others = joined.filter((m) => m.id !== viewerId);
+    if (others.length > 0) toast.show(`${others.map((m) => m.name.split(' ')[0]).join(' and ')} just joined`);
+    // toast is stable for the provider's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, viewerId]);
 
-  async function act(kind: 'join' | 'leave') {
-    setBusy(true);
+  // Optimistic: the button, the seat count and the celebration happen on tap; the server
+  // confirms in the background (a full quest puts it back and says so).
+  async function act(kind: 'join' | 'leave', e?: MouseEvent<HTMLButtonElement>) {
+    const from = e?.currentTarget ?? null;
+    setPending(kind);
+    if (kind === 'join') celebrateJoin(from, questId, viewer.avatarUrl, q?.emoji ?? '✨');
+    toast.show(kind === 'join' ? "You're in. See you there." : 'You left this plan.');
     try {
       await apiPost(`/api/quests/${questId}/${kind}`, {});
-      toast.show(kind === 'join' ? "You're in. See you there." : 'You left this plan.');
     } catch (e) {
       if (e instanceof ApiFetchError && e.status === 409) toast.show('Someone just took the last spot.');
       else toast.show(kind === 'join' ? "Couldn't join. Try again." : "Couldn't leave. Try again.");
     } finally {
-      setBusy(false);
       await refetch();
+      setPending(null);
       onChanged();
     }
   }
 
   const q = shown?.quest;
-  const isMember = shown?.viewerIsMember ?? false;
+  const serverMember = shown?.viewerIsMember ?? false;
+  const isMember = pending === 'join' ? true : pending === 'leave' ? false : serverMember;
+  const seatsLeft = shown ? Math.max(0, shown.seatsLeft + (isMember === serverMember ? 0 : isMember ? -1 : 1)) : 0;
   const isHost = q?.hostId === viewerId;
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
   const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
@@ -78,7 +99,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
     <section
       aria-label={q ? q.title : 'Plan details'}
       data-testid="quest-sheet"
-      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[58%] flex-col rounded-t-sheet bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[380px] md:rounded-card"
+      className="absolute inset-x-0 bottom-0 z-20 flex max-h-[58%] animate-sheet-up flex-col rounded-t-sheet bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[380px] md:animate-panel-in md:rounded-card"
     >
       {/* On phones the attribution rides on top of the sheet so it is never covered. */}
       <MapAttribution className="absolute bottom-full right-0 mb-1 md:hidden" />
@@ -155,8 +176,8 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               </li>
               <li className="flex items-center gap-2">
                 <Users size={18} className="text-fb-text-2" aria-hidden />
-                <span ref={seatsRef} data-testid="quest-seats" className={shown.seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2'}>
-                  {shown.seatsLeft > 0 ? `${shown.seatsLeft} ${shown.seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
+                <span ref={seatsRef} data-testid="quest-seats" className={cn('origin-left', seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2')}>
+                  {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
                 </span>
                 <span className="text-fb-text-2">· {q.capacity} max</span>
               </li>
@@ -174,7 +195,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               {friendLine && <p className="text-fb-meta text-fb-text-2" data-testid="quest-friends-going">{friendLine}</p>}
               <ul className="mt-2 space-y-2" data-testid="quest-going">
                 {people.map((p) => (
-                  <li key={p.id} className="flex items-center gap-2">
+                  <li key={p.id} className={cn('flex items-center gap-2', fresh.has(p.id) && 'animate-rise')}>
                     <Avatar src={p.avatarUrl} name={p.name} size={36} decorative />
                     <span className="min-w-0 flex-1 truncate text-fb-body font-semibold">{p.id === viewerId ? `${p.name} (you)` : p.name}</span>
                     {p.id === q.hostId && <span className="text-fb-meta text-fb-text-2">Host</span>}
@@ -205,11 +226,11 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
             isHost ? (
               <p className="text-center text-fb-body font-semibold text-fb-text-2">You&apos;re hosting this plan</p>
             ) : (
-              <Button variant="secondary" block disabled={busy} onClick={() => act('leave')}>Leave</Button>
+              <Button variant="secondary" block disabled={busy} onClick={() => void act('leave')}>Leave</Button>
             )
           ) : (
-            <Button variant="primary" block disabled={busy || shown.seatsLeft === 0} onClick={() => act('join')}>
-              {shown.seatsLeft === 0 ? 'Full' : 'Join'}
+            <Button variant="primary" block disabled={busy || seatsLeft === 0} onClick={(e) => void act('join', e)}>
+              {seatsLeft === 0 ? 'Full' : 'Join'}
             </Button>
           )}
           {!isMember && <ReportButton questId={questId} onReported={() => { onChanged(); onClose(); }} className="mx-auto mt-2" />}

@@ -28,3 +28,4 @@ export type { EmptyStateProps } from './EmptyState';
 export { ToastProvider, useToast } from './Toast';
 export type { ToastOptions } from './Toast';
 export { useMounted } from './useOverlay';
+export { EASE, bump, burst, celebrateJoin, dropIn, flash, flyAvatar, questPin, reducedMotion, squash } from './motion';
