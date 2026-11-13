@@ -94,7 +94,7 @@ Suggested matching rules (Alex decides):
 
 ## Deploying
 
-Apply `0004_hangout_ratings.sql` to out-here-dev and out-here-demo before deploying this branch. Without it, `npm run seed` / `seed:demo` fail (they truncate `hangout_ratings` and `hang_again`), and the "How was it?" notification is rejected by the old `notifications_type_check`. "We're done" still succeeds then: the rating prompt is isolated from the completion.
+Apply `0004_hangout_ratings.sql` to out-here-dev and out-here-demo before deploying this branch. Without it, `npm run seed` / `seed:demo` fail (they truncate `hangout_ratings` and `hang_again`), and without `0008_notification_types_union.sql` the "How was it?" notification is rejected by `notifications_type_check` (0008 is already applied to both). "We're done" still succeeds then: the rating prompt is isolated from the completion.
 
 ## Seed
 

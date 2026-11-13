@@ -42,15 +42,7 @@ create trigger hangout_ratings_touch before update on public.hangout_ratings
 alter table public.hangout_ratings enable row level security;
 alter table public.hang_again      enable row level security;
 
--- "How was Dumpling Den?" notifications after a hangout ends.
--- Both lists are the union of every migration that sets them: 0001_init plus 'intro' from
--- 0003_intros (on overnight). This file sorts after 0003_intros, so a list without 'intro' here
--- would reject every Muse Intro notification. A later migration that edits these checks must keep
--- every value already listed.
-alter table public.notifications drop constraint if exists notifications_type_check;
-alter table public.notifications add constraint notifications_type_check check (type in (
-  'friend_request', 'friend_accept', 'comment', 'reply', 'reaction', 'group_post', 'event_invite',
-  'quest_invite', 'quest_join', 'message', 'intro', 'hangout_rate'));
-alter table public.notifications drop constraint if exists notifications_object_type_check;
-alter table public.notifications add constraint notifications_object_type_check check (object_type in
-  ('post', 'comment', 'profile', 'group', 'event', 'quest', 'invite', 'thread', 'intro'));
+-- The "How was Dumpling Den?" notification type 'hangout_rate' is allowed by
+-- 0008_notification_types_union.sql, which holds the one list of notification types. This file
+-- does not touch notifications_type_check: on a database where 0007 or 0008 already ran, the
+-- runner applies this file after them, and rebuilding the check here would drop their values.

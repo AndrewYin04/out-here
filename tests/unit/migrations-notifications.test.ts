@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 // Each migration that rebuilds a notifications check replaces the whole list, so the one that
 // sorts last must allow every value any migration (or the TypeScript union) ever allowed.
 // Otherwise applying it fails on existing rows, or later inserts of a dropped type are rejected.
+// It reads every .sql file in supabase/migrations in name order, the order the runner applies them.
 const DIR = join(process.cwd(), 'supabase', 'migrations');
 const files = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort();
 
@@ -42,9 +43,21 @@ describe('notifications check constraints across migrations', () => {
     });
   }
 
-  it('the last type list keeps intro (0003_intros) and adds hangout_rate', () => {
-    const all = lists('type');
-    const last = all[all.length - 1];
-    expect(last.values).toEqual(expect.arrayContaining(['message', 'intro', 'hangout_rate']));
-  });
+  // 0008 holds the union of every branch's list, including values from migrations that are not
+  // on this branch (0003_intros, 0004_hangout_ratings, 0007_listing_pickups). A later file that
+  // rebuilds the checks must keep all of them, even if those migrations are absent here.
+  const UNION = {
+    type: ['friend_request', 'friend_accept', 'comment', 'reply', 'reaction', 'group_post', 'event_invite',
+      'quest_invite', 'quest_join', 'message', 'intro', 'hangout_rate', 'listing_hold', 'listing_update'],
+    object_type: ['post', 'comment', 'profile', 'group', 'event', 'quest', 'invite', 'thread', 'intro', 'listing'],
+  } as const;
+
+  for (const column of ['type', 'object_type'] as const) {
+    it(`the last ${column} list is 0008 or later and keeps every value in 0008's union`, () => {
+      const all = lists(column);
+      const last = all[all.length - 1];
+      expect(last.file >= '0008_notification_types_union.sql').toBe(true);
+      expect(UNION[column].filter((v) => !last.values.includes(v))).toEqual([]);
+    });
+  }
 });
