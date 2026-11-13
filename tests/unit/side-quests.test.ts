@@ -3,6 +3,7 @@ import { dateInZone, profileId, setNow, SUBMIT_GRACE_MS, zonedTimeToUtc } from '
 import { createMemoryStore } from '@/features/data/memory-store';
 import type { CoreStore } from '@/features/data/core';
 import { HttpError } from '@/features/data/errors';
+import { demoControlsEnabled } from '@/features/data/sidequest';
 
 // Daily Side Quests against the in-process store: schedule persistence, server-side deadlines,
 // duplicates, privacy, the board, Memories and the weekly streak.
@@ -291,5 +292,51 @@ describe('progress, Memories and the weekly streak', () => {
     const r = await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: '', crewId: null });
     expect(await store.streak(alex)).toEqual(before);
     expect(r.state.weeklyStreak).toEqual(before);
+  });
+});
+
+describe('the presenter button (server trigger)', () => {
+  it('is allowed only where the server enables it', () => {
+    expect(demoControlsEnabled({ NODE_ENV: 'production' })).toBe(false);
+    expect(demoControlsEnabled({ NODE_ENV: 'production', OUTHERE_DEMO_CONTROLS: '0' })).toBe(false);
+    expect(demoControlsEnabled({ NODE_ENV: 'production', OUTHERE_DEMO_CONTROLS: '1' })).toBe(true);
+    expect(demoControlsEnabled({ NODE_ENV: 'development' })).toBe(true);
+    expect(demoControlsEnabled({ NODE_ENV: 'development', OUTHERE_DEMO_CONTROLS: '0' })).toBe(false);
+  });
+
+  it('is refused by the server in production, whatever the browser sends', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(await status(store.sideQuestTrigger(alex, 120))).toBe(403);
+    expect((await store.sideQuestState(alex)).demo).toBe(false);
+  });
+
+  it('opens the quest now and ends after the chosen time', async () => {
+    const before = await store.sideQuestState(alex);
+    expect(before.demo).toBe(true);
+    const s = await store.sideQuestTrigger(alex, 120);
+    expect(s.phase).toBe('active');
+    expect(new Date(s.deadlineAt).getTime() - NOW.getTime()).toBe(120_000);
+    expect((await store.sideQuestState(alex)).deadlineAt).toBe(s.deadlineAt); // persisted like any drop
+    expect(await status(store.sideQuestTrigger(alex, 5))).toBe(400);
+    expect(await status(store.sideQuestTrigger(alex, 99999))).toBe(400);
+  });
+
+  it('can run again after a quest was completed, touching only the viewer\'s own records', async () => {
+    await store.sideQuestTrigger(alex, 120);
+    await store.sideQuestSubmit(alex, { file: photo(), audience: 'community', caption: 'first', crewId: null });
+    await store.sideQuestTrigger(maya, 120);
+    await store.sideQuestSubmit(maya, { file: photo(), audience: 'community', caption: 'maya', crewId: null });
+    const db0 = (await store.view()).db;
+    const others = { posts: db0.posts.filter((p) => p.targetType !== 'sidequest').length, memories: db0.memories.length, quests: db0.quests.length, crews: db0.crews.length };
+
+    const again = await store.sideQuestTrigger(alex, 120);
+    expect(again.phase).toBe('active');
+    expect(again.entry).toBeNull();
+    const db1 = (await store.view()).db;
+    // Alex's entry and board post are gone; Maya's are exactly as they were.
+    expect(db1.dailyEntries.filter((e) => !!e.challengeId).map((e) => e.userId)).toEqual([maya]);
+    expect(db1.posts.filter((p) => p.targetType === 'sidequest').map((p) => p.authorId)).toEqual([maya]);
+    expect({ posts: db1.posts.filter((p) => p.targetType !== 'sidequest').length, memories: db1.memories.length, quests: db1.quests.length, crews: db1.crews.length }).toEqual(others);
+    expect((await store.sideQuestState(maya)).entry?.caption).toBe('maya');
   });
 });

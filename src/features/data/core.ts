@@ -21,7 +21,7 @@ import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
   setSideQuestPrefs, sideQuestBoard, sideQuestHistory, sideQuestPhoto, sideQuestPrefs, sideQuestReport,
-  sideQuestState, sideQuestSubmit, sideQuestUnshare, type SubmitInput,
+  sideQuestState, sideQuestSubmit, sideQuestTrigger, sideQuestUnshare, type SubmitInput,
 } from './sidequest';
 import type { SideQuestPrefs } from '@/shared/api';
 
@@ -968,6 +968,7 @@ export class CoreStore {
   sideQuestUnshare(viewerId: ID, date: string) { return sideQuestUnshare(this, viewerId, date); }
   sideQuestReport(viewerId: ID, body: { date: string; userId: ID }) { return sideQuestReport(this, viewerId, body); }
   sideQuestHistory(viewerId: ID) { return sideQuestHistory(this, viewerId); }
+  sideQuestTrigger(viewerId: ID, seconds?: number) { return sideQuestTrigger(this, viewerId, seconds); }
   sideQuestPhoto(viewerId: ID, date: string, userId: ID) { return sideQuestPhoto(this, viewerId, date, userId); }
   sideQuestPrefs(viewerId: ID) { return sideQuestPrefs(this, viewerId); }
   setSideQuestPrefs(viewerId: ID, prefs: SideQuestPrefs) { return setSideQuestPrefs(this, viewerId, prefs); }

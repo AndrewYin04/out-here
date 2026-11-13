@@ -211,6 +211,7 @@ export type ThreadsResponse = { threads: ThreadView[] };
 // GET    /api/daily/side-quest/history          -> SideQuestHistoryResponse
 // GET|PUT /api/daily/side-quest/prefs           -> SideQuestPrefs   (active window / quiet hours)
 // GET    /api/daily/photo?date&userId           -> image bytes (owner, or anyone when shared with the community)
+// POST   /api/daily/side-quest/demo             body: SideQuestTriggerBody -> SideQuestState (presenter button; 403 unless the server enables it)
 export type SideQuestPrefs = { startMin: number; endMin: number; tz: string };
 
 /** A person's own entry for a date (private unless shared). */
@@ -241,6 +242,8 @@ export type SideQuestState = {
   crews: { id: string; name: string }[];
   /** The viewer's weekly in-person streak (existing meaning, unchanged). */
   weeklyStreak: { weeks: number; thisWeekDone: boolean };
+  /** The presenter button is enabled on this server for this viewer. */
+  demo: boolean;
 };
 
 export type SideQuestBoardEntry = {
@@ -278,3 +281,6 @@ export type SideQuestHistoryResponse = {
   /** Completed entries, newest first (the personal Side Quest memories). */
   memories: (SideQuestEntry & { title: string; emoji: string })[];
 };
+
+/** Open today's quest now; it ends `deadlineSeconds` from now (default 180). */
+export type SideQuestTriggerBody = { deadlineSeconds?: number };

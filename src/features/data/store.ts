@@ -92,6 +92,7 @@ export interface DataStore {
   sideQuestHistory: CoreStore['sideQuestHistory'];
   sideQuestPhoto: CoreStore['sideQuestPhoto'];
   sideQuestPrefs: CoreStore['sideQuestPrefs'];
+  sideQuestTrigger: CoreStore['sideQuestTrigger'];
   setSideQuestPrefs: CoreStore['setSideQuestPrefs'];
   // marketplace, reels, uploads
   listings: CoreStore['listings'];

@@ -19,7 +19,7 @@ import type {
   SideQuestBoardEntry, SideQuestBoardResponse, SideQuestEntry, SideQuestHistoryItem,
   SideQuestHistoryResponse, SideQuestPrefs, SideQuestState, SideQuestSubmitResponse,
 } from '@/shared/api';
-import type { Memory, Post } from '@/shared';
+import type { Memory, Post, Profile } from '@/shared';
 import type { CoreStore } from './core';
 import type { DailyEntryRow, SideQuestDropRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
@@ -36,6 +36,21 @@ const rand: Rand = (max) => {
   crypto.getRandomValues(buf);
   return buf[0] % max;
 };
+
+// ---------------------------------------------------------------- demo trigger
+/**
+ * The presenter button ("Drop a Side Quest") is allowed only where the server says so:
+ * OUTHERE_DEMO_CONTROLS=1 enables it anywhere (the demo deployment sets it), =0 disables it
+ * everywhere, and unset means "development only" (never in production). The browser only hides
+ * the button; the server checks again on every call, and only for demo personas.
+ */
+export function demoControlsEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  if (env.OUTHERE_DEMO_CONTROLS === '1') return true;
+  if (env.OUTHERE_DEMO_CONTROLS === '0') return false;
+  return env.NODE_ENV !== 'production';
+}
+
+const canDemo = (viewer: Profile | undefined): boolean => demoControlsEnabled() && !!viewer?.isDemoUser;
 
 // ---------------------------------------------------------------- locks
 // Serialises work per (person, date) inside one server instance, so a double tap cannot create
@@ -131,6 +146,7 @@ async function buildState(store: CoreStore, viewerId: string, date: string, drop
     boardCount: communityEntries(v, date).length,
     crews: crews.map((c) => ({ id: c.id, name: c.name })),
     weeklyStreak,
+    demo: canDemo(v.profileById.get(viewerId)),
   };
 }
 
@@ -320,4 +336,39 @@ export async function setSideQuestPrefs(store: CoreStore, viewerId: string, p: S
   if (!validWindow(p)) throw badRequest('Choose an active window of at least 2 hours inside one day.');
   await store.backend.upsert('sideQuestPrefs', [{ userId: viewerId, windowStartMin: p.startMin, windowEndMin: p.endMin, tz: p.tz, updatedAt: iso() }]);
   return p; // applies to days that have no drop yet; today's persisted drop never changes
+}
+
+// ---------------------------------------------------------------- demo trigger
+/**
+ * Presenter button: open today's Side Quest for the viewer right now, ending `seconds` from now.
+ * Touches only the viewer's own records for today: their previous entry (with its board post and
+ * any crew memory it made) is removed so the demo can run again, and their drop is replaced.
+ * Other people, other dates, quests, crews and Facebook content are untouched.
+ */
+export async function sideQuestTrigger(store: CoreStore, viewerId: string, seconds = 180): Promise<SideQuestState> {
+  const v0 = await store.view();
+  if (!demoControlsEnabled()) throw forbidden('the Side Quest trigger is not enabled here');
+  if (!v0.profileById.get(viewerId)?.isDemoUser) throw forbidden('the Side Quest trigger is for demo personas only');
+  if (!Number.isInteger(seconds) || seconds < 10 || seconds > 3600) throw badRequest('deadline must be 10 to 3600 seconds');
+  const window = windowOf(v0, viewerId);
+  const date = dateInZone(now(), window.tz);
+  return withLock(`submit:${viewerId}:${date}`, async () => {
+    const v = await store.view();
+    const e = v.db.dailyEntries.find((x) => x.date === date && x.userId === viewerId && isSideQuestEntry(x));
+    if (e) {
+      if (e.postId) await removePost(store, e.postId);
+      if (e.crewMemoryId) await store.backend.remove('memories', { id: e.crewMemoryId });
+      await store.backend.remove('dailyEntries', { date, userId: viewerId });
+      await store.backend.remove('dailyReports', { date, userId: viewerId });
+    }
+    const at = now();
+    const row: SideQuestDropRow = {
+      date, userId: viewerId, challengeId: challengeFor(date).id,
+      dropAt: new Date(at.getTime() - 1000).toISOString(), deadlineAt: new Date(at.getTime() + seconds * 1000).toISOString(),
+      durationMinutes: Math.max(5, Math.ceil(seconds / 60)), windowStartMin: window.startMin, windowEndMin: window.endMin, tz: window.tz,
+      createdAt: iso(),
+    };
+    await store.backend.upsert('sideQuestDrops', [row]);
+    return buildState(store, viewerId, date, row);
+  });
 }

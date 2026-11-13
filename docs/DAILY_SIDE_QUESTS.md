@@ -4,7 +4,7 @@ A surprise real-world challenge once a day. Everyone gets the same prompt; each 
 
 **Loop:** surprise popup on the map, timed mission, photo, quest complete, community board in Memories, back tomorrow.
 
-Branch: `feature/daily-side-quests`. Code: `src/features/daily/` (UI), `src/features/data/sidequest.ts` (server rules), `src/shared/sidequest.ts` (pool, schedule, time zones, phases). There is no separate Side Quest page and no demo controls.
+Branch: `feature/daily-side-quests`. Code: `src/features/daily/` (UI), `src/features/data/sidequest.ts` (server rules), `src/shared/sidequest.ts` (pool, schedule, time zones, phases). There is no separate Side Quest page.
 
 ## Where it lives
 
@@ -62,13 +62,17 @@ The older `GET /api/daily` and `POST /api/daily/entry` are left as they were.
 
 New tables `side_quest_drops`, `side_quest_prefs`, `daily_reports`. `daily_entries` gains `challenge_id`, `audience`, `caption`, `on_time`, `photo_key`, `post_id`, `crew_memory_id`, `submitted_at` (existing rows keep working). `posts.target_type` also allows `'sidequest'`. RLS is on with no anon policies. 0004 is reserved for hangout ratings (#11) and 0005 for the Memories boards branch.
 
-## Seeing it during development
+## The presenter button
 
-The drop time is random, and there is no trigger. To see the popup on a persona that has not opened Out Here today, open **Memories, My Side Quests, Quiet hours** and set a two-hour window around the current time, then open the Out Here map. The drop lands somewhere in that window, so it may be live, still coming, or already over; try another persona if so. Everything else (rules, privacy, the board) is covered by `tests/unit/side-quests.test.ts` and `tests/unit/side-quest-schedule.test.ts`.
+The drop time is random, so a live presentation cannot wait for it. On the Out Here map, a small **Drop a Side Quest** button (bottom-left) asks the server to open today's quest right now with a 3 minute deadline; the popup appears at once and runs the whole flow. Pressing it again after finishing resets the viewer's own entry and drops a fresh quest, so the demo can repeat.
+
+**Protection is on the server, not in the button.** `POST /api/daily/side-quest/demo` answers 403 unless `OUTHERE_DEMO_CONTROLS=1` is set on the server (the demo deployment sets it), or the server runs in development with the variable unset. `OUTHERE_DEMO_CONTROLS=0` disables it everywhere. The caller must also be a demo persona. The button is rendered only when the server reports `demo: true` for the viewer. It touches only the viewer's own Side Quest records for today (their previous entry with its board post and any crew memory they created, and their drop); other people, other dates, quests, crews and Facebook content are untouched. No keys or tokens reach the browser.
+
+Without the button, set a persona's quiet hours around the current time (Memories, My Side Quests, Quiet hours) and open the map: the drop lands somewhere in that window.
 
 ## Not done / known limits
 
-- **No on-demand trigger.** Because the drop is random, a live presentation cannot make the popup appear on cue. If the team wants a presenter control later, it needs a server-side switch like the one this branch used to have (removed on request).
+- **The presenter button is the only demo control.** Reset, deadline picking and board seeding were removed on request, so the board starts empty and fills only as people share. The deadline is fixed at 3 minutes.
 - **Empty board until people share.** Nothing is seeded onto the board, so on a fresh database it starts empty ("Be the first").
 - **Notifications.** The surprise appears when the Out Here map is open. There is no background web push and no notification type for it; no push infrastructure exists, so none is claimed.
 - **Comments.** The board supports reactions (the existing Like). Comments are not on the board: the existing comment API would expose strangers' full names.

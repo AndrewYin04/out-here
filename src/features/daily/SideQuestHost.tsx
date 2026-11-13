@@ -4,15 +4,18 @@
 // /out-here: when the drop arrives (or is already live when the map opens) a one-time popup reveals
 // the challenge with the live countdown. "Take photo" opens the camera, review and completion in
 // the same popup flow. "Later" minimizes it to a small countdown pill on the map, so dismissing it
-// never loses the quest. Finished quests live in Memories (the community board is there).
+// never loses the quest. Finished quests live in Memories (the community board is there). Where
+// the server enables it (development, or OUTHERE_DEMO_CONTROLS=1) a presenter button drops a
+// quest on demand.
 // Automated browsers (navigator.webdriver) skip the automatic popup so it never blocks tests; the
 // pill still appears.
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera, Sparkles } from 'lucide-react';
 import { formatCountdown, remainingMs } from '@/shared';
-import { useViewer } from '@/features/data';
-import { Button } from '@/features/ui';
+import { apiPost, useViewer } from '@/features/data';
+import type { SideQuestState } from '@/shared/api';
+import { Button, useToast } from '@/features/ui';
 import { CaptureFlow } from './CaptureFlow';
 import { Countdown } from './Countdown';
 import { useSideQuest } from './useSideQuest';
@@ -33,8 +36,10 @@ export function SideQuestHost() {
 function MapPopup() {
   const router = useRouter();
   const { handle } = useViewer();
+  const toast = useToast();
   const live = useSideQuest();
-  const { state, phase, now } = live;
+  const { state, phase, now, apply } = live;
+  const [dropping, setDropping] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const open = !!state && phase === 'active' && !state.entry;
@@ -60,6 +65,19 @@ function MapPopup() {
   if (!state) return null;
   const left = remainingMs(now, state.deadlineAt);
   const takePhoto = () => { setRevealing(false); setCapturing(true); };
+  // Presenter button: the server opens today's quest now (it re-checks that this is allowed).
+  const drop = async () => {
+    setDropping(true);
+    try {
+      apply(await apiPost<SideQuestState>('/api/daily/side-quest/demo', {}));
+      setCapturing(false);
+      setRevealing(true);
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : 'Couldn’t drop a Side Quest');
+    } finally {
+      setDropping(false);
+    }
+  };
 
   return (
     <>
@@ -92,6 +110,13 @@ function MapPopup() {
           <span aria-hidden>{state.challenge.emoji}</span>
           <span>Side Quest</span>
           <span className="tabular-nums" aria-hidden>{formatCountdown(left)}</span>
+        </button>
+      )}
+
+      {state.demo && (
+        <button type="button" onClick={drop} disabled={dropping} data-testid="sq-drop"
+          className="fixed bottom-[88px] left-3 z-40 flex items-center gap-1.5 rounded-full bg-fb-surface px-3 py-2 text-[14px] font-semibold text-fb-blue shadow-popover hover:bg-fb-hover disabled:opacity-60 md:bottom-8">
+          <Sparkles size={16} aria-hidden /> {dropping ? 'Dropping…' : 'Drop a Side Quest'}
         </button>
       )}
 
