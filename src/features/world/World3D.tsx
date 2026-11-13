@@ -8,7 +8,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
-import { useApi } from '@/features/data';
+import { useApi, useWhere } from '@/features/data';
 import type { ThreadView } from '@/shared/api';
 import { FriendChat, type ChatFriend } from './FriendChat';
 import { openChat as openMuseChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,setMuseDockFrom,useMuseViewport,photoTargetForRender,useMuseActivity } from '@/features/muse-companion';
@@ -233,6 +233,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   useEffect(()=>{if(!companion.open&&manualChatCamera.current){map.setMaxZoom(MAX_3D_ZOOM);conversationCamera.current=false;}manualChatCamera.current=false;},[map,companion.open]);
   const upNext = useUpNext();
   const tools = useDemoTools();
+  // Here (your real location): show the joystick so you can walk around from where you are.
+  const hereOn = useWhere().mode === 'here';
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petBoost = useRef(1);
@@ -414,11 +416,30 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // Home arrives after the first render: start the demo walk there if nothing moved yet.
   // A home inside a building outline starts on the nearest open ground instead (the tree refresh
   // repeats this once the buildings around it have loaded).
+  // A big jump in home (the dock's Here / Demo city toggle) moves you there even after you've walked:
+  // you, Jolly and the camera go to the new spot, and you can walk from there.
+  const lastHome = useRef<LatLng | null>(null);
   useEffect(() => {
-    if (!home || moved.current || sourceRef.current !== 'demo') return;
+    if (!home) return;
+    const jumped = !!lastHome.current && haversineMeters(lastHome.current, home) > 200;
+    lastHome.current = home;
+    if (jumped) {
+      stopWalk();
+      sourceRef.current = 'demo';
+      setSourceState('demo');
+      moved.current = false;
+      streetHeadingSet.current = false;
+      entering.current = true;
+      setFollow(true);
+    }
+    if (moved.current || sourceRef.current !== 'demo') return;
     pos.current = blockedRef.current ? nearestOpen(home, blockedRef.current) : home;
     petPos.current = pos.current;
     snapPending.current = true;
+    // Far from the 3D frame's origin the characters lose float precision and vanish: re-center it.
+    if (jumped) layerRef.current?.rebase(pos.current);
+    if (jumped) map.jumpTo({ center: [pos.current.lng, pos.current.lat] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [home]);
 
   // ---- Keyboard: arrows / WASD walk forward-back and turn ----
@@ -488,6 +509,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!origin) return;
     void buildSfCity(origin,Object.entries(DEMO_CITY_STARTS).map(([id,center])=>({id,center}))).then(city=>{
       if (cancelled || !layerRef.current) { city.dispose(); return; }
+      city.group.userData.builtAt=origin;city.group.userData.base=city.group.position.clone();
       layerRef.current.setStatic('sf-city',city.group);
       dispose=city.dispose;cityBounds.current=city.bounds;
       cityContains.current=blockerTest(city.bounds.map(ring=>[ring]));
@@ -1467,7 +1489,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Bottom left, above the view toggle: the joystick (demo walk only). */}
       {/* The joystick is a rehearsal tool: Let's go walks you there on its own. */}
-      {source === 'demo' && tools && <Joystick stick={stick} />}
+      {source === 'demo' && (tools || hereOn) && <Joystick stick={stick} />}
     </div>
   );
 }

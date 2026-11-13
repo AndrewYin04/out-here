@@ -321,6 +321,29 @@ export class WorldLayer implements CustomLayerInterface {
   /** The point the local frame is measured from (east/north meters). */
   getOrigin(): LatLng { return this.origin; }
 
+  /**
+   * Move the local frame to a new origin. Needed after a big jump (Here mode: San Francisco to
+   * Menlo Park, ~40 km): far from the origin, float precision at street zoom loses the characters.
+   * Scenery built in the old frame keeps its place on the map (it is shifted, not rebuilt).
+   */
+  rebase(origin: LatLng) {
+    this.origin = origin;
+    this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
+    const m = this.originMerc.meterInMercatorCoordinateUnits();
+    this.modelMatrix.makeTranslation(this.originMerc.x, this.originMerc.y, this.originMerc.z ?? 0).scale(new THREE.Vector3(m, -m, m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
+    for (const obj of this.statics.values()) this.placeStatic(obj);
+    if (this.treeSpots.length) this.setTrees(this.treeSpots);
+    if (this.lamps.length) this.setStreetFurniture(this.lamps);
+  }
+
+  /** A static stays where it was built: its frame's offset from the current origin. */
+  private placeStatic(obj: THREE.Object3D) {
+    const ud = obj.userData as { builtAt?: LatLng; base?: THREE.Vector3 };
+    if (!ud.builtAt) { ud.builtAt = this.origin; ud.base = obj.position.clone(); }
+    const o = offsetMeters(this.origin, ud.builtAt);
+    obj.position.set(ud.base!.x + o.east, ud.base!.y, ud.base!.z - o.north);
+  }
+
   setFocusActor(id:string){this.focusActor=id;}
 
   /** Scenery built in the local frame (Meta HQ). Depth-tested against the map's buildings. */
@@ -328,7 +351,7 @@ export class WorldLayer implements CustomLayerInterface {
     const old = this.statics.get(key);
     if (old) { this.scene.remove(old); this.statics.delete(key); }
     if(key==='hq'&&!obj){this.sight.boxes=[];this.sight.rings=[];}
-    if (obj) { applySightlineCutaway(obj,this.sight);this.scene.add(obj); this.statics.set(key, obj); }
+    if (obj) { applySightlineCutaway(obj,this.sight);this.placeStatic(obj);this.scene.add(obj); this.statics.set(key, obj); }
   }
 
   /** Keep `el` above a fixed point (`altitude` meters, real size), or stop when el is null. */
