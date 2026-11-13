@@ -41,6 +41,17 @@ describe('museJSON', () => {
     expect(runs[0]).toMatchObject({ route: 'test', ok: true, mock: true });
   });
 
+  it('logs logSignals with the output but returns the plain data', async () => {
+    delete process.env.MUSE_API_KEY;
+    const r = await museJSON({
+      schemaName: 'test', schema: Z, jsonSchema: JSON_SCHEMA, model: 'fast',
+      messages: [{ role: 'user', content: 'hi' }], mock: () => ({ answer: 'mocked' }), route: 'test',
+      logSignals: { pastHangoutsRated: 3, membersLeftOut: 1 },
+    });
+    expect(r.data).toEqual({ answer: 'mocked' });
+    expect(runs[0].output).toEqual({ answer: 'mocked', signals: { pastHangoutsRated: 3, membersLeftOut: 1 } });
+  });
+
   it('retries once on invalid JSON, then succeeds', async () => {
     live();
     let n = 0;
