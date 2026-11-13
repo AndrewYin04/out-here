@@ -61,7 +61,6 @@ test.describe("Post a plan", () => {
       await expect(sam.getByTestId("draft-pin")).toBeVisible();
 
       await sam.getByTestId("create-title").fill(title);
-      await sam.getByTestId("create-venue-chip").click();
       await sam.getByTestId("create-venue").fill("Ravenswood Board Game Cafe");
       await sam.getByTestId("create-when-0").click();
       await sam.getByTestId("create-next").click();

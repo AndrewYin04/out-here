@@ -106,7 +106,6 @@ export function CreatePlanSheet({ at, friends, preset = null, onMove, onEmoji, o
   const [duration, setDuration] = useState(60);
   const [capacity, setCapacity] = useState(6);
   const [venueName, setVenueName] = useState('Dropped pin');
-  const [editingVenue, setEditingVenue] = useState(false);
   const [place, setPlace] = useState<{ id: string; at: LatLng } | null>(null);
   const [priceMax, setPriceMax] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
@@ -301,14 +300,14 @@ export function CreatePlanSheet({ at, friends, preset = null, onMove, onEmoji, o
 
             <Label icon="📍">Where</Label>
             <div className="flex flex-wrap gap-2">
-              {editingVenue ? (
-                <input data-testid="create-venue" autoFocus value={venueName} maxLength={120} aria-label="Where"
-                  onChange={(e) => setVenueName(e.target.value)} onBlur={() => setEditingVenue(false)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') setEditingVenue(false); }}
-                  className="h-10 min-w-[160px] flex-1 rounded-full bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text outline-none ring-fb-blue focus:ring-2" />
-              ) : (
-                <ChipButton on testId="create-venue-chip" label="Change where" onClick={() => setEditingVenue(true)}>📍 {venueName}</ChipButton>
-              )}
+              {/* Always editable, styled as a chip: no swap between chip and field, so nothing jumps. */}
+              <label className="inline-flex h-10 max-w-full items-center gap-1.5 rounded-full bg-fb-blue-tint pl-3.5 pr-3 text-[15px] font-semibold text-fb-blue ring-fb-blue focus-within:ring-2">
+                <span aria-hidden>📍</span>
+                <span className="sr-only">Where</span>
+                <input data-testid="create-venue" value={venueName} maxLength={120} size={Math.min(28, Math.max(8, venueName.length))}
+                  onChange={(e) => setVenueName(e.target.value)} onFocus={(e) => e.currentTarget.select()}
+                  className="min-w-0 bg-transparent text-fb-blue outline-none" />
+              </label>
               <ChipButton label={`Price ${priceText(priceMax)}`} onClick={() => setPriceMax((p) => cycle(PRICES, p))}>💵 {priceText(priceMax)}</ChipButton>
               <ChipButton label={`Max ${capacity} people`} onClick={() => setCapacity((c) => cycle(SPOTS, c))}>
                 👥 Max <span data-testid="create-spots">{capacity}</span>
