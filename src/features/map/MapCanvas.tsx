@@ -334,7 +334,8 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
   const fitKey = (fitTo ?? []).map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(';');
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !picksKey) return;
+    // In the 3D street view the camera stays behind the avatar; beacons and the pet show the picks.
+    if (!map || !picksKey || map.getContainer().hasAttribute('data-view3d')) return;
     const ids = new Set(picksKey.split(','));
     const b = new LngLatBounds();
     let n = 0;

@@ -73,7 +73,7 @@ await step('Walk with the arrow keys', async () => {
 });
 
 await step('I’m free → the Muse pet listens, thinks, then answers', async () => {
-  await page.getByRole('button', { name: "I'm free", exact: true }).click();
+  await page.getByRole('button', { name: /^I'm free/ }).click();
   const bubble = page.getByTestId('pet-bubble');
   await page.waitForTimeout(1200);
   const listen = await bubble.textContent();

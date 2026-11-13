@@ -132,7 +132,8 @@ export function OutHereView() {
   const hasOrigin = !!ctx?.origin;
   const friendPinsReady = allFriendPins.length > 0;
   useEffect(() => {
-    if (!map) return;
+    // The 3D street view keeps its own camera (behind the avatar); only the 2D map reframes.
+    if (!map || map.getContainer().hasAttribute('data-view3d')) return;
     if (!filter.on) {
       const cam = savedCamera.current;
       savedCamera.current = null;
