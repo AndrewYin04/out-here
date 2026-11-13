@@ -4,14 +4,14 @@
 import dynamic from 'next/dynamic';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApi, useQuests, useViewer } from '@/features/data';
+import { apiPost, useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, useUpNextDismissed, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, formatDemoTime, seedId, walkingMinutes, type LatLng, type Quest } from '@/shared';
 import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
-import { ListingSheet } from './market/ListingSheet';
+import { ListingSheet, type Detour } from './market/ListingSheet';
 import { ListingsLayer } from './market/ListingsLayer';
 import { MarketMenu, MuseFindCard, watchLabel } from './market/MuseFind';
 import { SellerRequests } from './market/SellerRequests';
@@ -78,6 +78,9 @@ function setListingParam(id: string | null) {
   else url.searchParams.delete('listing');
   window.history.replaceState(window.history.state, '', url.toString());
 }
+
+/** Minutes a pickup stop takes on top of the walking (meet the seller, pay). */
+const PICKUP_MIN = 2;
 
 export function OutHereView() {
   const { viewer: persona } = useViewer();
@@ -436,10 +439,63 @@ export function OutHereView() {
   // Tests drive the tools directly, so the Demo pill only shows for people.
   const [navigatorIsTest, setNavigatorIsTest] = useState(true);
   useEffect(() => setNavigatorIsTest(navigator.webdriver === true), []);
+  // ---- A stop on the way: a held pickup becomes a waypoint before the plan ----
+  const [stop, setStop] = useState<{ listingId: string; title: string; to: LatLng; questId: string } | null>(null);
+  /** What the 3D walk heads to: the pickup first while a stop is set, then the plan. */
+  const walkTarget: Quest | null = useMemo(() => {
+    if (!walkQuest || !stop || stop.questId !== walkQuest.id) return walkQuest;
+    // A waypoint, not a plan: no members, so arriving there opens no photo.
+    return { ...walkQuest, id: `stop:${stop.listingId}`, title: stop.title, emoji: '🛍️', location: stop.to, approxLocation: stop.to, memberIds: [] };
+  }, [walkQuest, stop]);
   const onArrive = useCallback((questId: string) => {
+    if (questId.startsWith('stop:')) {
+      // Picked up: the walk carries on to the plan (walkTo is unchanged).
+      setStop(null);
+      toast.show(`Got it 🛍️ · on to ${walkQuest?.venueName ?? 'the plan'}`);
+      return;
+    }
     finishWalk(questId);
     setArrivedId(questId);
+  }, [finishWalk, toast, walkQuest?.venueName]);
+  const onWalkStop = useCallback((questId: string) => {
+    if (questId.startsWith('stop:')) { setStop(null); setWalkTo(null); return; }
+    finishWalk(questId);
   }, [finishWalk]);
+
+  // The plan you're on your way to (the walk's, else Up next) and what a stop at the open listing costs.
+  const headedTo = walkQuest ?? nextQuest ?? null;
+  const detour: Detour | null = useMemo(() => {
+    const to = openedListing?.listing.location;
+    const from = ctx?.origin;
+    if (!headedTo || !to || !from) return null;
+    const direct = walkingMinutes(from, headedTo.location);
+    const via = walkingMinutes(from, to) + PICKUP_MIN + walkingMinutes(to, headedTo.location);
+    const arrive = Date.now() + via * 60_000;
+    return {
+      extraMin: Math.max(1, via - direct), arriveAt: new Date(arrive).toISOString(),
+      venue: headedTo.venueName, title: headedTo.title, late: arrive > Date.parse(headedTo.startsAt) + 60_000,
+    };
+  }, [headedTo, openedListing, ctx?.origin]);
+  const stopOnTheWay = useCallback((to: LatLng) => {
+    const l = openedListing?.listing;
+    if (!headedTo || !l || !detour) return;
+    setStop({ listingId: l.id, title: `Pick up: ${l.title}`, to, questId: headedTo.id });
+    openListing(null);
+    select(null);
+    setArrivedId(null);
+    setView('3d');
+    setWalkTo({ questId: headedTo.id });
+    // Heads-up to the friends in the plan, in Messenger (one 1:1 thread each).
+    const friendIds = new Set(ctx?.friendIds ?? []);
+    const friends = headedTo.memberIds.filter((id) => id !== persona.id && friendIds.has(id)).slice(0, 3);
+    const names = friends.map((id) => allFriendPins.find((p) => p.friend.id === id)?.friend.name.split(' ')[0]).filter(Boolean);
+    const text = `Grabbing a ${l.title.toLowerCase()} on the way 🛍️ I'll be at ${headedTo.venueName} about ${detour.extraMin} min later, ${formatDemoTime(detour.arriveAt)}. Meet you there!`;
+    void Promise.all(friends.map(async (id) => {
+      const { thread } = await apiPost<{ thread: { id: string } }>('/api/threads', { memberIds: [id] });
+      await apiPost(`/api/threads/${thread.id}/messages`, { text });
+    })).catch(() => toast.show('Couldn’t message your friends. The stop is still on.'));
+    toast.show(names.length > 0 ? `Stopping for the pickup first · told ${names.join(' and ')}` : 'Stopping for the pickup first');
+  }, [openedListing, headedTo, detour, openListing, select, setView, ctx?.friendIds, persona.id, allFriendPins, toast]);
 
   return (
     <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkQuest?.id ?? undefined} data-arrived={arrivedId ?? undefined}>
@@ -480,8 +536,8 @@ export function OutHereView() {
           onOpenFriend={openFriend}
           onExit={exit3d}
           onZoomOut={zoomOut3d}
-          walkTo={walkQuest}
-          onWalkStop={finishWalk}
+          walkTo={walkTarget}
+          onWalkStop={onWalkStop}
           onArrive={onArrive}
         />
       )}
@@ -745,6 +801,8 @@ export function OutHereView() {
           museWatch={sheetLine?.watch ?? null}
           onClose={() => openListing(null)}
           onChanged={() => { void listingsApi.refetch(); }}
+          detour={detour}
+          onStopOnTheWay={stopOnTheWay}
         />
       )}
 
