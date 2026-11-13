@@ -9,3 +9,4 @@ export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';
 export type { RegroupCandidate, RegroupContext, RegroupMember, RegroupResult, RegroupSuggestion } from './regroup';
+export { TogetherMoment } from './TogetherMoment';

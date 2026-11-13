@@ -7,7 +7,7 @@
 // GPS. Neither writes a position to the server; Find My keeps doing location sharing.
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
-import { ArrivalSelfie, OPEN_SELFIE } from '@/features/memories';
+import { OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
 import { cn, useDemoTools } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
@@ -872,6 +872,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           </button>
         </div>
       )}
+      {/* You made it: the together moment (who's here, group selfie, Muse caption, how was it). */}
+      <TogetherMoment
+        quest={selfieQuest}
+        viewer={viewer}
+        walkers={together.plan?.id === selfieQuest?.id ? together.walkers : []}
+        onClose={closeSelfie}
+      />
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
       <style>{'[data-view3d] [data-map-marker="me"]{display:none}'}</style>
 
@@ -892,9 +899,16 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         {together.walkers.map((w) => (
           <div key={w.id} ref={bindLabel(`w:${w.id}`, 0.2)} style={{ visibility: 'hidden' }} className="absolute left-0 top-0">
-            <span data-testid="world-walker" className="block whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
-              🚶 {firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
-            </span>
+            {/* Arrived: a green check pops over their head (the "get together" moment). */}
+            {w.minutesAway <= 1 && together.plan && haversineMeters(w.location, together.plan.location) <= ARRIVE_METERS * 2 ? (
+              <span data-testid="world-walker" data-here="true" className="flex animate-pop-in items-center gap-1 whitespace-nowrap rounded-pill bg-[#31A24C] px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
+                <span aria-hidden className="flex size-4 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[#31A24C]">✓</span>{firstName(w.name)} · here
+              </span>
+            ) : (
+              <span data-testid="world-walker" className="block whitespace-nowrap rounded-pill bg-fb-blue px-2.5 py-1 text-[13px] font-semibold text-white shadow-card">
+                🚶 {firstName(w.name)} · {w.minutesAway <= 1 ? 'almost there' : `${w.minutesAway} min away`}
+              </span>
+            )}
           </div>
         ))}
         {nearFriends.map((f) => (
@@ -979,7 +993,6 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             📍 {arrival.text}
           </div>
         )}
-        <ArrivalSelfie quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
             🚶 Walk there · {selectedMin} min
