@@ -2,7 +2,7 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  demoDate, EARLY_PHOTO_MS, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
   type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
@@ -21,6 +21,7 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
+import { postWalkStep, walkers } from './walkers';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -779,7 +780,8 @@ export class CoreStore {
     if (!q) throw notFound('quest_not_found');
     const memberIds = v.questMemberIds(questId);
     if (!memberIds.includes(viewerId)) throw forbidden('only attendees can complete a hangout');
-    if (q.status !== 'done' && new Date(q.startsAt) > now()) throw conflict('This hangout has not started yet.');
+    const started = new Date(q.startsAt) <= now();
+    if (q.status !== 'done' && new Date(q.startsAt).getTime() - now().getTime() > EARLY_PHOTO_MS) throw conflict('This hangout has not started yet.');
     const t = iso();
     // shared prefs: quest tags plus interests at least two members share
     const counts = new Map<string, number>();
@@ -798,7 +800,8 @@ export class CoreStore {
     const existing = v.crewMemberIds(crew.id);
     const add = memberIds.filter((userId) => !existing.includes(userId));
     if (add.length) await this.backend.upsert('crewMembers', add.map((userId) => ({ crewId: crew.id, userId })));
-    if (q.status !== 'done') await this.backend.update('quests', { id: questId }, { status: 'done' });
+    // Early (EARLY_PHOTO_MS): the crew forms now, but the plan stays open for whoever is still on the way.
+    if (q.status !== 'done' && started) await this.backend.update('quests', { id: questId }, { status: 'done' });
     const after = await this.view();
     await publish(`quest:${questId}`, { seatsLeft: after.seatsLeft(after.questById.get(questId)!), memberCount: memberIds.length });
     for (const m of memberIds) await publish(`user:${m}`, { type: 'quest', id: questId });
@@ -889,6 +892,32 @@ export class CoreStore {
     return v.db.availability.filter((a) => friends.has(a.userId) && a.endsAt > t && v.canSee(viewerId, a.userId, a.audience))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map(({ audience: _a, ...a }) => { void _a; return { ...a, friend: v.profileFor(viewerId, v.profileById.get(a.userId)!) }; });
+  }
+
+  // ---------- Demo reset ----------
+  /**
+   * Puts the live demo story back to `fresh` (the seed built for now): every plan's times and
+   * seats, who's in them, free windows, invites, shared plans and location sharing. Plans people
+   * created are removed. Posts, profiles, friends, crews and past memories are left alone.
+   * Every open tab gets demo:reset and reloads.
+   */
+  async resetStory(fresh: Db): Promise<{ quests: number; members: number }> {
+    const db = (await this.view()).db;
+    const ids = <T,>(rows: T[], key: (r: T) => string) => [...new Set(rows.map(key))];
+    if (db.togetherPlans.length) await this.backend.remove('togetherPlans', { id: ids(db.togetherPlans, (p) => p.id) });
+    if (db.invites.length) await this.backend.remove('invites', { id: ids(db.invites, (i) => i.id) });
+    if (db.availability.length) await this.backend.remove('availability', { id: ids(db.availability, (a) => a.id) });
+    if (db.questMembers.length) await this.backend.remove('questMembers', { questId: ids(db.questMembers, (m) => m.questId) });
+    const seeded = new Set(fresh.quests.map((q) => q.id));
+    const created = db.quests.filter((q) => !seeded.has(q.id)).map((q) => q.id);
+    if (created.length) await this.backend.remove('quests', { id: created });
+    await this.backend.upsert('quests', fresh.quests);
+    if (fresh.questMembers.length) await this.backend.insert('questMembers', fresh.questMembers);
+    if (fresh.availability.length) await this.backend.insert('availability', fresh.availability);
+    if (fresh.invites.length) await this.backend.insert('invites', fresh.invites);
+    if (fresh.locationShares.length) await this.backend.upsert('locationShares', fresh.locationShares);
+    await publish('demo:reset', { at: iso() });
+    return { quests: fresh.quests.length, members: fresh.questMembers.length };
   }
 
   // ---------- Out Here: plan together ----------
@@ -988,7 +1017,8 @@ export class CoreStore {
       }
     }
     const updated = after.db.togetherPlans.find((p) => p.id === id) ?? row;
-    await publish(`together:${id}`, { status: updated.status });
+    // ids only (docs/REALTIME.md): the status and the locked quest let other phones flip at once
+    await publish(`together:${id}`, { status: updated.status, confirmedQuestId: updated.confirmedQuestId });
     for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
     return this.togetherView(after, viewerId, updated);
   }
@@ -1213,6 +1243,8 @@ export class CoreStore {
   friendPins(viewerId: ID) { return friendPins(this, viewerId); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
+  walkers(viewerId: ID, questId: ID) { return walkers(this, viewerId, questId); }
+  postWalkStep(viewerId: ID, questId: ID, location: LatLng) { return postWalkStep(this, viewerId, questId, location); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
 }
