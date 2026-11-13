@@ -531,10 +531,9 @@ export function OutHereView() {
       {/* Up Next is the primary action when a plan is coming up. Hidden while a sheet is open,
           which already shows the plan (one next step on screen at a time). */}
       {!selectedId && !creating && !sheetOpen && !walkingNow && upNext && !upNextClosed && (
-        // Below the Muse filter status and the Friends chip, so neither is ever covered. On a phone
-        // it stops 68 px short of the right edge: the Ask Muse orb (right 12 px, 48 px wide) sits
-        // at this height and covered Let's go.
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center max-md:right-[68px]',
+        // Below the Muse filter status and the Friends chip, so neither is ever covered. (Jolly, the
+        // Muse button, sits in the control row at the bottom, so the card can use the full width.)
+        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center',
           filter.on ? 'top-[100px]' : tools ? 'top-[60px]' : 'top-3')}>
           <UpNextCard
             key={upNext.quest.id}

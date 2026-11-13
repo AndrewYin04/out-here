@@ -397,3 +397,9 @@ let nudge: MuseNudge | null = null;
 export function showMuseNudge(n: MuseNudge): void { nudge = n; emit(); }
 export function dismissMuseNudge(id?: string): void { if (!nudge || (id && nudge.id !== id)) return; nudge = null; emit(); }
 export function useMuseNudge(): MuseNudge | null { return useSyncExternalStore(subscribe, () => nudge, () => null); }
+
+// The Out Here control row hosts Jolly (MuseDockButton variant="row"); while it is mounted the
+// floating Jolly is not shown, so there is only ever one Muse button.
+let dockSlots = 0;
+export function registerMuseDockSlot(): () => void { dockSlots++; emit(); return () => { dockSlots = Math.max(0, dockSlots - 1); emit(); }; }
+export function useMuseDockSlotted(): boolean { return useSyncExternalStore(subscribe, () => dockSlots > 0, () => false); }

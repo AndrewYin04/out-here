@@ -256,3 +256,9 @@ body {
 .muse-rail-row[data-state="done"] .muse-rail-detail { animation: muse-rail-in .35s cubic-bezier(.22, 1, .36, 1) both; }
 @keyframes muse-rail-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .muse-rail-row[data-state="done"] .muse-rail-detail { animation: none; } }
+/* Jolly in the map's control row: the same round button as Back to you and Map/3D, glowing softly. */
+.muse-dock-row .muse-dock-float { animation-duration: 4.2s; }
+.muse-dock-row .muse-dock-glow { inset: -5px; }
+.muse-dock-row .muse-dock-spark { right: -1px; top: -1px; width: 7px; height: 7px; }
+.muse-nudge-up { transform-origin: 90% 100%; animation-name: muse-nudge-rise; }
+@keyframes muse-nudge-rise { from { opacity: 0; transform: translateY(10px) scale(.88); } to { opacity: 1; transform: none; } }

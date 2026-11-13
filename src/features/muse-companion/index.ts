@@ -20,3 +20,5 @@ export { useMuseCommentary, type MuseCommentary } from './commentary';
 export { showMuseNudge, dismissMuseNudge, useMuseNudge, type MuseNudge } from './controller';
 export type { Thought, ThoughtFocus } from './thought-line';
 export { startPlanRun, addPlanStage, finishPlanRun, clearPlanRun, usePlanRun, type PlanRun } from './plan-run';
+export { MuseDockButton } from './MuseDock';
+export { registerMuseDockSlot, useMuseDockSlotted } from './controller';

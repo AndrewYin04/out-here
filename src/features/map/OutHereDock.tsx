@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { PeopleList, SharingSheet, flyToPin, useFriendPins } from '@/features/map/friends';
 import { YourPlans } from '@/features/memories';
-import { setMuseViewport } from '@/features/muse-companion';
+import { MuseDockButton, setMuseViewport } from '@/features/muse-companion';
 import { ImFreeButton } from '@/features/outhere';
 import { CategoryIcon, cn } from '@/features/ui';
 import type { Quest } from '@/shared';
@@ -177,6 +177,8 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
             </button>
           )}
           <span className="flex-1" />
+          {/* Jolly: the one Muse button, in the row with the map's own controls. */}
+          <MuseDockButton variant="row" />
           <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={onRecenter} className={cn(ROUND, 'shrink-0')}>
             <LocateFixed size={20} aria-hidden />
           </button>
