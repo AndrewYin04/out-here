@@ -53,7 +53,7 @@ export type PlanMeta = {
   /** Pre-check: how many friends' agents were asked (all friends; busy ones just answer nothing). */
   friendsChecked: number;
   /** Friends free in the window: first name and end time only, from availability they shared with the viewer. */
-  friendsFree: { firstName: string; freeUntil: string }[];
+  friendsFree: { id: string; name: string; avatarUrl: string; firstName: string; freeUntil: string }[];
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
@@ -138,7 +138,11 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     friendAvailability: ctx.friendAvailability, quests: ctx.quests, location: ctx.location, now,
   });
   const t3 = Date.now();
-  const friendsFree = result.friendsFree.map((f) => ({ firstName: f.firstName, freeUntil: f.freeUntil }));
+  // ids let the sheet offer "invite" on Muse's pick; only friends whose free time the viewer can see
+  const friendsFree = result.friendsFree.map((f) => {
+    const p = ctx.friends.find((x) => x.profile.id === f.friendId)?.profile;
+    return { id: f.friendId, name: p?.name ?? f.firstName, avatarUrl: p?.avatarUrl ?? '', firstName: f.firstName, freeUntil: f.freeUntil };
+  });
 
   if (result.candidates.length === 0) {
     const summary = summaryText([], parsed.intent, result.friendsFree.map((f) => f.firstName));

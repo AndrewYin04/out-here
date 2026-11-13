@@ -148,8 +148,10 @@ function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Ma
   const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
     .flatMap((id) => { const p = friends.get(id); return p ? [p.name.split(' ')[0]] : []; });
   // Nothing fit: say who is free (Muse drafts a plan with them below) instead of "no one".
-  const free = plan.suggestions.length === 0 ? (plan.meta?.friendsFree ?? []).map((f) => f.firstName) : [];
-  const who = down.length === 0 && free.length > 0 ? `${free.slice(0, 2).join(' and ')} ${free.length === 1 ? 'is' : 'are'} free too`
+  // No one matched a pick, but friends are free: name them (each pick has invite chips for them).
+  const free = (plan.meta?.friendsFree ?? []).map((f) => f.firstName);
+  const freeNames = free.length <= 2 ? free.join(' and ') : `${free.slice(0, 2).join(', ')} and ${free.length - 2} more`;
+  const who = down.length === 0 && free.length > 0 ? `${freeNames} ${free.length === 1 ? 'is' : 'are'} free too`
     : down.length === 0 ? 'no one free for this yet'
     : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
   return (
@@ -303,6 +305,14 @@ export function PlanSheet({ className }: { className?: string }) {
   const offline = result?.museSource === 'mock';
   const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   // Nothing posted fits but a friend is free: Muse drafts a plan for you two (DraftHangCard).
+  // Friends free in this window (their availability is shared with you): invite chips on each pick.
+  // The plan carries each free friend's name and photo, so the chips never wait on /api/friends.
+  const freeFriends = useMemo(() => (result?.plan.meta?.friendsFree ?? []).flatMap((f): PersonCard[] => {
+    if (!f.id) return [];
+    const known = friendMap.get(f.id);
+    if (known) return [known];
+    return f.name ? [{ id: f.id, handle: '', name: f.name, avatarUrl: f.avatarUrl ?? '', mutualFriendCount: 0, isFriend: true, online: false } as PersonCard] : [];
+  }), [result, friendMap]);
   const drafting = !!result && result.plan.suggestions.length === 0 && (result.plan.meta?.friendsFree?.length ?? 0) > 0 && !draftNone;
   const drops = result ? shownDrops(result.plan.meta?.dropped ?? []) : [];
   const steps = useMemo(() => (result?.plan.meta ? museSteps(result.plan, result.museSource) : []), [result]);
@@ -426,7 +436,7 @@ export function PlanSheet({ className }: { className?: string }) {
                       {(othersOpen ? picks : picks.slice(0, 1)).map((s, i) => (
                         <div key={`${s.questId ?? s.title}-${i}`} className="animate-rise" style={{ animationDelay: `${80 + i * 90}ms` }}>
                           {i === 0 && <p className="mb-1 px-1 text-[12px] font-bold uppercase tracking-wide text-fb-blue">{showMuse ? <span className="inline-flex items-center gap-1"><Sparkles size={12} aria-hidden />Muse’s pick</span> : 'Best fit'}</p>}
-                          <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} />
+                          <SuggestionCard s={s} friends={friendMap} showMuse={showMuse} alsoFree={freeFriends} />
                         </div>
                       ))}
                       {picks.length > 1 && !othersOpen && (

@@ -70,7 +70,8 @@ function MemoriesView({ handle }: { handle: string | null }) {
   useEffect(() => {
     if (!handle) return;
     let alive = true;
-    apiFetch<{ ratings: (HangoutRating & { quest: Quest })[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
+    // Cached on the first load, fresh after a rating is saved (refresh > 0), like the crews (#65).
+    apiFetch<{ ratings: (HangoutRating & { quest: Quest })[] }>('/api/me/ratings', refresh > 0 ? { headers: { 'x-outhere-fresh': '1' } } : {})
       .then((r) => { if (alive) setRatings(new Map(r.ratings.map((x) => [x.questId, x]))); })
       .catch(() => undefined);
     return () => { alive = false; };
@@ -82,7 +83,10 @@ function MemoriesView({ handle }: { handle: string | null }) {
     setError(null);
     (async () => {
       try {
-        const options = { headers: { 'x-outhere-fresh': '1' } };
+        // The first load reads the server's cached snapshot (fast). Only a refetch that a live
+        // update caused (a new photo) asks for fresh data, so it sees the write. Forcing fresh on
+        // every load made this page reload all the tables 3-5 times in a row (#65).
+        const options = refresh > 0 ? { headers: { 'x-outhere-fresh': '1' } } : {};
         const [{ crews: list }, { crews: metas, viewerId }] = await Promise.all([
           apiFetch<{ crews: Crew[] }>('/api/crews', options),
           apiFetch<{ viewerId: string; crews: CrewMeta[] }>('/api/muse/regroup', options),
@@ -310,5 +314,6 @@ async function fetchRegroup(crewId: string): Promise<RegroupResult & { mock: boo
   });
   const data = await res.json().catch(() => null) as (RegroupResult & { error?: string }) | null;
   if (!res.ok || !data || !data.suggestion) throw new ApiFetchError(res.status, data?.error ?? `HTTP ${res.status}`);
-  return { ...data, mock: res.headers.get('x-muse-mode') === 'mock' };
+  const mode = res.headers.get('x-muse-mode');
+  return { ...data, mock: mode === 'mock' || mode === 'fallback' };
 }
