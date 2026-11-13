@@ -22,6 +22,15 @@ type State =
 
 const first = (name: string) => name.split(' ')[0] ?? name;
 
+const DRAFT_TIMEOUT_MS = 12_000;
+class DraftTimeout extends Error {}
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new DraftTimeout('draft timed out')), ms);
+    p.then((v) => { window.clearTimeout(t); resolve(v); }, (e) => { window.clearTimeout(t); reject(e); });
+  });
+}
+
 /**
  * Renders nothing when no friend is free or no place fits (the caller's empty state stays).
  * `onNone` lets the caller show its own empty card in that case.
@@ -40,7 +49,13 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
     if (friendId) tried.current = [];
     if (another) setBusy(true); else setState({ kind: 'loading' });
     try {
-      const res = await apiPost<DraftResponse>('/api/muse/draft-hang', { text: ask, budgetMax, excludePlaceIds: tried.current, friendId });
+      // A dropped request on a flaky network would leave the card spinning: ask again after 12 s, once.
+      const body = { text: ask, budgetMax, excludePlaceIds: tried.current, friendId };
+      const res = await withTimeout(apiPost<DraftResponse>('/api/muse/draft-hang', body), DRAFT_TIMEOUT_MS)
+        .catch((e: unknown) => {
+          if (e instanceof DraftTimeout) return apiPost<DraftResponse>('/api/muse/draft-hang', body);
+          throw e;
+        });
       const live = res.mode === 'live';
       if (res.draft && res.friend) {
         tried.current = [...tried.current, res.draft.placeId];
