@@ -303,9 +303,10 @@ export function OutHereView() {
       )}
 
       {/* Map / 3D: one camera, two starting points. Bottom left on desktop; on a phone the bottom
-          row belongs to I'm free, so it sits above the 3D joystick instead. */}
+          row belongs to I'm free, so it sits above it, and in 3D above the joystick too (in 2D that
+          height would cover the plan pins). */}
       {!unsupported && (
-        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-[250px]">
+        <div className={`absolute bottom-6 left-3 z-20 ${view === '3d' ? 'max-md:bottom-[250px]' : 'max-md:bottom-20'}`}>
           <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
             {(['map', '3d'] as const).map((v) => (
               <button
