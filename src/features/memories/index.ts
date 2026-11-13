@@ -4,6 +4,7 @@ export { ArrivalSelfie } from './ArrivalSelfie';
 export { MEMORY_SAVED, RATE_HANGOUT, type MemorySavedDetail, type RateHangoutDetail } from './arrival';
 export { MemoriesPage } from './MemoriesPage';
 export { YourPlans } from './YourPlans';
+export { MemoryCapture } from './MemoryCapture';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';

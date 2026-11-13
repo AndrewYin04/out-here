@@ -8,7 +8,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Plus } from 'lucide-react';
 import { Button, cn, EmptyState, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
@@ -260,8 +260,28 @@ export function OutHereView() {
   }, [viewNote]);
   const show3d = view === '3d' && !unsupported && !!map;
 
+  // Up next: your next plan stays on the map. "Let's go" walks you there in 3D; arriving turns
+  // the card into "Take a photo together".
+  const upNext = useUpNext();
+  const [walkTo, setWalkTo] = useState<{ questId: string; nonce: number } | null>(null);
+  const [arrivedId, setArrivedId] = useState<string | null>(null);
+  const letsGo = useCallback((questId: string) => {
+    select(null);
+    setArrivedId(null);
+    if (unsupported) { select(questId); return; }
+    setView('3d');
+    setWalkTo({ questId, nonce: Date.now() });
+  }, [select, setView, unsupported]);
+  const walkingTo = show3d && walkTo && walkTo.questId !== arrivedId ? walkTo.questId : null;
+  // Arriving at your next plan: keep the Up next card (it turns into "Take a photo together")
+  // instead of the plan's panel, which the 3D view opens on arrival.
+  const onArrive = useCallback((questId: string) => {
+    setArrivedId(questId);
+    if (upNext?.quest.id === questId) select(null);
+  }, [upNext?.quest.id, select]);
+
   return (
-    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'}>
+    <div className="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]" data-testid="out-here-map" data-mode={mode} data-view={show3d ? '3d' : 'map'} data-walk-to={walkTo?.questId ?? undefined} data-arrived={arrivedId ?? undefined}>
       <h1 className="sr-only">Out Here map, Menlo Park</h1>
       {unsupported ? (
         <FallbackList quests={shown} walkMinutes={ctx?.walkMinutes ?? {}} now={now} onSelect={select} testIdFor={testIdFor} />
@@ -299,6 +319,8 @@ export function OutHereView() {
           onOpenFriend={openFriend}
           onExit={exit3d}
           onZoomOut={zoomOut3d}
+          walkTo={walkTo}
+          onArrive={onArrive}
         />
       )}
 
@@ -481,10 +503,22 @@ export function OutHereView() {
         </>
       )}
 
-      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). */}
-      {!selectedId && (
+      {/* Up next (your next plan), else "You and Maya are both free": under the toggle. */}
+      {!selectedId && !creating && (
         <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
-          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
+          {upNext ? (
+            <UpNextCard
+              key={upNext.quest.id}
+              plan={upNext}
+              arrived={arrivedId === upNext.quest.id}
+              walking={walkingTo === upNext.quest.id}
+              onGo={letsGo}
+              onSee={select}
+              className="pointer-events-auto w-full max-w-[440px]"
+            />
+          ) : (
+            <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
+          )}
         </div>
       )}
 

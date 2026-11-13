@@ -79,6 +79,7 @@ export interface DataStore {
   openTogether: CoreStore['openTogether'];
   createTogether: CoreStore['createTogether'];
   togetherPlans: CoreStore['togetherPlans'];
+  resetStory: CoreStore['resetStory'];
   together: CoreStore['together'];
   voteTogether: CoreStore['voteTogether'];
   friendAvailability: CoreStore['friendAvailability'];
