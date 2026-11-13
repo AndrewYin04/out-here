@@ -13,10 +13,10 @@ import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 import { MuseLabel, OfflineLabel } from './SuggestionCard';
 
-type DraftResponse = { draft: HangDraft | null; friend: PersonCard | null; reason?: string; mode?: 'live' | 'mock' | 'fallback' };
+type DraftResponse = { draft: HangDraft | null; friend: PersonCard | null; others?: PersonCard[]; reason?: string; mode?: 'live' | 'mock' | 'fallback' };
 type State =
   | { kind: 'loading' }
-  | { kind: 'draft'; draft: HangDraft; friend: PersonCard; live: boolean }
+  | { kind: 'draft'; draft: HangDraft; friend: PersonCard; live: boolean; others: PersonCard[] }
   | { kind: 'none' }
   | { kind: 'made'; draft: HangDraft; friend: PersonCard; questId: string };
 
@@ -34,15 +34,17 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
   const cardRef = useRef<HTMLDivElement>(null);
   const letsGo = useLetsGo();
 
-  const load = useCallback(async (another: boolean) => {
+  /** `another`: a different place with the same friend. `friendId`: redraft with that friend. */
+  const load = useCallback(async (another: boolean, friendId?: string) => {
     setError(null);
+    if (friendId) tried.current = [];
     if (another) setBusy(true); else setState({ kind: 'loading' });
     try {
-      const res = await apiPost<DraftResponse>('/api/muse/draft-hang', { text: ask, budgetMax, excludePlaceIds: tried.current });
+      const res = await apiPost<DraftResponse>('/api/muse/draft-hang', { text: ask, budgetMax, excludePlaceIds: tried.current, friendId });
       const live = res.mode === 'live';
       if (res.draft && res.friend) {
         tried.current = [...tried.current, res.draft.placeId];
-        setState({ kind: 'draft', draft: res.draft, friend: res.friend, live });
+        setState({ kind: 'draft', draft: res.draft, friend: res.friend, live, others: res.others ?? [] });
       } else if (another) {
         setError('That was the only spot that fits right now.');
       } else {
@@ -133,6 +135,19 @@ export function DraftHangCard({ ask, budgetMax, onNone }: { ask: string; budgetM
       )}
 
       {error && <p role="alert" className="mx-3 mt-2 text-[13px] text-fb-red">{error}</p>}
+
+      {state.kind === 'draft' && state.others.length > 0 && (
+        <div className="mx-3 mt-3 flex flex-wrap items-center gap-1.5 text-[13px] text-fb-text-2">
+          <span>Or plan with</span>
+          {state.others.map((p) => (
+            <button key={p.id} type="button" data-testid="draft-hang-with" disabled={busy}
+              onClick={() => void load(true, p.id)}
+              className="oh-press inline-flex h-7 items-center gap-1 rounded-full bg-fb-secondary-btn pl-0.5 pr-2.5 font-semibold text-fb-text disabled:opacity-60">
+              <Avatar src={p.avatarUrl} name={p.name} size={24} decorative />{first(p.name)}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex gap-2 p-3">
         {!made ? (

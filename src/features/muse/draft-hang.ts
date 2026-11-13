@@ -91,6 +91,7 @@ export function hangEnd(start: Date, until: Date): Date {
  */
 export function hangPlaces(
   places: HangPlaceInput[], me: LatLng, friend: LatLng, now: Date, until: Date, budgetMax: number | null,
+  opts: { ignoreHours?: boolean } = {},
 ): HangPlace[] {
   return places.flatMap((p) => {
     if (!p.location) return [];
@@ -101,7 +102,7 @@ export function hangPlaces(
     const start = hangStart(now, myWalk, theirWalk);
     const end = hangEnd(start, until);
     if (end.getTime() - start.getTime() < HANG_MIN_TOGETHER_MIN * 60_000) return [];
-    if (!openThrough(p.hours, start, end)) return [];
+    if (!opts.ignoreHours && !openThrough(p.hours, start, end)) return [];
     return [{ placeId: p.id, name: p.name, category: p.category, typicalCostUsd: p.typicalCostUsd, location: p.location, myWalk, theirWalk }];
   }).sort((a, b) => Math.max(a.myWalk, a.theirWalk) - Math.max(b.myWalk, b.theirWalk)).slice(0, MAX_PLACES);
 }

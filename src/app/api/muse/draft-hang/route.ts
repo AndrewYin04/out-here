@@ -1,5 +1,6 @@
 // POST /api/muse/draft-hang  body: { text, friendId?, budgetMax?, excludePlaceIds?, now? }
-//   -> { draft: HangDraft | null, friend: PersonCard | null, reason?: string, mode?: 'live'|'mock'|'fallback' }
+//   -> { draft: HangDraft | null, friend: PersonCard | null, others: PersonCard[], reason?: string, mode?: 'live'|'mock'|'fallback' }
+//   `others`: the other friends free with you, so the card can redraft with one of them.
 // When nothing posted fits but a friend is free with you, Muse drafts a hangout for the two of
 // you. Code lists the real places that are open, under budget and walkable for both in time;
 // Muse (fast model, strict schema) picks one and writes the title, why and invite; code checks
@@ -32,7 +33,8 @@ export const POST = route(async ({ store, viewer, req }) => {
   const at = b.now ? new Date(b.now) : demoNow();
   const free = await store.freeWithMe(viewer.id);
   const item = b.friendId ? free.items.find((i) => i.friend.id === b.friendId) : free.items[0];
-  if (!item) return { draft: null, friend: null, reason: 'no_friend_free' };
+  if (!item) return { draft: null, friend: null, others: [], reason: 'no_friend_free' };
+  const others = free.items.filter((i) => i.friend.id !== item.friend.id).slice(0, 3).map((i) => i.friend);
 
   const { db } = await store.museContext();
   const t = at.toISOString();
@@ -44,8 +46,10 @@ export const POST = route(async ({ store, viewer, req }) => {
   const friendAt = locOf(item.friend.id) ?? DEMO_CENTER;
   const until = new Date(item.until);
   const excluded = new Set(b.excludePlaceIds);
-  const places = hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, friendAt, at, until, b.budgetMax ?? null);
-  if (places.length === 0) return { draft: null, friend: item.friend, reason: 'no_place_fits' };
+  // Local testing at night only: OUTHERE_IGNORE_HOURS=1 skips opening hours (never set on Vercel).
+  const ignoreHours = process.env.NODE_ENV !== 'production' && process.env.OUTHERE_IGNORE_HOURS === '1';
+  const places = hangPlaces(db.places.filter((p) => !excluded.has(p.id)), meAt, friendAt, at, until, b.budgetMax ?? null, { ignoreHours });
+  if (places.length === 0) return { draft: null, friend: item.friend, others, reason: 'no_place_fits' };
 
   const ctx: HangContext = {
     text: b.text, now: at, until, budgetMax: b.budgetMax ?? null, places,
@@ -64,12 +68,12 @@ export const POST = route(async ({ store, viewer, req }) => {
       messages: hangMessages(ctx), model: 'fast', effort: 'minimal',
       mock: () => mockHang(ctx), route: routeName, userId: viewer.id, deadline: Date.now() + 8_000,
     });
-    return NextResponse.json({ draft: validateHang(res.data, ctx), friend: item.friend, mode: res.mock ? 'mock' : 'live' }, {
+    return NextResponse.json({ draft: validateHang(res.data, ctx), friend: item.friend, others, mode: res.mock ? 'mock' : 'live' }, {
       headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model },
     });
   } catch (err) {
     const msg = String((err as Error)?.message ?? err).slice(0, 200);
     reportFallback({ route: routeName, step: 'draft', error: msg, userId: viewer.id });
-    return NextResponse.json({ draft: validateHang(mockHang(ctx), ctx), friend: item.friend, mode: 'fallback' }, { headers: { 'x-muse-mode': 'fallback' } });
+    return NextResponse.json({ draft: validateHang(mockHang(ctx), ctx), friend: item.friend, others, mode: 'fallback' }, { headers: { 'x-muse-mode': 'fallback' } });
   }
 });
