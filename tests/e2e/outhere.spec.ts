@@ -13,8 +13,15 @@ async function openSheet(page: Page, persona: string) {
   await expect(page.getByTestId("plan-sheet")).toBeVisible();
 }
 
+/** After an ask the composer folds into one line; "Change" opens it again. */
+async function openComposer(page: Page) {
+  const change = page.getByTestId("picked-summary").getByRole("button", { name: "Change" });
+  if (await change.isVisible()) await change.click();
+}
+
 async function ask(page: Page, text: string) {
-  const box = page.getByPlaceholder(PLACEHOLDER);
+  await openComposer(page);
+  const box = page.locator("#imfree-text");
   await box.fill(text);
   await page.getByRole("button", { name: "Find a plan" }).click();
   await expect(page.getByTestId("plan-loading")).toHaveCount(0, { timeout: 15_000 });
@@ -24,10 +31,13 @@ async function ask(page: Page, text: string) {
 test.describe("Out Here plan sheet", () => {
   test("composer, chips, 15-minute time-fit and why-not-others", async ({ page }) => {
     await openSheet(page, "alex");
-    const box = page.getByPlaceholder(PLACEHOLDER);
+    const box = page.locator("#imfree-text");
     await expect(box).toBeFocused();
-    await page.getByRole("button", { name: "15 min" }).click();
-    await expect(box).toHaveValue("15 min");
+    // picking a time selects it (no text typed, nothing sent yet)
+    const fifteen = page.getByRole("button", { name: "15 min" });
+    await fifteen.click();
+    await expect(fifteen).toHaveAttribute("aria-pressed", "true");
+    await expect(box).toHaveValue("");
 
     await ask(page, "hungry, 15 min");
     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
@@ -63,11 +73,12 @@ test.describe("Out Here plan sheet", () => {
       await route.continue().catch(() => undefined);
     });
     await openSheet(page, "alex");
-    const box = page.getByPlaceholder(PLACEHOLDER);
+    const box = page.locator("#imfree-text");
     await box.fill("hungry, 15 min");
     await box.press("Enter");
     await expect(page.getByTestId("plan-loading")).toBeVisible();
     await page.waitForTimeout(300);
+    await openComposer(page);
     await box.fill(PLACEHOLDER);
     await box.press("Enter");
     await expect(page.getByTestId("plan-loading")).toHaveCount(0, { timeout: 15_000 });
@@ -77,7 +88,7 @@ test.describe("Out Here plan sheet", () => {
     await page.waitForTimeout(2_200); // the first (aborted) answer must not replace it
     await expect(summary).not.toContainText("15 min");
     await expect(page.getByTestId("plan-empty")).toHaveCount(0);
-    await expect(box).toHaveValue(PLACEHOLDER);
+    await expect(page.getByTestId("picked-summary")).toContainText(PLACEHOLDER);
     expect(calls).toBe(2);
   });
 

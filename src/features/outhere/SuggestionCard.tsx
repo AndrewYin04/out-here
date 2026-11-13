@@ -126,9 +126,9 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setError(null);
     try {
       const joining = !!s.questId && !isMember;
+      celebrate(joining); // optimistic: the moment shows on tap; an error below undoes the label
       if (joining) await apiPost(`/api/quests/${s.questId}/join`, {});
       const out = await apiPost<{ invite: { id: string } }>('/api/invites', { toId: p.id, questId: s.questId, suggestionTitle: s.title, message: message.trim() });
-      celebrate(joining);
       setSentTo((prev) => new Map(prev).set(p.id, out.invite.id));
       setInviteFor(null);
       await quest.refetch();
@@ -166,8 +166,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
     setBusy('join');
     setError(null);
     try {
+      celebrate(true); // optimistic, as above
       await apiPost(`/api/quests/${s.questId}/join`, {});
-      celebrate(true);
       await quest.refetch();
       onJoined?.();
     } catch (e) {
@@ -291,7 +291,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
           <div className="mt-3">
             <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null || (!isMember && seats === 0)}
               onClick={() => void goWith(lead, s.inviteDraft ?? `Want to come to ${s.title}? ${startsText(s.startsAt)}.`)}>
-              {sent ? `Invite sent to ${lead.name.split(' ')[0]}` : busy === 'invite' ? 'Sending…' : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
+              {sent || busy === 'invite' ? `Invite sent to ${lead.name.split(' ')[0]}` : seats === 0 && !isMember ? 'Full' : `Go with ${lead.name.split(' ')[0]}`}
             </Button>
             {!sent && (
               <div className="mt-1.5 flex justify-center gap-4 text-[13px] font-semibold text-fb-text-2">
@@ -304,7 +304,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
         return s.questId ? (
           <div className="mt-3">
             <Button block disabled={isMember || seats === 0 || busy === 'join'} onClick={() => void join()}>
-              {isMember ? "You're going" : busy === 'join' ? 'Joining…' : seats === 0 ? 'Full' : 'Join'}
+              {isMember || busy === 'join' ? "You're going" : seats === 0 ? 'Full' : 'Join'}
             </Button>
           </div>
         ) : null;

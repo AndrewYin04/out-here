@@ -32,11 +32,16 @@ function Sheet({ id }: { id: string }) {
   const api = useApi<TogetherResponse>(`/api/together/${id}`, [`together:${id}`, `user:${viewer.id}`]);
   const [busyOn, setBusyOn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const plan = api.data?.plan;
+  /** Your "I'm in" taps, shown at once (optimistic) until the server's copy arrives. */
+  const [mineLocal, setMineLocal] = useState<string[] | null>(null);
+  const served = api.data?.plan;
+  const plan = served && mineLocal ? { ...served, votes: { ...served.votes, [viewer.id]: mineLocal } } : served;
   const others = plan ? plan.members.filter((m) => m.id !== viewer.id) : [];
   const otherNames = names(others.map((m) => first(m.name)));
 
   const vote = async (questId: string, isIn: boolean) => {
+    const current = plan?.votes[viewer.id] ?? [];
+    setMineLocal(isIn ? [...current.filter((q) => q !== questId), questId] : current.filter((q) => q !== questId));
     setBusyOn(questId);
     setError(null);
     try {
@@ -45,9 +50,13 @@ function Sheet({ id }: { id: string }) {
     } catch {
       setError('Couldn’t save that. Try again.');
     } finally {
+      setMineLocal(null);
       setBusyOn(null);
     }
   };
+
+  // Everyone's in: a small card at the top of the map instead of a sheet over it.
+  if (plan?.status === 'confirmed') return <Confirmed plan={plan} otherNames={otherNames} />;
 
   return (
     <section
@@ -82,7 +91,6 @@ function Sheet({ id }: { id: string }) {
             ))}
           </div>
         )}
-        {plan?.status === 'confirmed' && <Confirmed plan={plan} otherNames={otherNames} />}
         {plan?.status === 'expired' && (
           <div className="rounded-card bg-fb-surface p-4 text-center shadow-card">
             <p className="text-[17px] font-semibold text-fb-text">This one passed</p>
@@ -153,35 +161,47 @@ function Waiting({ plan, viewerId }: { plan: TogetherView; viewerId: string }) {
   return <p className="mt-3 px-1 text-center text-[13px] text-fb-text-2" aria-live="polite" data-testid="together-waiting">{text}</p>;
 }
 
+/**
+ * "It's a plan!" as a compact card at the top of the map (top right on desktop), so the map and
+ * the plan's pin stay visible. Show on map opens that plan's panel; X closes the card.
+ */
 function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: string }) {
   const o = plan.options.find((x) => x.questId === plan.confirmedQuestId);
-  const emojiRef = useRef<HTMLParagraphElement>(null);
+  const emojiRef = useRef<HTMLSpanElement>(null);
   const emoji = o?.emoji;
-  // The moment everyone agrees: the card pops in and the plan's emoji bursts out of it.
+  // The moment everyone agrees: the card drops in and the plan's emoji bursts out of it.
   useEffect(() => {
     if (!emoji) return;
     const t = window.setTimeout(() => burst(emojiRef.current, [emoji, '🎉', '✨', emoji], 14), 180);
     return () => window.clearTimeout(t);
   }, [emoji]);
   if (!o) return null;
+  const showOnMap = () => { openTogether(null); window.dispatchEvent(new CustomEvent('outhere:select-quest', { detail: o.questId })); };
   return (
-    <div className="animate-pop-in rounded-card bg-fb-surface p-4 text-center shadow-card" data-testid="together-confirmed">
-      <p ref={emojiRef} className="text-[40px] leading-none" aria-hidden>{o.emoji}</p>
-      <p className="mt-2 text-[20px] font-bold text-fb-text">It’s a plan!</p>
-      <p className="mt-1 text-[15px] text-fb-text">{o.title} with {otherNames}</p>
-      <p className="mt-0.5 flex items-center justify-center gap-1 text-[13px] text-fb-text-2">
-        <MapPin size={14} aria-hidden />{o.venueName} · {startsText(o.startsAt)}
-      </p>
-      <div className="mt-4 flex flex-col gap-2">
-        <button type="button"
-          onClick={() => { openTogether(null); window.dispatchEvent(new CustomEvent('outhere:select-quest', { detail: o.questId })); }}
-          className="inline-flex h-10 items-center justify-center rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover">
-          See it on the map
+    <section aria-label="It's a plan" data-testid="together-confirmed"
+      className="absolute inset-x-3 top-[60px] z-30 animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover md:left-auto md:right-4 md:top-4 md:w-[360px]">
+      <div className="flex items-start gap-3">
+        <span ref={emojiRef} aria-hidden className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#E7F3E8] text-[26px]">{o.emoji}</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[16px] font-bold leading-5 text-fb-text">It’s a plan!</p>
+          <p className="mt-0.5 text-[14px] text-fb-text">{o.title} with {otherNames}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-[13px] text-fb-text-2">
+            <MapPin size={13} aria-hidden />{o.venueName} · {startsText(o.startsAt)}
+          </p>
+        </div>
+        <IconButton label="Close" size="sm" onClick={() => openTogether(null)}>
+          <X size={18} aria-hidden />
+        </IconButton>
+      </div>
+      <div className="mt-2.5 flex gap-2">
+        <button type="button" onClick={showOnMap}
+          className="oh-press h-9 flex-1 rounded-btn bg-fb-blue text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+          Show on map
         </button>
-        <Link href="/events?tab=going" className="inline-flex h-10 items-center justify-center gap-1.5 rounded-btn bg-fb-secondary-btn text-[15px] font-semibold text-fb-text">
-          <CalendarCheck size={17} aria-hidden />Your plans
+        <Link href="/events?tab=going" className="oh-press inline-flex h-9 items-center justify-center gap-1.5 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
+          <CalendarCheck size={16} aria-hidden />Your plans
         </Link>
       </div>
-    </div>
+    </section>
   );
 }

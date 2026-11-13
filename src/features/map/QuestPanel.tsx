@@ -31,7 +31,9 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   const { data, error, loading, refetch } = useApi<QuestDetail>(`/api/quests/${questId}`, [`quest:${questId}`]);
   const toast = useToast();
   const { viewer } = useViewer();
-  const [busy, setBusy] = useState(false);
+  /** Join/leave shown at once (optimistic); cleared when the server answers. */
+  const [pending, setPending] = useState<'join' | 'leave' | null>(null);
+  const busy = pending !== null;
   const seatsRef = useRef<HTMLSpanElement>(null);
   const prevSeats = useRef<number | null>(null);
   const prevMembers = useRef<Set<string> | null>(null);
@@ -63,25 +65,29 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown, viewerId]);
 
+  // Optimistic: the button, the seat count and the celebration happen on tap; the server
+  // confirms in the background (a full quest puts it back and says so).
   async function act(kind: 'join' | 'leave', e?: MouseEvent<HTMLButtonElement>) {
     const from = e?.currentTarget ?? null;
-    setBusy(true);
+    setPending(kind);
+    if (kind === 'join') celebrateJoin(from, questId, viewer.avatarUrl, q?.emoji ?? '✨');
+    toast.show(kind === 'join' ? "You're in. See you there." : 'You left this plan.');
     try {
       await apiPost(`/api/quests/${questId}/${kind}`, {});
-      if (kind === 'join') celebrateJoin(from, questId, viewer.avatarUrl, q?.emoji ?? '✨');
-      toast.show(kind === 'join' ? "You're in. See you there." : 'You left this plan.');
     } catch (e) {
       if (e instanceof ApiFetchError && e.status === 409) toast.show('Someone just took the last spot.');
       else toast.show(kind === 'join' ? "Couldn't join. Try again." : "Couldn't leave. Try again.");
     } finally {
-      setBusy(false);
       await refetch();
+      setPending(null);
       onChanged();
     }
   }
 
   const q = shown?.quest;
-  const isMember = shown?.viewerIsMember ?? false;
+  const serverMember = shown?.viewerIsMember ?? false;
+  const isMember = pending === 'join' ? true : pending === 'leave' ? false : serverMember;
+  const seatsLeft = shown ? Math.max(0, shown.seatsLeft + (isMember === serverMember ? 0 : isMember ? -1 : 1)) : 0;
   const isHost = q?.hostId === viewerId;
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
   const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
@@ -158,8 +164,8 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               </li>
               <li className="flex items-center gap-2">
                 <Users size={18} className="text-fb-text-2" aria-hidden />
-                <span ref={seatsRef} data-testid="quest-seats" className={cn('origin-left', shown.seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2')}>
-                  {shown.seatsLeft > 0 ? `${shown.seatsLeft} ${shown.seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
+                <span ref={seatsRef} data-testid="quest-seats" className={cn('origin-left', seatsLeft > 0 ? 'font-semibold text-fb-blue' : 'font-semibold text-fb-text-2')}>
+                  {seatsLeft > 0 ? `${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left` : 'Full'}
                 </span>
                 <span className="text-fb-text-2">· {q.capacity} max</span>
               </li>
@@ -200,8 +206,8 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
               <Button variant="secondary" block disabled={busy} onClick={() => void act('leave')}>Leave</Button>
             )
           ) : (
-            <Button variant="primary" block disabled={busy || shown.seatsLeft === 0} onClick={(e) => void act('join', e)}>
-              {shown.seatsLeft === 0 ? 'Full' : 'Join'}
+            <Button variant="primary" block disabled={busy || seatsLeft === 0} onClick={(e) => void act('join', e)}>
+              {seatsLeft === 0 ? 'Full' : 'Join'}
             </Button>
           )}
           <button

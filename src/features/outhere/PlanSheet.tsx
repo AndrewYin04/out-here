@@ -1,9 +1,9 @@
 'use client';
 
-import { ChevronDown, ChevronUp, SendHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useApi, useViewer } from '@/features/data';
-import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
+import { IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { shownDrops } from './dropped';
 import { museSteps } from './muse-steps';
@@ -11,12 +11,77 @@ import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
 import { setPlanAsk, setPlanOpen, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
-import { StatusDot, StatusRow, useMyStatus } from './FreeStatus';
+import { StatusCard, StatusDot, useMyStatus } from './FreeStatus';
 import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
-export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
-const CHIPS = ['15 min', '40 min', 'tonight', 'cheap eats', 'meet people'] as const;
+export const COMPOSER_PLACEHOLDER = 'Anything else? e.g. under $15, with Maya';
+
+// "For how long?" (pick one) and "Up for…" (pick any). Picking never sends anything: the two
+// buttons do. Find plans asks Muse with what you picked; Just show I'm free only sets your status.
+const DURATIONS = [
+  { id: '15', label: '15 min', min: 15 }, { id: '30', label: '30 min', min: 30 }, { id: '60', label: '1 hr', min: 60 },
+  { id: '120', label: '2 hr', min: 120 }, { id: 'tonight', label: 'Tonight', min: null },
+] as const;
+type DurationId = (typeof DURATIONS)[number]['id'];
+const MOODS = [
+  { id: 'hungry', emoji: '🍜', label: 'Hungry', ask: 'hungry' }, { id: 'coffee', emoji: '☕', label: 'Coffee', ask: 'coffee' },
+  { id: 'boba', emoji: '🧋', label: 'Boba', ask: 'boba' }, { id: 'walk', emoji: '🚶', label: 'Walk', ask: 'a walk' },
+  { id: 'music', emoji: '🎵', label: 'Music', ask: 'live music' }, { id: 'games', emoji: '🎮', label: 'Games', ask: 'games' },
+  { id: 'sports', emoji: '🏐', label: 'Sports', ask: 'sports' }, { id: 'people', emoji: '👋', label: 'Meet people', ask: 'meet people' },
+  { id: 'cheap', emoji: '💸', label: 'Cheap', ask: 'something cheap' },
+] as const;
+
+/** Minutes from now until 11 PM in the demo's time zone (at least an hour). */
+function minutesUntilTonight(): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' })
+    .formatToParts(new Date());
+  const h = Number(parts.find((x) => x.type === 'hour')?.value ?? 0);
+  const m = Number(parts.find((x) => x.type === 'minute')?.value ?? 0);
+  return Math.max(60, 23 * 60 - (h * 60 + m));
+}
+const durationMinutes = (id: DurationId | null): number | null => {
+  if (!id) return null;
+  if (id === 'tonight') return minutesUntilTonight();
+  return DURATIONS.find((d) => d.id === id)!.min;
+};
+/** Does the typed text already say how long ("40 min", "2 hours", "till 6", "tonight")? */
+const mentionsTime = (t: string) => /\b\d+\s*(m|min|mins|minutes|h|hr|hrs|hour|hours)\b|\b(tonight|till|until|before|after)\b/i.test(t);
+
+/** "hungry, boba, under $15, 1 hr". The picked time is left out when the text already has one. */
+function composeAsk(moods: ReadonlySet<string>, text: string, duration: DurationId | null): string {
+  const t = text.trim().replace(/[,\s]+$/, '');
+  const parts = [...MOODS.filter((m) => moods.has(m.id)).map((m) => m.ask), t];
+  if (duration && !mentionsTime(t)) parts.push(duration === 'tonight' ? 'tonight' : DURATIONS.find((d) => d.id === duration)!.label);
+  return parts.filter(Boolean).join(', ');
+}
+/** The note friends see: moods and text, no times ("hungry, under $15"). */
+function noteFor(moods: ReadonlySet<string>, text: string): string {
+  return [...MOODS.filter((m) => moods.has(m.id)).map((m) => m.ask), text.trim()].filter(Boolean).join(', ') || 'free';
+}
+
+function Pill({ on, onClick, children, label }: { on: boolean; onClick: () => void; children: React.ReactNode; label?: string }) {
+  return (
+    <button type="button" aria-pressed={on} aria-label={label} onClick={onClick}
+      className={cn(
+        'oh-press inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-pill px-3 text-[13px] font-semibold transition-colors',
+        on ? 'bg-fb-blue text-white' : 'bg-fb-secondary-btn text-fb-text hover:brightness-95',
+      )}>
+      {children}
+    </button>
+  );
+}
+
+function PickerRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-2">
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-fb-text-2">{label}</p>
+      <div className="-mx-4 mt-1 flex gap-2 overflow-x-auto px-4 pb-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-24px),transparent)] [scrollbar-width:none]">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /**
  * The one "I'm free" button. It also shows your status ("Free till 3:49"), so status and Muse
@@ -82,6 +147,11 @@ export function PlanSheet({ className }: { className?: string }) {
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [whyOpen, setWhyOpen] = useState(false);
+  const [duration, setDuration] = useState<DurationId | null>(null);
+  const [moods, setMoods] = useState<Set<string>>(new Set());
+  /** After an ask, the two picker rows fold into one line so Muse's results have room. */
+  const [pickersOpen, setPickersOpen] = useState(true);
+  const myStatus = useMyStatus();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const seq = useRef(0);
   const inFlight = useRef<AbortController | null>(null);
@@ -117,10 +187,22 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
 
+  const ask = composeAsk(moods, text, duration);
+  const toggleMood = (id: string) => setMoods((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  /** Just show I'm free / Update status: your status only, no Muse. */
+  const justFree = () => {
+    void myStatus.setFree(0, durationMinutes(duration) ?? 60, noteFor(moods, text));
+  };
+
   const submit = async (e?: FormEvent) => {
     e?.preventDefault();
-    const t = text.trim();
+    const t = ask.trim();
     if (!t) return;
+    // A picked time sets your status right away (friends see it while Muse thinks).
+    const picked = durationMinutes(duration);
+    if (picked !== null) void myStatus.setFree(0, picked, noteFor(moods, text));
+    setPickersOpen(false);
     // A new ask replaces one still in flight: abort it, and seq drops any late answer.
     inFlight.current?.abort();
     const ctrl = new AbortController();
@@ -136,18 +218,14 @@ export function PlanSheet({ className }: { className?: string }) {
       if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions);
       setStatus('done');
-      // Only the ask whose results are shown becomes the viewer's availability.
-      void shareAvailability(t, r.plan);
+      // Only the ask whose results are shown becomes the viewer's availability (unless a time
+      // was picked, which already set it).
+      if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
       setStatus('error'); setPlanSuggestions(null);
     }
-  };
-
-  const addChip = (c: string) => {
-    setText((prev) => (prev.trim() ? `${prev.trim().replace(/,$/, '')}, ${c}` : c));
-    inputRef.current?.focus();
   };
 
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
@@ -165,7 +243,7 @@ export function PlanSheet({ className }: { className?: string }) {
           data-testid="plan-sheet"
           className={cn(
             'absolute inset-x-0 bottom-0 z-30 flex animate-sheet-up flex-col rounded-t-[16px] bg-fb-surface shadow-popover md:animate-panel-in',
-            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[78%]',
+            result && result.plan.suggestions.length > 0 ? 'max-h-[50%]' : 'max-h-[82%]',
             'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
             className,
           )}
@@ -178,10 +256,36 @@ export function PlanSheet({ className }: { className?: string }) {
             </IconButton>
           </header>
 
-          <StatusRow />
-          <form onSubmit={(e) => void submit(e)} className="shrink-0 px-4">
-            <div className="flex items-end gap-2 rounded-[20px] bg-fb-secondary-btn px-3 py-2">
-              <label htmlFor="imfree-text" className="sr-only">What are you up for?</label>
+          {/* After an ask the whole top folds into one line, so Muse's results get the sheet. */}
+          {!pickersOpen && status !== 'idle' ? (
+            <div className="flex shrink-0 items-center gap-2 px-4 pb-3" data-testid="picked-summary">
+              {myStatus.status.kind !== 'busy' && <StatusDot s={myStatus.status} />}
+              <p className="min-w-0 flex-1 truncate text-[14px] text-fb-text">
+                {myStatus.status.kind !== 'busy' && <span className="font-semibold">{freeStatusLabel(myStatus.status)} · </span>}
+                <span className="text-fb-text-2">{asked}</span>
+              </p>
+              <button type="button" onClick={() => { setPickersOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }}
+                className="oh-press h-8 shrink-0 rounded-pill bg-fb-secondary-btn px-3 text-[13px] font-semibold text-fb-text">
+                Change
+              </button>
+            </div>
+          ) : (<>
+          <StatusCard />
+          <form onSubmit={(e) => void submit(e)} className="shrink-0 px-4" data-testid="free-composer">
+            <PickerRow label="For how long?">
+              {DURATIONS.map((d) => (
+                <Pill key={d.id} on={duration === d.id} onClick={() => setDuration((cur) => (cur === d.id ? null : d.id))}>{d.label}</Pill>
+              ))}
+            </PickerRow>
+            <PickerRow label="Up for">
+              {MOODS.map((m) => (
+                <Pill key={m.id} on={moods.has(m.id)} onClick={() => toggleMood(m.id)} label={m.label}>
+                  <span aria-hidden>{m.emoji}</span>{m.label}
+                </Pill>
+              ))}
+            </PickerRow>
+            <div className="mt-2 rounded-[14px] bg-fb-secondary-btn px-3 py-2 ring-fb-blue focus-within:ring-2">
+              <label htmlFor="imfree-text" className="sr-only">Anything else?</label>
               <textarea
                 id="imfree-text"
                 ref={inputRef}
@@ -193,28 +297,26 @@ export function PlanSheet({ className }: { className?: string }) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(); }
                 }}
-                className="max-h-24 min-h-6 flex-1 resize-none bg-transparent text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2"
+                className="block max-h-24 min-h-6 w-full resize-none bg-transparent text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"
               />
-              <button
-                type="submit"
-                aria-label="Find a plan"
-                disabled={!text.trim()}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-fb-blue hover:bg-fb-hover disabled:text-fb-text-2 disabled:opacity-50"
-              >
-                <SendHorizontal size={20} aria-hidden />
+            </div>
+            <div className="mt-2 flex gap-2 pb-3">
+              <button type="submit" aria-label="Find a plan" disabled={!ask.trim()}
+                className="oh-press h-10 flex-1 rounded-btn bg-fb-blue text-[15px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-50">
+                ✨ Find plans
+              </button>
+              <button type="button" onClick={justFree} disabled={myStatus.busy} data-testid="just-free"
+                className="oh-press h-10 rounded-btn bg-fb-secondary-btn px-4 text-[15px] font-semibold text-fb-text hover:brightness-95 disabled:opacity-50">
+                {myStatus.status.kind === 'busy' ? 'Just show I’m free' : 'Update status'}
               </button>
             </div>
-            <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-              {CHIPS.map((c) => (
-                <Chip key={c} onClick={() => addChip(c)} className="h-8 text-[13px]">{c}</Chip>
-              ))}
-            </div>
           </form>
+          </>)}
 
           <div className="min-h-0 flex-1 overflow-y-auto bg-fb-bg px-3 pb-4 pt-3 md:rounded-b-card">
             {status === 'idle' && (
               <p className="px-1 text-[15px] text-fb-text-2">
-                Say what you&apos;re up for. Muse checks which friends are free and what fits your time, walk included.
+                Pick a time and what you&apos;re up for. Muse checks which friends are free and what fits, walk included.
               </p>
             )}
 
@@ -250,7 +352,7 @@ export function PlanSheet({ className }: { className?: string }) {
                 {result.plan.suggestions.length === 0 ? (
                   <div data-testid="plan-empty" className="animate-rise rounded-card bg-fb-surface p-4 text-center shadow-card">
                     <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
-                    <p className="mt-1 text-[13px] text-fb-text-2">Try a longer window, or tap &quot;40 min&quot;.</p>
+                    <p className="mt-1 text-[13px] text-fb-text-2">Try a longer time, like 1 hr.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
