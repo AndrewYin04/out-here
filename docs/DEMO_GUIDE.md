@@ -73,6 +73,7 @@ Say: "Forty-five minutes, one sentence to Muse, a friend, a find, and a memory. 
 ## Fallbacks
 
 - **Muse is slow (no draft card after about 8 s):** keep talking over the "Muse is working" steps; the warmed cache normally answers in under 2 s. If nothing after 20 s, tap **Change** and send the same text again.
+- **Maya's card names the wrong item or none:** her history is now only the denim shoulder-bag Reel, so live Muse should pick the bag. If it does not, open Explore on Maya's phone, tap the $15 pin and say the reason yourself ("like the bag in the Reel she saved").
 - **No Muse card about the jacket or the bag (beat 3):** the team's fallback. On Alex, switch the dashboard to Explore, tap the jacket's pin, and run **Reserve for pickup** on it as a single listing. Say Muse's reason yourself.
 - **The walking view stalls or renders blank:** tap the **3D** button to return to the map and continue there; the plan, the pop-up and the photo all work on the flat map.
 - **The photo prompt does not open on arrival:** tap **Take a photo together** on Up next, or open the plan's pin and tap **Add a moment**.
@@ -81,6 +82,36 @@ Say: "Forty-five minutes, one sentence to Muse, a friend, a find, and a memory. 
 - **Invite does not arrive on Maya's phone within 3 s:** pull down or reload Maya's tab; the invite is in Out Here and in Notifications.
 - **Anything is left over from a rehearsal:** Reset demo (Setup step 2) and reload all three tabs.
 
-## Measured in the final rehearsal
+## Reset between runs
 
-See the table at the end of this file (filled in from the last full run).
+Every run creates a plan ("Make this plan"), two listings ("Open the pop-up"), a hold, a photo and a crew. Reset before each run, every time:
+
+1. Alex's tab: avatar menu → **Reset demo** → presenter key → **Reset shared demo**. This removes every plan, listing, hold, photo, crew and notification made since the seed, and restarts the story's clock from now.
+2. Reload all three tabs (Leo's again with `?as=leo&sell=popup`).
+3. If the reset key is not at hand: `npm run seed:demo` from Andrew's laptop (demo), or `npm run seed` (dev), then reload.
+
+Alex can post only 5 plans a day (`EVENTS_PER_DAY` in `src/features/data/core.ts`). Each run's "Make this plan" counts as one, so without a reset the sixth run fails with "You can post 5 plans a day". A reset or a reseed clears them.
+
+## Measured in rehearsal
+
+11 rounds on dev previews with real Muse, three headless Chromium screens on one laptop. Round 11 (preview of `80b95c8`: main 6b17c33 plus this branch) is the best full pass. Everything that ran on the server was fast; the slow numbers came from this laptop: three headless 3D maps on a CPU that other agents' test runs held at 100 %, plus Wi-Fi drops. Curl from the same laptop got the same routes in 0.3 to 5 s.
+
+| Step | Round 11 on screen | Server time (curl, warm) | Stage target |
+|---|---|---|---|
+| Maya's bubble on hover | 6 s after load (load itself slow) | friend pins under 2 s | instant |
+| Muse plan + draft card | 49.9 s (one retry fired) | plan 1.4 to 4.7 s, draft 0.8 to 3.2 s | 5 to 8 s, about 2 s from the warmed cache |
+| Make this plan | 6.5 s | | 1 to 2 s |
+| Invite on Maya's phone | 2.9 s | | about 2 s |
+| Maya accepts | 3.6 s | | |
+| "Maya's in" on Alex | 3.9 s | | about 2 s |
+| Let's go → 3D on both, Maya's avatar walking on Alex's screen | 0.1 s | | |
+| Open the pop-up (2 listings) | 11.0 s | | 2 to 4 s |
+| Alex's Muse card ("Fits the watch you set: track jacket under $25") | 19.1 s after the pop-up | finds 3.8 s | 4 to 6 s |
+| Maya's Muse card | 21.0 s after the pop-up, but it named the jacket; fixed after round 11 (see Fallbacks) | picks 2.5 to 5 s | 4 to 6 s |
+| Reserve → request on Leo's screen | 0.3 s (round 9) | | about 1 s |
+| Leo accepts → "Held for you · N min left" on Alex | 11.5 s (round 9) | | about 2 s |
+| Walk resumes, arrival opens the photo prompt | 25.8 s (round 9) | | about 10 s |
+| Save to crew album | 8.6 s (round 9) | | 2 to 4 s |
+| Muse caption | 8.5 s (round 9): "Navy track jacket with white stripes, ready to wear" | | 3 to 6 s |
+
+What was never measured end to end: Maya's photo in the album and "Get this group together again" on Memories (the run hit the 5-minute kill first), and Maya's bag find after the last seed fix (unit-tested with the mock, not yet seen on live Muse). Run the whole script once on the production URL after the 6 AM reseed and the warm-up, and check those three things by hand.
