@@ -83,7 +83,7 @@
 // POST /api/threads/:id/messages       body: { text }                   -> { message: Message }
 // POST /api/threads                    body: { memberIds, name? }       -> { thread: ThreadView }   (returns the existing 1:1 thread)
 // GET  /api/search?q&type                                               -> SearchResponse
-// GET  /api/listings  /  GET /api/listings/:id                          -> { listings: Listing[] } / { listing: Listing, seller: PersonCard }
+// GET  /api/listings  /  GET /api/listings/:id                          -> { listings: Listing[] } / ListingResponse
 // GET  /api/reels                                                       -> { reels: Reel[] }
 
 import type {
@@ -174,8 +174,13 @@ export type PersonCard = {
 
 export type CommentView = Comment & { author: PersonCard; replies: CommentView[] };
 
+/** A Marketplace listing as a post shows it: the share card under a seller's post. */
+export type ListingCard = Pick<Listing, 'id' | 'title' | 'priceUsd' | 'imageUrl' | 'status'>;
+
 export type PostView = Post & {
   author: PersonCard;
+  /** The seller's own listing this post shares (its photo is the listing photo), or null. */
+  listing?: ListingCard | null;
   group: { id: ID; slug: string; name: string } | null;
   reactionCounts: ReactionCounts;
   topReactions: ReactionType[];   // up to 3, most used first
@@ -230,7 +235,9 @@ export type SearchResponse = {
 export type FriendsResponse = { friends: PersonCard[] };
 export type FriendListsResponse = { lists: FriendList[] };
 export type ListingsResponse = { listings: Listing[] };
-export type ListingResponse = { listing: Listing; seller: PersonCard };
+/** An upcoming Out Here plan the seller linked to a listing (a `listing:<id>` quest tag for now). */
+export type ListingPlan = { questId: ID; title: string; emoji: string; venueName: string; startsAt: string; endsAt: string; seatsLeft: number };
+export type ListingResponse = { listing: Listing; seller: PersonCard; plan: ListingPlan | null };
 export type ReelsResponse = { reels: Reel[] };
 export type MessagesResponse = { messages: Message[] };
 export type ThreadsResponse = { threads: ThreadView[] };

@@ -120,7 +120,7 @@ export function PostCard({ post, onHide, onShared }: {
         </div>
       )}
 
-      {post.media.length > 0 && <PostMedia urls={post.media} />}
+      {post.listing ? <ListingShare listing={post.listing} /> : post.media.length > 0 && <PostMedia urls={post.media} />}
       {post.sharedPost && (
         <div className="px-3 pt-3 md:px-4"><SharedPostPreview post={post.sharedPost} /></div>
       )}
@@ -315,6 +315,29 @@ function LikeButton({ mine, total, onReact }: { mine: ReactionType | null; total
         {total > 0 && <span className={cn(meta && 'font-semibold')} data-testid="like-count">{compactCount(total)}</span>}
       </button>
     </div>
+  );
+}
+
+/** A seller's post that shares their Marketplace listing: the photo, price and title open the item page. */
+function ListingShare({ listing }: { listing: NonNullable<PostWithShared['listing']> }) {
+  const href = `${ROUTES.marketplace}/${encodeURIComponent(listing.id)}`;
+  return (
+    <Link href={href} className="mt-3 block border-y border-fb-divider hover:brightness-[0.98]" data-testid="listing-share">
+      {listing.imageUrl && (
+        <div className="bg-fb-skeleton">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={listing.imageUrl} alt="" className="mx-auto max-h-[500px] w-full object-cover" data-testid="post-media" />
+        </div>
+      )}
+      <div className="flex items-center gap-3 bg-fb-input px-3 py-2.5 md:px-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] uppercase tracking-wide text-fb-text-2">Marketplace</p>
+          <p className="text-[17px] font-semibold text-fb-text">${listing.priceUsd}</p>
+          <p className="truncate text-fb-meta text-fb-text">{listing.title}</p>
+        </div>
+        <span className="shrink-0 rounded-md bg-fb-secondary-btn px-3 py-2 text-fb-meta font-semibold text-fb-text">View listing</span>
+      </div>
+    </Link>
   );
 }
 

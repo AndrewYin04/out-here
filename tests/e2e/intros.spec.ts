@@ -47,7 +47,7 @@ test.describe('Muse Intros', () => {
       // Review P1: before Jordan says yes, nothing tells Alex what Jordan (or Jordan's agent) asked for.
       await expect(card.getByTestId('intro-reasons')).not.toContainText(/agent|was looking for|something similar/);
       await alex.screenshot({ path: `.verify/intros/intros-alex-new-${width}.png` });
-      await expect(card.getByTestId('first-step')).toContainText('Local-band show pregame');
+      await expect(card.getByTestId('first-step')).toContainText('Comics open house');
       await expect(card.getByRole('link', { name: 'See on map' })).toHaveAttribute('href', /^\/out-here\?quest=/);
 
       // Both agents' turns, interleaved; Jordan's agent's words stay private (outcome only).
@@ -104,7 +104,7 @@ test.describe('Muse Intros', () => {
       // Review P3: Muse's ask has quick replies on both cards. Hold seats joins both to the quest.
       const plan = card.getByTestId('muse-plan');
       await expect(plan).toBeVisible();
-      await expect(plan.getByTestId('muse-ask')).toContainText(/Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at .*Local-band show pregame/);
+      await expect(plan.getByTestId('muse-ask')).toContainText(/(Want me to hold 2 seats at|already going to) .*Comics open house/);
       await expect(jCard.getByTestId('muse-plan')).toBeVisible();
       const stepHref = await card.getByRole('link', { name: 'Plan it together' }).getAttribute('href');
       const questId = decodeURIComponent(stepHref!.split('quest=')[1]);

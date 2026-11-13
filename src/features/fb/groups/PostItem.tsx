@@ -67,6 +67,15 @@ export function PostItem({ post, showGroup = false }: { post: PostView; showGrou
         // eslint-disable-next-line @next/next/no-img-element
         <img src={post.media[0]} alt="" className="max-h-[600px] w-full object-cover" />
       )}
+      {post.listing && (
+        <Link href={`/marketplace/${encodeURIComponent(post.listing.id)}`} className="flex items-center gap-3 border-b border-fb-divider bg-fb-input px-3 py-2.5 hover:brightness-[0.98] md:px-4" data-testid="listing-share">
+          <span className="min-w-0 flex-1">
+            <span className="block text-[17px] font-semibold text-fb-text">${post.listing.priceUsd}</span>
+            <span className="block truncate text-fb-meta text-fb-text">{post.listing.title}</span>
+          </span>
+          <span className="shrink-0 rounded-md bg-fb-secondary-btn px-3 py-2 text-fb-meta font-semibold text-fb-text">View listing</span>
+        </Link>
+      )}
       <div className="flex h-10 items-center justify-between px-2 md:px-3">
         <div className="flex items-center gap-1">
           <button

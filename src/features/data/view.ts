@@ -7,7 +7,7 @@ import {
   type Thread, type Message, type Notification, type GroupRole, type RsvpStatus,
 } from '@/shared';
 import type {
-  CommentView, EventView, GroupView, NotificationView, PersonCard, PostView, ThreadView,
+  CommentView, EventView, GroupView, ListingCard, NotificationView, PersonCard, PostView, ThreadView,
 } from '@/shared/api';
 import type { Db, GroupRow, QuestRow, EventRow, CrewRow } from './db';
 
@@ -225,8 +225,17 @@ export class View {
       commentCount: this.commentTotal(post.id),
       previewComments: tree.slice(-2),
       shareCount: this.sharesBy.get(post.id) ?? 0,
+      listing: this.listingOfPost(post),
       sharedPost: shared && this.canSeePost(viewerId, shared) ? this.postView(viewerId, { ...shared, sharedPostId: null }) : null,
     };
+  }
+
+  /** A post by a seller whose photo is one of their unsold listings' photo shares that listing. */
+  listingOfPost(post: Post): ListingCard | null {
+    const img = post.media[0];
+    if (!img) return null;
+    const l = (this.db.listings ?? []).find((x) => x.sellerId === post.authorId && x.imageUrl === img && x.status !== 'sold');
+    return l ? { id: l.id, title: l.title, priceUsd: l.priceUsd, imageUrl: l.imageUrl, status: l.status } : null;
   }
 
   // ---------- groups ----------

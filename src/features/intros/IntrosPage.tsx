@@ -164,7 +164,8 @@ export function IntrosPage() {
   const runRound = async () => {
     setBusy('run'); setRound(null);
     try {
-      const r = await apiPost<RoundResult>('/api/intros/run', {});
+      // The demo round is a friendship round: the comic open house story introduces a new friend.
+      const r = await apiPost<RoundResult>('/api/intros/run', { kind: 'friendship' });
       setRound(r.message);
       await refetch();
     } catch (e) {
@@ -201,7 +202,7 @@ export function IntrosPage() {
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button variant="tint" size="sm" onClick={() => void runRound()} disabled={!!busy} icon={<Sparkles size={14} aria-hidden />}
             data-testid="run-round">
-            {busy === 'run' ? 'Agents are talking…' : 'Run an intro round (demo)'}
+            {busy === 'run' ? 'Agents are talking…' : 'Run a friendship intro round (demo)'}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void reset()} disabled={!!busy} icon={<RotateCcw size={14} aria-hidden />}>
             Reset my intros (demo)

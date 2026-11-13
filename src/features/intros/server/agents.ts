@@ -11,7 +11,7 @@ import { museJSON, MuseTimeoutError, type MuseJSONOptions, type MuseResult } fro
 import type { AgentTurn, FirstStep, ID, IntroKind, IntroProfile, Profile } from '@/shared';
 import type { View } from '@/features/data/server';
 import {
-  codeScore, distinctTopics, factsFor, firstName, introProfileOf, lookingForOf, trustLabels, type Candidate, type SharedFact,
+  codeScore, distinctTopics, factsFor, firstName, introProfileOf, keywords, lookingForOf, orderedFacts, trustLabels, type Candidate, type SharedFact,
 } from './rules';
 
 const ROUTE = 'intros/click';
@@ -63,23 +63,35 @@ function publicBrief(v: View, viewerId: ID, other: Profile, c: Candidate): Publi
 // ---------- first step: an upcoming quest that matches a shared fact ----------
 /**
  * Upcoming public quests that match the pair, best first: each shared interest (or fact keyword)
- * found in the quest's title, tags or description scores 1, a fact keyword adds 2. Ties go to the
+ * found in the quest's title, tags or description scores 1, a fact keyword adds 2, and each
+ * `boost` word (the lead reason's topic, the words of an on-request ask) adds 4. Ties go to the
  * sooner quest. Quests that match nothing are left out.
  */
 type QuestRow = View['db']['quests'][number];
-export function rankSteps(v: View, a: Profile, b: Profile, keys: string[], nowMs: number): QuestRow[] {
+export function rankSteps(v: View, a: Profile, b: Profile, keys: string[], nowMs: number, boost: string[] = []): QuestRow[] {
   const words = [...new Set([...keys, ...a.interests, ...b.interests].map((k) => k.toLowerCase()))];
+  const lead = [...new Set(boost.map((k) => k.toLowerCase()))];
   const upcoming = v.db.quests.filter((q) => q.isPublic && (q.status === 'open' || q.status === 'live') && Date.parse(q.endsAt) > nowMs);
   return upcoming.map((q) => {
     const hay = `${q.title} ${q.tags.join(' ')} ${q.description}`.toLowerCase();
-    return { q, s: words.filter((w) => hay.includes(w)).length + (keys.some((k) => hay.includes(k)) ? 2 : 0) };
+    return {
+      q,
+      s: words.filter((w) => hay.includes(w)).length + (keys.some((k) => hay.includes(k)) ? 2 : 0)
+        + 4 * lead.filter((w) => hay.includes(w)).length,
+    };
   }).filter((x) => x.s > 0).sort((x, y) => y.s - x.s || x.q.startsAt.localeCompare(y.q.startsAt)).map((x) => x.q);
 }
 
 export const stepOf = (q: QuestRow): FirstStep => ({ text: `${q.emoji} ${q.title} at ${q.venueName}`, questId: q.id, placeId: null });
 
-export function pickFirstStep(v: View, a: Profile, b: Profile, facts: SharedFact[], nowMs: number): FirstStep {
-  const best = rankSteps(v, a, b, facts.map((f) => f.keyword).filter(Boolean), nowMs)[0];
+/**
+ * The first step for A and B: the best upcoming quest, led by the fact A reads first ("You both
+ * love comics" puts the comics open house ahead of a band pregame that matches more interests)
+ * and by the words of an on-request ask ("someone into comics to go to the comics open house with").
+ */
+export function pickFirstStep(v: View, a: Profile, b: Profile, facts: SharedFact[], nowMs: number, ask = ''): FirstStep {
+  const lead = orderedFacts(facts, 'a')[0]?.topic ?? [];
+  const best = rankSteps(v, a, b, facts.map((f) => f.keyword).filter(Boolean), nowMs, [...lead, ...keywords(ask)])[0];
   if (best) return stepOf(best);
   return { text: '☕ A 20-minute coffee somewhere halfway', questId: null, placeId: null };
 }
@@ -160,7 +172,7 @@ const dialog = (log: AgentTurn[], me: 'a' | 'b') =>
 
 /** Runs one agent-to-agent exchange plus the judge for viewer A and candidate B. */
 export async function runClick(
-  v: View, a: Profile, aIntro: IntroProfile, c: Candidate, nowMs: number, deadline: number,
+  v: View, a: Profile, aIntro: IntroProfile, c: Candidate, nowMs: number, deadline: number, ask = '',
 ): Promise<ClickResult> {
   const b = c.profile;
   const bIntro = introProfileOf(v, b.id);
@@ -169,7 +181,7 @@ export async function runClick(
   const aSeesB = publicBrief(v, a.id, b, c);
   const bSeesA = publicBrief(v, b.id, a, c);
   const trust = trustLabels(v, c.trust);
-  const step = pickFirstStep(v, a, b, c.facts, nowMs);
+  const step = pickFirstStep(v, a, b, c.facts, nowMs, ask);
   const quest = step.questId ? v.db.quests.find((q) => q.id === step.questId) ?? null : null;
   const verb = stepVerb(c.kind, quest?.title ?? null);
   const aName = firstName(a); const bName = firstName(b);

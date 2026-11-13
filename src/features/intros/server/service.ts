@@ -72,17 +72,25 @@ function notYetOn(v: View, i: Intro): ID[] {
 
 /**
  * Muse's concrete ask for a connected pair, tied to the first step: "Want me to hold 2 seats at
- * 🎸 Local-band show pregame at The Signal Room (Today 7:50 PM, 3 seats left)? ..."
+ * 📚 Comics open house at Inkwell Comics Café (Starts in 30 min, 5 seats left)? ..."
+ * With `viewerId` the ask is written to that person when only one of them still needs a seat
+ * ("Jordan's already going to X. Want me to hold you a seat?" / "You're already going to X. Want
+ * me to save Alex a seat?"); without it (the pair's shared chat) it names both in the third person.
  */
-export function museAsk(v: View, i: Intro, nowMs: number): string {
+export function museAsk(v: View, i: Intro, nowMs: number, viewerId?: ID): string {
   const s = stepView(v, i, nowMs);
   if (!liveStep(s)) return 'Want me to find a plan for you two? Tap Pick a time on your intro.';
   const missing = notYetOn(v, i);
   if (missing.length === 0) return `You're both going to ${s.label} (${s.when}).`;
-  const going = [i.aId, i.bId].find((id) => !missing.includes(id)) ?? i.aId;
-  const hold = missing.length === 2 ? 'hold 2 seats'
-    : `hold a seat for ${firstName(v.profileById.get(missing[0]))} (${firstName(v.profileById.get(going))} is already going)`;
-  return `Want me to ${hold} at ${s.label} (${s.when}, ${seatsText(s.seatsLeft ?? 0)} left)? Tap Hold seats or Pick another time on your intro.`;
+  const tail = 'Tap Hold seats or Pick another time on your intro.';
+  const at = `${s.label} (${s.when}, ${seatsText(s.seatsLeft ?? 0)} left)`;
+  if (missing.length === 2) return `Want me to hold 2 seats at ${at}? ${tail}`;
+  const goingId = [i.aId, i.bId].find((id) => !missing.includes(id)) ?? i.aId;
+  const going = firstName(v.profileById.get(goingId));
+  const needs = firstName(v.profileById.get(missing[0]));
+  if (viewerId === goingId) return `You're already going to ${at}. Want me to save ${needs} a seat? ${tail}`;
+  if (viewerId === missing[0]) return `${going}'s already going to ${at}. Want me to hold you a seat? ${tail}`;
+  return `${going}'s already going to ${at}. Want me to hold a seat for ${needs}? ${tail}`;
 }
 
 /**
@@ -114,14 +122,14 @@ function planOptions(v: View, i: Intro, nowMs: number): IntroPlanOption[] {
 }
 
 /** The plan step on a connected card: Muse's ask, whether seats are held, and other plans. */
-export function planView(v: View, i: Intro, nowMs: number): IntroPlanView | null {
+export function planView(v: View, i: Intro, nowMs: number, viewerId?: ID): IntroPlanView | null {
   if (i.status !== 'accepted') return null;
   const s = stepView(v, i, nowMs);
   const live = liveStep(s);
   const need = live ? notYetOn(v, i).length : 0;
   return {
     questId: live ? i.firstStep.questId : null,
-    ask: museAsk(v, i, nowMs),
+    ask: museAsk(v, i, nowMs, viewerId),
     held: live && need === 0,
     seatsNeeded: need,
     canHold: live && need > 0 && (s.seatsLeft ?? 0) >= need,
@@ -219,7 +227,7 @@ export function cardFor(v: View, viewerId: ID, i: Intro, nowMs = now().getTime()
     state, closedText,
     threadId: state === 'connected' ? i.threadId : null,
     createdAt: i.createdAt,
-    plan: state === 'connected' ? planView(v, i, nowMs) : null,
+    plan: state === 'connected' ? planView(v, i, nowMs, viewerId) : null,
   };
 }
 
@@ -268,7 +276,9 @@ async function round(
   // Candidates run in parallel and fail alone: one that errors or times out is skipped.
   const vetted = await Promise.all(shortlist.map(async (c) => {
     try {
-      const raw = await runClick(view, me, opts.profile, c, nowMs, deadline);
+      // An on-request ask ("someone into comics to go to the comics open house with") also steers the first step.
+      const ask = opts.source === 'request' ? lookingForOf(opts.profile, c.kind) : '';
+      const raw = await runClick(view, me, opts.profile, c, nowMs, deadline, ask);
       return { c, r: scrubResult(view, viewerId, opts.profile, c.profile.id, { kind: c.kind, trustPath: c.trust, firstStep: raw.firstStep }, raw) };
     } catch (err) {
       console.error('[intros] agent exchange failed:', String((err as Error)?.message ?? err).slice(0, 200));

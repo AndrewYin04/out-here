@@ -22,6 +22,7 @@ const mock = () => { process.env.MUSE_MOCK = '1'; process.env.MUSE_QUIET = '1'; 
 /** Every reason a card may show, as code writes it. */
 const TEMPLATES = [
   /^You both love [a-z0-9 ,'-]+$/i,
+  /^You both love [a-z0-9 ,'-]+\. [A-Z][a-z]+ (posted|commented on (your|[A-Z][a-z]+'s) post): ".+"$/,
   /^You're both looking for new friends into (.+)$/,
   /^You're both open to coffee chats about (.+)$/,
   /^You're both hoping to meet someone into (.+)$/,
@@ -86,7 +87,7 @@ describe('P1: scrubbed reasons are real sentences', () => {
       }
     }
     expect(made).toBeGreaterThanOrEqual(4);
-  }, 20_000); // 1.6 s alone; 18 fresh stores, slow under a full parallel run
+  }, 60_000); // 4-6 s alone on this laptop; 18 fresh stores, over 20 s under a full parallel run
 
   it('guard unit: a leaking reason becomes the kind\'s template, or is dropped when nothing is shared', () => {
     const viewer = { interests: ['vinyl'], bio: '', job: null } as never;
@@ -165,7 +166,7 @@ describe('P3: Muse is in the chat and its ask works', () => {
     const card = (await listIntros(store, alex)).intros.find((x) => x.id === id)!;
     expect(card.plan?.held).toBe(false);
     expect(card.plan?.canHold).toBe(true);
-    expect(card.plan?.ask).toMatch(/^Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at /);
+    expect(card.plan?.ask).toMatch(/^(Want me to hold 2 seats at |You're already going to .+ Want me to save \w+ a seat\? |\w+'s already going to .+ Want me to hold you a seat\? )/);
   });
 
   it('Hold seats joins both people to the quest once, and Muse confirms in the chat', async () => {
@@ -193,7 +194,7 @@ describe('P3: Muse is in the chat and its ask works', () => {
     expect(moved.intro.step.label).toBe(opt.label);
     const last = (await store.messages(jordan, threadId)).at(-1)!;
     expect(last.kind).toBe('muse');
-    expect(last.text).toMatch(/^✨ Muse: Alex picked another time\. Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at /);
+    expect(last.text).toMatch(/^✨ Muse: Alex picked another time\. (Want me to hold 2 seats at |\w+'s already going to .+ Want me to hold a seat for \w+\? )/);
     await expect(planIntro(store, alex, id, { action: 'pick', questId: 'nope' })).rejects.toMatchObject({ status: 400 });
     const fresh = createMemoryStore();
     mock();

@@ -15,7 +15,7 @@ Two laptops drive it: Alex on laptop A and Jordan on laptop B. A phone shows tha
 - **Person 1** is Alex, on laptop A.
 - **Person 2** is Jordan, on laptop B. Jordan and Alex are strangers. The trust path is "you both know Maya": Jordan is already Maya's roommate in the seed.
 - **The seller** is Theo Nakamura (handle `theo`), a new fictional persona. Theo is not a friend of Alex or Jordan.
-- **The open house** is "📚 Comics open house" at Inkwell Comics Café, a fictional public venue about 580 m from Alex in a straight line. It starts 30 minutes after the reseed, lasts 2 hours, is free, and has 8 spots with 3 taken, so 5 are open. The walk is about 9 minutes (80 m/min with the 1.3 route factor).
+- **The open house** is "📚 Comics open house" at Inkwell Comics Café, a fictional public venue about 580 m from Alex in a straight line. It starts 30 minutes after the reseed, lasts 2 hours, is free, and has 8 spots with 3 taken, so 5 are open. The walk to the exact spot is about 9 minutes (80 m/min with the 1.3 route factor). Before Alex joins, the sheet uses the ~200 m fuzzed spot and reads "7 min walk"; say "about 7 minutes" in the script.
 - **Scene 2** is done live if Rishab's listing-to-plan link (#48) lands by Fri 6 AM PT. Otherwise the open house is pre-seeded and scene 2 takes about 10 seconds: show the listing, then the plan it names.
 - **The selfie** uses the laptop camera, with a prepared photo file as the backup.
 - **The demo database** (`out-here-demo`) is reseeded around Fri 6 to 7 AM PT, so dry runs use the real times, and again about 10 minutes before going on stage, so the open house still starts about 20 minutes after the demo begins.
@@ -27,8 +27,9 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 
 - **Theo's listing** (`l31`): "Box of indie comics: Night Courier #1–12 + 30 more", $60, with a drawn photo of the box. Its description ends "Open house today at Inkwell Comics Café, come flip through."
 - **Theo's Feed post** (`p301`): a public post in Menlo Park New Grads, a Group Alex is in, posted 24 minutes before the reseed, so it is near the top of Alex's Feed. Sage has commented.
-- **The plan** (quest key `comics-open-house`): hosted by Theo, with Sage and Yuki already in. It carries the tag `listing:<listing id>` until #48 adds a real link.
-- **Alex and Jordan** both list comics and zines in their interests. Their friendship intro settings ask for friends for local shows, comic shops and open houses. A friendship intro round for Alex picks Jordan at 91 (local bands, comics, zines), with a comics reason. A round over all kinds still makes the coffee-chat intro, now at 97.
+- **The plan** (quest key `comics-open-house`): hosted by Theo, with Sage and Yuki already in. Its bubble reads "bring a comic to trade 🔁" and its tags include zines and small-press. It carries the tag `listing:<listing id>` until #48 adds a real link; the plan's sheet shows "Hosted by Theo Nakamura" and a row for the $60 listing, and the listing page shows the plan.
+- **Posts that back the interest:** Alex commented on Theo's post ("been meaning to get into indie comics, is Night Courier a good place to start?"). Jordan posted about the zine swap at El Camino Coffee Works and Night Courier (`p302`). The intro reasons quote these.
+- **Alex and Jordan** both list comics and zines in their interests. Their friendship intro settings ask for friends for local shows, comic shops and open houses. A friendship intro round for Alex picks Jordan at 91 (local bands, comics, zines). The first reason is "You both love comics. Jordan posted: …" and the suggested first step is the Comics open house. The /intros button ("Run a friendship intro round (demo)") runs this friendship round, and Ask Muse with Friendship and "someone into comics to go to the comics open house with" gives the same intro. A round over all kinds (the API with no kind) still makes the coffee-chat intro at 97, also with the open house as its first step.
 - **Jordan's history:** one past hangout, a zine swap at El Camino Coffee Works 9 days ago with Sage, with a crew and one photo.
 
 ## Status key
@@ -44,8 +45,8 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 - **Screen:** laptop A.
 - **The judge sees:** Alex scrolls the Feed and sees a Marketplace post: a box of comics he likes.
 - **Status:** built in the seed (`wt/comic-seed`).
-- **Exists:** Feed, Marketplace pages, 31 seeded listings. Theo's comics listing and his Feed post about it.
-- **Needs:** nothing for the seed. A "Marketplace" share card on the post would read better than a plain photo post.
+- **Exists:** Feed, the Marketplace grid and item pages (`/marketplace`, `/marketplace/<id>`), 31 seeded listings. Theo's Feed post shows a Marketplace share card ($60, title, "View listing") that opens the item page.
+- **Needs:** nothing.
 - **Owner:** Andrew's agent (seed).
 
 ### Scene 2. The seller makes it an open house
@@ -55,7 +56,8 @@ Built on `wt/comic-seed` (`src/shared/seed/comics.ts`, `supabase/seed-content.js
 - **✨ Muse:** fills in the title, time and invite copy from one sentence.
 - **Status:** partly built.
 - **Exists on main (PR #43, Rishab #36):** "＋ Post a plan" from the map with the Muse one-line draft, plan visibility, check-ins, reports, and the plan page `/out-here/plan/<id>`. A new plan appears on everyone's map over the `quests:new` channel.
-- **Needs:** a link from a Marketplace listing to the plan, and the plan page showing the item. Until that lands, the seed links them with the quest tag `listing:<listingId>`.
+- **Exists in the seed (`wt/comic-seed`):** the item page shows "Comics open house · today 7:00 PM" with a link to the plan on the map, and the plan's map sheet shows the listing row and "Hosted by Theo Nakamura". Both are linked by the quest tag `listing:<listingId>`.
+- **Needs:** starting the plan from the listing live (#48) replaces the tag with a real link.
 - **Owner:** Rishab.
 
 ## Act 2: Muse brokers the match (0:40 to 2:40, proposed; the AI core)

@@ -11,7 +11,7 @@ import {
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
-  FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
+  FriendRequestView, GroupResponse, GroupView, ListingResponse, NotificationView, PersonCard, PostView, ProfileResponse,
   ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
 import type { Backend } from './backend';
@@ -1187,11 +1187,18 @@ export class CoreStore {
     return v.db.listings.filter((l) => l.status !== 'sold').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async listing(viewerId: ID, id: ID): Promise<{ listing: Listing; seller: PersonCard }> {
+  async listing(viewerId: ID, id: ID): Promise<ListingResponse> {
     const v = await this.view();
     const l = v.db.listings.find((x) => x.id === id);
     if (!l) throw notFound('listing_not_found');
-    return { listing: l, seller: v.person(viewerId, l.sellerId)! };
+    // The seller's upcoming plan for this listing, linked by a listing:<id> tag, if the viewer can see it.
+    const q = v.db.quests
+      .filter((x) => x.tags.includes(`listing:${l.id}`) && v.isActiveQuest(x) && v.canSeeQuest(viewerId, x))
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+    const plan = q ? {
+      questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt, endsAt: q.endsAt, seatsLeft: v.seatsLeft(q),
+    } : null;
+    return { listing: l, seller: v.person(viewerId, l.sellerId)!, plan };
   }
 
   async reels(): Promise<Reel[]> {

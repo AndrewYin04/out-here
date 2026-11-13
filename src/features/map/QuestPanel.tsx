@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { ApiFetchError, apiPost, useApi, useViewer, type QuestDetail } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, bump, celebrateJoin, cn, useToast } from '@/features/ui';
-import type { PersonCard } from '@/shared/api';
+import type { ListingResponse, PersonCard } from '@/shared/api';
 import { formatDemoTime } from '@/shared';
 import { friendsGoingLine, priceLabel, startsLabel, walkLabel } from './format';
 import { MapAttribution } from './MapAttribution';
@@ -23,6 +23,30 @@ export type QuestPanelProps = {
   /** Muse filter on: why this plan was kept ("✨ Muse" and the reason), shown at the top. */
   museReason?: { label: string; text: string } | null;
 };
+
+/** A plan a seller made for a Marketplace listing carries a `listing:<id>` tag. */
+const LISTING_TAG = /^listing:(.+)$/;
+
+/** The linked listing under a plan: thumbnail, title and price, opening the item page. */
+function ListingRow({ listingId }: { listingId: string }) {
+  const { data } = useApi<ListingResponse>(`/api/listings/${encodeURIComponent(listingId)}`);
+  const l = data?.listing;
+  if (!l) return null;
+  return (
+    <Link href={`/marketplace/${encodeURIComponent(l.id)}`} className="mt-3 flex items-center gap-3 rounded-card border border-fb-divider p-2 hover:bg-fb-hover" data-testid="quest-listing">
+      <span className="h-12 w-12 shrink-0 overflow-hidden rounded-btn bg-fb-skeleton">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {l.imageUrl && <img src={l.imageUrl} alt="" className="h-full w-full object-cover" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] text-fb-text-2">On Marketplace</span>
+        <span className="block truncate text-fb-meta font-semibold text-fb-text">{l.title}</span>
+        <span className="block text-fb-meta text-fb-text">{l.priceUsd === 0 ? 'Free' : `$${l.priceUsd}`}</span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-fb-text-2" aria-hidden />
+    </Link>
+  );
+}
 
 function friendsFirst(members: PersonCard[], hostId: string | undefined, viewerId: string): PersonCard[] {
   const rank = (p: PersonCard) => (p.id === viewerId ? 0 : p.isFriend ? 1 : p.id === hostId ? 2 : 3);
@@ -94,6 +118,7 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
   const people = shown ? friendsFirst(shown.members, q?.hostId, viewerId) : [];
   const friendLine = friendsGoingLine(people.filter((p) => p.isFriend && p.id !== viewerId).map((p) => p.name));
   const walk = walkLabel(walkMinutes);
+  const listingId = q?.tags.map((t) => LISTING_TAG.exec(t)?.[1]).find(Boolean) ?? null;
 
   return (
     <section
@@ -182,6 +207,14 @@ export function QuestPanel({ questId, walkMinutes, viewerId, now, onClose, onCha
                 <span className="text-fb-text-2">· {q.capacity} max</span>
               </li>
             </ul>
+
+            {shown.host && !isHost && (
+              <p className="mt-2 flex items-center gap-2 text-fb-meta text-fb-text-2" data-testid="quest-host">
+                <Avatar src={shown.host.avatarUrl} name={shown.host.name} size={24} decorative />
+                <span>Hosted by <Link href={`/profile/${shown.host.handle}`} className="font-semibold text-fb-text hover:underline">{shown.host.name}</Link></span>
+              </p>
+            )}
+            {listingId && <ListingRow listingId={listingId} />}
 
             {q.description && <p className="mt-3 text-fb-body">{q.description}</p>}
 

@@ -9503,6 +9503,46 @@
               "minutesAfter": 12
             }
           ]
+        },
+        {
+          "authorHandle": "alex",
+          "text": "been meaning to get into indie comics, is Night Courier a good place to start?",
+          "minutesAfter": 15,
+          "replies": [
+            {
+              "authorHandle": "theo",
+              "text": "perfect place to start, come by and flip through #1",
+              "minutesAfter": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "p302",
+      "authorHandle": "jordan",
+      "target": {
+        "type": "profile"
+      },
+      "audience": "public",
+      "text": "Zine swap at El Camino Coffee Works last week, left with more zines than I brought! Also: Night Courier is the best indie comics run I've found in years, a bike messenger in a city that never sleeps 📖",
+      "image": null,
+      "hoursAgo": 190,
+      "reactions": {
+        "like": 5,
+        "love": 2,
+        "care": 0,
+        "haha": 0,
+        "wow": 0,
+        "sad": 0,
+        "angry": 0
+      },
+      "comments": [
+        {
+          "authorHandle": "sage",
+          "text": "that swap was so good, same time next month?",
+          "minutesAfter": 40,
+          "replies": []
         }
       ]
     }

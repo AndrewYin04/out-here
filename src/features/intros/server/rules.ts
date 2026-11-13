@@ -183,6 +183,10 @@ export type SharedFact = {
   keyword: string; forA: string | null; forB: string | null; looker: 'a' | 'b' | null;
   /** Keywords of the underlying thing (an interest, a job): two facts sharing one are the same fact. */
   topic: string[];
+  /** That side's text quotes something the other person posted or commented, so it reads first. */
+  citedA?: boolean; citedB?: boolean;
+  /** For a shared interest: how many people list it. Rarer interests are more specific and read first. */
+  commonness?: number;
 };
 
 const sameTopic = (x: string[], y: string[]) => x.some((k) => y.includes(k));
@@ -199,21 +203,89 @@ export function distinctTopics(facts: SharedFact[]): number {
 
 /**
  * One reason per underlying fact, in the order one side reads them: what that side is looking
- * for first (the most specific), then shared interests, then what the other side is looking for.
- * A fact whose topic is already covered ("You both love local bands" after "You're looking for
- * people to go to local shows with, and Jordan is into local bands") is dropped.
+ * for first (the most specific), then shared interests backed by something the other person
+ * posted, then other shared interests (rarer ones first: "comics" before "local bands"), then
+ * what the other side is looking for. A fact whose
+ * topic is already covered ("You both love local bands" after "You're looking for people to go
+ * to local shows with, and Jordan is into local bands") is dropped.
  */
-export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
-  const rank = (f: SharedFact) => (f.looker === side ? 0 : f.looker === null ? 1 : 2);
+export function orderedFacts(facts: SharedFact[], side: 'a' | 'b'): SharedFact[] {
+  const cited = (f: SharedFact) => (side === 'a' ? f.citedA : f.citedB) === true;
+  const rank = (f: SharedFact) => (f.looker === side ? 0 : f.looker === null ? (cited(f) ? 1 : 2) : 3);
   const seen: string[][] = [];
-  const out: string[] = [];
-  for (const f of [...facts].sort((x, y) => rank(x) - rank(y))) {
+  const out: SharedFact[] = [];
+  const rarer = (x: SharedFact, y: SharedFact) => (x.commonness !== undefined && y.commonness !== undefined ? x.commonness - y.commonness : 0);
+  for (const f of [...facts].sort((x, y) => rank(x) - rank(y) || rarer(x, y))) {
     const text = side === 'a' ? f.forA : f.forB;
     if (!text || seen.some((t) => sameTopic(t, f.topic))) continue;
     seen.push(f.topic);
-    out.push(text);
+    out.push(f);
   }
   return out;
+}
+
+export function factsFor(facts: SharedFact[], side: 'a' | 'b'): string[] {
+  return orderedFacts(facts, side).map((f) => (side === 'a' ? f.forA : f.forB) ?? '');
+}
+
+/** A case-insensitive match for an interest that also takes the plural: "comic" finds "comics". */
+function phraseRe(phrase: string): RegExp | null {
+  const ws = phrase.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!ws.length) return null;
+  const parts = [...ws.slice(0, -1), stem(ws[ws.length - 1])].map((w) => w.replace(/[^a-z0-9]/g, (ch) => `\\${ch}`));
+  return new RegExp(`\\b${parts.join('\\s+')}`, 'i');
+}
+const sentencesOf = (t: string) => t.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+const clip = (t: string, max = 120) => (t.length <= max ? t : `${t.slice(0, t.lastIndexOf(' ', max - 1))}…`);
+
+type AuthorIndex = {
+  posts: Map<ID, View['db']['posts']>; comments: Map<ID, View['db']['comments']>; interestCount: Map<string, number>;
+};
+/** Posts and comments by author (newest first) and how many people list each interest, built once per View. */
+const authorIndexes = new WeakMap<View, AuthorIndex>();
+function authorIndex(v: View): AuthorIndex {
+  const cached = authorIndexes.get(v);
+  if (cached) return cached;
+  const newest = <T extends { createdAt: string }>(p: T, q: T) => q.createdAt.localeCompare(p.createdAt);
+  const by = <T extends { authorId: ID; createdAt: string }>(rows: readonly T[]) => {
+    const m = new Map<ID, T[]>();
+    for (const r of rows) { const l = m.get(r.authorId); if (l) l.push(r); else m.set(r.authorId, [r]); }
+    for (const l of m.values()) l.sort(newest);
+    return m;
+  };
+  const interestCount = new Map<string, number>();
+  for (const p of v.profileById.values()) {
+    for (const i of new Set(p.interests.map((x) => x.toLowerCase()))) interestCount.set(i, (interestCount.get(i) ?? 0) + 1);
+  }
+  const idx = { posts: by(v.db.posts), comments: by(v.db.comments), interestCount };
+  authorIndexes.set(v, idx);
+  return idx;
+}
+
+/**
+ * Something y posted or commented that x can see and that mentions `interest`, as a line for x:
+ * 'Jordan posted: "Zine swap at El Camino Coffee Works last week, ..."'. y's newest visible
+ * posts first, then y's comments on posts x can see. Null when nothing visible mentions it.
+ */
+export function citationOf(v: View, x: Profile, y: Profile, interest: string): string | null {
+  const re = phraseRe(interest);
+  if (!re) return null;
+  const name = firstName(y);
+  const idx = authorIndex(v);
+  for (const p of idx.posts.get(y.id) ?? []) {
+    if (!v.canSeePost(x.id, p)) continue;
+    const s = sentencesOf(p.text).find((t) => re.test(t));
+    if (s) return `${name} posted: "${clip(s)}"`;
+  }
+  for (const c of idx.comments.get(y.id) ?? []) {
+    const p = v.postById.get(c.postId);
+    if (!p || p.authorId === y.id || !v.canSeePost(x.id, p)) continue;
+    const s = sentencesOf(c.text).find((t) => re.test(t));
+    if (!s) continue;
+    const owner = p.authorId === x.id ? 'your' : `${firstName(v.profileById.get(p.authorId))}'s`;
+    return `${name} commented on ${owner} post: "${clip(s)}"`;
+  }
+  return null;
 }
 
 /**
@@ -230,7 +302,14 @@ export function sharedFacts(v: View, a: Profile, b: Profile, kind: IntroKind, aO
   for (const i of a.interests) {
     if (bInterests.has(i.toLowerCase())) {
       const t = `You both love ${i}`;
-      out.push({ keyword: i.toLowerCase(), forA: t, forB: t, looker: null, topic: keywords(i) });
+      // Each side reads what the other person posted about it, when there is something to cite.
+      const aCites = citationOf(v, a, b, i);
+      const bCites = citationOf(v, b, a, i);
+      out.push({
+        keyword: i.toLowerCase(), forA: aCites ? `${t}. ${aCites}` : t, forB: bCites ? `${t}. ${bCites}` : t,
+        looker: null, topic: keywords(i), citedA: !!aCites, citedB: !!bCites,
+        commonness: authorIndex(v).interestCount.get(i.toLowerCase()) ?? 0,
+      });
     }
   }
   const aText = lookingForOf(aP, kind);
@@ -251,6 +330,9 @@ export function sharedFacts(v: View, a: Profile, b: Profile, kind: IntroKind, aO
     const keys = keywords(looking);
     const e = evidence(y, keys, kind);
     if (!e) continue;
+    // "You're looking for ..., and Jordan is into comics" only repeats the want back when a shared
+    // interest already says it ("You both love comics. Jordan posted: ..."), so that fact covers it.
+    if (out.some((f) => f.looker === null && sameTopic(f.topic, keywords(e.term)))) continue;
     const forX = `You're looking for ${looking}, and ${e.they(firstName(y))}`;
     out.push({
       keyword: hit(keys, looking) ?? keys[0],

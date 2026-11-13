@@ -99,7 +99,8 @@ describe('mock Click round and double opt-in', () => {
     expect(c.score).toBe(97);
     expect(c.trustPath[0]).toBe('You both know Maya');
     expect(c.reasons.length).toBeGreaterThanOrEqual(2);
-    expect(c.reasons.join(' ')).toMatch(/local (bands|shows)/);
+    // Rarer shared interests read first (comics before local bands), each with what Jordan posted.
+    expect(c.reasons.join(' ')).toMatch(/You both love comics\. Jordan posted: "/);
     expect(c.reasons.join(' ')).toMatch(/design/);
     // Interleaved: your agent, their agent (outcome only), your agent, their verdict.
     expect(c.myAgentLog.map((t) => t.mine)).toEqual([true, false, true, false]);
@@ -134,7 +135,7 @@ describe('mock Click round and double opt-in', () => {
     expect(a.summary).toMatch(/worth going to the .* together/);
     // One fact, one mention: the summary names the kind and step, and no two reasons share a topic.
     expect(a.summary).not.toMatch(/local bands|local shows|design/);
-    expect(a.reasons.filter((r) => /local (bands|shows)/.test(r))).toHaveLength(1);
+    expect(a.reasons.filter((r) => /comics/.test(r))).toHaveLength(1);
     expect(a.reasons.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -174,7 +175,7 @@ describe('mock Click round and double opt-in', () => {
     expect(msgs.at(-1)!.kind).toBe('muse');
     expect(msgs.at(-1)!.text).toMatch(/^✨ Muse: Alex, meet Jordan\. Jordan, meet Alex\./);
     // Muse ends with a concrete ask the pair can answer from the intro card.
-    expect(msgs.at(-1)!.text).toMatch(/Want me to hold (2 seats|a seat for \w+ \(\w+ is already going\)) at .+ \((Starts in \d+ min|Today|Tomorrow|Happening now)[^)]*\)\? Tap Hold seats or Pick another time on your intro\.$/);
+    expect(msgs.at(-1)!.text).toMatch(/(Want me to hold 2 seats at|\w+'s already going to) .+ \((Starts in \d+ min|Today|Tomorrow|Happening now)[^)]*\)(\?|\. Want me to hold a seat for \w+\?) Tap Hold seats or Pick another time on your intro\.$/);
     const thread = (await store.threads(alex)).find((t) => t.id === threadId)!;
     expect(thread.name).toBe('Alex, Jordan + Muse');
     expect((await listIntros(store, alex)).intros[0].state).toBe('connected');
