@@ -40,3 +40,36 @@ describe('demo reset', () => {
     expect((await store.friendAvailability(alex)).some((a) => a.userId === maya && Date.parse(a.startsAt) <= later.getTime() + 10 * 60_000)).toBe(true);
   });
 });
+
+describe('demo reset covers what a thrift rehearsal touches', () => {
+  it('removes holds, new watches, photos, ratings and messages, and puts sold listings back', async () => {
+    setNow(NOW);
+    const store = createMemoryStore(NOW);
+    const seed = buildMemoryDb(NOW);
+    const b = store.backend;
+    const clone = <T extends Record<string, unknown>>(row: T, patch: Partial<T>) => ({ ...row, ...patch });
+    const listing = seed.listings[0];
+    // a rehearsal: the listing reserved then sold, a hold, a new watch, a selfie, a rating, a message
+    await b.update('listings', { id: listing.id } as never, { status: 'sold' } as never);
+    const tables = ['listingHolds', 'museWants', 'memories', 'hangoutRatings', 'messages', 'notifications'] as const;
+    const before = Object.fromEntries(tables.map((k) => [k, (seed[k] as unknown[]).length]));
+    const template = { listingHolds: null, museWants: seed.museWants[0], memories: seed.memories[0], hangoutRatings: seed.hangoutRatings[0], messages: seed.messages[0], notifications: seed.notifications[0] };
+    for (const k of tables) {
+      const t = template[k] as Record<string, unknown> | null;
+      if (!t) continue;
+      const extra = k === 'hangoutRatings' ? clone(t, { raterId: profileId('jordan') }) : clone(t, { id: `rehearsal-${k}` });
+      await b.insert(k, [extra] as never);
+    }
+    const s0 = (await store.museContext()).db;
+    expect((s0.museWants as unknown[]).length).toBe(before.museWants + 1);
+
+    const later = new Date(NOW.getTime() + 30 * 60_000);
+    setNow(later);
+    const r = await store.resetStory(buildMemoryDb(later));
+    expect(r.cleared).toBeGreaterThanOrEqual(5);
+    const db = (await store.museContext()).db;
+    for (const k of tables) expect((db[k] as unknown[]).length, k).toBe(before[k]);
+    expect(db.listings.find((l) => l.id === listing.id)?.status).toBe(listing.status);
+    expect(db.memories.some((m) => m.id === 'rehearsal-memories')).toBe(false);
+  });
+});
