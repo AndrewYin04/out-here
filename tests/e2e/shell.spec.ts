@@ -83,7 +83,7 @@ test.describe('desktop 1440', () => {
     await page.getByRole('search').getByRole('searchbox').fill('dumplings');
     await page.getByRole('search').getByRole('searchbox').press('Enter');
     await expect(page).toHaveURL(/\/search\?q=dumplings$/);
-    await expect(page.getByRole('heading', { name: 'Search', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Search results' })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
