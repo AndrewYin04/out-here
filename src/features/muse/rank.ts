@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { formatDemoTime, type MuseIntent, type PlanSuggestion } from '../../shared';
 import type { CandidateResult, PlanCandidate } from './candidates';
+import { normalizeText } from './cache-key';
 import { isMockMode, museJSON, reportFallback } from './client';
 import { firstName, type PlanContext } from './context';
 import {
@@ -59,6 +60,8 @@ export type RankResult = {
   /** True when the model failed and the heuristic answered instead. */
   fallback: boolean;
   error: string | null;
+  /** True when a cached Muse answer was served (muse_cache). */
+  cached?: boolean;
 };
 
 type IdMaps = {
@@ -161,6 +164,8 @@ export async function rankAndExplain(
     timeoutMs?: number;
     /** Live mode only: answer with the heuristic without calling the model, and say why. */
     skipModel?: string;
+    /** Text the cache key uses instead of ctx.text (plan together rounds its minutes). */
+    keyText?: string;
   },
 ): Promise<RankResult> {
   const started = Date.now();
@@ -212,6 +217,25 @@ export async function rankAndExplain(
       userId: ctx.viewer.id,
       deadline: ctx.deadline,
       timeoutMs: ctx.timeoutMs,
+      // Cache key: persona + normalized text + the intent's non-time fields + the ORDERED
+      // shortlist (quest id and the friend ids under it), because c1/f1 follow that order.
+      // Seats, walk minutes and start times are left out: validate() recomputes them from live
+      // data after a cached pick, and the claim check replaces a reason whose numbers are off.
+      // Friend facts Muse is told to cite (their status line, shared interests, and who is already
+      // going) are IN the key, so an edited bubble or a friend leaving misses and goes live
+      // instead of repeating a stale line.
+      cacheKey: {
+        text: normalizeText(ctx.keyText ?? ctx.text),
+        intent: {
+          activities: intent.activities, budgetMax: intent.budgetMax, wantsFriends: intent.wantsFriends,
+          openToNewPeople: intent.openToNewPeople, vibe: intent.vibe,
+        },
+        shortlist: shortlist.map((c) => [
+          c.questId,
+          c.friendOverlap.map((f) => [f.friendId, normalizeText(f.status ?? ''), [...f.sharedWithQuest].sort()]),
+          c.friendMembers.map((m) => m.friendId).sort(),
+        ]),
+      },
     });
     const suggestions = picksToSuggestions(res.data, maps);
     if (suggestions.length === 0) {
@@ -219,7 +243,7 @@ export async function rankAndExplain(
     }
     return {
       suggestions, summary: res.data.summary.trim(), model: res.model,
-      latencyMs: Date.now() - started, fallback: false, error: null,
+      latencyMs: Date.now() - started, fallback: false, error: null, cached: res.cached === true,
     };
   } catch (err) {
     return fallBack(String((err as Error)?.message ?? err).slice(0, 200));
