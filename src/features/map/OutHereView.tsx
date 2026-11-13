@@ -452,6 +452,7 @@ export function OutHereView() {
           selectedId={selectedId}
           viewerId={persona.id}
           origin={ctx?.origin ?? null}
+          hideMe={mode === 'friends'}
           walkMinutes={ctx?.walkMinutes ?? null}
           friendFaces={friendFaces}
           picks={picks}
@@ -606,7 +607,7 @@ export function OutHereView() {
 
       {mode === 'friends' && (
         <>
-          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
+          <FriendsLayer map={map} viewer={ctx?.viewer ?? null} origin={ctx?.origin ?? null} keepIds={friendKeep} reasonFor={friendKeep ? reasonFor : null} />
           {!unsupported && ctx && questsApi.data && visible.length === 0 && (
             <div className="pointer-events-none absolute inset-x-4 top-1/3 z-10 flex justify-center">
               <div className="pointer-events-auto w-full max-w-[340px] rounded-card bg-fb-surface shadow-card" data-testid="friends-empty">

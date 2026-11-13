@@ -21,6 +21,8 @@ import { firstName, isDesktop, panelPadding, updatedAgo, useFriendPins, useMySha
 export type FriendsLayerProps = {
   map: MapLibreMap | null;
   viewer: Profile | null;
+  /** Where walking times are measured from: the viewer's own pin sits here, so the map shows one "you". */
+  origin?: LatLng | null;
   /** Muse filter: show only these friends' pins. Omitted or null shows every friend. */
   keepIds?: ReadonlySet<string> | null;
   /** Muse filter: the reason row for a kept friend's card. */
@@ -102,7 +104,7 @@ function groupPins(map: MapLibreMap, pins: FriendPin[], px: number): Group[] {
 
 type Single = { pin: FriendPin; offset: [number, number]; chip: ChipMode; side: ChipSide; dx: number };
 
-export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: FriendsLayerProps) {
+export function FriendsLayer({ map, viewer, origin = null, keepIds = null, reasonFor = null }: FriendsLayerProps) {
   const lib = useMapLib();
   const tick = useViewTick(map);
   const { data } = useFriendPins();
@@ -114,6 +116,9 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
   }, [data, keepIds]);
   const openPin = pins.find((p) => p.friend.id === openId) ?? null;
   const me = mine?.share;
+  // One "you" on the map: the avatar pin stands where walking times are measured from (the blue dot
+  // is hidden in this view). Falls back to the shared spot when there is no origin yet.
+  const selfAt: LatLng | null = origin ?? me?.location ?? null;
 
   // Phones: once the pins load, frame the local friends and the viewer so their chips separate
   // (the default camera is set for the desktop map and leaves some of them off a 390 px screen).
@@ -122,7 +127,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
     if (!map || framed || pins.length === 0 || isDesktop()) return;
     const c = map.getContainer();
     if (c.clientWidth >= NARROW_MAP_PX) return;
-    const pts = [...pins.filter((p) => p.distanceKm < LOCAL_KM).map((p) => p.location), ...(me ? [me.location] : [])];
+    const pts = [...pins.filter((p) => p.distanceKm < LOCAL_KM).map((p) => p.location), ...(selfAt ? [selfAt] : [])];
     setFramed(true);
     if (pts.length < 2) return;
     const lats = pts.map((p) => p.lat);
@@ -130,7 +135,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], {
       padding: { top: 150, bottom: 120, left: 36, right: 36 }, maxZoom: 16, duration: 0,
     });
-  }, [map, pins, me, framed]);
+  }, [map, pins, selfAt, framed]);
 
   // Opens a friend's card and flies the map so their pin is clear of the card:
   // window event "findmy:open" { detail: { id, zoom? } } (the People sheet sends it).
@@ -189,7 +194,7 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
       const pt = map.project([pin.location.lng, pin.location.lat]);
       return { pin, x: pt.x + offset[0], y: pt.y + offset[1] };
     });
-    const mePt = me ? map.project([me.location.lng, me.location.lat]) : null;
+    const mePt = selfAt ? map.project([selfAt.lng, selfAt.lat]) : null;
     const opts = view.w < NARROW_MAP_PX ? NARROW_CHIPS : WIDE_CHIPS;
     const chips = placeChipsSided(screen, mePt ? { x: mePt.x, y: mePt.y } : null, view, false, opts);
     return {
@@ -199,19 +204,19 @@ export function FriendsLayer({ map, viewer, keepIds = null, reasonFor = null }: 
         return { ...s, chip: c?.mode ?? 'none', side: c?.side ?? 'above', dx: c?.dx ?? 0 };
       }),
     };
-  }, [map, pins, tick, me]);
+  }, [map, pins, tick, selfAt]);
 
   if (!map || !lib) return null;
   return (
     <>
-      {me && viewer && (
-        <MapMarker map={map} lib={lib} at={me.location} z={2} label="Your location">
-          <div className="flex flex-col items-center" data-testid="my-pin">
+      {selfAt && viewer && (
+        <MapMarker map={map} lib={lib} at={selfAt} z={2} label="Your location">
+          <div className="flex flex-col items-center" data-testid="my-pin" data-map-marker="me">
             <span className="rounded-full bg-white p-[2px] shadow-card ring-[3px] ring-fb-blue">
               <Avatar src={viewer.avatarUrl} name={viewer.name} size={36} decorative />
             </span>
             <span className="mt-0.5 rounded-full bg-fb-blue px-1.5 text-[11px] font-semibold leading-4 text-white">
-              {me.paused ? 'Paused' : 'You'}
+              {me?.paused ? 'Paused' : 'You'}
             </span>
           </div>
         </MapMarker>
