@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { body, LatLngZ, route } from '@/lib/api';
+import { body, LatLngZ, LIVE_TABLES, route } from '@/lib/api';
 
 const BodyZ = z.object({ location: LatLngZ });
 
@@ -12,4 +12,5 @@ export const GET = route<{ id: string }>(async ({ store, viewer, params }) => ({
 export const POST = route<{ id: string }>(async ({ store, viewer, params, req }) => {
   const b = await body(req, BodyZ);
   return store.postWalkStep(viewer.id, params.id, b.location);
-});
+  // Sent every few seconds while walking: re-read only the live tables, not all 32.
+}, { refresh: LIVE_TABLES });

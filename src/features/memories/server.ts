@@ -4,3 +4,5 @@ export {
   commonInterests, crewFits, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';
 export type { RegroupCandidate, RegroupContext, RegroupMember, RegroupResult, RegroupSuggestion } from './regroup';
+export { fallbackTakeaway, TAKEAWAY_JSON_SCHEMA, TakeawayZ, takeawayMessages, validateTakeaway } from './takeaway';
+export type { TakeawayContext } from './takeaway';

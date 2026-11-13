@@ -1,12 +1,13 @@
-// GET  /api/muse/regroup -> { viewerId, crews: { crewId, members: PersonCard[], originTitle, threadId }[] }
+// GET  /api/muse/regroup -> { viewerId, crews: { crewId, members: PersonCard[], originTitle, threadId, notAgainIds }[] }
 //      (the viewer's crews with member cards and the crew's group thread, for the Memories page)
 // POST /api/muse/regroup  body: { crewId, now? } -> { suggestion: { questId|null, title, whenText, reason }, message }
 //      Context comes from the store (members, shared interests, visible availability and Find My
 //      bubbles, upcoming quests nearby). Muse (fast model, strict schema) picks; code checks the
-//      quest id. Header x-muse-mode: mock|live. 502 { error } when Muse fails.
+//      quest id. Members the viewer said no to ("Hang out with them again?") are left out; 409 when
+//      that leaves nobody. Header x-muse-mode: mock|live. 502 { error } when Muse fails.
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { DEMO_CENTER, demoDate, formatDemoTime, minutesUntil, now as demoNow } from '@/shared';
+import { DEMO_CENTER, NEGATIVE_HIGHLIGHTS, demoDate, formatDemoTime, minutesUntil, now as demoNow } from '@/shared';
 import { museJSON } from '@/features/muse';
 import { body, IdZ, route } from '@/lib/api';
 import {
@@ -33,9 +34,13 @@ function whenText(iso: string, at: Date): string {
   return `${day} ${formatDemoTime(iso)}`;
 }
 
+/** People the viewer said no to ("Hang out with them again?"), at any hangout. The viewer's own answers. */
+async function saidNoTo(store: { hangAgainSignals(id: string): Promise<{ subjectId: string; again: boolean }[]> }, viewerId: string): Promise<Set<string>> {
+  return new Set((await store.hangAgainSignals(viewerId)).filter((a) => !a.again).map((a) => a.subjectId));
+}
+
 export const GET = route(async ({ store, viewer }) => {
-  const crews = await store.crews(viewer.id);
-  const { view } = await store.museContext();
+  const [crews, { view }, no] = await Promise.all([store.crews(viewer.id), store.museContext(), saidNoTo(store, viewer.id)]);
   return {
     viewerId: viewer.id,
     crews: crews.map((c) => {
@@ -45,7 +50,10 @@ export const GET = route(async ({ store, viewer }) => {
         const ms = view.threadMemberIds(t.id);
         return t.isGroup && ms.length === set.size && ms.every((m) => set.has(m));
       });
-      return { crewId: c.id, members, originTitle: view.questById.get(c.originQuestId)?.title ?? null, threadId: thread?.id ?? null };
+      // notAgainIds: crew members the viewer said no to. Only the viewer's own answers, so the
+      // Memories card can leave them out of invites and demote "Get this group together again".
+      const notAgainIds = c.memberIds.filter((m) => m !== viewer.id && no.has(m));
+      return { crewId: c.id, members, originTitle: view.questById.get(c.originQuestId)?.title ?? null, threadId: thread?.id ?? null, notAgainIds };
     }),
   };
 });
@@ -56,11 +64,20 @@ export const POST = route(async ({ store, viewer, req }) => {
   const crew = (await store.crews(viewer.id)).find((c) => c.id === b.crewId);
   if (!crew) return NextResponse.json({ error: 'crew not found' }, { status: 404 });
 
-  const [{ view }, pins, availability, mine] = await Promise.all([
+  const [{ view }, pins, availability, mine, no, rated] = await Promise.all([
     store.museContext(), store.friendPins(viewer.id), store.friendAvailability(viewer.id), store.myLocation(viewer.id),
+    saidNoTo(store, viewer.id), store.hangoutRatings(viewer.id),
   ]);
-  const others = crew.memberIds.filter((id) => id !== viewer.id);
-  const profiles = crew.memberIds.map((id) => view.profileById.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+  // Never re-invite someone the viewer said no to: they are left out of the context and of the seat check.
+  const others = crew.memberIds.filter((id) => id !== viewer.id && !no.has(id));
+  if (crew.memberIds.length > 1 && others.length === 0) {
+    return NextResponse.json({ error: 'nobody from this crew to invite' }, { status: 409 });
+  }
+  const invited = [viewer.id, ...others];
+  const liked = new Map<string, number>();
+  for (const r of rated) if (r.verdict === 'loved') for (const h of r.highlights) if (!NEGATIVE_HIGHLIGHTS.has(h)) liked.set(h, (liked.get(h) ?? 0) + 1);
+  const likedBefore = [...liked].sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0])).map(([h]) => h).slice(0, 4);
+  const profiles = invited.map((id) => view.profileById.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
   const members = others.flatMap((id) => {
     const p = view.profileById.get(id);
     if (!p) return [];
@@ -82,7 +99,7 @@ export const POST = route(async ({ store, viewer, req }) => {
       const row = view.questById.get(q.id);
       const seatsLeft = row ? view.seatsLeft(row) : Math.max(q.capacity - q.memberIds.length, 0);
       // The whole crew must fit: a 4-person crew is never sent to a 2-seat plan.
-      return crewFits(seatsLeft, crew.memberIds, q.memberIds) ? [{ q, seatsLeft }] : [];
+      return crewFits(seatsLeft, invited, q.memberIds) ? [{ q, seatsLeft }] : [];
     })
     .map(({ q, seatsLeft }) => {
       return {
@@ -98,7 +115,7 @@ export const POST = route(async ({ store, viewer, req }) => {
   const ctx: RegroupContext = {
     crewId: crew.id, crewName: crew.name, originTitle: view.questById.get(crew.originQuestId)?.title ?? null,
     lastHangoutText: demoDate(new Date(crew.lastHangoutAt)), viewerFirstName: first(viewer.name),
-    sharedPrefs: crew.sharedPrefs, sharedInterests, members, candidates,
+    sharedPrefs: crew.sharedPrefs, sharedInterests, members, candidates, likedBefore,
   };
 
   try {
@@ -106,6 +123,8 @@ export const POST = route(async ({ store, viewer, req }) => {
       schemaName: 'regroup', schema: RegroupZ, jsonSchema: REGROUP_JSON_SCHEMA,
       messages: regroupMessages(ctx), model: 'fast', effort: 'minimal',
       mock: () => mockRegroup(ctx), route: '/api/muse/regroup', userId: viewer.id, deadline: Date.now() + 12_000,
+      // "Why did Muse suggest this": past ratings used, as counts and chips, never whose answer.
+      logSignals: { pastHangoutsRated: rated.length, likedBefore, membersLeftOut: crew.memberIds.length - invited.length },
     });
     const out = validateRegroup(res.data, ctx);
     return NextResponse.json(out, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
