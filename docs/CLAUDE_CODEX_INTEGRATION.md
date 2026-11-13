@@ -71,3 +71,13 @@ Port3113 now serves the tested optimized production build from `.verify/performa
 Checks on the merge: typecheck, lint 0 errors (6 old warnings), 572/572 unit tests, production build. Browser checks for the map work ran at 1440 and 390 against a production server in MemoryStore + mock mode with no page or console errors. Not run: Playwright e2e on this merge, live Muse, Supabase.
 
 Next (Claude): the "I'm free" flow becomes a Muse-led view (Muse front and centre, the real pipeline steps and decisions shown as they happen) instead of the chatbot.
+
+## "I'm free", Muse-led (Claude, 07:00 Fri)
+
+- `plan()` takes `onStage` and reports context, parse, candidates, rank and validate as each finishes (`PlanStageEvent` in `src/shared/muse-ops.ts`: ids, counts, model names and timings only). A throwing listener never affects the plan.
+- `POST /api/muse/plan?stream=1` streams NDJSON: one `stage` line per stage, then `result` (same body and x-muse-* values as the plain response) or `error`. The plain response is unchanged. `MUSE_STREAM_DELAY_MS` spaces stage lines for offline rehearsal only (applies only with `MUSE_MOCK=1`).
+- `GET /api/muse/runs`: the viewer's own recent Muse operations from the run log (route, model, latency, live/cached/mock/failed, time), via `MuseRunStore.recent` (memory + Supabase). `MUSE_RUNS_LOG=1` also logs mock transports for local previews.
+- The plan sheet uses `requestPlanStream`: `MuseWorking` (Jolly front and centre, a five-row rail lit by real stages, each with its model and time) while it runs; `MuseDecided` (summary, picks, "How Muse decided", "What Muse did for you") after. `MuseStepsLoading`/`MuseStepsDone` are no longer used by the sheet.
+- `plan-run.ts` in muse-companion carries the sheet's run; `useMuseCommentary` plays it on the 2D map when the chat is closed (`source: 'plan'`), so Jolly follows each stage live, then narrates the result.
+
+Checks: typecheck, lint 0 errors, 575/575 unit tests (new: stage order and counts match the result, a throwing listener is harmless, stage thoughts), production build; browser at 1440 and 390 on a production server (mock + MemoryStore) with no page or console errors. Not run: Playwright e2e, live Muse, Supabase.

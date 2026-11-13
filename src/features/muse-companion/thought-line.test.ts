@@ -11,7 +11,7 @@ vi.mock('@/features/outhere', () => ({
 }));
 import type { ChatMessage } from './controller';
 import type { AgentEncounter } from './encounter';
-import { companionThoughts as thoughts, thoughtDwellMs, THOUGHT_MAX } from './thought-line';
+import { stageThought, companionThoughts as thoughts, thoughtDwellMs, THOUGHT_MAX } from './thought-line';
 const companionThoughts = (...a: Parameters<typeof thoughts>) => thoughts(...a).map((t) => t.text);
 
 const encounter = { id: 1, recipient: { id: 'maya', name: 'Maya Chen' }, source: 'backend', sent: 0, received: 0, messages: [], outcome: null } as unknown as AgentEncounter;
@@ -41,7 +41,7 @@ it('talks through a fresh plan: understood, friends, checked, the pick, then Mus
     '🥟 Dumpling Den: 9 min walk · 2 seats left',
     pick.reason,
     pick.bridge,
-    '1 more idea in the chat',
+    '1 more idea for you',
   ]);
 });
 
@@ -83,4 +83,16 @@ it('points each thought at what it is about on the map', () => {
   expect(f[2]).toEqual({ kind: 'checked', lit: ['q-dumpling'], dropped: [{ id: 'q-ramen', label: 'too far' }] });
   expect(f[3]).toEqual({ kind: 'quest', id: 'q-dumpling', friendIds: ['maya'] });
   expect(thoughts('sending', encounter, undefined, false)[0].focus).toEqual({ kind: 'encounter', friendId: 'maya' });
+});
+
+it('while a run is going, the thought follows the last finished stage', () => {
+  expect(stageThought([]).text).toBe('Reading what you asked');
+  const t = stageThought([
+    { stage: 'context', ms: 1, friends: 3, quests: 5 },
+    { stage: 'parse', ms: 1, model: 'mock', cached: false, understood: true, intent: {} as never },
+    { stage: 'candidates', ms: 1, fit: 2, checked: 5, friendsFree: [{ friendId: 'maya', firstName: 'Maya', freeUntil: '' }], dropped: [{ questId: 'q1', reason: 'walk' }] },
+  ]);
+  expect(t.text).toBe('Checked 5 plans: 1 fit · 2 too far · ranking them');
+  expect(t.focus).toEqual({ kind: 'checked', lit: [], dropped: [{ id: 'q1', label: 'too far' }], friends: ['maya'] });
+  expect(stageThought([{ stage: 'rank', ms: 1, model: 'muse-spark-1.0', cached: false, fallback: false, picks: 2 }]).text).toBe('Ranked 2 with Spark · double-checking the facts');
 });

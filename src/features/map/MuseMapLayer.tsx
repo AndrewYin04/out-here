@@ -54,8 +54,9 @@ export function MuseMapLayer({ map, me, quests, friendPins }: { map: MapLibreMap
   const friendAt = (id: string) => friendPins.find((p) => p.friend.id === id) ?? null;
   // Keep Jolly where you can see him: off the chat (a card bottom right on desktop, a sheet on phones).
   const clamp = (p: Pt): Pt => ({
-    x: Math.min(Math.max(p.x, 110), box.width - (phone ? 110 : 430)),
-    y: Math.min(Math.max(p.y, 170), box.height * (phone ? 0.5 : 1) - (phone ? 40 : 150)),
+    x: Math.min(Math.max(p.x, 110), box.width - (phone || c.source === 'plan' ? 110 : 430)),
+    // An "I'm free" run: the sheet is at the bottom (centred on desktop), so Jolly keeps to the top half.
+    y: Math.min(Math.max(p.y, 170), c.source === 'plan' ? box.height * (phone ? 0.36 : 0.5) : box.height * (phone ? 0.5 : 1) - (phone ? 40 : 150)),
   });
 
   const focus: ThoughtFocus | null = c.current?.focus ?? (encounter ? { kind: 'encounter', friendId: encounter.recipient.id } : null);
@@ -68,6 +69,7 @@ export function MuseMapLayer({ map, me, quests, friendPins }: { map: MapLibreMap
     if (rings[0]) jolly = rings[0].at;
   } else if (focus?.kind === 'checked') {
     for (const id of focus.lit) { const q = questOf(id); if (q) rings.push({ key: `q:${id}`, at: project(q.location), tone: 'lit', emoji: q.emoji }); }
+    for (const id of focus.friends ?? []) { const f = friendAt(id); if (f) rings.push({ key: `f:${id}`, at: project(f.location), tone: 'friend' }); }
     for (const d of focus.dropped.slice(0, 8)) { const q = questOf(d.id); if (q) tags.push({ key: `d:${d.id}`, at: project(q.location), text: `${q.emoji} ${d.label}` }); }
   } else if (focus?.kind === 'quest') {
     const q = questOf(focus.id);

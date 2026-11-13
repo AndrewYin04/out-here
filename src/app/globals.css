@@ -249,3 +249,10 @@ body {
 @keyframes muse-dock-wave { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-8px) rotate(-10deg); } 75% { transform: translateY(-8px) rotate(10deg); } }
 @media (prefers-reduced-motion: reduce) { .muse-nudge, .muse-dock[data-nudge] .muse-dock-float { animation: none; } }
 .muse-map-ring-emoji { position: absolute; left: -8px; top: -8px; display: flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 9999px; background: #fff; font: 400 13px/1 var(--font-sans); box-shadow: 0 1px 3px rgba(0, 0, 0, .3); }
+
+/* "I'm free", Muse-led (MuseAtWork): Jolly glows while he works, and each pipeline row slides in as
+   the server reports it. */
+.muse-hero { filter: drop-shadow(0 0 14px rgba(35, 217, 245, .45)); }
+.muse-rail-row[data-state="done"] .muse-rail-detail { animation: muse-rail-in .35s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes muse-rail-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .muse-rail-row[data-state="done"] .muse-rail-detail { animation: none; } }

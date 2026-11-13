@@ -1,7 +1,7 @@
 // Client calls for the plan sheet. The plan call uses fetch directly because the UI needs the
 // x-muse-source and x-muse-mode headers (apiFetch returns only the body).
 import { ApiFetchError, apiPost, currentPersona } from '@/features/data';
-import { DEMO_CENTER, type LatLng, type MusePlan } from '@/shared';
+import { DEMO_CENTER, type LatLng, type MusePlan, type PlanStageEvent } from '@/shared';
 import type { DroppedView } from './dropped';
 import { availabilityChanged } from './plan-state';
 
@@ -38,6 +38,53 @@ export async function requestPlan(text: string, signal?: AbortSignal): Promise<P
     ? 'fallback'
     : mode === 'mock' || data.meta?.source === 'mock' ? 'mock' : 'muse';
   return { plan: data, museSource };
+}
+
+/**
+ * The same plan request, streamed: onStage gets each pipeline stage as the server finishes it (what
+ * Muse read, who is free, what fit, which model ranked, what validation kept), then the result
+ * resolves exactly like requestPlan. A server or proxy that does not stream still works: the
+ * stages simply arrive together just before the result.
+ */
+export async function requestPlanStream(text: string, onStage: (e: PlanStageEvent) => void, signal?: AbortSignal): Promise<PlanResult> {
+  const res = await fetch('/api/muse/plan?stream=1', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-persona': currentPersona() },
+    body: JSON.stringify({ text }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiFetchError(res.status, data.error ?? `HTTP ${res.status}`);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let result: PlanResult | null = null;
+  const handle = (raw: string) => {
+    if (!raw.trim()) return;
+    let msg: { type?: string; body?: PlanResponse; headers?: Record<string, string>; status?: number; error?: string } & Partial<PlanStageEvent>;
+    try { msg = JSON.parse(raw); } catch { return; }
+    if (msg.type === 'stage' && msg.stage) { const { type: _t, ...e } = msg; void _t; onStage(e as PlanStageEvent); }
+    else if (msg.type === 'error') throw new ApiFetchError(msg.status ?? 502, msg.error ?? 'Muse could not make a plan right now');
+    else if (msg.type === 'result' && msg.body) {
+      const data = msg.body, h = msg.headers ?? {};
+      const mode = h['x-muse-mode'] ?? data.meta?.mode;
+      const museSource = h['x-muse-source'] === 'fallback' || data.meta?.source === 'fallback'
+        ? 'fallback' : mode === 'mock' || data.meta?.source === 'mock' ? 'mock' : 'muse';
+      result = { plan: data, museSource };
+    }
+  };
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (value) buf += dec.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf('\n')) >= 0) { handle(buf.slice(0, nl)); buf = buf.slice(nl + 1); }
+    if (done) break;
+  }
+  handle(buf);
+  if (!result) throw new ApiFetchError(502, 'Muse could not make a plan right now');
+  return result;
 }
 
 /**

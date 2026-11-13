@@ -23,7 +23,8 @@ const TAIL: [number, number][] = [[0.4, 15], [0.54, 11], [0.67, 7]];
 export function MuseThoughts({ anchorRef }: { anchorRef: RefObject<HTMLDivElement | null> }) {
   const c = useMuseCommentary();
   const encounter = useAgentEncounter();
-  if (!c.open) return null;
+  // In 3D the clouds are for the chat (the camera frames Jolly then); "I'm free" runs show in the sheet.
+  if (!c.open || c.source !== 'chat') return null;
   const text = c.current?.text;
   const [sx, sy] = SLOTS[c.index % SLOTS.length];
   return (

@@ -1,6 +1,8 @@
 import type { ChatMessage } from './controller';
 import type { AgentEncounter } from './encounter';
 import type { MuseState } from './state';
+import type { PlanStageEvent } from '@/shared';
+import type { PlanResponse } from '@/features/outhere/plan-api';
 import { museSteps } from '@/features/outhere';
 
 /** Longest line a thought cloud shows; longer Muse text is cut at a word with an ellipsis. */
@@ -13,7 +15,7 @@ export const THOUGHT_MAX = 110;
 export type ThoughtFocus =
   | { kind: 'me' }
   | { kind: 'friends'; ids: string[] }
-  | { kind: 'checked'; lit: string[]; dropped: { id: string; label: string }[] }
+  | { kind: 'checked'; lit: string[]; dropped: { id: string; label: string }[]; friends?: string[] }
   | { kind: 'quest'; id: string; friendIds: string[] }
   | { kind: 'encounter'; friendId: string };
 export type Thought = { text: string; focus: ThoughtFocus | null };
@@ -76,7 +78,7 @@ export function companionThoughts(state: MuseState, encounter: AgentEncounter | 
     if (top.reason) lines.push({ text: top.reason, focus });
     if (top.bridge) lines.push({ text: top.bridge, focus });
     const more = plan.suggestions.length - 1;
-    if (more > 0) lines.push({ text: `${more} more idea${more === 1 ? '' : 's'} in the chat`, focus: { kind: 'checked', lit: pickIds, dropped: [] } });
+    if (more > 0) lines.push({ text: `${more} more idea${more === 1 ? '' : 's'} for you`, focus: { kind: 'checked', lit: pickIds, dropped: [] } });
   } else {
     const rank = steps.find((s) => s.key === 'rank');
     if (rank) lines.push({ text: rank.text, focus: { kind: 'me' } });
@@ -87,4 +89,35 @@ export function companionThoughts(state: MuseState, encounter: AgentEncounter | 
 /** How long one thought stays up: long enough to read it (about 15 characters a second). */
 export function thoughtDwellMs(text: string): number {
   return Math.min(6500, Math.max(2600, 1400 + text.length * 65));
+}
+
+const MODEL = (m: string) => /ember/i.test(m) ? 'Ember' : /spark/i.test(m) ? 'Spark' : /wonder/i.test(m) ? 'Wonder' : m === 'heuristic' ? 'code' : m === 'mock' ? 'offline' : m;
+
+/**
+ * While an "I'm free" run is still going: one thought for the stage the server last reported, so
+ * Jolly says what Muse is actually on. The stage order is fixed, so "next" is never a guess about
+ * what happened, only about what the pipeline does next.
+ */
+export function stageThought(stages: PlanStageEvent[]): Thought {
+  const last = stages.at(-1);
+  const parse = stages.find((s) => s.stage === 'parse');
+  if (!last || last.stage === 'context') return { text: 'Reading what you asked', focus: { kind: 'me' } };
+  if (last.stage === 'parse') {
+    if (!last.understood) return { text: 'I couldn’t tell what you’re up for', focus: { kind: 'me' } };
+    const intent = museSteps({ intent: last.intent, suggestions: [], summary: '', meta: { dropped: [] } } as unknown as PlanResponse, 'muse')[0]?.text ?? 'Got it';
+    return { text: `${intent} · checking who’s free`, focus: { kind: 'me' } };
+  }
+  if (last.stage === 'candidates') {
+    const plans = museSteps({ intent: parse?.stage === 'parse' ? parse.intent : {}, suggestions: [], summary: '',
+      meta: { dropped: last.dropped, candidateCount: last.fit, understood: true } } as unknown as PlanResponse, 'muse')
+      .find((x) => x.key === 'plans')?.text ?? `${last.fit} fit`;
+    const dropped = last.dropped.flatMap((d) => (DROP_LABEL[d.reason] ? [{ id: d.questId, label: DROP_LABEL[d.reason] }] : []));
+    return { text: last.fit > 0 ? `${plans} · ranking them` : plans, focus: { kind: 'checked', lit: [], dropped, friends: last.friendsFree.map((f) => f.friendId) } };
+  }
+  if (last.stage === 'rank') {
+    const by = MODEL(last.model);
+    const how = by === 'offline' ? 'offline' : by === 'code' ? 'by time and distance' : `with ${by}`;
+    return { text: `Ranked ${last.picks} ${how} · double-checking the facts`, focus: { kind: 'me' } };
+  }
+  return { text: `Kept ${last.kept} after checking walks, times and seats`, focus: { kind: 'me' } };
 }
