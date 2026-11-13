@@ -8,8 +8,8 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { ArrivalSelfie } from '@/features/memories';
-import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
-import { cn } from '@/features/ui';
+import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
+import { cn, useDemoTools } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
@@ -34,7 +34,7 @@ export type World3DProps = {
   picks: string[] | null;
   selectedId: string | null;
   friendPins: FriendPin[];
-  onSelect: (questId: string) => void;
+  onSelect: (questId: string | null) => void;
   onOpenFriend: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
@@ -69,6 +69,13 @@ const typing = (t: EventTarget | null) => {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 };
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+/** Muse's hello follows where you are in the journey: no "tap I'm free" once you have a plan. */
+function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
+  if (!next) return `Hi ${name}! Tap ✨ I’m free and I’ll find something nearby.`;
+  const mins = Math.round((Date.parse(next.quest.startsAt) - Date.now()) / 60_000);
+  const when = mins <= 0 ? 'is happening now' : `starts in ${mins} min`;
+  return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
+}
 
 export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onArrive }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
@@ -129,6 +136,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // ---- Muse pet: what it says and where it floats ----
   const planOpen = usePlanOpen();
   const plan = usePlanStatus();
+  const upNext = useUpNext();
+  const tools = useDemoTools();
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petPos = useRef<LatLng>(start);
@@ -160,7 +169,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           : planOpen
             ? { text: 'What are you up for?', tone: 'plain' }
             : hello
-              ? { text: `Hi ${firstName(viewer.name)}! Tap ✨ I’m free and I’ll find something nearby.`, tone: 'plain' }
+              ? { text: helloLine(firstName(viewer.name), upNext), tone: 'plain' }
               : null;
   const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
   const nextPetState = cheer ? 'happy' : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
@@ -695,6 +704,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     setArrival(null);
     setWalk({ questId: selected.id, title: selected.title, emoji: selected.emoji, to: selected.location });
     setFollow(true);
+    onSelect(null);
   };
   useEffect(() => {
     if (!arrival) return;
@@ -736,17 +746,20 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   useEffect(() => {
     if (arrival) onArriveRef.current?.(arrival.id);
   }, [arrival]);
+  const walkHandled = useRef<number | null>(null);
   useEffect(() => {
-    if (!walkTo) return;
+    if (!walkTo || walkHandled.current === walkTo.nonce) return;
     const q = quests.find((x) => x.id === walkTo.questId);
     if (!q) return;
+    walkHandled.current = walkTo.nonce;
     setArrival(null);
     arrived.current.delete(q.id);
     setWalk({ questId: q.id, title: q.title, emoji: q.emoji, to: q.location });
     setFollow(true);
-    // Only a new request (nonce) starts a walk; quest list refreshes must not restart it.
+    // Only a new request (nonce) starts a walk; walkHandled keeps quest refreshes from restarting it,
+    // and quests is here so a request that arrived before the plans loaded still starts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [walkTo?.nonce]);
+  }, [walkTo?.nonce, quests]);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);

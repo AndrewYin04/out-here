@@ -3,11 +3,12 @@
 // every phone; each person taps "I'm in" on the ones they like, and it locks when everyone is in
 // on one. Nobody sees a "no": an unanswered plan expires quietly when the shared time ends.
 import Link from 'next/link';
-import { CalendarCheck, Check, MapPin, X } from 'lucide-react';
+import { CalendarCheck, Check, Footprints, MapPin, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { apiPost, useApi, useViewer } from '@/features/data';
 import { Avatar, Button, IconButton, Skeleton, burst, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type TogetherResponse, type TogetherView } from '@/shared';
+import { useLetsGo } from './lets-go';
 import { MuseLabel } from './SuggestionCard';
 import { MuseThinking, TOGETHER_STEPS } from './MuseThinking';
 import { openPlanWith, openTogether, useTogetherId } from './plan-state';
@@ -174,6 +175,7 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
   const o = plan.options.find((x) => x.questId === plan.confirmedQuestId);
   const emojiRef = useRef<HTMLSpanElement>(null);
   const emoji = o?.emoji;
+  const letsGo = useLetsGo();
   // The moment everyone agrees: the card drops in and the plan's emoji bursts out of it.
   useEffect(() => {
     if (!emoji) return;
@@ -181,6 +183,7 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
     return () => window.clearTimeout(t);
   }, [emoji]);
   if (!o) return null;
+  const go = () => { openTogether(null); letsGo(o.questId); };
   const showOnMap = () => { openTogether(null); window.dispatchEvent(new CustomEvent('outhere:select-quest', { detail: o.questId })); };
   return (
     <section aria-label="It's a plan" data-testid="together-confirmed"
@@ -199,8 +202,12 @@ function Confirmed({ plan, otherNames }: { plan: TogetherView; otherNames: strin
         </IconButton>
       </div>
       <div className="mt-2.5 flex gap-2">
+        <button type="button" onClick={go} data-testid="together-lets-go"
+          className="oh-press inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-btn bg-fb-blue text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+          <Footprints size={16} aria-hidden />Let&rsquo;s go
+        </button>
         <button type="button" onClick={showOnMap}
-          className="oh-press h-9 flex-1 rounded-btn bg-fb-blue text-[14px] font-semibold text-white hover:bg-fb-blue-hover">
+          className="oh-press h-9 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">
           Show on map
         </button>
         <Link href="/events?tab=going" className="oh-press inline-flex h-9 items-center justify-center gap-1.5 rounded-btn bg-fb-secondary-btn px-3 text-[14px] font-semibold text-fb-text">

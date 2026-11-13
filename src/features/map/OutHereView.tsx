@@ -8,9 +8,9 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, PeopleButton, useFriendPins } from '@/features/map/friends';
-import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
+import { BothFreeNudge, ImFreeButton, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Plus } from 'lucide-react';
-import { Button, cn, EmptyState, useToast } from '@/features/ui';
+import { Button, cn, EmptyState, useDemoTools, useToast } from '@/features/ui';
 import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
@@ -70,6 +70,7 @@ export function OutHereView() {
   const [creating, setCreating] = useState<{ at: LatLng; emoji: string } | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
+  const tools = useDemoTools();
 
   // ?quest=<id> deep link opens that quest's sheet; ?mode=friends|explore sets the toggle.
   useEffect(() => {
@@ -275,6 +276,21 @@ export function OutHereView() {
   const walkingTo = show3d && walkTo && walkTo.questId !== arrivedId ? walkTo.questId : null;
   // Arriving at your next plan: keep the Up next card (it turns into "Take a photo together")
   // instead of the plan's panel, which the 3D view opens on arrival.
+  // Every "Let's go" in the app (accepted invite, "Maya's in", a joined plan's panel) lands here;
+  // from another page it arrives as ?go=<questId>.
+  useEffect(() => listenLetsGo(letsGo), [letsGo]);
+  const goParam = useRef(false);
+  useEffect(() => {
+    if (goParam.current) return;
+    goParam.current = true;
+    const url = new URL(window.location.href);
+    const id = url.searchParams.get('go');
+    if (!id) return;
+    url.searchParams.delete('go');
+    window.history.replaceState(window.history.state, '', url.toString());
+    setMode('explore');
+    letsGo(id);
+  }, [letsGo]);
   const onArrive = useCallback((questId: string) => {
     setArrivedId(questId);
     if (upNext?.quest.id === questId) select(null);
@@ -373,7 +389,7 @@ export function OutHereView() {
             </button>
           ))}
         </div>
-        <button
+        {tools && <button
           type="button"
           aria-pressed={filter.on}
           data-testid="muse-filter-toggle"
@@ -385,7 +401,7 @@ export function OutHereView() {
           )}
         >
           <span aria-hidden>✨</span> Muse filter
-        </button>
+        </button>}
       </div>
 
       {filter.on && (
