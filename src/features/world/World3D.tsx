@@ -34,6 +34,10 @@ export type World3DProps = {
   onOpenFriend: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
+  /** Start the demo walk to this plan (e.g. "Let's go" on the Up next card). A new nonce restarts it. */
+  walkTo?: { questId: string; nonce: number } | null;
+  /** Called once when you arrive at a plan (walked there or walked into it). */
+  onArrive?: (questId: string) => void;
 };
 
 type Source = 'demo' | 'gps';
@@ -60,7 +64,7 @@ const typing = (t: EventTarget | null) => {
 };
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
-export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit }: World3DProps) {
+export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, walkTo = null, onArrive }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
   /** Meta HQ: building labels, the campus box (no generated trees inside it), and the tour. */
@@ -636,6 +640,24 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     const t = window.setTimeout(() => setArrival(null), 5000);
     return () => window.clearTimeout(t);
   }, [arrival]);
+
+  // Up next → "Let's go": walk to that plan, the same as tapping Walk there on it.
+  const onArriveRef = useRef(onArrive);
+  onArriveRef.current = onArrive;
+  useEffect(() => {
+    if (arrival) onArriveRef.current?.(arrival.id);
+  }, [arrival]);
+  useEffect(() => {
+    if (!walkTo) return;
+    const q = quests.find((x) => x.id === walkTo.questId);
+    if (!q) return;
+    setArrival(null);
+    arrived.current.delete(q.id);
+    setWalk({ questId: q.id, title: q.title, emoji: q.emoji, to: q.location });
+    setFollow(true);
+    // Only a new request (nonce) starts a walk; quest list refreshes must not restart it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walkTo?.nonce]);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);

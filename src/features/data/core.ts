@@ -988,7 +988,8 @@ export class CoreStore {
       }
     }
     const updated = after.db.togetherPlans.find((p) => p.id === id) ?? row;
-    await publish(`together:${id}`, { status: updated.status });
+    // ids only (docs/REALTIME.md): the status and the locked quest let other phones flip at once
+    await publish(`together:${id}`, { status: updated.status, confirmedQuestId: updated.confirmedQuestId });
     for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
     return this.togetherView(after, viewerId, updated);
   }
