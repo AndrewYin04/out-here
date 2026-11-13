@@ -25,10 +25,11 @@ const BOX_W = 46;
 const BOX_TOP = 30;
 const BOX_BOTTOM = 32;
 const LABEL_H = 16;
+const LABEL_GAP = 6;
 /** Share of the map the phone plan sheet covers while results show (its max-h-[50%]). */
 const PHONE_RESULTS_SHEET = 0.5;
 /** Width of a 12 px semibold pin label, estimated so hidden labels can be placed too. */
-const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 6;
+const labelWidth = (text: string) => Math.ceil(text.length * 6.4) + 14;
 /** On phones only the first few plans (selected, joined, soonest) carry a label below zoom 15. */
 const MOBILE_LABELS = 5;
 const LABEL_ALL_ZOOM = 15;
@@ -110,7 +111,7 @@ function buildPin(q: Quest, testId: string): PinParts {
 
   const label = document.createElement('span');
   label.setAttribute('data-role', 'pin-label');
-  label.style.cssText = 'position:absolute;left:50%;top:48px;transform:translateX(-50%);white-space:nowrap;font:600 12px/15px var(--font-sans);color:#080809;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff,0 0 4px #fff;pointer-events:none;';
+  label.style.cssText = 'position:absolute;white-space:nowrap;font:600 12px/16px var(--font-sans);color:#080809;background:rgba(255,255,255,.85);border-radius:6px;padding:0 4px;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 3px #fff,0 0 4px #fff;pointer-events:none;';
 
   const faces = document.createElement('span');
   faces.setAttribute('aria-hidden', 'true');
@@ -207,6 +208,7 @@ export default function MapCanvas({
   const order = useRef<string[]>([]);
   const framed = useRef(false);
   const frame = useRef(0);
+  const symbolLayers = useRef<string[]>([]);
   const select = useRef(onSelect);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
@@ -233,23 +235,45 @@ export default function MapCanvas({
     // Labels go to the shown pins in priority order, wherever they clear every pin and label.
     const maxLabels = isDesktop() || map.getZoom() >= LABEL_ALL_ZOOM ? Infinity : MOBILE_LABELS;
     const shownBoxes = input.filter((x) => g.has(x.id));
+    const { clientWidth, clientHeight } = map.getContainer();
+    const layers = symbolLayers.current;
     const taken: Box[] = [];
     for (const { id, p } of shownBoxes) {
       const ref = pins.current.get(id)!;
       const lw = labelWidth(ref.label.textContent ?? '');
-      const lb: Box = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM - 4, w: lw, h: LABEL_H };
-      // While a plan shows, dimmed pins drop their labels so the "✨ Muse pick" pills have room.
-      const fits = !ref.root.hasAttribute('data-dimmed')
-        && taken.length < maxLabels
-        && !shownBoxes.some((o) => o.id !== id && overlaps(o.box, lb))
-        && !taken.some((t) => overlaps(t, lb));
-      const show = fits || id === selectedRef.current;
-      if (show) taken.push(lb);
-      ref.label.style.display = show ? 'block' : 'none';
+      const selected = id === selectedRef.current;
+      const dimmed = ref.root.hasAttribute('data-dimmed');
       // Text bubble: zoomed in or selected, and never on top of a "✨ Muse pick" pill.
-      const bubbleOn = !!ref.bubble.textContent && !ref.pick.isConnected && !ref.root.hasAttribute('data-dimmed')
-        && (id === selectedRef.current || map.getZoom() >= BUBBLE_ZOOM);
+      const bubbleOn = !!ref.bubble.textContent && !ref.pick.isConnected && !dimmed
+        && (selected || map.getZoom() >= BUBBLE_ZOOM);
       ref.bubble.style.display = bubbleOn ? 'block' : 'none';
+      const below = { x: p.x - lw / 2, y: p.y + BOX_BOTTOM, w: lw, h: LABEL_H };
+      let label: Box | undefined;
+      if (selected || (!dimmed && taken.length < maxLabels)) {
+        const sideY = p.y - LABEL_H / 2;
+        const side = BOX_W / 2 + LABEL_GAP;
+        const candidates: Box[] = [
+          below,
+          { ...below, x: p.x + side, y: sideY },
+          { ...below, x: p.x - side - lw, y: sideY },
+        ];
+        if (!bubbleOn && !ref.pick.isConnected) candidates.push({ ...below, y: p.y - BOX_TOP - LABEL_GAP - LABEL_H });
+        label = candidates.find((box) => (
+          box.x >= 0 && box.y >= 0 && box.x + box.w <= clientWidth && box.y + box.h <= clientHeight
+          && !shownBoxes.some((other) => other.id !== id && overlaps(other.box, box))
+          && !taken.some((other) => overlaps(other, box))
+          && (layers.length === 0 || map.queryRenderedFeatures(
+            [[box.x, box.y], [box.x + box.w, box.y + box.h]], { layers },
+          ).length === 0)
+        ));
+        if (!label && selected) label = below;
+      }
+      ref.label.style.display = label ? 'block' : 'none';
+      if (label) {
+        taken.push(label);
+        ref.label.style.left = `${label.x - p.x + PIN / 2}px`;
+        ref.label.style.top = `${label.y - p.y + PIN / 2}px`;
+      }
     }
     for (const [id, ref] of pins.current) {
       const members = g.get(id);
@@ -313,11 +337,16 @@ export default function MapCanvas({
     framed.current = false; // a new map (dev Strict Mode remounts) needs its own first framing
     let loaded = false;
     const timer = window.setTimeout(() => { if (!loaded) setTiles('failed'); }, TILE_TIMEOUT_MS);
-    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); });
+    map.on('style.load', () => {
+      symbolLayers.current = map.getStyle().layers.filter((layer) => layer.type === 'symbol').map((layer) => layer.id);
+      schedule();
+    });
+    map.on('load', () => { loaded = true; window.clearTimeout(timer); setTiles('ready'); schedule(); });
     // Tile or style errors are shown as the plain-background state, not thrown to the console.
     map.on('error', () => {});
     map.on('move', schedule);
     map.on('resize', schedule);
+    map.on('idle', schedule);
     // Drop a pin: right-click (desktop) or long-press (touch). Markers stop their own clicks,
     // so this only fires on the map itself.
     map.on('contextmenu', (e) => {
@@ -348,6 +377,7 @@ export default function MapCanvas({
       cancelPress();
       cancelAnimationFrame(frame.current);
       current.clear();
+      symbolLayers.current = [];
       draftMarker.current = null;
       me.current = null;
       onMap(null);

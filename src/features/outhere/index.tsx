@@ -6,6 +6,7 @@ export { ImFreeButton, PlanSheet, COMPOSER_PLACEHOLDER } from './PlanSheet';
 export { InviteInbox } from './InviteInbox';
 export { BothFreeNudge, StatusCard, useMyAvailability, useMyStatus } from './FreeStatus';
 export { TogetherSheet } from './TogetherSheet';
+export { UpNextCard, useUpNext } from './UpNext';
 export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, OfflineLabel, SeatsBadge } from './SuggestionCard';
 export { MuseStepsLoading } from './MuseSteps';
