@@ -7,3 +7,4 @@ export {
   useCrews, useNotifications, useFeed, realtimeConfig, type ApiState, type ChannelHandler, type RealtimeConfig,
 } from './hooks';
 export type { QuestDetail, AvailabilityItem, InviteView, PostWithShared } from './core';
+export type { Walker } from './walkers';

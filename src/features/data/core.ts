@@ -21,6 +21,7 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
+import { postWalkStep, walkers } from './walkers';
 
 const PAGE = 10;
 const iso = () => now().toISOString();
@@ -1213,6 +1214,8 @@ export class CoreStore {
   friendPins(viewerId: ID) { return friendPins(this, viewerId); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }
   updateMyLocation(viewerId: ID, patch: LocationPatch) { return updateMyLocation(this, viewerId, patch); }
+  walkers(viewerId: ID, questId: ID) { return walkers(this, viewerId, questId); }
+  postWalkStep(viewerId: ID, questId: ID, location: LatLng) { return postWalkStep(this, viewerId, questId, location); }
   hangInvite(viewerId: ID, body: HangBody) { return hangInvite(this, viewerId, body); }
   hangSuggestion(viewerId: ID, toId: ID) { return hangSuggestion(this, viewerId, toId); }
 }
