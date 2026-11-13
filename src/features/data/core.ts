@@ -2,19 +2,21 @@
 // class over MemoryBackend and SupabaseBackend. Every method takes the viewer id first and
 // applies visibility for that viewer. Mutations publish realtime messages after the write.
 import {
-  demoDate, fuzzLocation, haversineMeters, now, PERSONA_HANDLES, audienceListId, seedId, walkingMinutes,
+  demoDate, fuzzLocation, haversineMeters, now, overlapWindow, PERSONA_HANDLES, audienceListId, rankFreeFriends, seedId, walkingMinutes,
+  type FreeFriendInput,
   type Audience, type Availability, type Crew, type DailyEntry, type DailyQuest, type Friendship, type FriendList,
   type ID, type LatLng, type Listing, type Memory, type Message, type NotificationObjectType,
   type NotificationType, type Post, type Profile, type ProfileField, type Quest, type ReactionType, type Reel, type RsvpStatus,
-  type Story, type Invite,
+  type Story, type Invite, type TogetherOption,
 } from '@/shared';
 import type {
   CommentView, CreatePostBody, CreateQuestBody, EventResponse, EventView, FeedResponse,
   FriendRequestView, GroupResponse, GroupView, NotificationView, PersonCard, PostView, ProfileResponse,
-  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan,
+  ReactResponse, SearchResponse, SearchType, StoryGroup, ThreadView, YourPlan, FreeWithMeItem, FreeWithMeResponse, TogetherView,
 } from '@/shared/api';
 import type { Backend } from './backend';
-import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow } from './db';
+import { pairSignals } from './matching';
+import type { AvailabilityRow, CrewRow, Db, InviteRow, QuestRow, TogetherRow } from './db';
 import { badRequest, conflict, forbidden, HttpError, notFound } from './errors';
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
@@ -720,6 +722,54 @@ export class CoreStore {
     return availability;
   }
 
+  /** "Busy": ends the viewer's current and upcoming free windows and tells friends. */
+  async clearAvailability(viewerId: ID): Promise<void> {
+    const v = await this.view();
+    const at = now();
+    const nowIso = at.toISOString();
+    const open = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > nowIso);
+    for (const a of open) {
+      // An upcoming window is closed to a 1 s window in the past (the table requires ends_at > starts_at).
+      const patch = a.startsAt < nowIso ? { endsAt: nowIso } : { startsAt: new Date(at.getTime() - 1000).toISOString(), endsAt: nowIso };
+      await this.backend.update('availability', { id: a.id }, patch);
+    }
+    if (open.length === 0) return;
+    const after = await this.view();
+    for (const f of after.friendIds(viewerId)) await publish(`user:${f}`, { type: 'availability', id: open[0].id });
+  }
+
+  /** Friends free when the viewer is, ranked, with a suggested group. Empty when the viewer is busy. */
+  async freeWithMe(viewerId: ID): Promise<FreeWithMeResponse> {
+    const v = await this.view();
+    const at = now();
+    const t = at.toISOString();
+    const mine = v.db.availability.filter((a) => a.userId === viewerId && a.endsAt > t);
+    if (mine.length === 0) return { items: [], group: [] };
+    const me = v.profileById.get(viewerId);
+    const best = new Map<ID, FreeFriendInput & { text: string }>();
+    for (const a of v.db.availability) {
+      if (a.endsAt <= t || !v.areFriends(viewerId, a.userId) || !v.canSee(viewerId, a.userId, a.audience)) continue;
+      for (const w of mine) {
+        const o = overlapWindow(w, a, at);
+        if (!o) continue;
+        const prev = best.get(a.userId);
+        if (prev && prev.from <= o.from) continue;
+        const p = v.profileById.get(a.userId);
+        const theirs = p ? v.profileFor(viewerId, p).interests : [];
+        const shared = (me?.interests ?? []).filter((i) => theirs.some((x) => x.toLowerCase() === i.toLowerCase()));
+        best.set(a.userId, { id: a.userId, from: o.from, until: o.until, friendUntil: a.endsAt, sharedInterests: shared, text: a.text });
+      }
+    }
+    const pair = await pairSignals(this, [viewerId, ...best.keys()]);
+    const { ranked, group } = rankFreeFriends([...best.values()], (x, y) => v.areFriends(x, y), at, { viewerId, pair });
+    const items: FreeWithMeItem[] = ranked.flatMap((r) => {
+      const friend = v.person(viewerId, r.id);
+      if (!friend) return [];
+      return [{ friend, from: r.from, until: r.until, text: best.get(r.id)!.text, sharedInterests: r.sharedInterests, knows: r.knows, freeNow: r.freeNow, score: r.score }];
+    });
+    return { items, group };
+  }
+
   async myAvailability(viewerId: ID): Promise<Availability[]> {
     const v = await this.view();
     const t = iso();
@@ -735,6 +785,108 @@ export class CoreStore {
     return v.db.availability.filter((a) => friends.has(a.userId) && a.endsAt > t && v.canSee(viewerId, a.userId, a.audience))
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
       .map(({ audience: _a, ...a }) => { void _a; return { ...a, friend: v.profileFor(viewerId, v.profileById.get(a.userId)!) }; });
+  }
+
+  // ---------- Out Here: plan together ----------
+  private togetherView(v: View, viewerId: ID, row: TogetherRow): TogetherView {
+    const { memberKey: _k, ...plan } = row;
+    void _k;
+    const expired = plan.status === 'proposing' && plan.expiresAt <= iso();
+    return { ...plan, status: expired ? 'expired' : plan.status, members: v.people(viewerId, plan.memberIds) };
+  }
+
+  private togetherRow(v: View, viewerId: ID, id: ID): TogetherRow {
+    const row = v.db.togetherPlans.find((p) => p.id === id);
+    if (!row || !row.memberIds.includes(viewerId)) throw notFound('plan_not_found');
+    return row;
+  }
+
+  /**
+   * The group's open shared plan (viewer + friendIds), or null. `fresh` re-reads the plans table
+   * first, so a plan another member created during this request is found (Supabase snapshots
+   * are loaded once per request).
+   */
+  async openTogether(viewerId: ID, friendIds: ID[], opts: { fresh?: boolean } = {}): Promise<TogetherView | null> {
+    if (opts.fresh) await this.backend.reload('togetherPlans');
+    const v = await this.view();
+    const key = [...new Set([viewerId, ...friendIds])].sort().join(',');
+    const t = iso();
+    const row = v.db.togetherPlans.find((p) => p.memberKey === key && p.status === 'proposing' && p.expiresAt > t);
+    return row ? this.togetherView(v, viewerId, row) : null;
+  }
+
+  /**
+   * Creates the group's shared plan. If another member created one in the meantime (both
+   * tapped at once), returns theirs: the unique index on (member_key) where open makes the
+   * second insert fail, and the in-process check covers MemoryStore.
+   */
+  async createTogether(viewerId: ID, body: { friendIds: ID[]; options: TogetherOption[]; summary: string; expiresAt: string }): Promise<TogetherView> {
+    const v = await this.view();
+    const memberIds = [...new Set([viewerId, ...body.friendIds])].sort();
+    if (memberIds.length < 2) throw badRequest('pick at least one friend');
+    for (const id of memberIds) if (id !== viewerId && !v.areFriends(viewerId, id)) throw badRequest('everyone must be your friend');
+    const existing = await this.openTogether(viewerId, body.friendIds, { fresh: true });
+    if (existing) return existing;
+    const row: TogetherRow = {
+      id: uuid(), memberKey: memberIds.join(','), memberIds, startedBy: viewerId,
+      options: body.options, votes: {}, status: 'proposing', confirmedQuestId: null,
+      summary: body.summary, expiresAt: body.expiresAt, createdAt: iso(),
+    };
+    try {
+      await this.backend.insert('togetherPlans', [row]);
+    } catch (e) {
+      const theirs = await this.openTogether(viewerId, body.friendIds, { fresh: true });
+      if (theirs) return theirs;
+      throw e;
+    }
+    for (const m of memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id: row.id });
+    return this.togetherView(await this.view(), viewerId, row);
+  }
+
+  /** The viewer's open plans and ones confirmed in the last 2 hours, newest first. */
+  async togetherPlans(viewerId: ID): Promise<TogetherView[]> {
+    const v = await this.view();
+    const t = now().getTime();
+    return v.db.togetherPlans
+      .filter((p) => p.memberIds.includes(viewerId) && (
+        (p.status === 'proposing' && Date.parse(p.expiresAt) > t)
+        || (p.status === 'confirmed' && Date.parse(p.createdAt) > t - 2 * 3600_000)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((p) => this.togetherView(v, viewerId, p));
+  }
+
+  async together(viewerId: ID, id: ID): Promise<TogetherView> {
+    const v = await this.view();
+    return this.togetherView(v, viewerId, this.togetherRow(v, viewerId, id));
+  }
+
+  /**
+   * "I'm in" (or not) on one option. The backend does the vote and, when every member is in on
+   * one option, the seat check and the whole group's join in one transaction (vote_together):
+   * two people tapping at once never lose a vote, and a group is never split by the last seat.
+   */
+  async voteTogether(viewerId: ID, id: ID, questId: ID, isIn: boolean): Promise<TogetherView> {
+    const v = await this.view();
+    const row = this.togetherRow(v, viewerId, id);
+    if (row.status !== 'proposing' || row.expiresAt <= iso()) return this.togetherView(v, viewerId, row);
+    const before = row.options.some((o) => o.questId === questId) ? v.questMemberIds(questId) : [];
+    const r = await this.backend.voteTogether(id, viewerId, questId, isIn);
+    const after = await this.view();
+    if (r.status === 'confirmed' && r.questId) {
+      const q = after.questById.get(r.questId);
+      const memberIds = after.questMemberIds(r.questId);
+      await publish(`quest:${r.questId}`, { seatsLeft: r.seatsLeft ?? 0, memberCount: memberIds.length });
+      for (const m of row.memberIds) {
+        await publish(`user:${m}`, { type: 'quest', id: r.questId });
+        if (q && r.questId === questId && !before.includes(m)) {
+          await this.notify(after, q.hostId, 'quest_join', m, 'quest', r.questId, `${firstName(after.profileById.get(m))} joined ${q.title}.`);
+        }
+      }
+    }
+    const updated = after.db.togetherPlans.find((p) => p.id === id) ?? row;
+    await publish(`together:${id}`, { status: updated.status });
+    for (const m of row.memberIds) if (m !== viewerId) await publish(`user:${m}`, { type: 'together', id });
+    return this.togetherView(after, viewerId, updated);
   }
 
   // ---------- Out Here: invites ----------

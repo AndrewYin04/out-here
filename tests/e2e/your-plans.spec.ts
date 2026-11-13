@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test('two attendees can find a joined hangout and share one crew album', async ({ page, browser, request }, testInfo) => {
   const as = (persona: string) => ({ 'x-persona': persona });
   const now = Date.now();
+  // Project name keeps parallel phone/desktop runs from creating same-titled plans.
   const title = `Crew photo test ${testInfo.project.name} ${now}`;
   const created = await request.post('/api/quests', {
     headers: as('alex'),
