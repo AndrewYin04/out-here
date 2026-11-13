@@ -1,14 +1,71 @@
 'use client';
 
-import { Check, UserRound } from 'lucide-react';
+import { Check, RotateCcw, UserRound } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { BRAND } from '@/config/brand';
+import { apiFetch, useChannel } from '@/features/data';
 import { Avatar, MenuItem, MenuLabel, MenuLink, MenuSeparator, Popover, Skeleton } from '@/features/ui';
 import { ROUTES } from './nav';
 import { useShellData } from './ShellDataProvider';
 
+const DEMO_KEY = 'outhere-demo-key';
+
+/**
+ * Demo control: put the story back to "now" (plans, seats, free times, invites, shared plans).
+ * Two taps, so it can't happen by accident. On the deployed demo it needs the demo key, which
+ * the presenter loads once by opening the app with ?demoKey=…
+ */
+function ResetDemoItem() {
+  const [armed, setArmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!armed) return;
+    const t = window.setTimeout(() => setArmed(false), 4000);
+    return () => window.clearTimeout(t);
+  }, [armed]);
+  const run = async () => {
+    if (busy) return;
+    if (!armed) { setArmed(true); setError(null); return; }
+    setBusy(true);
+    try {
+      let key: string | null = null;
+      try { key = window.sessionStorage.getItem(DEMO_KEY); } catch { /* storage blocked */ }
+      await apiFetch('/api/demo/reset', { method: 'POST', headers: key ? { 'x-demo-key': key } : {} });
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error && /demo key/.test(e.message) ? 'Needs the demo key: open the app once with ?demoKey=…' : 'Couldn’t reset. Try again.');
+      setBusy(false);
+      setArmed(false);
+    }
+  };
+  return (
+    <>
+      <MenuItem
+        icon={<RotateCcw size={20} aria-hidden />}
+        description={armed ? 'Tap again: plans, seats and free times go back to now' : 'Plans, seats and free times back to now'}
+        onSelect={() => void run()}
+        className={armed ? 'bg-[#FDE8EA]' : undefined}
+      >
+        <span data-testid="reset-demo" className={armed ? 'font-semibold text-fb-red' : undefined}>
+          {busy ? 'Resetting…' : armed ? 'Tap again to reset' : 'Reset demo'}
+        </span>
+      </MenuItem>
+      {error && <p role="alert" className="px-2 pb-1 text-[13px] text-fb-red">{error}</p>}
+    </>
+  );
+}
+
 /** The avatar button at the top right. Its menu hosts the demo persona switcher. */
 export function AccountMenu() {
   const { viewer, personas, activeHandle, ready, switchPersona } = useShellData();
+  // ?demoKey=… is remembered for this tab (the deployed demo's reset needs it).
+  useEffect(() => {
+    const k = new URLSearchParams(window.location.search).get('demoKey');
+    if (k) { try { window.sessionStorage.setItem(DEMO_KEY, k); } catch { /* storage blocked */ } }
+  }, []);
+  // Someone reset the demo: every open tab reloads into the fresh story.
+  useChannel(['demo:reset'], () => window.location.reload());
   return (
     <Popover
       label="Account"
@@ -76,6 +133,8 @@ export function AccountMenu() {
               );
             })}
           </div>
+          <MenuSeparator />
+          <ResetDemoItem />
           <MenuSeparator />
           <p className="px-2 pb-1 text-[12px] text-fb-text-2">{BRAND.footer}</p>
         </>

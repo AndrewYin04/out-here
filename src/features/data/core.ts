@@ -891,6 +891,32 @@ export class CoreStore {
       .map(({ audience: _a, ...a }) => { void _a; return { ...a, friend: v.profileFor(viewerId, v.profileById.get(a.userId)!) }; });
   }
 
+  // ---------- Demo reset ----------
+  /**
+   * Puts the live demo story back to `fresh` (the seed built for now): every plan's times and
+   * seats, who's in them, free windows, invites, shared plans and location sharing. Plans people
+   * created are removed. Posts, profiles, friends, crews and past memories are left alone.
+   * Every open tab gets demo:reset and reloads.
+   */
+  async resetStory(fresh: Db): Promise<{ quests: number; members: number }> {
+    const db = (await this.view()).db;
+    const ids = <T,>(rows: T[], key: (r: T) => string) => [...new Set(rows.map(key))];
+    if (db.togetherPlans.length) await this.backend.remove('togetherPlans', { id: ids(db.togetherPlans, (p) => p.id) });
+    if (db.invites.length) await this.backend.remove('invites', { id: ids(db.invites, (i) => i.id) });
+    if (db.availability.length) await this.backend.remove('availability', { id: ids(db.availability, (a) => a.id) });
+    if (db.questMembers.length) await this.backend.remove('questMembers', { questId: ids(db.questMembers, (m) => m.questId) });
+    const seeded = new Set(fresh.quests.map((q) => q.id));
+    const created = db.quests.filter((q) => !seeded.has(q.id)).map((q) => q.id);
+    if (created.length) await this.backend.remove('quests', { id: created });
+    await this.backend.upsert('quests', fresh.quests);
+    if (fresh.questMembers.length) await this.backend.insert('questMembers', fresh.questMembers);
+    if (fresh.availability.length) await this.backend.insert('availability', fresh.availability);
+    if (fresh.invites.length) await this.backend.insert('invites', fresh.invites);
+    if (fresh.locationShares.length) await this.backend.upsert('locationShares', fresh.locationShares);
+    await publish('demo:reset', { at: iso() });
+    return { quests: fresh.quests.length, members: fresh.questMembers.length };
+  }
+
   // ---------- Out Here: plan together ----------
   private togetherView(v: View, viewerId: ID, row: TogetherRow): TogetherView {
     const { memberKey: _k, ...plan } = row;
