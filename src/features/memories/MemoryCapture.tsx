@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
-import { Camera, Sparkles } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { apiFetch, apiPost } from '@/features/data';
-import { Button, burst, flash } from '@/features/ui';
-import type { CompleteQuestResponse } from '@/shared';
+import { apiFetch, currentPersona, PERSONA_EVENT } from '@/features/data';
+import { Button, flash } from '@/features/ui';
+import type { CompleteQuestResponse,Memory } from '@/shared';
 
 const MAX_BYTES = 3_500_000;
 
@@ -27,91 +26,45 @@ async function preparePhoto(file: File): Promise<Blob> {
   throw new Error('Choose a smaller JPG, PNG, or WebP photo.');
 }
 
-export function MemoryCapture({ questId, crewId, onSaved }: {
-  questId: string; crewId: string | null; onSaved: (id: string) => void;
+import { SavedPhotoReview } from './SavedPhotoReview';
+
+export function MemoryCapture({ questId, crewId, onSaved, onMemory }: {
+  questId:string; crewId:string|null; onSaved:(id:string)=>void; onMemory?:(memory:Memory)=>void;
 }) {
-  const inputId = useId();
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [caption, setCaption] = useState('');
-  const [pending, setPending] = useState<'save' | 'caption' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [savedCrew, setSavedCrew] = useState<string | null>(null);
-  const savedRef = useRef<HTMLParagraphElement>(null);
-  useEffect(() => { if (savedCrew) burst(savedRef.current, ['📸', '✨', '💛'], 10); }, [savedCrew]);
-
-  useEffect(() => {
-    if (!photo) { setPreview(null); return; }
-    const url = URL.createObjectURL(photo);
-    setPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photo]);
-
-  async function suggestCaption() {
-    setPending('caption');
-    setError(null);
-    try {
-      const response = await apiPost<{ caption: string }>('/api/muse/caption', { questId });
-      setCaption(response.caption);
-    } catch {
-      setError('Muse couldn’t suggest a caption. You can write one or save the photo as is.');
-    } finally {
-      setPending(null);
-    }
+  const inputId=useId();
+  const [photo,setPhoto]=useState<File|null>(null),[preview,setPreview]=useState<string|null>(null);
+  const [caption,setCaption]=useState(''),[pending,setPending]=useState(false),[error,setError]=useState<string|null>(null);
+  const [saved,setSaved]=useState<Memory|null>(null);
+  const upload=useRef<AbortController|null>(null);
+  useEffect(()=>{const clear=()=>{upload.current?.abort();upload.current=null;setPhoto(null);setSaved(null);setCaption('');setPending(false);};window.addEventListener(PERSONA_EVENT,clear);return()=>{upload.current?.abort();upload.current=null;window.removeEventListener(PERSONA_EVENT,clear);};},[]);
+  useEffect(()=>{if(!photo){setPreview(null);return;}const url=URL.createObjectURL(photo);setPreview(url);return()=>URL.revokeObjectURL(url);},[photo]);
+  async function save(event:FormEvent){
+    event.preventDefault();if(!photo||pending)return;setPending(true);setError(null);
+    const owner=currentPersona(),ctrl=new AbortController();upload.current=ctrl;
+    const valid=()=>!ctrl.signal.aborted&&currentPersona()===owner&&upload.current===ctrl;
+    try{
+      const file=await preparePhoto(photo);
+      if(!valid())return;
+      const id=crewId??(await apiFetch<CompleteQuestResponse>(`/api/quests/${questId}/complete`,{method:'POST',body:'{}',signal:ctrl.signal})).crew.id;
+      if(!valid())return;
+      const form=new FormData();form.set('photo',file,file instanceof File?file.name:'hangout.jpg');form.set('questId',questId);form.set('crewId',id);form.set('caption',caption);
+      const {memory}=await apiFetch<{memory:Memory}>('/api/memories',{method:'POST',body:form,signal:ctrl.signal});
+      if(!valid())return;
+      setSaved(memory);setPhoto(null);onSaved(id);onMemory?.(memory);
+      window.dispatchEvent(new CustomEvent('outhere:memory-saved',{detail:{questId,crewId:id,memoryId:memory.id}}));
+    }catch(e){if(valid())setError(e instanceof Error?e.message:'Couldn’t save your photo.');}finally{if(valid()){upload.current=null;setPending(false);}}
   }
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    if (!photo || pending) return;
-    setPending('save');
-    setError(null);
-    try {
-      const file = await preparePhoto(photo);
-      const id = crewId ?? (await apiPost<CompleteQuestResponse>(`/api/quests/${questId}/complete`, {})).crew.id;
-      onSaved(id);
-      const form = new FormData();
-      form.set('photo', file, file instanceof File ? file.name : 'hangout.jpg');
-      form.set('questId', questId);
-      form.set('crewId', id);
-      form.set('caption', caption);
-      await apiFetch('/api/memories', { method: 'POST', body: form });
-      setSavedCrew(id);
-      setPhoto(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t save your photo.');
-    } finally {
-      setPending(null);
+  if(saved)return <SavedPhotoReview memory={saved} onChange={setSaved}/>;
+  return <form className="mt-4 space-y-3" onSubmit={save}>
+    <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden/>Take a photo together</label>
+    <input id={inputId} type="file" accept="image/*" capture="environment" disabled={pending} className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-secondary-btn file:px-3 file:py-2" onChange={e=>{setPhoto(e.currentTarget.files?.[0]??null);setError(null);flash();}}/>
+    {preview&&
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={preview} alt="Photo preview" width={800} height={600} className="max-h-48 w-full object-contain"/>
     }
-  }
-
-  if (savedCrew) return (
-    <p ref={savedRef} role="status" className="mt-4 animate-pop-in rounded-card bg-fb-blue-tint p-3 text-sm text-fb-text">
-      Photo saved to your crew album. <Link href={`/memories#crew-${savedCrew}`} className="font-semibold text-fb-blue hover:underline">View memory</Link>
-    </p>
-  );
-  return (
-    <form className="mt-4 space-y-3 rounded-card bg-fb-bg p-3" onSubmit={save}>
-      <label htmlFor={inputId} className="flex items-center gap-2 text-sm font-semibold"><Camera size={16} aria-hidden />Take a photo together</label>
-      <input id={inputId} type="file" accept="image/*" capture="environment" disabled={!!pending}
-        className="block w-full text-sm file:mr-2 file:rounded-btn file:border-0 file:bg-fb-surface file:px-3 file:py-2 file:font-semibold"
-        onChange={(event) => { const f = event.currentTarget.files?.[0] ?? null; if (f) flash(); setPhoto(f); setError(null); }} />
-      {preview && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img key={preview} src={preview} alt="Photo preview" className="max-h-48 w-full animate-polaroid rounded-btn bg-fb-surface object-contain p-1.5 shadow-card" />
-      )}
-      <p className="text-sm text-fb-text-2">Shared with the people from this hangout.</p>
-      <label className="block space-y-1 text-sm font-semibold">
-        <span>Caption (optional)</span>
-        <input value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={500} disabled={!!pending}
-          className="w-full rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 font-normal" />
-      </label>
-      {error && <p role="alert" className="text-sm text-fb-red">{error}</p>}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={!photo || !!pending}>{pending === 'save' ? 'Saving…' : 'Save to crew album'}</Button>
-        <Button type="button" variant="tint" icon={<Sparkles size={16} />} disabled={!!pending} onClick={suggestCaption}>
-          {pending === 'caption' ? 'Thinking…' : 'Suggest caption'}
-        </Button>
-      </div>
-    </form>
-  );
+    <p className="text-sm text-fb-text-2">Only the people from this hangout can see it.</p>
+    <label className="block text-sm font-semibold">Caption (optional)<input value={caption} maxLength={500} onChange={e=>setCaption(e.target.value)} className="mt-1 w-full rounded-btn border border-fb-divider bg-fb-surface px-3 py-2 font-normal"/></label>
+    {error&&<p role="alert" className="text-sm text-fb-red">{error}</p>}
+    <Button type="submit" disabled={!photo||pending}>{pending?'Saving…':'Save to crew album'}</Button>
+  </form>;
 }

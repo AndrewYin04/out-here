@@ -15,7 +15,8 @@ export type MuseEvent =
   | { type: 'USER_INPUT_STARTED' }
   | { type: 'USER_INPUT_ENDED' }
   | { type: 'MUSE_REQUEST_STARTED' }
-  | { type: 'MUSE_RESPONSE_RECEIVED' }
+  | { type: 'MUSE_RESPONSE_RECEIVED'; live?: boolean }
+  | { type: 'MUSE_REQUEST_CANCELLED' }
   | { type: 'MUSE_REQUEST_FAILED' }
   | { type: 'RESPONSE_SETTLED' }
   | { type: 'PLAN_SELECTED'; questId: string }
@@ -29,13 +30,15 @@ export type MuseEvent =
 export type MuseSnapshot = {
   /** Is the chat panel open (Jolly is in its foreground position)? */
   open: boolean;
+  /** Request-scoped visual signal, never inferred from navigation or movement. */
+  energy: 'off' | 'pending' | 'success' | 'fade';
   state: MuseState;
   /** What was last chosen from a plan, so the map can show it. Bumps `selectionSeq` on every pick. */
   selectedQuestId: string | null;
   selectionSeq: number;
 };
 
-export const INITIAL: MuseSnapshot = { open: false, state: 'idle', selectedQuestId: null, selectionSeq: 0 };
+export const INITIAL: MuseSnapshot = { open: false, energy: 'off', state: 'idle', selectedQuestId: null, selectionSeq: 0 };
 
 /** States a user action must not interrupt (the request is in flight, or a later feature owns Muse). */
 const BUSY: ReadonlySet<MuseState> = new Set(['thinking', 'delivering', 'evaluating', 'sending', 'receiving']);
@@ -44,10 +47,11 @@ export function reduce(s: MuseSnapshot, e: MuseEvent): MuseSnapshot {
   switch (e.type) {
     case 'CHAT_OPENED':
       if (s.open) return s; // rapid taps never restart the approach
+      if(BUSY.has(s.state))return {...s,open:true};
       return { ...s, open: true, state: 'approaching' };
     case 'CHAT_CLOSED':
       if (!s.open) return s;
-      return { ...s, open: false, state: 'returning' };
+      return { ...s, open: false, energy: 'fade', state: 'returning' };
     case 'APPROACH_DONE':
       return s.state === 'approaching' ? { ...s, state: 'idle' } : s;
     case 'RETURN_DONE':
@@ -57,12 +61,14 @@ export function reduce(s: MuseSnapshot, e: MuseEvent): MuseSnapshot {
     case 'USER_INPUT_ENDED':
       return s.state === 'listening' ? { ...s, state: 'idle' } : s;
     case 'MUSE_REQUEST_STARTED':
-      return { ...s, state: 'thinking' };
+      return s.open ? { ...s, state: 'thinking', energy: 'pending' } : s;
     case 'MUSE_RESPONSE_RECEIVED':
       // A reply that lands after the chat closed has nothing to talk to: stay as the close left it.
-      return s.state === 'thinking' ? { ...s, state: s.open ? 'responding' : 'idle' } : s;
+      return s.state === 'thinking' ? { ...s, state: s.open ? 'responding' : 'idle', energy: e.live === false ? 'fade' : 'success' } : s;
     case 'MUSE_REQUEST_FAILED':
-      return s.state === 'thinking' ? { ...s, state: s.open ? 'error' : 'idle' } : s;
+      return s.state === 'thinking' ? { ...s, state: s.open ? 'error' : 'idle', energy: 'fade' } : s;
+    case 'MUSE_REQUEST_CANCELLED':
+      return { ...s, energy: 'fade', state: s.open ? 'idle' : 'returning' };
     case 'RESPONSE_SETTLED':
       return s.state === 'responding' ? { ...s, state: 'idle' } : s;
     case 'PLAN_SELECTED':

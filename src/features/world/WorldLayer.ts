@@ -11,6 +11,10 @@ import { makeAvatar, makePet, type Character, type ModelSet } from './characters
 import { characterScale, offsetMeters } from './math';
 import { MuseTrail, type MuseTrailModeSetting } from './muse-trail';
 import type { TreeSpot } from './trees';
+import {buildTreeBatch,type TreeBatch} from './vegetation';
+import {loadSceneryAssets,type SceneryAssets} from './scenery-assets';
+import type {StreetLamp} from './street-furniture';
+import {makeSightline,applySightlineCutaway,cameraFromProjection,blocksSightline} from './cutaway';
 
 export type ActorKind = 'avatar' | 'pet';
 type Actor = {
@@ -19,6 +23,8 @@ type Actor = {
   char: Character;
   pos: LatLng;
   heading: number;
+  state:string;
+  posed:boolean;
   /** Meters above the ground, before the zoom scale. */
   altitude: number;
   /** The DOM label kept above this actor's head. */
@@ -74,7 +80,17 @@ export class WorldLayer implements CustomLayerInterface {
   private models: ModelSet | null = null;
   private clock = new THREE.Timer();
   private elapsed = 0;
+  private motionQuery=typeof window==='undefined'?null:window.matchMedia('(prefers-reduced-motion: reduce)');
   private full = new THREE.Matrix4();
+  private inverse=new THREE.Matrix4();
+  private eyeScratch=new THREE.Vector4();
+  private sight=makeSightline();
+  private focusActor='me';
+  private focusScreen={x:0,y:0,elevation:0};
+  private sightRay=new THREE.Ray();
+  private sightDirection=new THREE.Vector3();
+  private sightHit=new THREE.Vector3();
+  private modelMatrix = new THREE.Matrix4();
   private tmp = new THREE.Vector4();
   private trailPos = new THREE.Vector3();
   private trailAnchor = new THREE.Vector3();
@@ -82,48 +98,49 @@ export class WorldLayer implements CustomLayerInterface {
   private shadowMat = new THREE.MeshBasicMaterial({
     map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   });
-  private trunkGeo = new THREE.CylinderGeometry(0.18, 0.26, 1, 6);
-  private canopyGeo = new THREE.IcosahedronGeometry(1, 0);
-  private trunkMat = new THREE.MeshStandardMaterial({ color: '#8A6A4F', roughness: 0.9 });
-  private canopyMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true });
-  private trunks: THREE.InstancedMesh | null = null;
+  private vegetation:TreeBatch|null=null;
+  private treeSpots:TreeSpot[]=[];
+  private scenery:SceneryAssets|null=null;
+  private disposed=false;
+  private furniture:THREE.InstancedMesh|null=null;
+  private lamps:StreetLamp[]=[];
   private statics = new Map<string, THREE.Object3D>();
   private anchors = new Map<string, { pos: LatLng; altitude: number; el: HTMLElement }>();
-  private canopies: THREE.InstancedMesh | null = null;
   /** Characters are drawn only at or above this zoom. */
   minZoom = 0;
 
   constructor(origin: LatLng) {
     this.origin = origin;
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
-    this.scene.add(new THREE.HemisphereLight('#ffffff', '#8d8d8d', 2.2));
-    this.charScene.add(new THREE.HemisphereLight('#ffffff', '#8d8d8d', 2.2));
-    const sun2 = new THREE.DirectionalLight('#ffffff', 1.6);
-    sun2.position.set(-40, 100, 60);
+    const m=this.originMerc.meterInMercatorCoordinateUnits();
+    this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
+    this.scene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
+    this.charScene.add(new THREE.HemisphereLight('#D5E3EB', '#CBD5B0', .95));
+    const sun2 = new THREE.DirectionalLight('#FFF2D9', 2.4);
+    sun2.position.set(-5,8,7);
     this.charScene.add(sun2);
-    const sun = new THREE.DirectionalLight('#ffffff', 1.6);
-    sun.position.set(-40, 100, 60);
+    const sun = new THREE.DirectionalLight('#FFF2D9', 2.4);
+    sun.position.set(-5,8,7);
     this.scene.add(sun);
   }
 
   /** Swap in loaded models; existing placeholder characters are rebuilt from them. */
   setModels(models: ModelSet) {
     this.models = models;
-    // Loop over a copy: each actor is removed and re-added, and a live Map iterator would visit
-    // the re-added entries again forever.
-    for (const [id, a] of [...this.actors]) {
-      const label = a.label;
-      this.removeActor(id);
-      this.upsertActor(id, a.kind, a.seed);
-      this.setPose(id, a.pos, a.heading, a.altitude);
-      this.bindLabel(id, label, a.labelLift);
+    for (const a of this.actors.values()) {
+      const previous=a.char;
+      const next=a.kind==='pet'?makePet(models,a.seed):makeAvatar(models,a.seed);
+      next.root.position.copy(previous.root.position);next.root.quaternion.copy(previous.root.quaternion);next.root.scale.copy(previous.root.scale);
+      next.root.traverse(o=>{o.frustumCulled=!(o as THREE.SkinnedMesh).isSkinnedMesh;});
+      next.setState(a.state);
+      this.charScene.remove(previous.root);previous.dispose();a.char=next;this.charScene.add(next.root);
     }
   }
 
   upsertActor(id: string, kind: ActorKind, seed: string) {
     if (this.actors.has(id)) return;
     const char = kind === 'pet' ? makePet(this.models, seed) : makeAvatar(this.models, seed);
-    char.root.traverse((o) => { o.frustumCulled = false; });
+    char.root.traverse((o) => { o.frustumCulled = !(o as THREE.SkinnedMesh).isSkinnedMesh; });
     this.charScene.add(char.root);
     // The walking view gets the calm wake; the showpiece style is for flights and later animations.
     const trail = kind === 'pet' ? new MuseTrail({ style: 'walk' }) : null;
@@ -136,7 +153,7 @@ export class WorldLayer implements CustomLayerInterface {
       shadow.frustumCulled = false;
       this.scene.add(shadow);
     }
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0, trail, shadow });
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, state:kind==='pet'?'hover':'idle',posed:false,altitude: 0, label: null, labelLift: 0, trail, shadow });
   }
 
   removeActor(id: string) {
@@ -158,10 +175,33 @@ export class WorldLayer implements CustomLayerInterface {
     a.pos = pos; a.heading = heading; a.altitude = altitude;
   }
 
-  setState(id: string, state: string) { this.actors.get(id)?.char.setState(state); }
+  setState(id: string, state: string) { const a=this.actors.get(id);if(!a||(a.state===state&&!['wave','happy','celebrate'].includes(state)))return;a.state=state;a.char.setState(state); }
 
   /** Muse's wake follows its speed by default ('auto'); force a look for scripted moves. */
   setTrailMode(id: string, mode: MuseTrailModeSetting) { this.actors.get(id)?.trail?.setMode(mode); }
+
+  sendMusePulse(fromId: string, toId: string): void {
+    const from=this.actors.get(fromId), to=this.actors.get(toId);
+    if (!from?.trail || !to || !from.char.getEffectCenter || !to.char.getEffectCenter) return;
+    from.char.getEffectCenter(this.trailPos); to.char.getEffectCenter(this.trailAnchor);
+    from.trail.sendPulse(this.trailPos, this.trailAnchor);
+  }
+  setMuseTrailStyle(id: string, style: 'walk' | 'full') { this.actors.get(id)?.trail?.setConfig({style, seed:id, ...(id.startsWith('muse:') ? {brightBlue:'#23D9F5',cyanAccent:'#B8F7FF'} : {})}); }
+
+  setProcessing(id: string, phase: 'off' | 'pending' | 'success' | 'fade') { this.actors.get(id)?.trail?.setProcessing(phase); }
+
+  /** Actual animated body centre, in map-canvas pixels, for the existing camera rig. */
+  actorScreenPoint(id: string, out: { x: number; y: number; elevation: number }): boolean {
+    const actor = this.actors.get(id), canvas = this.map?.getCanvas();
+    if (!actor || !canvas || !actor.char.getEffectCenter) return false;
+    actor.char.getEffectCenter(this.trailPos);
+    out.elevation = this.trailPos.y;
+    this.tmp.set(this.trailPos.x, this.trailPos.y, this.trailPos.z, 1).applyMatrix4(this.full);
+    if (this.tmp.w <= 0) return false;
+    out.x = (this.tmp.x / this.tmp.w + 1) * canvas.clientWidth / 2;
+    out.y = (1 - this.tmp.y / this.tmp.w) * canvas.clientHeight / 2;
+    return Number.isFinite(out.x) && Number.isFinite(out.y);
+  }
 
   /** Keep `el` positioned above the actor's head (CSS transform), or stop when el is null. */
   bindLabel(id: string, el: HTMLElement | null, liftMeters = 0.25) {
@@ -175,11 +215,14 @@ export class WorldLayer implements CustomLayerInterface {
   /** The point the local frame is measured from (east/north meters). */
   getOrigin(): LatLng { return this.origin; }
 
+  setFocusActor(id:string){this.focusActor=id;}
+
   /** Scenery built in the local frame (Meta HQ). Depth-tested against the map's buildings. */
   setStatic(key: string, obj: THREE.Object3D | null) {
     const old = this.statics.get(key);
     if (old) { this.scene.remove(old); this.statics.delete(key); }
-    if (obj) { this.scene.add(obj); this.statics.set(key, obj); }
+    if(key==='hq'&&!obj){this.sight.boxes=[];this.sight.rings=[];}
+    if (obj) { applySightlineCutaway(obj,this.sight);this.scene.add(obj); this.statics.set(key, obj); }
   }
 
   /** Keep `el` above a fixed point (`altitude` meters, real size), or stop when el is null. */
@@ -189,32 +232,19 @@ export class WorldLayer implements CustomLayerInterface {
     if (el) this.anchors.set(id, { pos, altitude, el }); else this.anchors.delete(id);
   }
 
-  /** Low-poly trees (two instanced meshes, so hundreds cost two draw calls). Real size, not zoom-scaled. */
-  setTrees(spots: TreeSpot[]) {
-    for (const m of [this.trunks, this.canopies]) { if (m) { this.scene.remove(m); m.dispose(); } }
-    this.trunks = null;
-    this.canopies = null;
-    if (spots.length === 0) return;
-    const trunks = new THREE.InstancedMesh(this.trunkGeo, this.trunkMat, spots.length);
-    const canopies = new THREE.InstancedMesh(this.canopyGeo, this.canopyMat, spots.length);
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const greens = [new THREE.Color('#5DAE4B'), new THREE.Color('#6FBF55'), new THREE.Color('#4E9E45'), new THREE.Color('#82C35E')];
-    spots.forEach((t, i) => {
-      const o = offsetMeters(this.origin, t);
-      const h = t.height;
-      m.compose(new THREE.Vector3(o.east, h * 0.22, -o.north), q, new THREE.Vector3(h * 0.9, h * 0.44, h * 0.9));
-      trunks.setMatrixAt(i, m);
-      q.setFromEuler(new THREE.Euler(0, t.tone * Math.PI * 2, 0));
-      m.compose(new THREE.Vector3(o.east, h * 0.62, -o.north), q, new THREE.Vector3(h * 0.34, h * 0.42, h * 0.34));
-      canopies.setMatrixAt(i, m);
-      canopies.setColorAt(i, greens[Math.floor(t.tone * greens.length) % greens.length]);
-      q.identity();
-    });
-    for (const mesh of [trunks, canopies]) { mesh.frustumCulled = false; mesh.instanceMatrix.needsUpdate = true; this.scene.add(mesh); }
-    if (canopies.instanceColor) canopies.instanceColor.needsUpdate = true;
-    this.trunks = trunks;
-    this.canopies = canopies;
+  /** Shared rounded prototypes, independently instanced at real metre dimensions. */
+  setTrees(spots:TreeSpot[]){
+    this.treeSpots=spots;this.vegetation?.dispose();if(this.vegetation)this.scene.remove(this.vegetation.object);
+    this.vegetation=null;if(!spots.length)return;
+    this.vegetation=buildTreeBatch(spots.map(t=>{const o=offsetMeters(this.origin,t);return{x:o.east,y:0,z:-o.north,height:t.height,tone:t.tone,kind:t.kind};}),this.scenery?.evergreen);
+    this.scene.add(this.vegetation.object);
+  }
+
+  setStreetFurniture(spots:StreetLamp[]){
+    this.lamps=spots;if(this.furniture){this.scene.remove(this.furniture);this.furniture.geometry.dispose();(this.furniture.material as THREE.Material).dispose();this.furniture.dispose();this.furniture=null;}
+    if(!spots.length||!this.scenery?.streetlight)return;
+    const geo=this.scenery.streetlight.clone(),mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85}),mesh=new THREE.InstancedMesh(geo,mat,spots.length),m=new THREE.Matrix4(),q=new THREE.Quaternion(),p=new THREE.Vector3(),s=new THREE.Vector3();
+    spots.forEach((lamp,i)=>{const o=offsetMeters(this.origin,lamp);m.compose(p.set(o.east,0,-o.north),q.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,lamp.heading),s.setScalar(lamp.height));mesh.setMatrixAt(i,m);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();mesh.name='Kenney-streetlights';this.scene.add(mesh);this.furniture=mesh;
   }
 
   setBeacons(specs: BeaconSpec[]) {
@@ -252,20 +282,23 @@ export class WorldLayer implements CustomLayerInterface {
     this.map = map;
     this.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     this.renderer.autoClear = false;
+    this.renderer.toneMapping=THREE.AgXToneMapping;this.renderer.toneMappingExposure=1.15;
+    void loadSceneryAssets().then(assets=>{if(this.disposed)return;this.scenery=assets;if(this.treeSpots.length)this.setTrees(this.treeSpots);if(this.lamps.length)this.setStreetFurniture(this.lamps);});
   }
 
   onRemove() {
+    this.disposed=true;
     for (const id of [...this.actors.keys()]) this.removeActor(id);
     this.setBeacons([]);
-    this.setTrees([]);
+    this.setTrees([]);this.vegetation?.dispose();this.vegetation=null;this.setStreetFurniture([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
     this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
-    this.trunkGeo.dispose(); this.canopyGeo.dispose(); this.trunkMat.dispose(); this.canopyMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
     // The renderer shares MapLibre's context; dispose only three's own resources.
     this.renderer?.dispose();
     this.renderer = null;
+    this.map?.getContainer().removeAttribute('data-world-characters');
     this.map = null;
   }
 
@@ -280,15 +313,11 @@ export class WorldLayer implements CustomLayerInterface {
     const zoom = map.getZoom();
     const scale = characterScale(zoom);
     const showChars = zoom >= this.minZoom;
-    if (this.trunks) this.trunks.visible = showChars;
-    if (this.canopies) this.canopies.visible = showChars;
+    const markerMode=showChars?'true':'false',container=map.getContainer();if(container.dataset.worldCharacters!==markerMode)container.dataset.worldCharacters=markerMode;
+    if(this.vegetation)this.vegetation.object.visible=zoom>=15.5;
+    if(this.furniture)this.furniture.visible=zoom>=17;
     for (const o of this.statics.values()) o.visible = zoom >= 14.5;
-    const m = this.originMerc.meterInMercatorCoordinateUnits();
-    const model = new THREE.Matrix4()
-      .makeTranslation(this.originMerc.x, this.originMerc.y, this.originMerc.z ?? 0)
-      .scale(new THREE.Vector3(m, -m, m))
-      .multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-    this.full.fromArray(options.defaultProjectionData.mainMatrix as unknown as number[]).multiply(model);
+    this.full.fromArray(options.defaultProjectionData.mainMatrix as unknown as number[]).multiply(this.modelMatrix);
     this.camera.projectionMatrix.copy(this.full);
 
     const canvas = map.getCanvas();
@@ -300,9 +329,12 @@ export class WorldLayer implements CustomLayerInterface {
       const s = a.kind === 'pet' ? scale * 0.9 : scale;
       a.char.root.visible = showChars;
       a.char.root.position.set(o.east, a.altitude * scale, -o.north);
-      a.char.root.rotation.set(0, Math.PI - toRad(a.heading), 0);
+      const target=Math.PI-toRad(a.heading),current=a.char.root.rotation.y;
+      const delta=Math.atan2(Math.sin(target-current),Math.cos(target-current));
+      const reduced=this.motionQuery?.matches;
+      a.char.root.rotation.set(0,a.posed&&!reduced?current+delta*(1-Math.exp(-dt*10)):target,0);a.posed=true;
       a.char.root.scale.setScalar(s);
-      a.char.update(dt, this.elapsed);
+      if(showChars)a.char.update(dt, this.elapsed);
       if (a.shadow) {
         // Soft contact shadow on the ground under the avatar, sized to its footprint.
         a.shadow.visible = showChars;
@@ -314,9 +346,18 @@ export class WorldLayer implements CustomLayerInterface {
           // Muse's actual world position (its centre), never a separate simulation. Vertical motion is
           // ignored: height here is altitude x zoom scale, which changes while zooming.
           this.trailPos.set(o.east, a.altitude * scale + a.char.height * s * 0.5, -o.north);
+          a.char.getEffectCenter?.(this.trailPos);
           // The wake stems from the platform under Muse's feet (the character's origin), not its back.
           this.trailAnchor.set(o.east, a.altitude * scale + 0.03 * s, -o.north);
-          a.trail.update(this.trailPos, dt, { camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
+          const responses = a.trail.isReleasing() ? document.querySelectorAll<HTMLElement>('[data-muse-response]') : null;
+          const response = responses?.item(responses.length - 1);
+          const rect = response?.getBoundingClientRect();
+          const canvasRect = rect ? canvas.getBoundingClientRect() : null;
+          const result = rect && canvasRect && rect.width > 0 && rect.height > 0 ? {
+            x: ((rect.left + rect.width / 2 - canvasRect.left) / w) * 2 - 1,
+            y: 1 - ((Math.max(canvasRect.top, rect.top) + Math.min(rect.height / 2, 70) - canvasRect.top) / h) * 2,
+          } : undefined;
+          a.trail.update(this.trailPos, dt, { result, camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
         } else a.trail.object.visible = false;
       }
       if (a.label) {
@@ -345,7 +386,16 @@ export class WorldLayer implements CustomLayerInterface {
       a.el.style.visibility = x > -100 && x < w + 100 && py > -50 && py < h + 50 ? 'visible' : 'hidden';
     }
 
-    const pulse = 0.5 + Math.sin(this.elapsed * 3) * 0.5;
+    const focus=this.actors.get(this.focusActor);
+    const focusVisible=this.actorScreenPoint(this.focusActor,this.focusScreen)&&this.focusScreen.x>=0&&this.focusScreen.x<=w&&this.focusScreen.y>=0&&this.focusScreen.y<=h;
+    if(focus&&focusVisible&&cameraFromProjection(this.full,this.inverse,this.sight.start.value,this.eyeScratch)){
+      if(focus.char.getEffectCenter)focus.char.getEffectCenter(this.sight.end.value);
+      else{focus.char.root.getWorldPosition(this.sight.end.value);this.sight.end.value.y+=focus.char.height*scale*.5;}
+      const length=this.sightDirection.subVectors(this.sight.end.value,this.sight.start.value).length();this.sightDirection.normalize();this.sightRay.set(this.sight.start.value,this.sightDirection);
+      const ease=this.motionQuery?.matches?1:1-Math.exp(-dt*8);
+      this.sight.boxes.forEach((box,i)=>{const hit=zoom>=19&&this.sightRay.intersectBox(box,this.sightHit);const blocked=!!hit&&this.sightHit.distanceTo(this.sight.start.value)<length-.2&&blocksSightline(this.sight.start.value,this.sight.end.value,box,this.sight.rings[i]??[]);const goal=blocked ? .32 : 1;this.sight.fades.value[i]+=(goal-this.sight.fades.value[i])*ease;});
+    }else this.sight.fades.value.fill(1);
+    const pulse = this.motionQuery?.matches ? .5 :0.5 + Math.sin(this.elapsed * 3) * 0.5;
     for (const b of this.beacons.values()) {
       const o = offsetMeters(this.origin, b.spec.pos);
       const radius = b.spec.strong ? 4.5 : 3;

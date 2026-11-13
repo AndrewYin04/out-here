@@ -56,9 +56,10 @@ type Props = {
   friends: Map<string, PersonCard>;
   showMuse: boolean;
   onJoined?: () => void;
+  approvalRequired?: boolean;
 };
 
-export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
+export function SuggestionCard({ s, friends, showMuse, onJoined, approvalRequired = false }: Props) {
   const quest = useQuest(s.questId);
   const seats = quest.data?.seatsLeft ?? s.seatsLeft;
   const price = quest.data?.quest.priceMax;
@@ -192,9 +193,8 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
             {seats !== null && <SeatsBadge seats={seats} />}
           </div>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-fb-text-2">
-            <span className="inline-flex items-center gap-1"><Footprints size={14} aria-hidden />{s.travelMinutes} min walk</span>
-            <span aria-hidden>·</span>
-            <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden />{startsText(s.startsAt)}</span>
+            {s.questId && <><span className="inline-flex items-center gap-1"><Footprints size={14} aria-hidden />{s.travelMinutes} min walk</span><span aria-hidden>·</span></>}
+            <span className="inline-flex items-center gap-1"><Clock size={14} aria-hidden />{s.kind === 'friend_hang' && !s.questId ? 'Time to be confirmed' : startsText(s.startsAt)}</span>
             {price !== undefined && (<><span aria-hidden>·</span><span>{price === 0 ? 'Free' : `Up to $${price}`}</span></>)}
           </p>
         </div>
@@ -238,7 +238,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
           <div className="flex -space-x-1.5">
             {people.map((p) => <Avatar key={p.id} src={p.avatarUrl} name={p.name} size={24} ring />)}
           </div>
-          <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} can make it</span>
+          <span>{people.map((p) => p.name.split(' ')[0]).join(', ')} {approvalRequired ? 'still needs to approve' : 'can make it'}</span>
         </div>
       )}
 
@@ -286,6 +286,13 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
       {!inviteFor && (() => {
         const lead = people.find((p) => !outcomes.has(p.id));
         const sent = lead ? sentTo.has(lead.id) : false;
+        if (lead && approvalRequired && !s.questId) return (
+          <div className="mt-3">
+            <Button block variant={sent ? 'secondary' : 'primary'} disabled={sent || busy !== null} onClick={() => openInvite(lead)}>
+              {sent ? `Invite sent to ${lead.name.split(' ')[0]}` : `Invite ${lead.name.split(' ')[0]}`}
+            </Button>
+          </div>
+        );
         // With a friend: one main action, "Go with Maya" (join + Muse's invite). Without: Join.
         if (lead && s.questId) return (
           <div className="mt-3">
@@ -316,6 +323,7 @@ export function SuggestionCard({ s, friends, showMuse, onJoined }: Props) {
 /** "Maya's in. You're both going to Dumpling Den, 4:43 PM · leave by 4:34 PM for the 9 min walk." */
 function outcomeText(name: string, o: Outcome, venue: string | null, s: PlanSuggestion): string {
   if (o.status === 'declined') return `${name} can't make it this time.`;
+  if (!s.questId) return `${name} accepted your invitation. Confirm the time together.`;
   if (!o.together) return `${name} accepted, but only one seat was left, so ${name} took it.`;
   const leaveBy = new Date(Date.parse(s.startsAt) - s.travelMinutes * 60_000).toISOString();
   const where = venue ?? s.title;

@@ -12,8 +12,10 @@ import { cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import {
   closeChat, museDispatch, openChat, retryLast, selectPlan, sendMessage,
-  useChatError, useChatMessages, useMuseSnapshot, type ChatMessage,
+  reportAgentRecipientError, sendAgentMessage, useAgentEncounter, useChatError, useChatMessages, useMuseSnapshot, type ChatMessage,
 } from './controller';
+import { simulationTransport } from './encounter';
+import { backendTransport, isCoordinationAsk } from '@/features/muse-encounters';
 import { MuseOrb, MuseStyles } from './MuseOrb';
 
 const firstName = (n: string) => n.split(' ')[0] ?? n;
@@ -24,6 +26,7 @@ const SHOWN_ON = /^\/(out-here|memories)(\/|$)/;
 const STATE_LABEL: Record<string, string> = {
   approaching: 'Muse is coming over', listening: 'Muse is listening', thinking: 'Muse is thinking',
   responding: 'Muse replied', returning: 'Muse is heading back', error: 'Muse hit a problem',
+  sending: 'Checking with your friend', receiving: 'Reading the reply',
 };
 
 /** Keep the panel above the on-screen keyboard (mobile): the visual viewport shrinks, the layout one does not. */
@@ -41,7 +44,7 @@ function useKeyboardInset(active: boolean): number {
   return inset;
 }
 
-function Bubble({ m, friends, onView }: { m: ChatMessage; friends: Map<string, PersonCard>; onView: (questId: string) => void }) {
+function Bubble({ m, friends, onView, reveal }: { reveal: boolean; m: ChatMessage; friends: Map<string, PersonCard>; onView: (questId: string) => void }) {
   if (m.role === 'user') {
     return (
       <div className="muse-msg flex justify-end">
@@ -56,7 +59,7 @@ function Bubble({ m, friends, onView }: { m: ChatMessage; friends: Map<string, P
   }
   const suggestions = m.plan?.suggestions ?? [];
   return (
-    <div className="muse-msg flex flex-col items-start gap-2" data-testid="muse-msg-muse" data-source={m.source}>
+    <div className={cn("flex flex-col items-start gap-2", reveal && "muse-result-reveal")} data-testid="muse-msg-muse" data-source={m.source} data-muse-response={m.id}>
       <div className="max-w-[92%] rounded-[18px] rounded-bl-md bg-fb-secondary-btn px-3 py-2 text-[15px] leading-[20px] text-fb-text">
         {m.source === 'muse' && <MuseLabel className="mb-1" />}
         {m.source === 'mock' && <OfflineLabel className="mb-1" />}
@@ -65,7 +68,7 @@ function Bubble({ m, friends, onView }: { m: ChatMessage; friends: Map<string, P
       </div>
       {suggestions.slice(0, 3).map((s, i) => (
         <div key={`${m.id}:${s.questId ?? s.title}:${i}`} className="w-full overflow-hidden rounded-card border border-fb-divider bg-fb-surface" data-testid="muse-chat-plan">
-          <SuggestionCard s={s} friends={friends} showMuse={false} />
+          <SuggestionCard s={s} friends={friends} showMuse={false} approvalRequired={m.plan?.meta.coordination} />
           {s.questId && (
             <button
               type="button"
@@ -97,10 +100,15 @@ export function MuseChat() {
   const logRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const kb = useKeyboardInset(snap.open);
-  const thinking = snap.state === 'thinking';
+  const encounter = useAgentEncounter();
+  const demo = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('encounterDemo') === '1';
+  const thinking = (!!encounter && !encounter.outcome) || snap.state === 'thinking' || snap.state === 'sending' || snap.state === 'receiving' || snap.state==='evaluating';
+  const busy = thinking;
 
   // The panel is for these pages only; leaving them puts Jolly back (the conversation stays).
   const here = SHOWN_ON.test(pathname ?? '');
+  // Any navigation or unmount cancels the request, including moves between supported pages.
+  useEffect(() => () => closeChat(), [pathname]);
   useEffect(() => { if (!here && snap.open) closeChat(); }, [here, snap.open]);
 
   // The "I'm free" composer and the chat never show together: if the composer opens, Muse steps back.
@@ -130,8 +138,13 @@ export function MuseChat() {
   useEffect(() => { if (wasOpen.current && !snap.open) launcherRef.current?.focus({ preventScroll: true }); wasOpen.current = snap.open; }, [snap.open]);
 
   const submit = useCallback((text: string) => {
-    if (sendMessage(text)) setDraft('');
-  }, []);
+    const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? []);
+    const matches = [...friends.values()].filter(f => words.has(firstName(f.name).toLowerCase()));
+    if (demo || (isCoordinationAsk(text) && matches.length > 0)) {
+      if (matches.length !== 1) { reportAgentRecipientError(); return; }
+      if (sendAgentMessage(text, {id:matches[0].id, name:matches[0].name}, demo ? simulationTransport : backendTransport)) setDraft('');
+    } else if (sendMessage(text)) setDraft('');
+  }, [demo, friends]);
   const onSubmit = (e: FormEvent) => { e.preventDefault(); submit(draft); };
 
   const onView = useCallback((questId: string) => {
@@ -162,7 +175,7 @@ export function MuseChat() {
           onClick={openChat}
           className="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0"
         >
-          <MuseOrb state={snap.state} size={32} />
+          <MuseOrb state="idle" size={32} />
           {/* Phones: just the orb, up by the map chips, so it never covers a sheet's buttons. */}
           <span className="max-md:sr-only">Ask Muse</span>
         </button>
@@ -180,14 +193,14 @@ export function MuseChat() {
             // desktop: a compact card anchored bottom right, the map stays the focus
             'md:bottom-4 md:right-4 md:w-[380px] md:max-h-[min(580px,calc(100dvh-96px))] md:rounded-card',
             // mobile: a bottom sheet that stops short of the top bar
-            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[calc(100dvh-56px-120px)] max-md:rounded-t-[16px]',
+            'max-md:inset-x-0 max-md:bottom-14 max-md:max-h-[min(52dvh,calc(100dvh-176px))] max-md:rounded-t-[16px]',
           )}
         >
           <header className="flex shrink-0 items-center gap-2 border-b border-fb-divider px-3 py-2">
-            <MuseOrb state={snap.state} size={36} />
+            <MuseOrb state="idle" size={36} />
             <div className="min-w-0 flex-1">
               <h2 className="text-[16px] font-bold leading-5 text-fb-text">Muse <span aria-hidden>✨</span></h2>
-              <p className="truncate text-[12px] leading-4 text-fb-text-2" data-testid="muse-state-label">{STATE_LABEL[snap.state] ?? 'Ready when you are'}</p>
+              <p className="truncate text-[12px] leading-4 text-fb-text-2" data-testid="muse-state-label">{demo ? 'Simulation only · illustrative positions · no messages sent' : encounter?.source === 'simulation' ? 'Simulated coordination · offline' : STATE_LABEL[snap.state] ?? 'Ready when you are'}</p>
             </div>
             <button
               type="button"
@@ -208,19 +221,18 @@ export function MuseChat() {
                 </p>
               </div>
             )}
-            {messages.map((m) => <div key={m.id} data-msg>{<Bubble m={m} friends={friends} onView={onView} />}</div>)}
+            {messages.map((m) => <div key={m.id} data-msg>{<Bubble m={m} friends={friends} onView={onView} reveal={snap.state === 'responding' && m === messages.at(-1) && m.role === 'muse' && m.source === 'muse'} />}</div>)}
             {thinking && (
               <div className="muse-msg flex items-center gap-2 text-[14px] text-fb-text-2" data-testid="muse-thinking" role="status">
-                <MuseOrb state="thinking" size={28} />
-                <span>Checking who’s free and what fits…</span>
+                <span>{demo ? "Simulated exchange; no friend was contacted." : "Checking who’s free and what fits…"}</span>
               </div>
             )}
             {error && !thinking && (
               <div role="alert" data-testid="muse-error" className="flex items-center gap-2 rounded-card bg-[#FDE8EA] px-3 py-2 text-[14px] text-fb-red">
                 <span className="flex-1">{error}</span>
-                <button type="button" onClick={retryLast} className="inline-flex items-center gap-1 rounded-btn px-2 py-1 font-semibold hover:bg-white/60">
+                {messages.some(m => m.role === 'user' && m.failed) && <button type="button" onClick={retryLast} className="inline-flex items-center gap-1 rounded-btn px-2 py-1 font-semibold hover:bg-white/60">
                   <RotateCcw className="size-4" aria-hidden /> Retry
-                </button>
+                </button>}
               </div>
             )}
           </div>
@@ -230,7 +242,7 @@ export function MuseChat() {
               <button
                 key={c.label}
                 type="button"
-                disabled={thinking}
+                disabled={busy}
                 onClick={c.run}
                 className="oh-press h-8 shrink-0 whitespace-nowrap rounded-pill bg-fb-blue-tint px-3 text-[13px] font-semibold text-fb-blue hover:brightness-95 disabled:opacity-50"
               >
@@ -248,7 +260,7 @@ export function MuseChat() {
               maxLength={280}
               enterKeyHint="send"
               autoComplete="off"
-              placeholder="Ask Muse anything…"
+              placeholder={demo ? "Demo: ask about one named friend" : "Ask Muse anything…"}
               onChange={(e) => setDraft(e.target.value)}
               onFocus={() => museDispatch({ type: 'USER_INPUT_STARTED' })}
               onBlur={() => museDispatch({ type: 'USER_INPUT_ENDED' })}
@@ -258,7 +270,7 @@ export function MuseChat() {
               type="submit"
               aria-label="Send"
               data-testid="muse-send"
-              disabled={!draft.trim() || thinking}
+              disabled={!draft.trim() || busy}
               className="grid size-10 shrink-0 place-items-center rounded-full bg-fb-blue text-white transition-opacity hover:bg-fb-blue-hover disabled:opacity-40"
             >
               <Send className="size-5" aria-hidden />

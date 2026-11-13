@@ -8,13 +8,19 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { usePlanOpen, usePlanStatus } from '@/features/outhere';
-import { openChat, petPose, useMuseSnapshot } from '@/features/muse-companion';
+import { openChat, minimizeChat, petPose, useMuseSnapshot, useAgentEncounter, finishAgentEncounter,attachMuseWorld,useMuseViewport,photoTargetForRender } from '@/features/muse-companion';
+import {ArrivalSelfie} from '@/features/memories';
+import {photoFocusBearing} from '@/features/muse-vision';
+import {museCameraArea} from './muse-layout';
+import {loadSceneryAssets} from './scenery-assets';
+import {placeStreetFurniture} from './street-furniture';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
+import { EncounterMotion } from './encounter-motion';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
 import { buildHq, loadHq, type HqLabel } from './hq';
-import { blockerTest, nearestOnLines, nearestOpen, placeTrees, type Area, type Street } from './trees';
+import { blockerTest, nearestOnLines, nearestOpen, placeTrees, streetHeading,type Area, type Street } from './trees';
 import {
   ARRIVE_METERS, buildingFlatten, CHARACTER_MIN_ZOOM, DEMO_WALK_SPEEDUP, ENTER_ZOOM, FAR_FROM_DEMO_M, MAX_3D_PITCH, MAX_3D_ZOOM,
   bearingDeg, characterScale, lerpDeg, minutesLeft, moveMeters, normalizeDeg, pitchForZoom, stepToward,
@@ -94,6 +100,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const setWalk = useCallback((w: Walk | null) => { walkRef.current = w; setWalkState(w); }, []);
   const [walkMin, setWalkMin] = useState<number | null>(null);
   const [arrival, setArrival] = useState<{ id: string; text: string } | null>(null);
+  const [capture,setCapture]=useState<(Quest&{captureOwner:string})|null>(null);
+  const captureRef=useRef(capture);captureRef.current=capture;
+  useEffect(()=>attachMuseWorld(),[viewer.id]);
+  const viewport=useMuseViewport(),viewportRef=useRef(viewport);viewportRef.current=viewport;
+  const cameraRects=useRef<{bounds:DOMRect;panel:DOMRect|null}|null>(null);
   const arrived = useRef(new Set<string>());
   const [source, setSourceState] = useState<Source>('demo');
   const sourceRef = useRef<Source>('demo');
@@ -101,6 +112,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const [farKm, setFarKm] = useState<number | null>(null);
   const [nearFriends, setNearFriends] = useState<NearFriend[]>([]);
   const nearKey = useRef('');
+  const streetHeadingSet=useRef(false);
   const [, setSecond] = useState(0);
   const questsRef = useRef(quests);
   questsRef.current = quests;
@@ -113,6 +125,23 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // The Muse companion (chat): while it is open Jolly comes to the front and acts out its state.
   const companion = useMuseSnapshot();
   const pose = petPose(companion);
+  const encounter = useAgentEncounter();
+  const encounterRef = useRef(encounter); encounterRef.current = encounter;
+  const processing = useRef(companion.energy);
+  processing.current = companion.energy;
+  useEffect(()=>{
+    const el=map.getContainer(),panel=document.querySelector<HTMLElement>('[data-testid="muse-chat"]');
+    const measure=()=>{cameraRects.current={bounds:el.getBoundingClientRect(),panel:panel?.getBoundingClientRect()??null};};
+    measure();const observer=new ResizeObserver(measure);observer.observe(el);if(panel)observer.observe(panel);
+    window.addEventListener('resize',measure,{passive:true});window.addEventListener('scroll',measure,{capture:true,passive:true});
+    return()=>{observer.disconnect();window.removeEventListener('resize',measure);window.removeEventListener('scroll',measure,true);};
+  },[map,companion.open]);
+  useEffect(()=>{
+    const open=(event:Event)=>{const id=(event as CustomEvent<string>).detail;const q=questsRef.current.find(q=>q.id===id&&q.memberIds.includes(viewer.id));if(q){minimizeChat();setCapture({...q,captureOwner:viewer.id});event.preventDefault();}};
+    window.addEventListener('outhere:open-selfie',open);return()=>window.removeEventListener('outhere:open-selfie',open);
+  },[viewer.id]);
+  const chatOpen = useRef(companion.open);
+  chatOpen.current = companion.open;
   const petMode = useRef<PetMode>('follow');
   const petState = useRef('hover');
   const petPos = useRef<LatLng>(start);
@@ -157,11 +186,12 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
   // ---- Set up the 3D map, and put it back on the way out ----
   useEffect(() => {
-    const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch() };
+    const saved = { maxZoom: map.getMaxZoom(), maxPitch: map.getMaxPitch(), fov:map.getVerticalFieldOfView() };
     let layer: WorldLayer | null = null;
     let undoTheme: (() => void) | null = null;
     let cancelled = false;
     map.setMaxPitch(MAX_3D_PITCH);
+    map.setVerticalFieldOfView(48);
     map.setMaxZoom(MAX_3D_ZOOM);
     map.dragRotate.enable();
     map.touchZoomRotate.enable({ around: 'center' });
@@ -207,7 +237,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     map.on('idle', add);
 
     // Dragging or rotating the map by hand looks around; "Back to me" follows again.
-    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); setFollow(false); } };
+    const detach = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { if (encounterRef.current) finishAgentEncounter(encounterRef.current.id); entering.current = false; stopTour(); setFollow(false); } };
     // A pinch or scroll by hand ends the fly-in, so zooming out to the city is never undone.
     const userZoom = (e: { originalEvent?: unknown }) => { if (e.originalEvent) { entering.current = false; stopTour(); } };
     map.on('dragstart', detach);
@@ -236,7 +266,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // (React's dev double mount, or a quick Map → 3D): then its limits must stay.
       map.once('moveend', () => {
         if (map.getContainer().hasAttribute('data-view3d')) return;
-        map.setMaxPitch(saved.maxPitch);
+        map.setMaxPitch(saved.maxPitch);map.setVerticalFieldOfView(saved.fov);
         map.setMaxZoom(saved.maxZoom);
       });
     };
@@ -314,10 +344,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!ready) return;
     let cancelled = false;
     let dispose: (() => void) | null = null;
-    void loadHq().then((data) => {
+    void Promise.all([loadHq(),loadSceneryAssets()]).then(([data,assets]) => {
       const layer = layerRef.current;
       if (cancelled || !data || !layer) return;
-      const model = buildHq(data, layer.getOrigin());
+      const model = buildHq(data, layer.getOrigin(),assets);
       layer.setStatic('hq', model.group);
       dispose = model.dispose;
       hqFlatten.current = model.setFlatten;
@@ -395,28 +425,30 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       const layer = layerRef.current;
       source ??= tileSourceId(map);
       if (!layer || !source) return;
-      const farFromLast = !center || haversineMeters(center, pos.current) > 250;
+      const camera=map.getCenter(),focus=followRef.current?pos.current:{lat:camera.lat,lng:camera.lng};
+      const farFromLast = !center || haversineMeters(center, focus) > 150;
       if (!farFromLast && !dirty && !snapPending.current) return;
       snapPending.current = false;
       dirty = false;
-      center = pos.current;
+      center = focus;
       const q = (sourceLayer: string, classes: string[]) => map.querySourceFeatures(source!, {
         sourceLayer, filter: ['match', ['get', 'class'], classes, true, false],
       });
       const areas: Area[] = [
-        ...q('landcover', ['wood']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 9 }))),
-        ...q('landcover', ['grass', 'wetland']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 24 }))),
-        ...q('landuse', ['park', 'cemetery']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 18 }))),
-        ...map.querySourceFeatures(source, { sourceLayer: 'park' }).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 18 }))),
+        ...q('landcover', ['wood']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 13 }))),
+        ...q('landcover', ['grass']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 38 }))),
+        ...q('landuse', ['park', 'cemetery']).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 25 }))),
+        ...map.querySourceFeatures(source, { sourceLayer: 'park' }).flatMap((f) => polys(f).map((rings) => ({ rings, spacing: 25 }))),
       ];
       const streets: Street[] = [
-        ...q('transportation', ['minor', 'service']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 16, offset: 7 }))),
-        ...q('transportation', ['tertiary', 'secondary', 'primary']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 18, offset: 12 }))),
+        ...q('transportation', ['minor', 'service']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 28, offset: 7,width:5.5 }))),
+        ...q('transportation', ['tertiary', 'secondary', 'primary']).flatMap((f) => lines(f).map((coords) => ({ coords, spacing: 34, offset: 12,width:8 }))),
       ];
+      streets.push(...q('transportation',['path','pedestrian','track']).flatMap(f=>lines(f).map(coords=>({coords,spacing:30,offset:3,width:2,trees:false}))));
       const buildings = map.querySourceFeatures(source, { sourceLayer: 'building' }).flatMap((f) => polys(f));
       const water = map.querySourceFeatures(source, { sourceLayer: 'water' }).flatMap((f) => polys(f));
       // No trees on sports fields, playgrounds or in the water.
-      const blockers = [...buildings, ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water,
+      const blockers = [...buildings, ...q('landcover',['wetland']).flatMap(f=>polys(f)), ...q('landuse', ['pitch', 'playground', 'track', 'stadium']).flatMap((f) => polys(f)), ...water,
         // Meta HQ has its real, mapped trees (hq.ts); no generated ones there.
         ...(hqBox.current ? [[hqBox.current]] : [])];
       // You can't walk into a building or the bay. The demo walk starts on open ground.
@@ -430,8 +462,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         const onStreet = nearestOnLines(start, roads, 250) ?? nearestOnLines(start, paths, 150) ?? start;
         pos.current = nearestOpen(onStreet, blockedRef.current);
         petPos.current = pos.current;
+        if(followRef.current&&!streetHeadingSet.current){const aligned=streetHeading(pos.current,roads.length?roads:paths,heading.current);if(aligned!==null){heading.current=aligned;streetHeadingSet.current=true;}}
       }
-      layer.setTrees(placeTrees({ origin: DEMO_CENTER, center: pos.current, radiusM: 700, cap: 700, areas, streets, blockers }));
+      const spots=placeTrees({ origin: DEMO_CENTER, center: focus, radiusM: 650, cap: 480, areas, streets, blockers });layer.setTrees(spots);
+      layer.setStreetFurniture(placeStreetFurniture({origin:DEMO_CENTER,center:focus,streets,blockers,radiusM:500,cap:48}).filter(lamp=>!spots.some(tree=>haversineMeters(lamp,tree)<3)));
     };
     refresh();
     const t = window.setInterval(refresh, 1500);
@@ -442,6 +476,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
+    const visualQA=process.env.NODE_ENV==='development'&&new URLSearchParams(window.location.search).get('worldQA')==='1';
     let slowFor = 0;
     let lastNear = 0;
     let lastCheck = 0;
@@ -449,6 +484,19 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     let lastMe = '';
     let lastPet = '';
     let lastSecond = 0;
+    let chatCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number } | null = null;
+    let returnCamera: { center: [number, number]; zoom: number; bearing: number; elevation: number } | null = null;
+    let restoringUntil = 0;
+    let flight: { id:number; peer:string; created:boolean; motion:EncounterMotion; origin:LatLng; altitude:number; scale:number; bearing:number; cursor:number; pulseAge:number;direction:'sent'|'received'|null } | null = null;
+    const clearFlight = () => {
+      if (!flight) return;
+      const layer=layerRef.current;
+      if (flight.created) layer?.removeActor(flight.peer);
+      layer?.setMuseTrailStyle('pet','walk');
+      lastPet='';
+      const id=flight.id; flight=null; finishAgentEncounter(id);
+    };
+    const screenPoint = { x: 0, y: 0, elevation: 0 };
 
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
@@ -456,10 +504,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       last = now;
       const layer = layerRef.current;
       if (!layer) return;
+      const photoFocus=photoTargetForRender();
+      layer.setFocusActor(chatOpen.current?'pet':'me');
+      layer.setProcessing('pet', photoFocus ? 'off' : processing.current);
 
       // Too slow for this device: hand back to the 2D map.
       slowFor = dt > 0.05 ? slowFor + dt : 0;
-      if (slowFor > 4) { onExit('slow'); return; }
+      if (slowFor > 4 && !captureRef.current && !visualQA) { onExit('slow'); return; }
 
       // Movement
       let moving = false;
@@ -512,6 +563,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             layer.setState('me', 'wave');
             setArrival({ id: w.questId, text: `You’re at ${w.emoji} ${w.title}` });
             onSelect(w.questId);
+            const q=questsRef.current.find(q=>q.id===w.questId&&q.memberIds.includes(viewer.id));if(q){minimizeChat();setCapture({...q,captureOwner:viewer.id});}
           }
         }
       }
@@ -520,18 +572,64 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       layer.setPose('me', pos.current, heading.current, 0);
 
       // The pet: at your shoulder, or in front of you facing the camera while it talks.
-      const front = petMode.current === 'front';
-      const offBearing = front ? heading.current : heading.current + 125;
+      const front = !photoFocus && petMode.current === 'front';
+      const offBearing = front ? normalizeDeg(camBearing.current+180) : heading.current + 125;
       const offMeters = (front ? 1.6 : 1.1) * scale;
       const target = moveMeters(pos.current, offMeters, offBearing);
       const gap = haversineMeters(petPos.current, target);
       const kp = 1 - Math.exp(-dt * 5);
       petPos.current = gap > 0.05 ? moveMeters(petPos.current, gap * kp, bearingDeg(petPos.current, target)) : target;
-      petAlt.current += ((front ? 2.0 : 1.55) - petAlt.current) * kp;
+      petAlt.current += ((front ? 1.0 : .8) - petAlt.current) * kp;
       const flying = gap > 2.5 * scale;
       const pState = flying ? 'fly' : petState.current;
       if (pState !== lastPet) { layer.setState('pet', pState); lastPet = pState; }
-      layer.setPose('pet', petPos.current, front ? normalizeDeg(camBearing.current + 180) : heading.current, petAlt.current);
+      let petBearing=front ? normalizeDeg(camBearing.current + 180) : heading.current;
+      if(photoFocus){layer.actorScreenPoint('pet',screenPoint);const b=cameraRects.current?.bounds;if(b)petBearing=photoFocusBearing({x:screenPoint.x+b.left,y:screenPoint.y+b.top},photoFocus.rect,camBearing.current);}
+      layer.setPose('pet', petPos.current, petBearing, petAlt.current);
+
+      // One logical companion per user, in the same scene/frame loop. Origins are visual
+      // staging points nearby, never a peer's private or inferred physical location.
+      const request = encounterRef.current;
+      if (!request && flight) clearFlight();
+      if (request) {
+        if (flight && flight.id !== request.id) clearFlight();
+        if (!flight) {
+          const peer=`muse:${request.recipient.id}`;
+          const created=!layer.actorIds().includes(peer);
+          layer.upsertActor(peer,'pet',request.recipient.id);
+          layer.setMuseTrailStyle('pet','full'); layer.setMuseTrailStyle(peer,'full');
+          flight={id:request.id,peer,created,motion:new EncounterMotion(),origin:{...petPos.current},altitude:petAlt.current,scale,bearing:camBearing.current,cursor:0,pulseAge:1,direction:null};
+        }
+        const f=flight; f.pulseAge+=dt;
+        const remaining=f.cursor<request.messages.length;
+        const safeToReturn=!remaining && f.pulseAge>.55;
+        const done=f.motion.update(dt, request.outcome === 'error' || request.outcome === 'cancelled' || safeToReturn ? request.outcome : null, reducedMotion());
+        const mix=f.motion.mix;
+        const midpoint=moveMeters(f.origin,1.5*f.scale,f.bearing+70);
+        const near=moveMeters(midpoint,.6*f.scale,f.bearing-90);
+        const far=moveMeters(midpoint,.6*f.scale,f.bearing+90);
+        const peerStart=moveMeters(f.origin,5*f.scale,f.bearing+80);
+        const at=(a:LatLng,b:LatLng):LatLng=>({lat:a.lat+(b.lat-a.lat)*mix,lng:a.lng+(b.lng-a.lng)*mix});
+        const own=at(f.origin,near), other=at(peerStart,far);
+        const altitude=f.altitude+f.motion.arc;
+        layer.setPose('pet',own,bearingDeg(own,other),altitude);
+        layer.setPose(f.peer,other,bearingDeg(other,own),altitude+.04);
+        const meeting=f.motion.progress===1;
+        const speaking=meeting&&f.pulseAge<.65;
+        layer.setState('pet',meeting ? (speaking&&f.direction==='sent'?'talk':'hover'):'fly');
+        layer.setState(f.peer,meeting ? (speaking&&f.direction==='received'?'talk':'hover'):'fly');
+        if (meeting && request.outcome !== 'error' && request.outcome !== 'cancelled') {
+          if (remaining && f.pulseAge>.65) {
+            const received=request.messages[f.cursor++]==='received';
+            f.direction=received?'received':'sent';
+            layer.setState(received ? f.peer : 'pet','talk');
+            layer.setState(received ? 'pet' : f.peer,'hover');
+            layer.sendMusePulse(received ? f.peer : 'pet',received ? 'pet' : f.peer);
+            f.pulseAge=0;
+          }
+        }
+        if (done) { petPos.current={...f.origin}; petAlt.current=f.altitude; clearFlight(); }
+      }
 
       // Friends near you become avatars (nearest few), the rest stay as map pins.
       if (now - lastNear > 1000) {
@@ -579,6 +677,44 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       // scroll. Any camera call stops MapLibre's gestures, so following waits out a user zoom.
       hqFlatten.current?.(buildingFlatten(zoom));
       if (touring.current) return; // the HQ tour drives the camera
+      if (chatOpen.current) {
+        if (!chatCamera) {
+          const c = map.getCenter();
+          chatCamera = returnCamera ?? { center: [c.lng, c.lat], zoom: entering.current ? ENTER_ZOOM : zoom, bearing: map.getBearing(), elevation: map.getCenterElevation() };
+          returnCamera = null; restoringUntil = 0;
+          entering.current = false;
+          map.stop(); map.setMaxZoom(24.2); map.setCenterClampedToGround(false);
+        }
+        camBearing.current = map.getBearing();
+        const {bounds,panel}=cameraRects.current??{bounds:map.getContainer().getBoundingClientRect(),panel:null};
+        const phone = bounds.width < 768;
+        const area=museCameraArea(bounds,[panel,viewportRef.current.occlusion]);
+        if(!area)return;
+        const targetX=area.x,targetY=area.y;
+        const targetZoom = encounterRef.current ? (phone ? 22.2 : 22.5) : phone
+          ? 23 + Math.log2(Math.max(80, Math.min(125, area.height * .35)) / 80)
+          : 23.8;
+        const easing = reducedMotion() ? 1 : 1 - Math.exp(-dt * 4);
+        layer.actorScreenPoint('pet', screenPoint);
+        map.setCenterElevation(map.getCenterElevation() + (screenPoint.elevation - map.getCenterElevation()) * easing);
+        const cameraFocus=flight ? moveMeters(flight.origin,1.5*flight.scale,flight.bearing+70) : petPos.current;
+        map.easeTo({
+          center: [cameraFocus.lng, cameraFocus.lat],
+          zoom: zoom + (targetZoom - zoom) * easing,
+          offset: [targetX - bounds.width / 2, targetY - bounds.height / 2], duration: 0,
+        });
+        return;
+      }
+      if(chatCamera){returnCamera=chatCamera;chatCamera=null;restoringUntil=now+(reducedMotion()?0:1100);}
+      if(returnCamera){
+        const target=returnCamera,c=map.getCenter(),k=reducedMotion()?1:1-Math.exp(-dt*8);
+        map.setCenterElevation(map.getCenterElevation()+(target.elevation-map.getCenterElevation())*k);
+        map.easeTo({center:[c.lng+(target.center[0]-c.lng)*k,c.lat+(target.center[1]-c.lat)*k],zoom:zoom+(target.zoom-zoom)*k,bearing:lerpDeg(map.getBearing(),target.bearing,k),duration:0});
+        if(reducedMotion()||now>=restoringUntil||Math.abs(map.getZoom()-target.zoom)<.005){
+          map.jumpTo({center:target.center,zoom:target.zoom,bearing:target.bearing,elevation:target.elevation});map.setMaxZoom(MAX_3D_ZOOM);map.setCenterClampedToGround(true);returnCamera=null;restoringUntil=0;
+        }
+        return; // Never overwrite a restored camera with the zoom sampled before restoration.
+      }
       const busy = map.isZooming() || (!followRef.current && map.isMoving());
       if (followRef.current && !busy) {
         let z = zoom;
@@ -594,8 +730,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       }
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, tryMove]);
+    return () => { cancelAnimationFrame(raf); clearFlight(); const previous = chatCamera ?? returnCamera; if (previous) { map.jumpTo({ center: previous.center, zoom: previous.zoom, bearing: previous.bearing, elevation: previous.elevation }); map.setCenterClampedToGround(true); } };
+  }, [map, gps.reading, onExit, onSelect, setFollow, setWalk, tryMove,viewer.id]);
 
   // ---- GPS source ----
   const chooseSource = async (next: Source) => {
@@ -603,7 +739,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     sourceRef.current = next;
     setSourceState(next);
     setWalk(null);
-    if (next === 'demo') { pos.current = home ?? DEMO_CENTER; moved.current = false; setFarKm(null); }
+    if (next === 'demo') { streetHeadingSet.current=false;pos.current = home ?? DEMO_CENTER; moved.current = false; setFarKm(null); }
     setFollow(true);
   };
   const [gpsNote, setGpsNote] = useState<string | null>(null);
@@ -658,6 +794,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   return (
     <div
       data-testid="world-3d"
+      data-scene-ready={layerRef.current ? 'true' : 'false'}
+      data-agent-peers={layerRef.current?.actorIds().filter(id => id.startsWith('muse:')).length ?? 0}
       data-follow={follow ? 'true' : 'false'}
       data-source={source}
       data-zoom={map.getZoom().toFixed(1)}
@@ -666,8 +804,9 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       data-lng={pos.current.lng.toFixed(5)}
       className="pointer-events-none absolute inset-0 z-[5]"
     >
+      <ArrivalSelfie key={viewer.id} quest={capture?.captureOwner===viewer.id?capture:null} onClose={()=>setCapture(null)}/>
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
-      <style>{'[data-view3d] [data-map-marker="me"]{display:none}'}</style>
+      <style>{'[data-view3d] [data-map-marker="me"]{transition:opacity .18s}[data-view3d][data-world-characters="true"] [data-map-marker="me"]{opacity:0;pointer-events:none}@media(prefers-reduced-motion:reduce){[data-view3d] [data-map-marker="me"]{transition:none}}'}</style>
 
       {/* Labels the world layer keeps above heads: the pet's speech, friends' names and status. */}
       <div className="absolute inset-0 overflow-hidden">
@@ -741,9 +880,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           </div>
         )}
         {arrival && !walk && (
-          <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
-            📍 {arrival.text}
-          </div>
+          <button type="button" data-testid="arrival" onClick={()=>{const q=questsRef.current.find(q=>q.id===arrival.id&&q.memberIds.includes(viewer.id));if(q){minimizeChat();setCapture({...q,captureOwner:viewer.id});}}} className="pointer-events-auto rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-popover">{arrival.text}</button>
         )}
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">

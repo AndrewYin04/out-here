@@ -286,7 +286,7 @@ export function OutHereView() {
 
       {/* Map / 3D: one camera, two starting points. Bottom left, clear of the I'm free pill. */}
       {!unsupported && (
-        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-20">
+        <div className="absolute bottom-6 left-3 z-20 max-md:bottom-auto max-md:top-[76px]">
           <div role="group" aria-label="Camera" className="flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
             {(['map', '3d'] as const).map((v) => (
               <button

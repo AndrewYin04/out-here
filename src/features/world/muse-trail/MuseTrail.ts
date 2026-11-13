@@ -23,6 +23,8 @@ import { sampleWake, TrailHistory, WakeSamples } from './path';
 import { BILLBOARD_VERT, GLOW_FRAG, PARTICLE_FRAG, RIBBON_FRAG, RIBBON_VERT } from './shaders';
 
 export type TrailView = {
+  /** Existing response container centre in normalized screen coordinates. */
+  result?: { x: number; y: number };
   /** Local-to-clip matrix (projection x view). Needed to face ribbons and sparks at the camera. */
   camera?: THREE.Matrix4;
   /**
@@ -79,6 +81,16 @@ export class MuseTrail {
   private modeSetting: MuseTrailModeSetting = 'auto';
   private mode: MuseTrailMode = 'idle';
   private params: ModeParams = zeroParams();
+  private processing: 'off' | 'pending' | 'success' | 'fade' = 'off';
+  private pulseAge = 10;
+  private pulseFrom = new THREE.Vector3();
+  private pulseTo = new THREE.Vector3();
+  private processingAge = 0;
+  private processingFinished = true;
+  private processingGain = 0;
+  private processingCenter = new THREE.Vector3();
+  private resultTarget = new THREE.Vector3();
+  private hasResult = false;
   private time = 0;
   private disposed = false;
   private mq: MediaQueryList | null = null;
@@ -189,6 +201,19 @@ export class MuseTrail {
   setMode(mode: MuseTrailModeSetting): void { this.modeSetting = mode; }
   getMode(): MuseTrailMode { return this.mode; }
 
+  /** Controller-owned signal. Repeated render frames never restart the effect. */
+  setProcessing(phase: 'off' | 'pending' | 'success' | 'fade'): void {
+    if (phase === this.processing) return;
+    this.processing = phase; this.processingAge = 0; this.hasResult = false; this.processingFinished = false;
+    this.history.clear(); this.hasAnchor = false;
+  }
+  /** Exactly one visual pulse per actual transport event; uses the existing ribbon/pool. */
+  sendPulse(from: THREE.Vector3, to: THREE.Vector3): void {
+    if (this.cfg.reducedMotion) return;
+    this.pulseFrom.copy(from); this.pulseTo.copy(to); this.pulseAge=0;
+  }
+  isReleasing(): boolean { return this.processing === 'success' && this.processingAge < .45; }
+
   setConfig(patch: Partial<MuseTrailConfig>): void {
     const next = effectiveConfig({ ...this.cfg, ...patch });
     const rebuild = next.quality !== this.cfg.quality || next.style !== this.cfg.style || next.filamentCount !== this.cfg.filamentCount
@@ -237,6 +262,26 @@ export class MuseTrail {
     this.updateBasis(position, view.camera);
     this.adapt(dt);
 
+    this.pulseAge += dt;
+    const pulsing = this.pulseAge < .65 && !this.cfg.reducedMotion;
+    this.processingAge += dt;
+    const processing = this.processing === 'pending' || ((this.processing === 'success' || this.processing === 'fade') && this.processingAge < .45 && this.processingGain > .001);
+    if (this.processing !== 'pending' && this.processingAge >= .45 && !this.processingFinished) {
+      this.plife.fill(0); this.history.clear(); this.processingFinished = true;
+    }
+    this.processingCenter.copy(position);
+    if (this.processing === 'pending') this.processingGain = Math.min(1, this.processingGain + dt / .45);
+    else this.processingGain = Math.max(0, this.processingGain - dt / .45);
+    if (this.isReleasing() && view.result && view.camera) {
+      const depth = this.v4.set(position.x, position.y, position.z, 1).applyMatrix4(view.camera);
+      if (depth.w > 0) {
+        const z = depth.z / depth.w;
+        const point = this.v4.set(view.result.x, view.result.y, z, 1).applyMatrix4(this.inv);
+        this.resultTarget.set(point.x / point.w, point.y / point.w, point.z / point.w);
+        this.hasResult = true;
+      }
+    }
+
     // ---- motion: speed, direction, teleports
     let moved = 0;
     const vw = view.verticalWeight ?? 1;
@@ -266,7 +311,7 @@ export class MuseTrail {
     const moving = speedRatio >= DEFAULT_THRESHOLDS.moving && this.mode !== 'off';
 
     // ---- smooth every layer toward what this mode asks for
-    const target = styledParams(this.mode, this.cfg.style);
+    const target = processing || pulsing ? { ...styledParams('fly', 'full'), ribbon: .36, filament: .65, diffuse: .20, glow: .25, halo: .28, particleRate: 12, spread: .30 } : styledParams(this.mode, this.cfg.style);
     this.params = easeParams(this.params, this.cfg.reducedMotion ? { ...target, ribbon: 0, filament: 0, diffuse: 0, particleRate: target.particleRate * 0.25 } : target, dt);
     this.u.uFadePow.value = STYLES[this.cfg.style].fadePow;
     this.u.uTipFade.value = STYLES[this.cfg.style].tipFade;
@@ -281,22 +326,22 @@ export class MuseTrail {
 
     // ---- emit path points at a fixed spacing (interpolated, so fast moves leave no gaps)
     const longWake = !this.cfg.reducedMotion;
-    if (moving && longWake) this.emit(scale, speedRatio, dt);
+    if (!processing && moving && longWake) this.emit(scale, speedRatio, dt);
     else if (!this.hasAnchor) { this.lastAnchor.copy(this.anchor); this.hasAnchor = true; }
     else this.lastAnchor.copy(this.anchor);
     const life = this.cfg.trailLifetime * Math.max(0.3, this.params.lifetime);
     this.history.prune(this.time, life);
 
     // ---- gains for the shaders
-    const I = this.cfg.intensity;
+    const I = this.cfg.intensity * (processing ? this.processingGain : 1);
     this.u.uIntensity.value = I;
     this.u.uCoreGain.value = this.params.ribbon;
     this.u.uFilGain.value = this.params.filament;
     this.u.uDiffGain.value = this.params.diffuse;
 
     // ---- layers
-    const haveWake = this.buildRibbons(scale, life);
-    this.stepParticles(dt, scale, speedRatio, moving, life);
+    const haveWake = this.buildRibbons(scale, life, processing, pulsing);
+    this.stepParticles(dt, scale, processing ? 1 : speedRatio, processing ? this.processing === 'pending' : moving, life);
     this.placeGlows(position, scale, speedRatio, I);
 
     const p = this.params;
@@ -394,12 +439,39 @@ export class MuseTrail {
   }
 
   // ---------------------------------------------------------------- ribbons
-  private buildRibbons(scale: number, life: number): boolean {
+  private buildRibbons(scale: number, life: number, processing = false, pulsing = false): boolean {
     const rb = this.ribbon;
     if (!rb) return false;
     const w = this.wake;
     const m = rb.M;
-    if (sampleWake(this.history, this.anchor.x, this.anchor.y, this.anchor.z, this.time, m, w) < 2) return false;
+    if (pulsing) {
+      const head = this.pulseAge / .48;
+      for (let j=0;j<m;j++) {
+        const u=j/(m-1), t=Math.max(0,Math.min(1,head-u*.35));
+        const arc=Math.sin(t*Math.PI)*scale*.18;
+        w.px[j]=this.pulseFrom.x+(this.pulseTo.x-this.pulseFrom.x)*t+this.up.x*arc;
+        w.py[j]=this.pulseFrom.y+(this.pulseTo.y-this.pulseFrom.y)*t+this.up.y*arc;
+        w.pz[j]=this.pulseFrom.z+(this.pulseTo.z-this.pulseFrom.z)*t+this.up.z*arc;
+        w.u[j]=u; w.age[j]=life*Math.max(u*.6,Math.max(0,(head-1)/.35));
+      }
+      w.count=m;
+    } else if (processing && !this.cfg.reducedMotion) {
+      const release = this.processing === 'success' && this.hasResult ? Math.min(1, this.processingAge / .45) : 0;
+      for (let j = 0; j < m; j++) {
+        const u = j / (m - 1), a = this.time * 1.7 - u * Math.PI * 3.6;
+        const radius = scale * (.38 + .04 * Math.sin(a * 1.7 + this.time));
+        const drift = scale * .16 * Math.sin(a * .73 + this.time * .3);
+        w.px[j] = this.processingCenter.x + this.right.x * radius * Math.cos(a) + this.up.x * radius * Math.sin(a) + this.view.x * drift;
+        w.py[j] = this.processingCenter.y + this.right.y * radius * Math.cos(a) + this.up.y * radius * Math.sin(a) + this.view.y * drift;
+        w.pz[j] = this.processingCenter.z + this.right.z * radius * Math.cos(a) + this.up.z * radius * Math.sin(a) + this.view.z * drift;
+        const t = release * release * (3 - 2 * release) * (1 - u * .5);
+        w.px[j] += (this.resultTarget.x - w.px[j]) * t;
+        w.py[j] += (this.resultTarget.y - w.py[j]) * t;
+        w.pz[j] += (this.resultTarget.z - w.pz[j]) * t;
+        w.age[j] = u * life * .45; w.u[j] = u;
+      }
+      w.count = m;
+    } else if (sampleWake(this.history, this.anchor.x, this.anchor.y, this.anchor.z, this.time, m, w) < 2) return false;
     const n = w.count;
 
     // Tangents, camera-facing side vectors, depth (lift) vectors and how sharply the path bends.
@@ -467,7 +539,7 @@ export class MuseTrail {
     const pt = this.particles;
     if (!pt || this.pn === 0) return;
     const reduced = this.cfg.reducedMotion;
-    const I = this.cfg.intensity;
+    const I = this.u.uIntensity.value;
     const w = this.wake;
 
     // spawn along the wake (never only at the head), biased toward the newer half

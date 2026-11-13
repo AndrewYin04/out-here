@@ -60,7 +60,7 @@ describe('muse companion state', () => {
     const delivering = reduce(INITIAL, { type: 'ACTION_STARTED', state: 'delivering' });
     expect(delivering.state).toBe('delivering');
     expect(reduce(delivering, { type: 'ACTION_ENDED' }).state).toBe('idle');
-    const thinking = reduce(INITIAL, { type: 'MUSE_REQUEST_STARTED' });
+    const thinking = reduce({ ...INITIAL, open: true }, { type: 'MUSE_REQUEST_STARTED' });
     expect(reduce(thinking, { type: 'ACTION_STARTED', state: 'sending' })).toBe(thinking);
   });
 

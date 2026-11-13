@@ -12,27 +12,27 @@ type PaintProp = Parameters<MapLibreMap['setPaintProperty']>[1];
 type PaintValue = Parameters<MapLibreMap['setPaintProperty']>[2];
 /** Paint overrides on Positron's own layers: [layer id, property, value]. Missing layers are skipped. */
 const PAINT: [string, PaintProp, PaintValue][] = [
-  ['background', 'background-color', '#D8EDC4'],
-  ['park', 'fill-color', '#A9DA8E'],
-  ['landcover_wood', 'fill-color', '#8FCB7A'],
-  ['landuse_residential', 'fill-color', '#DDEFCB'],
-  ['water', 'fill-color', '#84C8EE'],
-  ['waterway', 'line-color', '#84C8EE'],
+  ['background', 'background-color', '#E5E5D8'],
+  ['park', 'fill-color', '#C4D4AD'],
+  ['landcover_wood', 'fill-color', '#A9C397'],
+  ['landuse_residential', 'fill-color', '#DDDCCD'],
+  ['water', 'fill-color', '#91BEC8'],
+  ['waterway', 'line-color', '#91BEC8'],
   ['highway_path', 'line-color', '#F8F3E6'],
-  ['highway_minor', 'line-color', '#FFFFFF'],
-  ['highway_major_casing', 'line-color', '#CFD7E0'],
-  ['highway_major_inner', 'line-color', '#FFFFFF'],
-  ['highway_motorway_casing', 'line-color', '#E3D29E'],
-  ['highway_motorway_inner', 'line-color', '#FFF3CF'],
+  ['highway_minor', 'line-color', '#75828A'],
+  ['highway_major_casing', 'line-color', '#EEE9DD'],
+  ['highway_major_inner', 'line-color', '#75828A'],
+  ['highway_motorway_casing', 'line-color', '#D8D1BC'],
+  ['highway_motorway_inner', 'line-color', '#879095'],
   // The flat footprints sit under the 3D walls; drop them where the walls are drawn.
   ['building', 'fill-opacity', ['interpolate', ['linear'], ['zoom'], 15.5, 1, 16.5, 0]],
 ];
 
-const LIGHT: LightSpecification = { anchor: 'map', color: '#FFFFFF', intensity: 0.28, position: [1.4, 215, 38] };
+const LIGHT: LightSpecification = { anchor: 'map', color: '#FFF1D8', intensity: 0.48, position: [1.4, 215, 38] };
 const SKY: SkySpecification = {
-  'sky-color': '#7DBBF2',
-  'horizon-color': '#DCEBFA',
-  'fog-color': '#EEF4F9',
+  'sky-color': '#BAD2DD',
+  'horizon-color': '#E5E8DD',
+  'fog-color': '#E5E8DD',
   'sky-horizon-blend': 0.55,
   'horizon-fog-blend': 0.5,
   'fog-ground-blend': 0.55,
@@ -62,6 +62,19 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     undo.push(() => { if (map.getLayer(id)) map.setPaintProperty(id, prop, before); });
   }
 
+  for(const layer of style.layers){
+    if(layer.type!=='line'||!('source-layer' in layer)||layer['source-layer']!=='transportation'||!layer.id.startsWith('highway_'))continue;
+    const path=/path|track|pedestrian/.test(layer.id), casing=/casing/.test(layer.id), bridge=/bridge/.test(layer.id);
+    const width=path?1.7:/motorway/.test(layer.id)?12:/major/.test(layer.id)?8:5.5;
+    const beforeColor=map.getPaintProperty(layer.id,'line-color'),beforeWidth=map.getPaintProperty(layer.id,'line-width');
+    map.setPaintProperty(layer.id,'line-color',path?'#E8DFCB':casing?'#EEE9DD':bridge?'#8E969A':'#75828A');
+    map.setPaintProperty(layer.id,'line-width',['interpolate',['exponential',2],['zoom'],12,(width+(casing?2.2:0))*.0658,22,(width+(casing?2.2:0))*67.4]);
+    undo.push(()=>{if(map.getLayer(layer.id)){map.setPaintProperty(layer.id,'line-color',beforeColor);map.setPaintProperty(layer.id,'line-width',beforeWidth);}});
+    const hasCasing=style.layers.some(other=>other.id!==layer.id&&(other.id===`${layer.id}_casing`||other.id===layer.id.replace(/_inner$/,'_casing')));
+    if(!path&&!casing&&!hasCasing){const id=`oh-curb-${layer.id}`;map.addLayer({...layer,id,paint:{...layer.paint,'line-color':'#EEE9DD','line-opacity':1,'line-width':['interpolate',['exponential',2],['zoom'],12,(width+2.2)*.0658,22,(width+2.2)*67.4]}},layer.id);undo.push(()=>{if(map.getLayer(id))map.removeLayer(id);});}
+
+  }
+
   const add = (layer: AddLayerObject, beforeId?: string) => {
     if (map.getLayer(layer.id)) return;
     map.addLayer(layer, beforeId && map.getLayer(beforeId) ? beforeId : undefined);
@@ -69,16 +82,17 @@ export function applyCityTheme(map: MapLibreMap): () => void {
   };
 
   if (source) {
+    add({id:'oh-3d-developed',type:'fill',source,'source-layer':'landuse',filter:['match',['get','class'],['industrial','commercial','retail','residential'],true,false],paint:{'fill-color':['match',['get','class'],'residential','#DEDCCD','#D8D9CE'],'fill-opacity':.7}},firstRoad);
     // Grass and sports fields: in the tiles, not drawn by Positron.
     add({
       id: GRASS_ID, type: 'fill', source, 'source-layer': 'landcover',
       filter: ['match', ['get', 'class'], ['grass', 'wetland', 'farmland'], true, false],
-      paint: { 'fill-color': '#B5DD98', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': ['match',['get','class'],'wetland','#B7CEC1','farmland','#D0D5AB','#CBD8B4'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',
       filter: ['match', ['get', 'class'], ['pitch', 'playground', 'stadium', 'track', 'park', 'cemetery'], true, false],
-      paint: { 'fill-color': '#9FD487', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': '#B6CCA3', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     // Real buildings at their mapped heights, walls tinted by height and lit from the south-west.
     add({
@@ -86,22 +100,12 @@ export function applyCityTheme(map: MapLibreMap): () => void {
       paint: {
         'fill-extrusion-color': [
           'interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 8],
-          0, '#E6E1F2', 10, '#DCD9EE', 25, '#D2DCF1', 60, '#C8D7F0',
+          0, '#E7DFC9', 10, '#DED7C7', 25, '#D4D5CC', 60, '#C9D4D1',
         ],
-        // Full mapped height from a distance; up close behind the avatar they drop to 25% (as in
-        // Pokémon GO), so the low camera sees the street instead of a wall of roof.
-        'fill-extrusion-height': [
-          'interpolate', ['linear'], ['zoom'],
-          18, ['coalesce', ['get', 'render_height'], 8],
-          19.6, ['*', 0.25, ['coalesce', ['get', 'render_height'], 8]],
-        ],
-        'fill-extrusion-base': [
-          'interpolate', ['linear'], ['zoom'],
-          18, ['coalesce', ['get', 'render_min_height'], 0],
-          19.6, ['*', 0.25, ['coalesce', ['get', 'render_min_height'], 0]],
-        ],
+        'fill-extrusion-height': ['max', 3.5, ['coalesce', ['get', 'render_height'], 8]],
+        'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
         'fill-extrusion-vertical-gradient': true,
-        'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 16.5, 0.95, 18.5, 0.95, 19.6, 0.82],
+        'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 14.5, 0, 15.5, 1],
       },
     }, firstSymbol);
   }

@@ -1145,6 +1145,16 @@ export class CoreStore {
     return this.backend.downloadCrewPhoto(id);
   }
 
+  /** Explicit uploader action only: updates the saved record, never uploads or publishes. */
+  async updateMemoryCaption(viewerId: ID, id: ID, caption: string): Promise<Memory> {
+    const v = await this.view();
+    const memory = v.db.memories.find(m => m.id === id);
+    if (!memory || memory.uploaderId !== viewerId || !v.crewMemberIds(memory.crewId).includes(viewerId)) throw notFound('memory_not_found');
+    await this.backend.update('memories', {id, uploaderId:viewerId}, {caption});
+    for (const member of v.crewMemberIds(memory.crewId)) if(member!==viewerId) await publish(`user:${member}`,{type:'memory',id});
+    return {...memory,caption};
+  }
+
   async daily(date: string = demoDate()): Promise<DailyQuest> {
     const v = await this.view();
     const d = v.db.dailyQuests.find((x) => x.date === date);

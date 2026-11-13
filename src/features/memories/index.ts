@@ -2,6 +2,9 @@
 // /api/muse/regroup route uses (no node-only imports, safe on both sides).
 export { MemoriesPage } from './MemoriesPage';
 export { YourPlans } from './YourPlans';
+export {ArrivalSelfie} from './ArrivalSelfie';
+export {MemoryCapture} from './MemoryCapture';
+export {SavedPhotoReview} from './SavedPhotoReview';
 export {
   commonInterests, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupValidationError, RegroupZ, regroupMessages, validateRegroup,
 } from './regroup';

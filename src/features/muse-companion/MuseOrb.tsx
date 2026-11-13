@@ -53,12 +53,14 @@ export function MuseStyles() {
 @keyframes muse-msg{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .muse-panel{transform-origin:100% 100%;animation:muse-unfold .38s cubic-bezier(.22,1,.36,1) .28s both}
 .muse-msg{animation:muse-msg .28s ease-out both}
+.muse-result-reveal{animation:muse-result .35s ease-out both}
+@keyframes muse-result{from{opacity:.55;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){
   .muse-orb *{animation:none!important;transition:none!important}
   .muse-orb[data-state=thinking] .muse-orb-ring{opacity:1}
   .muse-orb[data-state=thinking] .muse-orb-dot{opacity:0}
   .muse-panel{animation:muse-fade .15s linear both!important}
-  .muse-msg{animation:none}
+  .muse-msg,.muse-result-reveal{animation:none}
 }`}</style>
   );
 }

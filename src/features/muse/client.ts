@@ -5,9 +5,11 @@ import { createHash } from 'node:crypto';
 import OpenAI from 'openai';
 import type { z } from 'zod';
 
-export type MuseModelRole = 'fast' | 'smart';
+export type MuseModelRole = 'fast' | 'smart' | 'vision';
 export type MuseEffort = 'minimal' | 'low' | 'medium' | 'high';
-export type MuseMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+export type MuseMessage =
+  | { role: 'system' | 'assistant'; content: string }
+  | { role: 'user'; content: string | ({ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } })[] };
 
 /** One logged call. Matches the muse_runs row minus id; never holds keys or prompts. */
 export type MuseRunRecord = {
@@ -51,6 +53,10 @@ export type MuseJSONOptions<T> = {
    * min(timeoutMs, time left); no attempt starts with less than MIN_ATTEMPT_MS left.
    */
   deadline?: number;
+  /** Parent request cancellation. Never retries a cancelled call. */
+  signal?: AbortSignal;
+  /** Private image analysis: no disk cache or output/provider-error text in run logs. */
+  sensitive?: boolean;
 };
 
 /** Raw chat call, replaceable in tests. Returns the message text and usage. */
@@ -91,6 +97,7 @@ export function isMockMode(): boolean {
 }
 
 export function modelFor(role: MuseModelRole): string {
+  if (role === 'vision') return process.env.MUSE_MODEL_VISION || 'muse-spark-1.3';
   return role === 'fast'
     ? process.env.MUSE_MODEL_FAST || 'muse-ember-1.0'
     : process.env.MUSE_MODEL_SMART || 'muse-spark-1.3';
@@ -137,19 +144,27 @@ export function reportFallback(info: { route: string; step: string; error: strin
 }
 
 /** Runs one transport attempt with a hard timer, so a transport that ignores the timeout cannot hang the plan. */
-async function attemptWithTimeout<T>(ms: number, run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+async function attemptWithTimeout<T>(ms: number, run: (signal: AbortSignal) => Promise<T>, parent?: AbortSignal): Promise<T> {
   const ctrl = new AbortController();
+  parent?.throwIfAborted();
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
+  const abort = () => { ctrl.abort(); rejectAbort(new DOMException('Cancelled', 'AbortError')); };
+  parent?.addEventListener('abort', abort, { once: true });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => { ctrl.abort(); reject(new MuseTimeoutError(ms)); }, ms);
   });
   try {
-    return await Promise.race([run(ctrl.signal), timeout]);
+    return await Promise.race([run(ctrl.signal), timeout, aborted]);
   } catch (err) {
+    if (parent?.aborted) throw new DOMException('Cancelled', 'AbortError');
+    if (err instanceof OpenAI.APIConnectionTimeoutError) throw new MuseTimeoutError(ms);
     if (ctrl.signal.aborted) throw new MuseTimeoutError(ms);
     throw err;
   } finally {
     clearTimeout(timer);
+    parent?.removeEventListener('abort', abort);
   }
 }
 
@@ -268,6 +283,7 @@ export function extractJSON(content: string): unknown {
  * In mock mode returns opts.mock() without touching the network.
  */
 export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<T>> {
+  opts.signal?.throwIfAborted();
   const started = Date.now();
   const mock = isMockMode();
   const model = mock ? 'mock' : modelFor(opts.model);
@@ -286,7 +302,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
   if (mock) {
     const data = opts.schema.parse(opts.mock());
     const latencyMs = Date.now() - started;
-    emit({ ...base, latencyMs, output: data, ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
+    emit({ ...base, latencyMs, output: opts.sensitive ? null : data, ...usage, ok: true, error: null, cached: false, createdAt: new Date().toISOString() });
     return { data, model, latencyMs, usage, mock: true };
   }
 
@@ -294,7 +310,8 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
   let cached = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      let reply = attempt === 0 ? await cacheRead(inputHash) : null;
+      opts.signal?.throwIfAborted();
+      let reply = attempt === 0 && !opts.sensitive ? await cacheRead(inputHash) : null;
       cached = reply !== null;
       if (!reply) {
         const cap = opts.timeoutMs ?? MUSE_TIMEOUT_MS;
@@ -309,7 +326,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
           effort,
           timeoutMs,
           signal,
-        }));
+        }), opts.signal);
         if (!res.content) throw new MuseError('empty reply');
         reply = { content: res.content, usage: res.usage };
       }
@@ -317,11 +334,12 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
       usage.completionTokens = reply.usage.completionTokens;
       const parsed = opts.schema.safeParse(extractJSON(reply.content));
       if (!parsed.success) throw new MuseError(`invalid JSON for ${opts.schemaName}: ${parsed.error.issues[0]?.message ?? 'schema mismatch'}`);
-      if (!cached) await cacheWrite(inputHash, reply);
+      if (!cached && !opts.sensitive) await cacheWrite(inputHash, reply);
       const latencyMs = Date.now() - started;
-      emit({ ...base, latencyMs, output: parsed.data, ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
+      emit({ ...base, latencyMs, output: opts.sensitive ? null : parsed.data, ...usage, ok: true, error: null, cached, createdAt: new Date().toISOString() });
       return { data: parsed.data, model, latencyMs, usage, mock: false };
     } catch (err) {
+      if (opts.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
       lastError = err;
       const status = statusOf(err);
       const retryable = !(err instanceof MuseTimeoutError) && (
@@ -335,7 +353,7 @@ export async function museJSON<T>(opts: MuseJSONOptions<T>): Promise<MuseResult<
     }
   }
   const latencyMs = Date.now() - started;
-  const error = safeError(lastError);
+  const error = opts.sensitive ? 'Photo analysis request failed' : safeError(lastError);
   emit({ ...base, latencyMs, output: null, ...usage, ok: false, error, cached, createdAt: new Date().toISOString() });
   if (lastError instanceof MuseTimeoutError) throw lastError;
   throw new MuseError(error, statusOf(lastError));

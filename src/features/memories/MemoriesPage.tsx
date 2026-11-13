@@ -24,6 +24,7 @@ function MemoriesView({ handle }: { handle: string | null }) {
   const [crews, setCrews] = useState<CrewRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  useEffect(()=>{const saved=()=>setRefresh(n=>n+1);window.addEventListener('outhere:memory-saved',saved);return()=>window.removeEventListener('outhere:memory-saved',saved);},[]);
   useChannel([`user:${viewer.id}`], (_channel, payload) => {
     if (payload.type === 'memory' || payload.resync) setRefresh((value) => value + 1);
   });

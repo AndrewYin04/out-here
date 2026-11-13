@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import type { LatLng } from '@/shared';
 import { offsetMeters } from './math';
 import { hash01, inPolygon } from './trees';
+import {buildTreeBatch,type LocalTree} from './vegetation';
+import type {SceneryAssets} from './scenery-assets';
 
 type Ring = number[][];
 export type HqBuilding = {
@@ -132,7 +134,7 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
   if (geos.length === 0) return null;
   // Minimal merge for same-attribute geometries (position/normal/uv + index).
   const out = new THREE.BufferGeometry();
-  const names = ['position', 'normal', 'uv'].filter((n) => geos.every((g) => g.getAttribute(n)));
+  const names = ['position', 'normal', 'uv','worldBuildingId'].filter((n) => geos.every((g) => g.getAttribute(n)));
   const arrays: Record<string, number[]> = Object.fromEntries(names.map((n) => [n, []]));
   const index: number[] = [];
   let offset = 0;
@@ -145,7 +147,7 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
     offset += count;
     g.dispose();
   }
-  for (const n of names) out.setAttribute(n, new THREE.Float32BufferAttribute(arrays[n], n === 'uv' ? 2 : 3));
+  for (const n of names) out.setAttribute(n, new THREE.Float32BufferAttribute(arrays[n], n==='worldBuildingId'?1:n === 'uv' ? 2 : 3));
   out.setIndex(index);
   return out;
 }
@@ -163,7 +165,7 @@ export type HqModel = {
 };
 
 /** Builds the campus in the layer's local frame around `origin`. Client only (canvas textures). */
-export function buildHq(data: HqData, origin: LatLng): HqModel {
+export function buildHq(data: HqData, origin: LatLng, assets?:SceneryAssets): HqModel {
   const group = new THREE.Group();
   /** Walls, roofs, parapets: scaled in height by setFlatten. */
   const tall = new THREE.Group();
@@ -184,14 +186,17 @@ export function buildHq(data: HqData, origin: LatLng): HqModel {
   const tops: { rings: Ring[]; top: number }[] = [];
 
   const drawn = data.buildings.filter((b) => b.part || !b.hasParts);
-  for (const b of drawn) {
+  const fadeBounds:THREE.Box3[]=[],fadeRings:THREE.Vector2[][][]=[];
+  const tag=(g:THREE.BufferGeometry,id:number)=>{g.setAttribute('worldBuildingId',new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(Math.min(id,31)),1));return g;};
+  for (const [buildingIndex,b] of drawn.entries()) {
     const { base, top } = heightsOf(b);
     const local = b.rings.map((r) => toLocal(origin, r));
     const style: FacadeStyle = /MPK\s*2\d/i.test(b.name ?? '') ? 'gehry' : 'classic';
-    styled[style].walls.push(wallGeometry(local, base, top, FLOOR_M));
-    parapets.push(wallGeometry(local, top, top + PARAPET_M, PARAPET_M));
+    styled[style].walls.push(tag(wallGeometry(local, base, top, FLOOR_M),buildingIndex));
+    parapets.push(tag(wallGeometry(local, top, top + PARAPET_M, PARAPET_M),buildingIndex));
     const roof = flatGeometry(local, top + 0.02);
-    if (roof) roofs.push(roof);
+    if (roof) roofs.push(tag(roof,buildingIndex));
+    const bounds=new THREE.Box3();for(const ring of local)for(const p of ring){bounds.expandByPoint(new THREE.Vector3(p.x,base,-p.y));bounds.expandByPoint(new THREE.Vector3(p.x,top+PARAPET_M,-p.y));}fadeBounds.push(bounds);fadeRings.push(local.map(r=>r.map(p=>new THREE.Vector2(p.x,-p.y))));
     tops.push({ rings: b.rings, top });
     const name = shortName(b.name);
     if (name && !b.part) {
@@ -201,14 +206,15 @@ export function buildHq(data: HqData, origin: LatLng): HqModel {
     }
   }
 
+  group.userData.worldBuildingBounds=fadeBounds.slice(0,32);group.userData.worldBuildingRings=fadeRings.slice(0,32);
   for (const s of Object.values(styled)) {
     const g = merge(s.walls);
-    if (g) tall.add(new THREE.Mesh(keep(g), s.mat));
+    if(g){const mesh=new THREE.Mesh(keep(g),s.mat);mesh.userData.worldOccluder=true;tall.add(mesh);}
   }
   const roofG = merge(roofs);
-  if (roofG) tall.add(new THREE.Mesh(keep(roofG), keep(new THREE.MeshStandardMaterial({ color: '#C9CCD1', roughness: 0.9, side: THREE.DoubleSide }))));
+  if(roofG){const mesh=new THREE.Mesh(keep(roofG),keep(new THREE.MeshStandardMaterial({color:'#D6D4C7',roughness:.95,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
   const parG = merge(parapets);
-  if (parG) tall.add(new THREE.Mesh(keep(parG), keep(new THREE.MeshStandardMaterial({ color: '#ECEDEE', roughness: 0.8, side: THREE.DoubleSide }))));
+  if(parG){const mesh=new THREE.Mesh(keep(parG),keep(new THREE.MeshStandardMaterial({color:'#E5DFCC',roughness:.9,side:THREE.DoubleSide})));mesh.userData.worldOccluder=true;tall.add(mesh);}
 
   // Rooftop park(s): a planted surface on the roof they sit on.
   const roofTopAt = (p: LatLng) => tops.find((t) => inPolygon(p, t.rings))?.top ?? null;
@@ -229,45 +235,14 @@ export function buildHq(data: HqData, origin: LatLng): HqModel {
 
   // The campus's mapped trees, on the rooftop park where they stand on it.
   if (data.trees.length) {
-    const trunkGeo = keep(new THREE.CylinderGeometry(0.18, 0.26, 1, 6));
-    const canopyGeo = keep(new THREE.IcosahedronGeometry(1, 0));
-    const trunkMat = keep(new THREE.MeshStandardMaterial({ color: '#86664B', roughness: 0.9 }));
-    const canopyMat = keep(new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.85, flatShading: true }));
-    const greens = ['#5DAE4B', '#6FBF55', '#4E9E45', '#82C35E'].map((c) => new THREE.Color(c));
-    const ground: { o: { east: number; north: number }; y: number; i: number }[] = [];
-    const roof: typeof ground = [];
-    data.trees.forEach(([lng, lat], i) => {
-      const p = { lat, lng };
-      const top = parkTops.find((r) => inPolygon(p, r.rings));
-      (top ? roof : ground).push({ o: offsetMeters(origin, p), y: top ? top.y : 0, i });
-    });
-    const plant = (list: typeof ground, small: boolean, into: THREE.Group) => {
-      if (list.length === 0) return;
-      const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-      const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, list.length);
-      const m = new THREE.Matrix4();
-      const q = new THREE.Quaternion();
-      list.forEach(({ o, y, i }, k) => {
-        const h = (small ? 5 : 7) + hash01(i, 11, 3) * 5;
-        q.identity();
-        m.compose(new THREE.Vector3(o.east, y + h * 0.22, -o.north), q, new THREE.Vector3(h * 0.9, h * 0.44, h * 0.9));
-        trunks.setMatrixAt(k, m);
-        q.setFromEuler(new THREE.Euler(0, hash01(i, 5, 9) * Math.PI * 2, 0));
-        m.compose(new THREE.Vector3(o.east, y + h * 0.62, -o.north), q, new THREE.Vector3(h * 0.34, h * 0.42, h * 0.34));
-        canopies.setMatrixAt(k, m);
-        canopies.setColorAt(k, greens[Math.floor(hash01(i, 2, 1) * greens.length) % greens.length]);
-      });
-      trunks.instanceMatrix.needsUpdate = true;
-      canopies.instanceMatrix.needsUpdate = true;
-      if (canopies.instanceColor) canopies.instanceColor.needsUpdate = true;
-      into.add(trunks, canopies);
-      disposables.push(trunks, canopies);
-    };
+    const ground:LocalTree[]=[],roof:LocalTree[]=[];
+    data.trees.forEach(([lng,lat],i)=>{const p={lat,lng},top=parkTops.find(r=>inPolygon(p,r.rings)),o=offsetMeters(origin,p),tone=hash01(i,2,1);(top?roof:ground).push({x:o.east,y:top?top.y:0,z:-o.north,height:(top?3.7:6)+hash01(i,11,3)*(top?1.8:3),tone,kind:Math.min(3,Math.floor(tone*4)) as 0|1|2|3});});
+    const plant=(list:LocalTree[],_small:boolean,into:THREE.Group)=>{if(!list.length)return;const batch=buildTreeBatch(list,assets?.evergreen);into.add(batch.object);disposables.push(batch);};
     plant(ground, false, group);
     plant(roof, true, onRoof);
   }
 
-  group.traverse((o) => { o.frustumCulled = false; });
+  group.traverse(o=>{if(o instanceof THREE.InstancedMesh)o.computeBoundingSphere();});
   return {
     group,
     setFlatten: (f: number) => {

@@ -4,3 +4,9 @@ export { MuseChat } from './MuseChat';
 export { MuseOrb } from './MuseOrb';
 export { openChat, closeChat, sendMessage, selectPlan, museDispatch, useMuseSnapshot, useChatMessages } from './controller';
 export { petPose, type MuseEvent, type MuseSnapshot, type MuseState, type ExternalState } from './state';
+
+export { sendAgentMessage, finishAgentEncounter, useAgentEncounter } from './controller';
+export type { AgentEncounter, AgentTransport, AgentRecipient, AgentEvent } from './encounter';
+export {beginPhotoAnalysis,endPhotoAnalysis} from './controller';
+export {attachMuseWorld,minimizeChat,setMuseViewport,useMuseViewport,setPhotoAnalysisTarget,photoTargetForRender} from './controller';
+export type {MuseViewport} from './controller';

@@ -20,6 +20,7 @@ type Pick = { candidate: string; friends: string[]; reason: string; bridge: stri
 function rankWith(build: (cands: Cand[]) => Pick[]): MuseTransport {
   return async (req) => {
     if (req.schemaName === 'intent') return { content: INTENT_40, usage };
+    if (typeof req.messages[1].content !== 'string') throw new Error('Expected text ranking input');
     const user = JSON.parse(req.messages[1].content) as { candidates: Cand[] };
     return { content: JSON.stringify({ summary: 'Dumplings fit.', picks: build(user.candidates) }), usage };
   };
