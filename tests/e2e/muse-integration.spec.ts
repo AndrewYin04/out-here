@@ -13,8 +13,9 @@ for(const reduced of [false,true])test(`arrival photo to saved memory and map${r
   expect(made.ok()).toBeTruthy();const{quest}=await made.json();
   expect((await request.post(`/api/quests/${quest.id}/join`,{headers:{'x-persona':'maya'},data:{}})).ok()).toBeTruthy();
   await page.goto(`/out-here?as=alex&view=3d&quest=${quest.id}`);
-  await expect(page.getByTestId('walk-there')).toBeVisible({timeout:30000});await page.getByTestId('walk-there').click();
-  const dialog=page.getByRole('dialog',{name:'At Test comics courtyard'});await expect(dialog).toBeVisible({timeout:30000});
+  // Phones: the open plan card covers the 3D Walk there button; its Let's go starts the same walk.
+  const go=page.getByTestId(info.project.name==='phone'?'quest-lets-go':'walk-there');await expect(go).toBeVisible({timeout:30000});await go.click();
+  const dialog=page.getByRole('dialog',{name:'You made it'});await expect(dialog).toBeVisible({timeout:30000});
   await dialog.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');
   await dialog.getByLabel('Caption (optional)').fill('Our comics meetup');
   const upload=page.waitForResponse(r=>r.url().endsWith('/api/memories')&&r.request().method()==='POST');

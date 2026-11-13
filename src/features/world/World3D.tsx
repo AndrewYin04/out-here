@@ -1130,7 +1130,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         <ArrivalSelfie key={viewer.id} quest={selfieQuest} onClose={closeSelfie} />
         {canWalk && selected && !walk && (
-          <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
+          // Phones: an open plan card covers this spot, and its own Let's go does the same.
+          <button type="button" data-testid="walk-there" onClick={startWalk} className={cn('pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover', selectedId && 'max-md:hidden')}>
             <Footprints size={18} aria-hidden />Walk there · {selectedMin} min
           </button>
         )}

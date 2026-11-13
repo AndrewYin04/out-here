@@ -134,10 +134,13 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
     const el = rootRef.current;
     if (!el) return;
     const report = () => {
+      // A band across the bottom of the map: on desktop the panel is a centred card, but the
+      // camera should keep Jolly above it, not beside it (museCameraArea reads wide = bottom).
       const r = el.getBoundingClientRect();
+      const map = el.parentElement?.getBoundingClientRect();
       setMuseViewport({
         level: level === 0 ? 'collapsed' : level === 1 ? 'partial' : 'expanded',
-        occlusion: { left: r.left, top: r.top, width: r.width, height: r.height },
+        occlusion: { left: map?.left ?? 0, top: r.top, width: map?.width ?? window.innerWidth, height: r.height },
       });
     };
     report();
