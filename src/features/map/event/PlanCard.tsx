@@ -129,7 +129,7 @@ export function PlanCard({
       <div ref={pager} className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* ---------- Plan ---------- */}
         <section aria-label="Plan" className="w-full shrink-0 snap-start overflow-y-auto px-4 pb-4">
-          <div className={cn('relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#DDEDFE] via-[#F2F4F7] to-[#FDE7EF]', sheet ? 'aspect-[16/9]' : 'aspect-[16/9] md:aspect-[2/1]')}>
+          <div className={cn('relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#DDEDFE] via-[#F2F4F7] to-[#FDE7EF]', sheet ? 'h-[clamp(150px,48vw,220px)]' : 'aspect-[16/9] md:aspect-[2/1]')}>
             {photo ? (
               // eslint-disable-next-line @next/next/no-img-element -- seed photo or user upload
               <img src={photo} alt="" className="absolute inset-0 size-full object-cover" />
