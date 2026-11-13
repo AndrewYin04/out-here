@@ -105,6 +105,9 @@ export interface DataStore {
   friendPins: CoreStore['friendPins'];
   myLocation: CoreStore['myLocation'];
   updateMyLocation: CoreStore['updateMyLocation'];
+  // walking there together (#46)
+  walkers: CoreStore['walkers'];
+  postWalkStep: CoreStore['postWalkStep'];
   hangInvite: CoreStore['hangInvite'];
   hangSuggestion: CoreStore['hangSuggestion'];
 }
