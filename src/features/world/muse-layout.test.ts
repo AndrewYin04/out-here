@@ -1,4 +1,4 @@
-import{expect,it}from'vitest';import{museCameraArea,museStage,museChatZoom}from'./muse-layout';
+import{expect,it}from'vitest';import{museCameraArea,museStage,museChatZoom,museConversationArea}from'./muse-layout';
 const bounds={left:0,top:56,width:390,height:788};
 it('keeps Muse above a partial dashboard and avoids fully occluded camera churn',()=>{
   const area=museCameraArea(bounds,[{left:0,top:500,width:390,height:344}])!;expect(area.y+56).toBeLessThan(500);
@@ -27,4 +27,12 @@ it('backs the camera away when a keyboard leaves a short visible scene',()=>{
   const desktop=museChatZoom({width:1000,height:600},false);
   const phone=museChatZoom({width:366,height:150},true);
   expect(phone).toBeLessThan(desktop);expect(phone).toBeGreaterThan(22);
+});
+
+it('reserves a stable conversation frame independent of reply and dashboard height',()=>{
+  const phone=museConversationArea(bounds);
+  expect(phone.x).toBe(195);expect(phone.y+phone.height/2).toBeLessThan(500);
+  const desktop=museConversationArea({...bounds,width:1440});expect(desktop.x).toBeLessThan(600);
+  const keyboard=museConversationArea(bounds,{left:0,top:0,width:390,height:500});
+  expect(keyboard.height).toBeLessThan(phone.height);expect(keyboard.y).toBeLessThan(phone.y);
 });

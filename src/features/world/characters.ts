@@ -20,6 +20,8 @@ export interface Character {
   readonly root: THREE.Object3D;
   /** Model-space height in meters, where a label sits above. */
   readonly height: number;
+  /** Rest-pose body centre: camera framing must not follow animation. */
+  readonly cameraHeight?: number;
   setState(state: string): void;
   update(dt: number, t: number): void;
   /** Current animated plush-body centre for effects, excluding bubble and headphone bounds. */
@@ -320,6 +322,8 @@ const LIMBS:readonly Role[]=['armL','armR','legL','legR'];
 class GltfCharacter implements Character {
   readonly root = new THREE.Group();
   readonly height: number;
+  readonly cameraHeight: number;
+  private ownedGeometry: THREE.BufferGeometry[] = [];
   private hop = new THREE.Group();
   private effectBody: THREE.Mesh | null = null;
   private mixer: THREE.AnimationMixer;
@@ -379,6 +383,10 @@ class GltfCharacter implements Character {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.frustumCulled = false;
+      if (kind === 'pet' && mesh.name === 'Muse_FurFibers') {
+        const sparse = sparseFurGeometry(mesh.geometry);
+        if (sparse) { mesh.geometry = sparse; this.ownedGeometry.push(sparse); }
+      }
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const next = mats.map((m) => {
         // Jolly's fur is a warm cream in the model, but the scene's cool daylight and tone mapping turn
@@ -431,6 +439,9 @@ class GltfCharacter implements Character {
     const box = new THREE.Box3(), part = new THREE.Box3();
     model.traverseVisible((o)=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;mesh.geometry.computeBoundingBox();if(mesh.geometry.boundingBox)box.union(part.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld));});
     this.height = Math.max(0.3, Number.isFinite(box.max.y)?box.max.y:0.3);
+    this.cameraHeight = this.effectBody?.geometry.boundingBox
+      ? this.effectBody.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(this.effectBody.matrixWorld).y
+      : this.height / 2;
     this.mixer = new THREE.AnimationMixer(model);
     for (const clip of spec.gltf.animations) {
       const adapted = adaptClip(clip, keepNames, spec.node, spec.relativeRoot, hide);
@@ -640,7 +651,7 @@ vec3 jollyLimbs(vec3 p) {
     } else out.set(0, this.height / 2, 0).applyMatrix4(this.root.matrixWorld);
   }
 
-  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); this.glow?.dispose(); }
+  dispose() { this.mixer.stopAllAction(); this.mixer.uncacheRoot(this.mixer.getRoot()); this.owned.forEach((m) => m.dispose()); this.ownedGeometry.forEach((g) => g.dispose()); this.glow?.dispose(); }
 }
 
 // ---- Loading ----
@@ -710,4 +721,33 @@ export function makeAvatar(models: ModelSet | null, seed: string): Character {
 
 export function makePet(models: ModelSet | null, seed: string): Character {
   return models?.pet ? new GltfCharacter(models.pet, 'pet', seed) : new PlaceholderPet();
+}
+
+/** Keep complete authored hairs, never disconnected triangles. Own all output buffers. */
+export function sparseFurGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry | null {
+  const index = source.index, vertices = source.getAttribute('position')?.count;
+  const strandVertices = 24, strandIndices = 108, stride = 4;
+  if (!index || !vertices || vertices % strandVertices || index.count !== vertices / strandVertices * strandIndices) return null;
+  for (let i = 0; i < index.count; i++) {
+    const start = Math.floor(i / strandIndices) * strandVertices;
+    if (index.getX(i) < start || index.getX(i) >= start + strandVertices) return null;
+  }
+  if (Object.values(source.attributes).some(a => a instanceof THREE.InterleavedBufferAttribute)) return null;
+  const strands = Math.ceil(vertices / strandVertices / stride), geometry = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(source.attributes)) {
+    const input = attribute as THREE.BufferAttribute;
+    const data = new (input.array.constructor as new(length: number) => typeof input.array)(strands * strandVertices * input.itemSize);
+    for (let hair = 0; hair < strands; hair++) {
+      const start = hair * stride * strandVertices * input.itemSize;
+      data.set(input.array.subarray(start, start + strandVertices * input.itemSize), hair * strandVertices * input.itemSize);
+    }
+    geometry.setAttribute(name, new THREE.BufferAttribute(data, input.itemSize, input.normalized));
+  }
+  const indices = new Uint32Array(strands * strandIndices);
+  for (let hair = 0; hair < strands; hair++) for (let j = 0; j < strandIndices; j++) {
+    indices[hair * strandIndices + j] = index.getX(hair * stride * strandIndices + j) - hair * stride * strandVertices + hair * strandVertices;
+  }
+  geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+  geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+  return geometry;
 }

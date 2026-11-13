@@ -11,5 +11,5 @@
   },
   "timeScale": { "avatar": { "walk": 0.6 } },
   "petRelativeMotion": true,
-  "hide": ["Muse_SpeechBubble"]
+  "hide": ["Muse_SpeechBubble", "Muse_ThinkingDots"]
 }
