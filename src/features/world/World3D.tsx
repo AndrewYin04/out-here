@@ -78,6 +78,32 @@ const CATEGORY_COLOR: Record<Quest['category'], string> = {
 
 const firstName = (name: string) => name.split(' ')[0] ?? name;
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** The walk's route: a glowing Facebook-blue line on the street from you to the plan (under the buildings). */
+const ROUTE_SRC = 'oh-walk-route';
+function setRoute(map: MapLibreMap, from: LatLng | null, to: LatLng | null) {
+  const data = {
+    type: 'FeatureCollection' as const,
+    features: from && to ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: [[from.lng, from.lat], [to.lng, to.lat]] } }] : [],
+  };
+  try {
+    const src = map.getSource(ROUTE_SRC) as { setData?: (d: unknown) => void } | undefined;
+    if (src?.setData) { src.setData(data); return; }
+    if (!from || !to) return;
+    map.addSource(ROUTE_SRC, { type: 'geojson', data });
+    const before = map.getLayer(BUILDINGS_ID) ? BUILDINGS_ID : undefined;
+    map.addLayer({ id: `${ROUTE_SRC}-glow`, type: 'line', source: ROUTE_SRC, layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#5AA9FF', 'line-opacity': 0.35, 'line-blur': 6, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 15, 6, 22, 220] } }, before);
+    map.addLayer({ id: `${ROUTE_SRC}-line`, type: 'line', source: ROUTE_SRC, layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#0866FF', 'line-opacity': 0.9, 'line-dasharray': [1.2, 1.4], 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 15, 2.5, 22, 70] } }, before);
+  } catch { /* style reloading: the next tick tries again */ }
+}
+function clearRoute(map: MapLibreMap) {
+  try {
+    for (const id of [`${ROUTE_SRC}-line`, `${ROUTE_SRC}-glow`]) if (map.getLayer(id)) map.removeLayer(id);
+    if (map.getSource(ROUTE_SRC)) map.removeSource(ROUTE_SRC);
+  } catch { /* map gone */ }
+}
 const typing = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
@@ -116,6 +142,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const start = home ?? DEMO_CENTER;
   const pos = useRef<LatLng>(start);
   const heading = useRef(0);
+  /** Arrival cinematic: a slow orbit around you and the plan, pulled back, then home behind you. */
+  const orbit = useRef<{ start: number; from: number } | null>(null);
   const camBearing = useRef(map.getBearing());
   const moved = useRef(false);
   /** Inside a building or water? From the tiles around the avatar, refreshed with the trees. */
@@ -332,6 +360,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       if (layer && map.getLayer(layer.id)) map.removeLayer(layer.id);
       undoTheme?.();
       layerRef.current = null;
+      clearRoute(map);
       map.getContainer().removeAttribute('data-view3d');
       map.setTransformCameraUpdate(null);
       map.dragRotate.disable();
@@ -643,6 +672,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             moving = false;
             arrived.current.add(w.questId);
             layer.setState('me', 'wave');
+            if (!reducedMotion()) orbit.current = { start: now, from: camBearing.current };
             setArrival({ id: w.questId, text: `You’re at ${w.title}` });
             if (w.questId !== requestedWalk.current?.id) onSelect(w.questId);
 
@@ -781,6 +811,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           } else if (d > ARRIVE_METERS * 3) arrived.current.delete(q.id);
         }
         const w = walkRef.current;
+        setRoute(map, w ? pos.current : null, w ? w.to : null);
         const m = w ? minutesLeft(pos.current, w.to) : null;
         if (m !== lastMin) { if (m != null && lastMin != null && m < lastMin) sfx('progress_tick'); lastMin = m; setWalkMin(m); }
       }
@@ -836,7 +867,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           z = reducedMotion() ? ENTER_ZOOM : zoom + (ENTER_ZOOM - zoom) * (1 - Math.exp(-dt * 2.2));
           if (Math.abs(ENTER_ZOOM - z) < 0.02) { z = ENTER_ZOOM; entering.current = false; }
         }
-        camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
+        const o = orbit.current;
+        if (o && !entering.current) {
+          // 3.2 s: swing 150° around you while the camera rises a little, then glide back behind you.
+          const t = Math.min(1, (now - o.start) / 3200);
+          const ease = t * t * (3 - 2 * t);
+          camBearing.current = normalizeDeg(o.from + 150 * ease);
+          z = ENTER_ZOOM - 0.9 * Math.sin(Math.PI * Math.min(1, t * 1.15));
+          if (t >= 1) orbit.current = null; // then the normal follow glides back behind you
+        } else {
+          camBearing.current = lerpDeg(camBearing.current, heading.current, 1 - Math.exp(-dt * 2.5));
+        }
         const h = map.getContainer().clientHeight;
         map.easeTo({ center: [pos.current.lng, pos.current.lat], zoom: z, bearing: camBearing.current, offset: [0, Math.round(h * 0.2)], duration: 0 });
       } else if (!busy) {
