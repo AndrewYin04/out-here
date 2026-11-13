@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Entry points into Out Here: the Feed's "I'm free" opens the composer on /out-here, the old
-// /out-here/friends path redirects to Friends mode, the friend card offers View profile and
-// Want to hang? (Message stays hidden until Messenger opens threads from ?to=), and status bubbles
+// /out-here/friends path redirects to Friends mode, the friend card offers View profile,
+// Message (/messages?to=<handle>) and Want to hang?, and status bubbles
 // show the full thought on desktop and a short form (never emoji alone) on phones, where a
 // colliding chip moves below its avatar or shortens instead of hiding. Runs at 390 (phone project) and 1440 (desktop project).
 
@@ -45,14 +45,14 @@ for (const width of [390, 1440]) {
       await page.screenshot({ path: `test-results/entry-imfree-${width}.png` });
     });
 
-    test('the friend card offers View profile and Want to hang?, and no dead Message link', async ({ page }) => {
+    test('the friend card offers View profile, Message and Want to hang?', async ({ page }) => {
       await openFriendsMap(page, width);
       await page.locator('[data-testid="friend-pin"][data-handle="maya"]').click();
       const card = page.getByTestId('friend-card');
       await expect(card).toBeVisible();
       await expect(card.getByRole('button', { name: 'Want to hang?' })).toBeVisible();
       await expect(card.getByRole('link', { name: 'View profile' })).toHaveAttribute('href', '/profile/maya');
-      await expect(card.getByRole('link', { name: 'Message' })).toHaveCount(0);
+      await expect(card.getByRole('link', { name: 'Message' })).toHaveAttribute('href', '/messages?to=maya');
       await page.screenshot({ path: `test-results/entry-card-${width}.png` });
       await card.getByRole('link', { name: 'View profile' }).click();
       await expect(page).toHaveURL(/\/profile\/maya/);

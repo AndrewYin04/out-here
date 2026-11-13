@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { declineTracked, trackInvites } from './invites';
 
 // Find My inside Facebook: friend pins with status bubbles, the friend card, the People list,
 // sharing settings, and live updates between two personas. Runs at 390 (phone project) and
@@ -16,7 +17,7 @@ async function pinsFor(request: APIRequestContext, handle: string): Promise<Pin[
 
 async function openMap(page: Page, handle: string, width: number, path = '/out-here/friends') {
   await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
-  await page.goto(`${path}?as=${handle}`);
+  await page.goto(`${path}${path.includes('?') ? '&' : '?'}as=${handle}`);
   // /out-here/friends redirects to /out-here?mode=friends, which opens the map in Friends mode.
   await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
   await expect(page.locator('[data-testid="friend-pin"]').first()).toBeVisible({ timeout: 15_000 });
@@ -52,6 +53,10 @@ for (const width of [390, 1440]) {
     test.beforeEach(({}, info) => {
       test.skip((width === 390) !== (info.project.name === 'phone'), 'one width per project');
     });
+    // Want to hang? sends real invites; decline them so their toast cards do not cover later specs.
+    let sent: ReturnType<typeof trackInvites> = [];
+    test.beforeEach(({ page }) => { sent = trackInvites(page); });
+    test.afterEach(async ({ request }) => { await declineTracked(request, sent); });
 
     test('friend pins, card, Want to hang?, and the People list', async ({ page }) => {
       await openMap(page, 'alex', width);
@@ -67,8 +72,8 @@ for (const width of [390, 1440]) {
       await expect(card).toContainText('Boulder Bay Gym');
       await expect(card).toContainText('min walk');
       await expect(card).toContainText('find a climbing buddy');
-      // Messenger cannot open a thread from ?to= yet, so the card hides Message
-      await expect(card.getByRole('link', { name: 'Message' })).toHaveCount(0);
+      // Message opens or starts the Messenger thread with Kai
+      await expect(card.getByRole('link', { name: 'Message' })).toHaveAttribute('href', '/messages?to=kai');
       await page.screenshot({ path: `test-results/findmy-card-${width}.png` });
       await card.getByRole('button', { name: 'Want to hang?' }).click();
       await expect(page.getByTestId('hang-suggestion')).toBeVisible();
@@ -89,8 +94,9 @@ for (const width of [390, 1440]) {
       await expect(page.getByTestId('friend-card')).toContainText('km away');
     });
 
-    test('the Out Here tab opens the Friends map, and chips never overlap', async ({ page }) => {
-      await openMap(page, 'alex', width, '/out-here');
+    test('the Out Here tab in Friends mode shows the Friends map, and chips never overlap', async ({ page }) => {
+      // /out-here opens in Explore; ?mode=friends opens the Friends view
+      await openMap(page, 'alex', width, '/out-here?mode=friends');
       await page.waitForTimeout(1500);
       const boxes = await page.locator('[data-testid="friend-chip"]').evaluateAll((els) =>
         els.map((e) => (e.parentElement as HTMLElement).getBoundingClientRect()).map((r) => ({ x0: r.left, y0: r.top, x1: r.right, y1: r.bottom })));

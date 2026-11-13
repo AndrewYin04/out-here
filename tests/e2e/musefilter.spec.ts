@@ -60,7 +60,8 @@ test.describe('Muse filter', () => {
     await page.getByTestId('muse-filter-show-all').click();
     await expect(page.getByTestId('muse-filter-status')).toHaveCount(0);
     await expect(page.getByTestId('muse-filter-toggle')).toHaveAttribute('aria-pressed', 'false');
-    await expect.poll(() => questPins(page).count()).toBe(all);
+    // at least every pin from before: the other project's specs may add a plan meanwhile
+    await expect.poll(() => questPins(page).count()).toBeGreaterThanOrEqual(all);
     expect(errors).toEqual([]);
   });
 
