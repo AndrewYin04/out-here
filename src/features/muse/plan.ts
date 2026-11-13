@@ -19,6 +19,11 @@ export type PlanInput = {
   provider?: PlanContextProvider;
   /** Use this context directly (tests). */
   context?: PlanContext;
+  /**
+   * Text the Muse cache key uses instead of text, for callers whose text carries a live number
+   * (plan together sends "..., 43 min" and keys on the rounded minutes).
+   */
+  keyText?: string;
 };
 
 export type PlanTimings = { contextMs: number; parseMs: number; candidatesMs: number; rankMs: number; validateMs: number; totalMs: number };
@@ -52,6 +57,8 @@ export type PlanMeta = {
   dropped: DroppedQuest[];
   issues: ValidationIssue[];
   timings: PlanTimings;
+  /** Which model steps were served from muse_cache (real Muse answers stored earlier). */
+  cache: { parse: boolean; rank: boolean };
 };
 
 export type PlanOutput = { plan: MusePlan; meta: PlanMeta };
@@ -89,6 +96,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
 
   const parsed = await parseIntent(input.text, now, ctx.viewer, {
     deadline: Math.min(deadline, Date.now() + PARSE_BUDGET_MS),
+    keyText: input.keyText,
   });
   const parseFellBack = !mock && parsed.model === 'heuristic';
   const t2 = Date.now();
@@ -110,6 +118,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     friendsFree: [],
     dropped: [],
     issues: [],
+    cache: { parse: parsed.cached, rank: false },
     ...rest,
     timings: {
       contextMs: t1 - t0, parseMs: t2 - t1, candidatesMs: 0, rankMs: 0, validateMs: 0,
@@ -143,6 +152,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
     viewer: ctx.viewer, now, text: input.text,
     deadline: Math.min(deadline, Date.now() + RANK_BUDGET_MS),
     // parse already failed, so Muse is likely down or slow: do not wait on it a second time
+    keyText: input.keyText,
     skipModel: parseFellBack ? `skipped: parse fell back (${parsed.error ?? 'unknown'})` : undefined,
   });
   const t4 = Date.now();
@@ -173,6 +183,7 @@ export async function plan(input: PlanInput): Promise<PlanOutput> {
         friendsFree,
         dropped: result.dropped,
         issues: checked.issues,
+        cache: { parse: parsed.cached, rank: ranked.cached === true },
       },
       { candidatesMs: t3 - t2, rankMs: t4 - t3, validateMs: t5 - t4, totalMs: t5 - t0 },
     ),
