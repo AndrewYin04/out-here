@@ -4,6 +4,9 @@
 // (PlanSheet already renders one). Server code imports './server/plan-context' directly.
 export { ImFreeButton, PlanSheet, COMPOSER_PLACEHOLDER } from './PlanSheet';
 export { InviteInbox } from './InviteInbox';
+export { BothFreeNudge, StatusRow, useMyAvailability, useMyStatus } from './FreeStatus';
+export { TogetherSheet } from './TogetherSheet';
+export { openTogether, useTogetherId } from './plan-state';
 export { SuggestionCard, MuseLabel, SeatsBadge } from './SuggestionCard';
 export { setPlanOpen, usePlanOpen, setPlanSuggestions, usePlanSuggestions, usePlanAsk, setPlanStatus, usePlanStatus, type PlanPicks, type PlanStatus } from './plan-state';
 export { useMuseFilter, MUSE_FILTER_KEY, type MuseFilter, type MuseFilterMode } from './filter-state';

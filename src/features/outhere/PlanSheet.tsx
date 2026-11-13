@@ -10,27 +10,60 @@ import { museSteps } from './muse-steps';
 import { MuseStepsDone, MuseStepsLoading } from './MuseSteps';
 
 import { errorText, requestPlan, shareAvailability, type PlanResult } from './plan-api';
-import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen } from './plan-state';
+import { setPlanAsk, setPlanOpen, setPlanStatus, setPlanSuggestions, usePlanOpen, usePlanPrefill, useTogetherId } from './plan-state';
+import { StatusDot, StatusRow, useMyStatus } from './FreeStatus';
+import { freeStatusLabel } from '@/shared';
 import { MuseLabel, OfflineLabel, SuggestionCard } from './SuggestionCard';
 
 export const COMPOSER_PLACEHOLDER = 'hungry, got like 40 min, under $15';
 const CHIPS = ['15 min', '40 min', 'tonight', 'cheap eats', 'meet people'] as const;
 
-/** Floating "I'm free" pill. Opens the plan sheet. */
+/**
+ * The one "I'm free" button. It also shows your status ("Free till 3:49"), so status and Muse
+ * live in one place: tapping it opens the composer, where you can ask Muse or just set free/busy.
+ */
 export function ImFreeButton({ className }: { className?: string }) {
   const open = usePlanOpen();
-  if (open) return null;
+  const together = useTogetherId();
+  const { status } = useMyStatus();
+  if (open || together) return null;
+  const label = status.kind === 'busy' ? null : freeStatusLabel(status);
   return (
     <button
       type="button"
       onClick={() => setPlanOpen(true)}
+      aria-label={label ? `I'm free · ${label}` : "I'm free"}
+      data-status={status.kind}
+      data-testid="im-free"
       className={cn(
-        'inline-flex h-12 items-center gap-2 rounded-full bg-fb-blue px-5 text-[17px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover active:brightness-95',
+        'inline-flex h-12 items-center gap-2 rounded-full bg-fb-blue px-5 text-[17px] font-semibold text-white shadow-popover transition-colors hover:bg-fb-blue-hover active:brightness-95',
         className,
       )}
     >
-      <span aria-hidden>✨</span> I&apos;m free
+      {label ? (
+        <><StatusDot s={status} className="size-3 ring-2 ring-white" />{label}</>
+      ) : (
+        <><span aria-hidden>✨</span> I&apos;m free</>
+      )}
     </button>
+  );
+}
+
+/**
+ * "Checked with 6 friends · Maya's likely down". Names only friends who came back likely down;
+ * everyone else stays unnamed, so nobody's no is shown.
+ */
+function PrecheckLine({ plan, friends }: { plan: PlanResult['plan']; friends: Map<string, PersonCard> }) {
+  const checked = plan.meta?.friendsChecked ?? 0;
+  if (checked === 0) return null;
+  const down = [...new Set(plan.suggestions.flatMap((s) => (s.precheck ?? []).map((c) => c.friendId)))]
+    .flatMap((id) => { const p = friends.get(id); return p ? [p.name.split(' ')[0]] : []; });
+  const who = down.length === 0 ? 'no one free for this yet'
+    : down.length === 1 ? `${down[0]}'s likely down` : `${down.slice(0, -1).join(', ')} and ${down.at(-1)} are likely down`;
+  return (
+    <p data-testid="precheck-line" className="mb-3 px-1 text-[13px] text-fb-text-2">
+      ✨ Asked your friends’ Muse · <span className="font-semibold text-fb-text">{who}</span>
+    </p>
   );
 }
 
@@ -67,6 +100,16 @@ export function PlanSheet({ className }: { className?: string }) {
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+  // "Make a plan" from the both-free nudge starts the composer with that friend's name.
+  const prefill = usePlanPrefill();
+  useEffect(() => {
+    if (!prefill) return;
+    setText(prefill.text);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    });
+  }, [prefill]);
   useEffect(() => {
     inFlight.current?.abort();
     setResult(null); setPlanSuggestions(null); setPlanAsk(null); setPlanStatus(null);
@@ -146,6 +189,7 @@ export function PlanSheet({ className }: { className?: string }) {
             </IconButton>
           </header>
 
+          <StatusRow />
           <form onSubmit={(e) => void submit(e)} className="shrink-0 px-4">
             <div className="flex items-end gap-2 rounded-[20px] bg-fb-secondary-btn px-3 py-2">
               <label htmlFor="imfree-text" className="sr-only">What are you up for?</label>
@@ -213,6 +257,7 @@ export function PlanSheet({ className }: { className?: string }) {
                     <p className="text-[15px] leading-5 text-fb-text">{summary}</p>
                   </div>
                 )}
+                <PrecheckLine plan={result.plan} friends={friendMap} />
                 {result.plan.suggestions.length === 0 ? (
                   <div data-testid="plan-empty" className="rounded-card bg-fb-surface p-4 text-center shadow-card">
                     <p className="text-[17px] font-semibold text-fb-text">No plan fits {windowLabel(asked)} right now</p>
