@@ -342,13 +342,38 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     if (n === 0) return;
     if (origin) b.extend([origin.lng, origin.lat]);
     for (const p of fitTo ?? []) b.extend([p.lng, p.lat]);
+    if (isDesktop()) {
+      map.fitBounds(b, { padding: { top: 90, bottom: 70, left: 460, right: 90 }, maxZoom: 16, duration: 600 });
+      schedule();
+      return;
+    }
+    // Phones: the results sheet covers 68% of the map (PlanSheet). A fitBounds with ~570 px of
+    // bottom padding on a ~730 px map left the strip above the sheet without tiles, so the
+    // camera is computed with even padding, zoomed out until the picks fit the strip, and
+    // its center shifted up by offset (no padding is kept on the map).
+    const w = map.getContainer().clientWidth;
     const h = map.getContainer().clientHeight;
-    const padding = isDesktop()
-      ? { top: 90, bottom: 70, left: 460, right: 90 }
-      // With results the phone sheet covers 68% of the map (PlanSheet); fit the
-      // picks, their pills and labels in the space above it, 24 px clear of the sheet edge.
-      : { top: 72, bottom: Math.max(0, Math.min(Math.round(h * PHONE_RESULTS_SHEET) + 24 + BOX_BOTTOM + LABEL_H, h - 72 - 90)), left: 48, right: 48 };
-    map.fitBounds(b, { padding, maxZoom: isDesktop() ? 16 : 15.5, duration: 600 });
+    const sheetPx = Math.round(h * PHONE_RESULTS_SHEET);
+    const TOP_UI = 72; // Explore/Friends toggle and the Muse filter pill
+    const strip = Math.max(80, h - sheetPx - TOP_UI - 24);
+    const cam = map.cameraForBounds(b, { padding: 48, maxZoom: 15.5, bearing: map.getBearing() });
+    if (!cam || cam.zoom === undefined) return;
+    // Pixel size of the bounds at the camera's zoom, then the zoom that fits it in the strip,
+    // leaving room for the pins (above the point) and their labels (below it).
+    const ne = map.project(b.getNorthEast());
+    const sw = map.project(b.getSouthWest());
+    const scale = 2 ** (cam.zoom - map.getZoom());
+    const bw = Math.abs(ne.x - sw.x) * scale;
+    const bh = Math.abs(ne.y - sw.y) * scale;
+    const fitW = (w - 96) / Math.max(bw, 1);
+    const fitH = (strip - BOX_TOP - BOX_BOTTOM - LABEL_H) / Math.max(bh, 1);
+    const zoom = Math.min(15.5, cam.zoom + Math.log2(Math.min(1, fitW, fitH)));
+    // The strip's middle sits this far above the map's middle.
+    const lift = h / 2 - (TOP_UI + strip / 2);
+    map.easeTo({
+      center: cam.center, zoom, bearing: map.getBearing(), offset: [0, -lift],
+      padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600,
+    });
     schedule();
     // quests/origin/fitTo are read at the moment a plan arrives; picksKey and fitKey trigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -360,6 +385,9 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
     const map = mapRef.current;
     if (!map || framed.current || quests.length === 0 || !origin || !walkMinutes) return;
     framed.current = true;
+    // A plan that answered before the map's data loaded has already framed its picks; framing
+    // every plan now would move the picks under the phone sheet.
+    if (picksKey) return;
     const desktop = isDesktop();
     const pick = desktop
       ? quests
@@ -373,7 +401,7 @@ export default function MapCanvas({ quests, selectedId, viewerId, origin, walkMi
       duration: 0,
     });
     schedule();
-  }, [quests, origin, walkMinutes]);
+  }, [quests, origin, walkMinutes, picksKey]);
 
   // The viewer's own dot (where walking times are measured from).
   useEffect(() => {

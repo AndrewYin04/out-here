@@ -66,6 +66,29 @@ describe('ruledOut', () => {
     expect(out.offTopic).toBe(2);
   });
 
+  it('a shorter ask: the pick that disappeared and the close time misses come first', () => {
+    // "hungry, 15 min": the dumplings were a pick at 40 min and now start after the window
+    const short = askLimits({ ...intent, windowEnd: iso(15) });
+    const drops = [
+      drop('ramen', 'walk', { walkMinutes: 28 }),
+      drop('sushi', 'budget', { priceMax: 26 }),
+      drop('dumplings', 'window', { startsAt: iso(25) }),
+      drop('pho', 'window', { startsAt: iso(150) }),
+      drop('boba', 'late', { startsAt: iso(3), walkMinutes: 4 }),
+    ];
+    const out = ruledOut(drops, short, 2, ['dumplings', 'boba']);
+    expect(out.top.map((r) => r.questId)).toEqual(['dumplings', 'boba']);
+    expect(out.top[0].text).toBe("starts 11:25 AM, after you're free till 11:15 AM");
+    expect(out.more.map((r) => r.questId)).toEqual(['ramen', 'sushi', 'pho']);
+    // with no previous plan, a time miss 10 min past a 15 min window still beats walk and budget
+    expect(ruledOut(drops, short, 2).top.map((r) => r.questId)).toEqual(['boba', 'dumplings']);
+  });
+
+  it('closest miss first within walk and budget', () => {
+    const out = ruledOut([drop('far', 'walk', { walkMinutes: 40 }), drop('sushi', 'budget', { priceMax: 16 }), drop('ramen', 'walk', { walkMinutes: 28 })], limits);
+    expect(out.top.map((r) => r.questId)).toEqual(['sushi', 'ramen', 'far']);
+  });
+
   it('empty input', () => {
     expect(ruledOut([], limits)).toEqual({ top: [], more: [], offTopic: 0 });
   });
@@ -87,7 +110,9 @@ describe('museWork', () => {
     const w = museWork(make(), 'muse', NOW)!;
     expect(w.checked).toBe('Checked 8 plans and 6 friends');
     expect(w.fit).toBe('2 fit');
-    expect(w.read).toEqual(['food', '40 min', 'under $15', 'up to 25 min walk']);
+    expect(w.read).toEqual(['food', '40 min', 'under $15']);
+    // the walk cap was never typed: a muted default, not part of what was read
+    expect(w.walkDefault).toBe('walks up to 25 min (default)');
     expect(w.friends).toBe('Free then: Maya till 11:58 AM, Liam till 12:38 PM');
     expect(w.rank).toBe('Muse ranked 2 of 2 and explained why · 1.2 s');
   });
@@ -101,6 +126,18 @@ describe('museWork', () => {
 
   it('not understood: nothing to show', () => {
     expect(museWork(make({ understood: false }), 'muse', NOW)).toBeNull();
+  });
+
+  it('the read line credits Muse only when the live model parsed the words', () => {
+    const live = make({ models: { parse: 'muse-ember-1.0', rank: 'muse-spark-1.0' } });
+    expect(museWork(live, 'muse', NOW)!.readByMuse).toBe(true);
+    expect(museWork(live, 'fallback', NOW)!.readByMuse).toBe(false);
+    expect(museWork(make({ models: { parse: 'heuristic', rank: 'muse-spark-1.0' } }), 'muse', NOW)!.readByMuse).toBe(false);
+    expect(museWork(make({ mode: 'mock', models: { parse: 'mock', rank: 'mock' } }), 'mock', NOW)!.readByMuse).toBe(false);
+    // a walk limit from the words is part of what was read, with no default line
+    const walk = museWork({ ...make(), intent: { ...intent, maxWalkMinutes: 10 } }, 'muse', NOW)!;
+    expect(walk.read).toContain('up to 10 min walk');
+    expect(walk.walkDefault).toBeNull();
   });
 
   it('mock ranking says so', () => {

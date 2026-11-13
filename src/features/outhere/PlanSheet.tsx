@@ -6,6 +6,7 @@ import { useApi, useViewer } from '@/features/data';
 import { Chip, IconButton, Skeleton, cn } from '@/features/ui';
 import type { PersonCard } from '@/shared';
 import { withChip } from './chip-text';
+import { summaryWithoutTop } from './dedupe';
 import { museWork } from './muse-work';
 import { MuseStepsLoading, MuseWorkPanel } from './MuseSteps';
 
@@ -46,6 +47,8 @@ export function PlanSheet({ className }: { className?: string }) {
   const [text, setText] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [result, setResult] = useState<PlanResult | null>(null);
+  /** Quest ids the answer before this one suggested: a pick that dropped out is explained first. */
+  const [previousIds, setPreviousIds] = useState<string[]>([]);
   const [asked, setAsked] = useState('');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -68,7 +71,7 @@ export function PlanSheet({ className }: { className?: string }) {
   }, [open]);
   useEffect(() => {
     inFlight.current?.abort();
-    setResult(null); setPlanSuggestions(null); setPlanAsk(null);
+    setResult(null); setPreviousIds([]); setPlanSuggestions(null); setPlanAsk(null);
     setStatus('idle');
   }, [viewer.id]);
   useEffect(() => () => { inFlight.current?.abort(); setPlanSuggestions(null); }, []);
@@ -89,6 +92,7 @@ export function PlanSheet({ className }: { className?: string }) {
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
+      setPreviousIds(result ? result.plan.suggestions.flatMap((s) => (s.questId ? [s.questId] : [])) : []);
       setResult(r); setPlanSuggestions(r.plan.suggestions);
       setStatus('done');
       // Only the ask whose results are shown becomes the viewer's availability.
@@ -108,13 +112,12 @@ export function PlanSheet({ className }: { className?: string }) {
   // ✨ Muse only on live model text. Mock (offline heuristic) text gets an "Offline" label.
   const showMuse = result?.museSource === 'muse';
   const offline = result?.museSource === 'mock';
-  const summary = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
   // Read once per answer: phones show 2 ruled-out rows, wider screens 3.
   const work = useMemo(() => {
     if (!result?.plan.meta) return null;
     const wide = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
-    return museWork(result.plan, result.museSource, new Date(), wide ? 3 : 2);
-  }, [result]);
+    return museWork(result.plan, result.museSource, new Date(), wide ? 3 : 2, previousIds);
+  }, [result, previousIds]);
   const hasPicks = status === 'done' && !!result && result.plan.suggestions.length > 0;
   // First name -> end of the free window Muse matched (meta.friendsFree carries no ids).
   // A first name two free friends share is left out rather than guessed.
@@ -128,6 +131,14 @@ export function PlanSheet({ className }: { className?: string }) {
     for (const n of dup) out.delete(n);
     return out;
   }, [result]);
+  // Under the cards the summary drops sentences that repeat the top card.
+  const summary = useMemo(() => {
+    const raw = result?.plan.summary.replace(/^\[mock\]\s*/, '') ?? '';
+    const top = result?.plan.suggestions[0];
+    const friend = top?.friendIds[0] ? friendMap.get(top.friendIds[0]) : undefined;
+    const name = friend ? (friend.name.split(' ')[0] ?? friend.name) : undefined;
+    return summaryWithoutTop(raw, top, name ? { name, freeUntil: freeUntil.get(name) } : undefined);
+  }, [result, friendMap, freeUntil]);
 
   return (
     <>

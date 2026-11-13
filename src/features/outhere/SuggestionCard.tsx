@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, apiPost, useChannel, useQuest, useViewer, type InviteView } from '@/features/data';
 import { Avatar, Button, cn } from '@/features/ui';
 import { formatDemoTime, minutesUntil, type PersonCard, type PlanSuggestion } from '@/shared';
+import { reasonCoversOverlap } from './dedupe';
 import { errorText } from './plan-api';
 import { setPlanOpen } from './plan-state';
 
@@ -150,6 +151,9 @@ export function SuggestionCard({ s, friends, freeUntil, priceMax, showMuse, onJo
   };
 
   const venue = quest.data?.quest.venueName ?? null;
+  // The overlap line goes when the reason already names this friend and their free-until time.
+  const firstNames = people.map((p) => p.name.split(' ')[0] ?? p.name);
+  const overlapCovered = reasonCoversOverlap(s.reason, firstNames, firstNames[0] ? freeUntil?.get(firstNames[0]) : undefined, s.bridge);
   const answered = people.flatMap((p) => { const o = outcomes.get(p.id); return o ? [{ p, o }] : []; });
 
   return (
@@ -178,7 +182,7 @@ export function SuggestionCard({ s, friends, freeUntil, priceMax, showMuse, onJo
         </p>
       )}
 
-      {(people.length > 0 || s.bridge) && (
+      {(people.length > 0 || s.bridge) && !overlapCovered && (
         <div data-testid="suggestion-overlap" className="mt-1.5 flex items-center gap-2 text-[13px] leading-[18px] text-fb-text-2">
           {people.length > 0 ? (
             <div className="flex shrink-0 -space-x-1.5">

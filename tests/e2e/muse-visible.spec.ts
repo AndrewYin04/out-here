@@ -9,6 +9,10 @@ import { mkdirSync } from "node:fs";
 const PLACEHOLDER = "hungry, got like 40 min, under $15";
 const SHOTS = ".verify/muse-visible";
 
+// Headless Chromium's default GL backend drops the map canvas after a few idle seconds at phone
+// size, so screenshots showed a gray map with pins. SwiftShader keeps the tiles drawn.
+test.use({ launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] } });
+
 test("Muse's reasoning is visible on the plan sheet without a tap", async ({ page }, info) => {
   const phone = info.project.name === "phone";
   if (phone) await page.setViewportSize({ width: 390, height: 844 });
@@ -39,7 +43,9 @@ test("Muse's reasoning is visible on the plan sheet without a tap", async ({ pag
   if ((await rank.getAttribute("data-by")) === "code") await expect(work).not.toContainText("✨");
   await expect(page.getByTestId("muse-work-read")).toContainText("under $15");
   await expect(page.getByTestId("muse-work-read")).toContainText("40 min");
-  await expect(page.getByTestId("muse-work-read")).toContainText("up to 25 min walk");
+  // The walk cap was never typed: a muted default, not part of what was read. Mock: no ✨ on it.
+  await expect(page.getByTestId("muse-work-walk-default")).toHaveText(" · walks up to 25 min (default)");
+  await expect(page.getByTestId("muse-work-read")).toHaveAttribute("data-by", "code");
 
   const ramen = page.getByTestId("ruled-out").filter({ hasText: "Ramen run" });
   await expect(ramen).toBeVisible();
@@ -52,8 +58,17 @@ test("Muse's reasoning is visible on the plan sheet without a tap", async ({ pag
 
   const pick = page.getByTestId("suggestion").first();
   await expect(pick).toContainText("Dumplings before the rush");
-  await expect(pick.getByTestId("suggestion-reason")).toBeVisible();
-  await expect(pick.getByTestId("suggestion-overlap")).toContainText("Maya");
+  const reason = pick.getByTestId("suggestion-reason");
+  await expect(reason).toBeVisible();
+  // Maya's bubble is paraphrased, not pasted; the overlap line would only repeat it.
+  await expect(reason).toContainText("Maya's craving dumplings");
+  await expect(reason).not.toContainText("·");
+  await expect(reason).not.toContainText("status says");
+  await expect(pick.getByTestId("suggestion-overlap")).toHaveCount(0);
+  // No card's reason is the budget line alone.
+  for (const r of await page.getByTestId("suggestion-reason").all()) await expect(r).not.toHaveText(/^(✨ Muse: )?Within your \$\d+ budget\.$/);
+  // The summary does not repeat the top card.
+  await expect(page.getByTestId("plan-summary")).not.toContainText("Dumplings before the rush");
   // Price is in the plan answer, so every card's meta row has it on first paint.
   for (const card of await page.getByTestId("suggestion").all()) await expect(card).toContainText(/Up to \$\d+|Free/);
   await expect(page.getByTestId("plan-sheet")).not.toContainText(/under your \$\d+ budget/);
@@ -127,4 +142,69 @@ test("a time chip replaces the time in the ask, and 15 min narrows to boba", asy
   await expect(page.getByTestId("suggestion")).toHaveCount(1);
   await expect(page.getByTestId("suggestion").first()).toContainText(/boba/i);
   await page.screenshot({ path: `${SHOTS}/chip15-1440.png` });
+});
+
+test("a shorter ask explains the pick that dropped out first, and the map strip keeps its tiles", async ({ page }, info) => {
+  const phone = info.project.name === "phone";
+  if (phone) await page.setViewportSize({ width: 390, height: 844 });
+  mkdirSync(SHOTS, { recursive: true });
+  await page.goto("/out-here?as=alex");
+  await page.getByRole("button", { name: "I'm free" }).click();
+  const box = page.getByPlaceholder(PLACEHOLDER);
+  await box.fill("hungry, 40 min, under $15");
+  await page.getByRole("button", { name: "Find a plan" }).click();
+  await expect(page.getByTestId("suggestion").first()).toContainText("Dumplings before the rush", { timeout: 15_000 });
+  await box.fill("hungry, 15 min, under $15");
+  await page.getByRole("button", { name: "Find a plan" }).click();
+  await expect(page.getByTestId("muse-work-read")).toContainText("15 min", { timeout: 15_000 });
+  // The dumplings were the top pick a moment ago: their row is first, shown without a tap, and
+  // it names the time. (Whether boba still fits 15 min depends on the clock, so it is not checked.)
+  const rows = page.getByTestId("ruled-out");
+  await expect(rows.first()).toContainText("Dumplings before the rush");
+  await expect(rows.first()).toHaveAttribute("data-reason", /^(window|late)$/);
+  await expect(rows.first()).toContainText(/starts \d+:\d\d [AP]M/);
+  await page.waitForTimeout(2_000);
+  await page.screenshot({ path: `${SHOTS}/short-ask-${phone ? 390 : 1440}.png` });
+  // The strip above the sheet shows map detail, not a flat background: count distinct colors.
+  const strip = await page.screenshot({ clip: { x: 0, y: 120, width: phone ? 390 : 1000, height: 120 } });
+  const colors = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext("2d")!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const set = new Set<number>();
+    for (let i = 0; i < d.length; i += 4) set.add(((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3));
+    return set.size;
+  }, strip.toString("base64"));
+  expect(colors).toBeGreaterThan(60);
+});
+
+test("live mode credits Muse for reading the words, and keeps the default walk cap apart", async ({ page }, info) => {
+  const phone = info.project.name === "phone";
+  if (phone) await page.setViewportSize({ width: 390, height: 844 });
+  mkdirSync(SHOTS, { recursive: true });
+  // Present the mock answer as a live one: Ember parsed the words, Spark ranked.
+  await page.route("**/api/muse/plan", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.meta = { ...body.meta, mode: "live", source: "muse", models: { parse: "muse-ember-1.0", rank: "muse-spark-1.0" } };
+    body.summary = String(body.summary).replace(/^\[mock\]\s*/, "");
+    await route.fulfill({ response: res, json: body, headers: { ...res.headers(), "x-muse-mode": "live", "x-muse-source": "muse" } });
+  });
+  await page.goto("/out-here?as=alex");
+  await page.getByRole("button", { name: "I'm free" }).click();
+  await page.getByPlaceholder(PLACEHOLDER).fill("hungry, got like 40 min, under $15");
+  await page.getByRole("button", { name: "Find a plan" }).click();
+  const read = page.getByTestId("muse-work-read");
+  await expect(read).toHaveAttribute("data-by", "muse", { timeout: 15_000 });
+  await expect(read).toContainText(/^✨ Muse read: food · 40 min · under \$15/);
+  await expect(page.getByTestId("muse-work-walk-default")).toContainText("walks up to 25 min (default)");
+  // The plan answers before the map has drawn: wait for the tiles and the picks' camera move.
+  await expect(page.locator('[data-tiles="ready"]')).toHaveCount(1, { timeout: 15_000 });
+  await page.waitForTimeout(2_000);
+  await page.screenshot({ path: `${SHOTS}/live-${phone ? 390 : 1440}.png` });
 });

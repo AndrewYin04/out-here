@@ -11,8 +11,12 @@ export type MuseWork = {
   checked: string;
   /** "2 fit", or null when nothing was checked. */
   fit: string | null;
-  /** Your words as Muse read them: ["food", "40 min", "under $15", "up to 25 min walk"]. */
+  /** Your words as read: ["food", "40 min", "under $15"], plus the walk cap when you typed one. */
   read: string[];
+  /** True when the live model (Ember) read your words; only then does the read line get ✨ Muse. */
+  readByMuse: boolean;
+  /** "walks up to 25 min (default)": the cap code applied because the ask named none. */
+  walkDefault: string | null;
   /** "Maya is free till 3:58 PM", or null when no friends were checked. */
   friends: string | null;
   ruledOut: RuledOut;
@@ -32,8 +36,18 @@ export function readParts(plan: PlanResponse, now: Date): string[] {
   const w = windowText(plan, now);
   if (w) parts.push(w);
   if (intent.budgetMax !== null) parts.push(`under $${intent.budgetMax}`);
-  parts.push(`up to ${askLimits(intent).walkCap} min walk`);
+  // A walk cap the ask named is part of what was read; the default cap is shown apart (walkDefault).
+  if (intent.maxWalkMinutes !== null) parts.push(`up to ${intent.maxWalkMinutes} min walk`);
   return parts;
+}
+
+/**
+ * The parse step used the live model (meta.models.parse names it), not the offline heuristic.
+ * source 'muse' already means live mode (requestPlan); mock and fallback answers stay unlabelled.
+ */
+export function readByMuse(plan: PlanResponse, source: PlanResult['museSource']): boolean {
+  const parse = plan.meta.models?.parse;
+  return source === 'muse' && !!parse && parse !== 'mock' && parse !== 'heuristic';
 }
 
 function friendsLine(plan: PlanResponse): string | null {
@@ -50,7 +64,11 @@ function friendsLine(plan: PlanResponse): string | null {
  * Null when Muse could not read the ask; the sheet then shows only its summary. topN: ruled-out
  * rows shown without a tap (the phone sheet shows 2 so the first pick's buttons stay on screen).
  */
-export function museWork(plan: PlanResponse, source: PlanResult['museSource'], now: Date = new Date(), topN = 3): MuseWork | null {
+export function museWork(
+  plan: PlanResponse, source: PlanResult['museSource'], now: Date = new Date(), topN = 3,
+  /** Quest ids the plan shown before this one suggested, so a pick that disappeared is explained first. */
+  previousSuggested: Iterable<string> = [],
+): MuseWork | null {
   if (plan.meta.understood === false) return null;
   const fitN = plan.meta.candidateCount ?? plan.suggestions.length;
   const dropped = plan.meta.dropped ?? [];
@@ -63,8 +81,10 @@ export function museWork(plan: PlanResponse, source: PlanResult['museSource'], n
     checked,
     fit: plansN > 0 ? `${fitN} fit` : null,
     read: readParts(plan, now),
+    readByMuse: readByMuse(plan, source),
+    walkDefault: plan.intent.maxWalkMinutes === null ? `walks up to ${askLimits(plan.intent).walkCap} min (default)` : null,
     friends: friendsLine(plan),
-    ruledOut: ruledOut(dropped, askLimits(plan.intent), topN),
+    ruledOut: ruledOut(dropped, askLimits(plan.intent), topN, previousSuggested),
     rank: rankStep(plan, source).text,
     rankByMuse: source === 'muse' && fitN > 0,
   };

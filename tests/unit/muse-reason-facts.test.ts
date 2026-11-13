@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanCandidate } from '../../src/features/muse/candidates';
 import { rankPrompt, REASON_FACT_RULE } from '../../src/features/muse/prompts/rank';
-import { concreteReason, factReason, hasConcreteFact } from '../../src/features/muse/prompts/reason-facts';
+import { concreteReason, factReason, hasConcreteFact, statusPhrase } from '../../src/features/muse/prompts/reason-facts';
 import { validate } from '../../src/features/muse/validate';
 import type { MuseIntent, PlanSuggestion, Quest } from '../../src/shared';
 
@@ -48,33 +48,39 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     expect(hasConcreteFact('Maya would like this one.', withMaya)).toBe(true);
   });
 
-  it('replaces a generic reason with a fact the card meta row does not already show', () => {
+  it('replaces a generic reason with a concrete fit, never the budget alone', () => {
     const c = candidate();
     expect(hasConcreteFact('It is the open plan nearby that fits your time best.', c)).toBe(false);
     expect(hasConcreteFact('It is the food plan that fits your time best.', candidate({ matchedActivities: ['food'] }))).toBe(false);
     expect(concreteReason('Good for boba fans.', c)).toBe('Good for boba fans.');
-    // the budget only (the meta row shows the $7), never "4 min walk, $7, starts in 9 min"
-    expect(concreteReason('Fits your time best.', c, { budgetMax: 15 })).toBe('Within your $15 budget.');
-    // the viewer's own interest by name beats the budget
-    expect(factReason(candidate({ viewerInterests: ['boba', 'sketching'] }), { budgetMax: 15 }))
+    // no friend and no named interest: walk, start and price against the ask
+    const ask = { budgetMax: 15, windowStart: at(0), windowEnd: at(15), now: NOW };
+    expect(concreteReason('Fits your time best.', c, ask)).toBe('Fits before your 15 min is up: 4 min walk, starts in 9 min, $7 of your $15.');
+    expect(factReason(c, { budgetMax: 15 })).toBe('4 min walk, starts 10:09 AM, $7 of your $15.');
+    expect(factReason(c, ask)).not.toBe('Within your $15 budget.');
+    // the viewer's own interest by name comes first
+    expect(factReason(candidate({ viewerInterests: ['boba', 'sketching'] }), ask))
       .toBe('You listed boba and sketching in your interests.');
-    // a friend's bubble beats everything
+    // a friend's bubble beats everything, paraphrased
     const withMaya = candidate({
       friendOverlap: [{
         friendId: 'maya', availabilityId: 'a', firstName: 'Maya', availabilityText: '', freeFrom: at(0), freeUntil: at(60),
-        sharedWithViewer: [], status: 'craving boba', sharedWithQuest: ['boba'], travelMinutes: 5,
+        sharedWithViewer: [], status: 'craving boba 🧋 · lunch break for ~45 min · wants to try Tea Lab', sharedWithQuest: ['boba'], travelMinutes: 5,
       }],
     });
-    expect(factReason(withMaya, { budgetMax: 15 })).toBe('Maya\'s status says "craving boba".');
-    // no budget: the free time left on arrival, then the quest's own tags
-    expect(factReason(c, { windowEnd: at(40) })).toBe('You get there with 36 min of your free time left.');
+    expect(factReason(withMaya, ask)).toBe("Maya's craving boba and wants to try Tea Lab.");
+    // no window and no budget: the quest's own tags, then nothing
     expect(factReason(c)).toBe('For people into boba and sketching.');
-    // only meta-row facts left: no reason line at all
-    const bare = candidate({ quest: { ...quest, tags: [] } });
-    expect(factReason(bare)).toBe('');
-    for (const r of [factReason(c, { budgetMax: 15 }), factReason(c, { windowEnd: at(40) }), factReason(c), factReason(bare)]) {
-      expect(r).not.toMatch(/min walk|starts in|\$7\b/);
-    }
+    expect(factReason(candidate({ quest: { ...quest, tags: [] } }))).toBe('');
+  });
+
+  it('statusPhrase paraphrases a bubble line instead of quoting it', () => {
+    expect(statusPhrase('Maya', 'craving dumplings 🥟 · lunch break for ~45 min · wants to try Dumpling Den'))
+      .toBe("Maya's craving dumplings and wants to try Dumpling Den");
+    expect(statusPhrase('Sam', 'board game brain 🎲 · setting up for tonight')).toBe('Sam says "board game brain"');
+    expect(statusPhrase('Ana', 'wants to ride the Bay Trail')).toBe('Ana wants to ride the Bay Trail');
+    expect(statusPhrase('Ana', '')).toBeNull();
+    expect(statusPhrase('Ana', null)).toBeNull();
   });
 
   it('validate() falls back to the fact-based reason when the model reason has no fact', () => {
@@ -90,8 +96,8 @@ describe('rank prompt: reasons cite a concrete fact', () => {
     const ctx = { quests: [quest], friends: [], location: LOC, viewer: { id: 'alex' }, knownPeople: [] };
     const out = validate([s], [candidate()], ctx as never, { intent, text: 'thirsty', now: NOW });
     expect(out.suggestions).toHaveLength(1);
-    expect(out.suggestions[0].reason).toBe('You get there with 36 min of your free time left.');
+    expect(out.suggestions[0].reason).toBe('Fits before your 40 min is up: 4 min walk, starts in 9 min, $7.');
     const budgeted = validate([s], [candidate()], ctx as never, { intent: { ...intent, budgetMax: 15 }, text: 'thirsty, under $15', now: NOW });
-    expect(budgeted.suggestions[0].reason).toBe('Within your $15 budget.');
+    expect(budgeted.suggestions[0].reason).toBe('Fits before your 40 min is up: 4 min walk, starts in 9 min, $7 of your $15.');
   });
 });

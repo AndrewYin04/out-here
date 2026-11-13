@@ -118,9 +118,9 @@ function RuledOutItem({ row }: { row: RuledOutRow }) {
 
 /**
  * What was checked and who did it, open by default so a judge sees it without a tap. Code
- * counted the plans and friends, read the limits and ruled plans out (candidates.ts), so those
- * lines carry no Muse label. Only the rank line says ✨ Muse, and only when the live model
- * ranked and explained the picks. The other ruled-out rows open on "N more".
+ * counted the plans and friends and ruled plans out (candidates.ts), so those lines carry no
+ * Muse label. The read line says ✨ Muse when the live model parsed the words, and the rank line
+ * when the live model ranked and explained the picks. The other ruled-out rows open on "N more".
  */
 export function MuseWorkPanel({ work }: { work: MuseWork }) {
   const [open, setOpen] = useState(false);
@@ -145,8 +145,13 @@ export function MuseWorkPanel({ work }: { work: MuseWork }) {
         {work.checked}
         {work.fit && <span className="font-normal text-fb-text-2"> · {work.fit}</span>}
       </p>
-      <p data-testid="muse-work-read" className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
-        <span className="font-semibold text-fb-text">Read</span> {work.read.join(' · ')}
+      <p data-testid="muse-work-read" data-by={work.readByMuse ? 'muse' : 'code'} className="mt-1 text-[13px] leading-[18px] text-fb-text-2">
+        {work.readByMuse
+          ? <span className="font-semibold text-fb-blue">✨ Muse read:</span>
+          : <span className="font-semibold text-fb-text">Read</span>}
+        {' '}<span className="text-fb-text">{work.read.join(' · ')}</span>
+        {/* The walk cap is code's default when the ask named none: muted, and not part of what was read. */}
+        {work.walkDefault && <span data-testid="muse-work-walk-default"> · {work.walkDefault}</span>}
       </p>
       {work.friends && (
         <p data-testid="muse-work-friends" className="mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] text-fb-text-2">
