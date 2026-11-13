@@ -67,7 +67,8 @@ function MemoriesView({ handle }: { handle: string | null }) {
   useEffect(() => {
     if (!handle) return;
     let alive = true;
-    apiFetch<{ ratings: (HangoutRating & { quest: Quest })[] }>('/api/me/ratings', { headers: { 'x-outhere-fresh': '1' } })
+    // Cached on the first load, fresh after a rating is saved (refresh > 0), like the crews (#65).
+    apiFetch<{ ratings: (HangoutRating & { quest: Quest })[] }>('/api/me/ratings', refresh > 0 ? { headers: { 'x-outhere-fresh': '1' } } : {})
       .then((r) => { if (alive) setRatings(new Map(r.ratings.map((x) => [x.questId, x]))); })
       .catch(() => undefined);
     return () => { alive = false; };

@@ -19,7 +19,7 @@ test.describe("Memories", () => {
   test("the first load reads the cache, not a forced reload of every table (#65)", async ({ page }) => {
     const fresh: string[] = [];
     page.on("request", (r) => {
-      if (/\/api\/(crews|muse\/regroup|memories)/.test(r.url()) && r.headers()["x-outhere-fresh"] === "1") fresh.push(r.url());
+      if (/\/api\/(crews|muse\/regroup|memories|me\/ratings)/.test(r.url()) && r.headers()["x-outhere-fresh"] === "1") fresh.push(r.url());
     });
     await page.goto("/memories?as=alex");
     await expect(page.getByTestId("crew-card").first()).toBeVisible({ timeout: 15_000 });
