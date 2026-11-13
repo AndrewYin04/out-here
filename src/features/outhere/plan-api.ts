@@ -21,7 +21,35 @@ export type PlanResponse = MusePlan & {
 /** "mock" = offline heuristic text, "fallback" = code answered after a live model step failed. */
 export type PlanResult = { plan: PlanResponse; museSource: 'muse' | 'fallback' | 'mock' };
 
+/** A plan request that has not answered in this long is sent again once (a dropped request on stage Wi-Fi). */
+const PLAN_ATTEMPT_MS = 15_000;
+
 export async function requestPlan(text: string, signal?: AbortSignal): Promise<PlanResult> {
+  try {
+    return await planAttempt(text, signal, PLAN_ATTEMPT_MS);
+  } catch (e) {
+    if (signal?.aborted || !(e instanceof DOMException && e.name === 'TimeoutError')) throw e;
+    return planAttempt(text, signal, PLAN_ATTEMPT_MS * 2);
+  }
+}
+
+async function planAttempt(text: string, outer: AbortSignal | undefined, ms: number): Promise<PlanResult> {
+  const ctrl = new AbortController();
+  const onAbort = () => ctrl.abort(outer?.reason);
+  outer?.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => ctrl.abort(new DOMException('plan timed out', 'TimeoutError')), ms);
+  try {
+    return await planOnce(text, ctrl.signal);
+  } catch (e) {
+    if (ctrl.signal.aborted && !outer?.aborted) throw new DOMException('plan timed out', 'TimeoutError');
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    outer?.removeEventListener('abort', onAbort);
+  }
+}
+
+async function planOnce(text: string, signal?: AbortSignal): Promise<PlanResult> {
   const res = await fetch('/api/muse/plan', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-persona': currentPersona() },
