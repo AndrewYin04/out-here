@@ -63,6 +63,7 @@ test.describe("Post a plan", () => {
       const group = sam.getByTestId("create-group-select");
       await expect(group).toBeVisible();
       await group.selectOption({ label: "Peninsula Board Game Night" });
+      await sam.getByTestId("create-more").click(); // the optional extras are folded
       await sam.getByTestId("create-bubble").fill("Bringing Wingspan 🐦");
       await sam.getByTestId("create-post").click();
 
