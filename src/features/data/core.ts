@@ -21,9 +21,9 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import {
-  addMuseWant, createListing, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold,
+  addMuseWant, createListing, goLiveSale, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold, saleDrafts,
 } from './market';
-import { marketplaceContext, recordWatch, watch } from './watch';
+import { marketplaceContext, recordWatch, watch, watchedReels } from './watch';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
   hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, mutualHangAgainMany, myRatings,
@@ -935,6 +935,36 @@ export class CoreStore {
     if (fresh.availability.length) await this.backend.insert('availability', fresh.availability);
     if (fresh.invites.length) await this.backend.insert('invites', fresh.invites);
     if (fresh.locationShares.length) await this.backend.upsert('locationShares', fresh.locationShares);
+    // "45 Minutes to Thrift": the pop-up back to a draft, no holds, the seeded watch and Reels, and
+    // nothing left over from a rehearsal (its album photos, crew, ratings and notifications).
+    const notSeeded = <K extends 'listings' | 'museWants' | 'watchEvents' | 'memories' | 'crews' | 'notifications' | 'messages'>(k: K) => {
+      const keep = new Set((fresh[k] as { id: string }[]).map((r) => r.id));
+      return (db[k] as { id: string }[]).filter((r) => !keep.has(r.id)).map((r) => r.id);
+    };
+    if (db.listingHolds.length) await this.backend.remove('listingHolds', { id: ids(db.listingHolds, (h) => h.id) });
+    const extraListings = notSeeded('listings');
+    if (extraListings.length) await this.backend.remove('listings', { id: extraListings });
+    if (fresh.listings.length) await this.backend.upsert('listings', fresh.listings);
+    const extraWants = notSeeded('museWants');
+    if (extraWants.length) await this.backend.remove('museWants', { id: extraWants });
+    if (fresh.museWants.length) await this.backend.upsert('museWants', fresh.museWants);
+    const extraWatch = notSeeded('watchEvents');
+    if (extraWatch.length) await this.backend.remove('watchEvents', { id: extraWatch });
+    if (fresh.watchEvents.length) await this.backend.upsert('watchEvents', fresh.watchEvents);
+    const extraMemories = notSeeded('memories');
+    if (extraMemories.length) await this.backend.remove('memories', { id: extraMemories });
+    const extraCrews = notSeeded('crews');
+    if (extraCrews.length) {
+      await this.backend.remove('crewMembers', { crewId: extraCrews });
+      await this.backend.remove('crews', { id: extraCrews });
+    }
+    const seededQuests = new Set(fresh.quests.map((q) => q.id));
+    const extraRatings = db.hangoutRatings.filter((r) => !seededQuests.has(r.questId)).map((r) => r.questId);
+    if (extraRatings.length) await this.backend.remove('hangoutRatings', { questId: [...new Set(extraRatings)] });
+    const extraNotes = notSeeded('notifications');
+    if (extraNotes.length) await this.backend.remove('notifications', { id: extraNotes });
+    const extraMessages = notSeeded('messages');
+    if (extraMessages.length) await this.backend.remove('messages', { id: extraMessages });
     await publish('demo:reset', { at: iso() });
     return { quests: fresh.quests.length, members: fresh.questMembers.length };
   }
@@ -1305,10 +1335,13 @@ export class CoreStore {
   releaseHold(viewerId: ID, holdId: ID) { return releaseHold(this, viewerId, holdId); }
   markSold(viewerId: ID, listingId: ID) { return markSold(this, viewerId, listingId); }
   museWants(viewerId: ID) { return museWants(this, viewerId); }
+  saleDrafts(viewerId: ID) { return saleDrafts(this, viewerId); }
+  goLiveSale(viewerId: ID, label: string) { return goLiveSale(this, viewerId, label); }
   // ---------- watch history (watch.ts) ----------
   watch(viewerId: ID) { return watch(this, viewerId); }
   recordWatch(viewerId: ID, videoKey: string, seconds: number) { return recordWatch(this, viewerId, videoKey, seconds); }
   marketplaceContext(viewerId: ID) { return marketplaceContext(this, viewerId); }
+  watchedReels(viewerId: ID) { return watchedReels(this, viewerId); }
   addMuseWant(viewerId: ID, w: Parameters<typeof addMuseWant>[2]) { return addMuseWant(this, viewerId, w); }
   removeMuseWant(viewerId: ID, id: ID) { return removeMuseWant(this, viewerId, id); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }

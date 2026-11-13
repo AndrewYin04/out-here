@@ -16,6 +16,10 @@ export type SeedVideo = {
   poster: string;
   /** Keyframe prompts for the clip (gen:images, then gen:clips); without them the clip moves over the poster. */
   frames?: string[];
+  /** Marketplace words Muse may match because someone watched this ("denim purse"); code-checked. */
+  lookFor?: string[];
+  /** What in the video those items are like ("the shoulder bag"), for Muse's line. */
+  look?: string;
 };
 
 export const SEED_VIDEOS: readonly SeedVideo[] = raw as SeedVideo[];

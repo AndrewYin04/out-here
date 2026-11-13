@@ -16,7 +16,8 @@
         "dumplings",
         "local bands",
         "trying new food",
-        "running"
+        "running",
+        "boba"
       ],
       "budgetMax": 15,
       "circles": [
@@ -40,6 +41,7 @@
       "job": "UX researcher",
       "bio": "just moved to Redwood City for UX research, usually take a long lunch around 11",
       "interests": [
+        "boba",
         "dumplings",
         "local bands",
         "yoga",
@@ -11373,6 +11375,50 @@
       "description": "Nightstand with one drawer, clean and solid. Pickup near Stanford, selling because I'm decluttering before finals.",
       "image": "/seed/listings/l30.webp",
       "hoursAgo": 276
+    },
+    {
+      "id": "p01",
+      "sellerHandle": "leo",
+      "title": "Track jacket, navy with white stripes - $20",
+      "priceUsd": 20,
+      "condition": "Used - good",
+      "category": "Clothing",
+      "description": "Zip-up track jacket, men's M, fits like a modern S. From my pop-up rack.",
+      "image": "/seed/listings/p01.webp",
+      "hoursAgo": 1
+    },
+    {
+      "id": "p02",
+      "sellerHandle": "leo",
+      "title": "Y2K denim purse - $18",
+      "priceUsd": 18,
+      "condition": "Used - like new",
+      "category": "Bags",
+      "description": "Small denim shoulder purse with a silver clasp. Pop-up pickup only.",
+      "image": "/seed/listings/p02.webp",
+      "hoursAgo": 1
+    },
+    {
+      "id": "p03",
+      "sellerHandle": "leo",
+      "title": "Corduroy bucket hat - $8",
+      "priceUsd": 8,
+      "condition": "Used - good",
+      "category": "Clothing",
+      "description": "Brown corduroy, one size.",
+      "image": "/seed/listings/p03.webp",
+      "hoursAgo": 1
+    },
+    {
+      "id": "p04",
+      "sellerHandle": "leo",
+      "title": "Graphic band tee - $10",
+      "priceUsd": 10,
+      "condition": "Used - good",
+      "category": "Clothing",
+      "description": "Soft, faded, unisex L. Fictional band.",
+      "image": "/seed/listings/p04.webp",
+      "hoursAgo": 1
     }
   ]
 }

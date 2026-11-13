@@ -384,4 +384,29 @@ Model muse-image-1.0, $0.01/image, cache .cache/images/, cap 200/run.
 | /seed/videos/reel-denim-5-ways.webp | 33753 | true | generated | 49.9 |
 | /seed/videos/reel-flea-market-finds.webp | 39664 | true | generated | 40.0 |
 | /seed/videos/reel-thrift-outfit-40.webp | 36485 | true | generated | 42.6 |
+
+### Run 2026-11-13T11:31:34.484Z
+
+`referenced=246 processed=5 generated=5 cacheHits=0 fallbacks=0 failures=0 stillMissing=0 spendUsd=0.05 publicSeedMB=20.01 seconds=32`
+
+| Kind | Files | Avg KB |
+|---|---|---|
+| portrait | 62 | 11.8 |
+| cover | 12 | 57.9 |
+| post | 45 | 61.0 |
+| story | 16 | 83.3 |
+| event | 20 | 63.7 |
+| listing | 34 | 33.0 |
+| reelposter | 4 | 44.8 |
+| video | 20 | 43.9 |
+| reelframe | 15 | 81.2 |
+| clip | 18 | 94.0 |
+
+| Path | ms | ok | how | KB |
+|---|---|---|---|---|
+| /seed/listings/p01.webp | 31762 | true | generated | 37.6 |
+| /seed/listings/p02.webp | 11245 | true | generated | 76.1 |
+| /seed/listings/p03.webp | 9607 | true | generated | 50.3 |
+| /seed/listings/p04.webp | 19530 | true | generated | 65.9 |
+| /seed/videos/reel-denim-bag-styling.webp | 21634 | true | generated | 46.5 |
 <!-- images:end -->

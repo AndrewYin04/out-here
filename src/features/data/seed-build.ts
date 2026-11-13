@@ -139,11 +139,28 @@ export const PICKUP_LISTINGS = [
   { id: 'l05', meters: 1200, bearing: 300, openMin: 390, listedMinAgo: 20, label: 'Belle Haven', spot: 'Lobby of the Hamilton Ave apartments' },
   { id: 'l26', meters: 3400, bearing: 160, openMin: 540, listedMinAgo: 120, label: 'Palo Alto', spot: 'Driveway, green door on Middlefield' },
 ] as const;
-/** What Alex told Muse yesterday; the demo seller lists a matching chair live. */
+/** The watch Alex set with Muse yesterday; the pop-up's $20 track jacket fits it. */
 export const ALEX_WANT = {
-  text: 'I need a desk chair under $40, ideally within a 15-minute drive',
-  item: 'desk chair', keywords: ['desk chair', 'office chair', 'chair'], maxPrice: 40, maxDriveMin: 15,
+  text: 'track jacket under $25',
+  item: 'track jacket', keywords: ['track jacket', 'jacket'], maxPrice: 25, maxDriveMin: null,
 };
+
+/**
+ * "45 Minutes to Thrift": Leo's pop-up sale, prefilled as a draft (a pickup label and place, no
+ * pickup window), so nobody sees it until Leo taps Go live. Ids are listings in seed-content.json.
+ * The track jacket fits Alex's watch; the denim purse is like the bag in the Reel Maya watched.
+ */
+export const POPUP_SALE = {
+  seller: 'leo', label: 'Campus Thrift Pop-Up', spot: 'Folding tables by the Hacker Way Courts',
+  place: 'Bobalicious Corner', meters: 260, bearing: 20,
+  items: ['p01', 'p02', 'p03', 'p04'],
+} as const;
+
+/** Reels Maya watched before the demo: [video key, seconds, hours ago]. */
+export const MAYA_WATCH_HISTORY: readonly [string, number, number][] = [
+  ['reel-denim-bag-styling', 58, 20],
+  ['reel-thrift-outfit-40', 60, 44],
+];
 
 const iso = (d: Date) => d.toISOString();
 const addMin = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
@@ -324,7 +341,8 @@ export function buildSeed(
   for (const a of DEMO_AVAILABILITY) {
     const handle = a.handle ?? alexLocalFriends[a.friendSlot ?? 0];
     if (!handle || !has(handle)) { warnings.push(`availability "${a.text}": no person for slot`); continue; }
-    const near = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const base = a.nearPlace ? requirePlace(a.nearPlace) : homes.get(handle)!;
+    const near = a.offsetM ? offsetPoint(base, a.offsetM, a.bearingDeg ?? 0) : base;
     t.availability.push({
       id: seedId('availability', `${handle}:${a.text}`), user_id: pid(handle), text: a.text,
       starts_at: iso(addMin(demoNow, a.startsInMin)), ends_at: iso(addMin(demoNow, a.endsInMin)),
@@ -604,9 +622,21 @@ export function buildSeed(
       pickup_until: iso(addMin(demoNow, p.openMin)), created_at: iso(addMin(demoNow, -p.listedMinAgo)),
     });
   }
+  // The pop-up sale: draft listings at one place, off the map until the seller goes live.
+  {
+    const at = offsetPoint(requirePlace(POPUP_SALE.place), POPUP_SALE.meters, POPUP_SALE.bearing);
+    for (const id of POPUP_SALE.items) {
+      const row = t.listings.find((r) => r.id === seedId('listing', id));
+      if (!row) { warnings.push(`pop-up listing ${id}: not in seed content, skipped`); continue; }
+      Object.assign(row, {
+        lat: Number(at.lat.toFixed(6)), lng: Number(at.lng.toFixed(6)), pickup_label: POPUP_SALE.label, pickup_spot: POPUP_SALE.spot,
+        pickup_until: null, created_at: iso(addMin(demoNow, -30)),
+      });
+    }
+  }
   if (has('alex')) {
     t.muse_wants.push({
-      id: seedId('want', 'alex-desk-chair'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
+      id: seedId('want', 'alex-track-jacket'), user_id: pid('alex'), text: ALEX_WANT.text, item: ALEX_WANT.item,
       keywords: ALEX_WANT.keywords, max_price: ALEX_WANT.maxPrice, max_drive_min: ALEX_WANT.maxDriveMin,
       active: true, created_at: iso(addMin(demoNow, -26 * 60)),
     });
@@ -617,6 +647,15 @@ export function buildSeed(
     ALEX_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
       t.watch_events.push({
         id: seedId('watch', `alex-${i}-${key}`), user_id: pid('alex'), video_key: key, seconds,
+        created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
+      });
+    });
+  }
+
+  if (has('maya')) {
+    MAYA_WATCH_HISTORY.forEach(([key, seconds, hoursAgo], i) => {
+      t.watch_events.push({
+        id: seedId('watch', `maya-${i}-${key}`), user_id: pid('maya'), video_key: key, seconds,
         created_at: iso(addMin(demoNow, -Math.round(hoursAgo * 60))),
       });
     });

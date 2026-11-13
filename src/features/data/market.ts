@@ -283,3 +283,45 @@ export async function removeMuseWant(store: CoreStore, viewerId: ID, id: ID): Pr
   await store.backend.update('museWants', { id }, { active: false });
   return { ok: true };
 }
+
+// ---------- draft sales (a pop-up prefilled by the seller, live in one tap) ----------
+
+/** A pop-up sale goes live for this long. */
+export const SALE_OPEN_MIN = 180;
+
+/**
+ * A draft sale is the seller's listings that carry a pickup label and a place but no pickup window
+ * yet ("Campus Thrift Pop-Up"). Nobody else sees them until the seller taps Go live.
+ */
+export function isDraftForSale(l: Listing): boolean {
+  return l.status !== 'sold' && !!l.location && !!l.pickupLabel && !l.pickupUntil;
+}
+
+export type SaleDraft = { label: string; items: { id: ID; title: string; priceUsd: number; imageUrl: string | null }[] };
+
+export async function saleDrafts(store: CoreStore, viewerId: ID): Promise<{ sales: SaleDraft[] }> {
+  const v = await store.view();
+  const by = new Map<string, SaleDraft>();
+  for (const l of v.db.listings.map(withPickup)) {
+    if (l.sellerId !== viewerId || !isDraftForSale(l)) continue;
+    const label = l.pickupLabel!;
+    const sale = by.get(label) ?? { label, items: [] };
+    sale.items.push({ id: l.id, title: l.title, priceUsd: l.priceUsd, imageUrl: l.imageUrl });
+    by.set(label, sale);
+  }
+  return { sales: [...by.values()] };
+}
+
+/** The seller's draft sale goes on the map now, open for SALE_OPEN_MIN minutes. */
+export async function goLiveSale(store: CoreStore, viewerId: ID, label: string): Promise<{ listingIds: ID[]; pickupUntil: string }> {
+  const v = await store.view();
+  const items = v.db.listings.map(withPickup).filter((l) => l.sellerId === viewerId && isDraftForSale(l) && l.pickupLabel === label);
+  if (items.length === 0) throw notFound('sale_not_found');
+  const at = now();
+  const until = new Date(at.getTime() + SALE_OPEN_MIN * 60_000).toISOString();
+  const ids = items.map((l) => l.id);
+  await store.backend.update('listings', { id: ids }, { pickupUntil: until, createdAt: iso(at) });
+  // Ids only: every map refetches /api/listings/map, which fuzzes the place per viewer.
+  for (const id of ids) await publish('listings:new', { listingId: id });
+  return { listingIds: ids, pickupUntil: until };
+}

@@ -249,6 +249,11 @@ export function PlanSheet({ className }: { className?: string }) {
     try {
       const r = await requestPlan(t, ctrl.signal);
       if (mine !== seq.current) return;
+      // Muse is about to draft a plan with a free friend: it reads "who is free with you" from
+      // your shared availability, so save that first (otherwise the draft races it and finds no one).
+      const willDraft = r.plan.suggestions.length === 0 && (r.plan.meta?.friendsFree?.length ?? 0) > 0;
+      if (willDraft && picked === null) await shareAvailability(noteFor(moods, text), r.plan);
+      if (mine !== seq.current) return;
       setResult(r); setPlanSuggestions(r.plan.suggestions); setDraftNone(false);
       setStatus('done');
       const top = r.plan.suggestions[0];
@@ -262,7 +267,7 @@ export function PlanSheet({ className }: { className?: string }) {
       });
       // Only the ask whose results are shown becomes the viewer's availability (unless a time
       // was picked, which already set it).
-      if (picked === null) void shareAvailability(noteFor(moods, text), r.plan);
+      if (picked === null && !willDraft) void shareAvailability(noteFor(moods, text), r.plan);
     } catch (err) {
       if (mine !== seq.current || ctrl.signal.aborted) return;
       setError(errorText(err, 'Muse could not make a plan right now. Try again in a moment.'));
