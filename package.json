@@ -21,6 +21,7 @@
     "gen:clips": "node scripts/gen-clips.mjs",
     "eval:muse": "node --env-file=.env.local scripts/muse-smoke.mjs",
     "eval:muse:plan": "node --env-file=.env.local --import tsx scripts/eval-muse.mjs",
+    "warm:demo": "node --env-file=.env.local --import tsx scripts/warm-demo.ts",
     "watch:3d": "node scripts/watch-3d.mjs",
     "models:sync": "node -e \"require('fs').copyFileSync('assets/muse-companion/muse-companion.glb','public/models/muse-companion.glb'); console.log('copied muse-companion.glb to public/models')\""
   },
