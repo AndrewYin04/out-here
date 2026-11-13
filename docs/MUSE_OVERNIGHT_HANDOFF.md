@@ -1,6 +1,6 @@
 # Muse companion local handoff
 
-Friday November 13, 2026, Pacific. Branch `feature/muse-companion-overnight`, worktree `/Users/ally/Github/out-here-muse-overnight`, base `origin/main@7a21247`, team issue #82. Local commits are recorded below after verification.
+Friday November 13, 2026, Pacific. Branch `feature/muse-companion-overnight`, worktree `/Users/ally/Github/out-here-muse-overnight`, base `origin/main@7a21247`, team issue #82. Local implementation commit: `3ac0ced` (`feat(muse): unify companion activity and refine map presence`). The following documentation commit records the last verification results.
 
 ## Open the work
 
@@ -22,7 +22,7 @@ Full route trace and inference/cache/database distinctions: `docs/MUSE_OVERNIGHT
 
 - Final full unit suite: **560 passed across72 files**. Loader retry and companion regression subset:37 passed.
 - Typecheck passed; lint zero errors with six existing unused-variable warnings. Isolated production build passed; final minor launcher position changed after that build.
-- Planner API smoke:6 passed across desktop and phone.
+- Planner API smoke:6 passed across desktop and phone. Final map filter suite:8/8 passed on the isolated production preview, including Alex/Maya, persistent toggle, reason lists, quest sheets and viewport fits.
 - New surface lifecycle suite:6 passed at1440 and390, including Marketplace pending/failure/retry/cached-empty/navigation, regroup approval/cancel, and context caption preserving edits.
 - Integration rerun:7 passed,3 failed. One mobile photo setup exhausted the shared fixture server's daily quest-host cap after repeated tests. Two existing Vision tests expect404 for an unauthorized caption PATCH; the current main-derived backend returns403 for non-crew access, and grants caption edits to crew members. This branch did not change those permissions. Fresh isolated production rerun: **8/8 passed** across desktop and phone, covering encounters→ordinary chat, saved-photo cancel/retry/manual edits, processing error/cancel and camera restoration. This confirms the earlier mobile setup failure was accumulated fixture state, not a product permission change.
 - Visual captures inspected at1440,1280,390: `.verify/muse-overnight/final-{map,chat}-{width}.png`; all three actual models ready, no page errors or horizontal overflow (`final-visual.json`). Earlier placeholder/blank-map debugging captures are not final evidence.

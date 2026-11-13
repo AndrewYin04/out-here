@@ -13,8 +13,8 @@ Young adults use the existing map to turn free time into a plan. The main action
 - [x] Rendering specialist: existing trail paths/filaments/particles, reduced motion and bounds.
 - [x] Character/camera specialist: lateral staging, viewport/sheet/keyboard framing, manual camera respect, existing clips.
 - [x] Independent engineering review and fixes.
-- [ ] Independent browser/UX review at 1440,1280,390, two personas, request timing/failures/navigation/reduced motion.
-- [ ] Unit/typecheck/lint/production build and relevant end-to-end tests.
+- [x] Specialist and lead visual review at1440/1280/390, two personas, timing/failures/navigation/reduced motion; independent UX reviewer interrupted by session usage limit, lead completed captures.
+- [x] Unit/typecheck/lint/production build and scoped end-to-end tests; legacy Vision permission assertion mismatch documented.
 - [x] Local milestone commits, final evidence and limitations, keep local app running.
 
 ## Current verification
