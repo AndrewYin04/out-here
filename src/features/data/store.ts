@@ -114,9 +114,6 @@ export interface DataStore {
   watch: CoreStore['watch'];
   recordWatch: CoreStore['recordWatch'];
   marketplaceContext: CoreStore['marketplaceContext'];
-  watchedReels: CoreStore['watchedReels'];
-  saleDrafts: CoreStore['saleDrafts'];
-  goLiveSale: CoreStore['goLiveSale'];
   reels: CoreStore['reels'];
   uploadFile: CoreStore['uploadFile'];
   /** Raw tables + view helpers for server-side Muse candidate generation. Never send to the browser. */

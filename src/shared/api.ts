@@ -281,15 +281,8 @@ export type HoldRespondBody = { accept: boolean };
 export type MuseWantsResponse = { wants: MuseWant[] };
 /** One listing Muse surfaced for a want: the facts code checked, and Muse's one line. */
 export type MuseFind = {
-  /** wantId is null for a Reel find. */
-  listingId: ID; wantId: ID | null; title: string; priceUsd: number; imageUrl: string | null;
+  listingId: ID; wantId: ID; title: string; priceUsd: number; imageUrl: string | null;
   driveMin: number; pickupUntil: string; listedMinAgo: number; sellerFirstName: string;
-  /** Why Muse surfaced it: a watch the viewer set ("track jacket under $25"), or a Reel they watched. */
-  via: 'want' | 'reel';
-  /** The pop-up sale it belongs to ("Campus Thrift Pop-Up"), when the seller listed several items there. */
-  sale: string | null;
-  /** For a Reel find: the Reel's title. */
-  reelTitle: string | null;
   line: string; source: 'muse' | 'mock' | 'fallback';
 };
 export type MuseFindsResponse = { finds: MuseFind[] };

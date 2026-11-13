@@ -21,9 +21,9 @@ import { badRequest, conflict, forbidden, HttpError, notFound, tooMany } from '.
 import { onlineUserIds, publish } from './realtime-server';
 import { View } from './view';
 import {
-  addMuseWant, createListing, goLiveSale, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold, saleDrafts,
+  addMuseWant, createListing, mapListing, mapListings, listingFor, markSold, museWants, releaseHold, removeMuseWant, requestHold, respondHold,
 } from './market';
-import { marketplaceContext, recordWatch, watch, watchedReels } from './watch';
+import { marketplaceContext, recordWatch, watch } from './watch';
 import { friendPins, hangInvite, hangSuggestion, myLocation, updateMyLocation, type HangBody, type LocationPatch } from './locations';
 import {
   hangAgainAbout, hangAgainSignals, hangoutRatings, hangoutRecap, mutualHangAgain, mutualHangAgainMany, myRatings,
@@ -1335,13 +1335,10 @@ export class CoreStore {
   releaseHold(viewerId: ID, holdId: ID) { return releaseHold(this, viewerId, holdId); }
   markSold(viewerId: ID, listingId: ID) { return markSold(this, viewerId, listingId); }
   museWants(viewerId: ID) { return museWants(this, viewerId); }
-  saleDrafts(viewerId: ID) { return saleDrafts(this, viewerId); }
-  goLiveSale(viewerId: ID, label: string) { return goLiveSale(this, viewerId, label); }
   // ---------- watch history (watch.ts) ----------
   watch(viewerId: ID) { return watch(this, viewerId); }
   recordWatch(viewerId: ID, videoKey: string, seconds: number) { return recordWatch(this, viewerId, videoKey, seconds); }
   marketplaceContext(viewerId: ID) { return marketplaceContext(this, viewerId); }
-  watchedReels(viewerId: ID) { return watchedReels(this, viewerId); }
   addMuseWant(viewerId: ID, w: Parameters<typeof addMuseWant>[2]) { return addMuseWant(this, viewerId, w); }
   removeMuseWant(viewerId: ID, id: ID) { return removeMuseWant(this, viewerId, id); }
   myLocation(viewerId: ID) { return myLocation(this, viewerId); }

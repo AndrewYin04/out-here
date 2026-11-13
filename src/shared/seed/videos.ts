@@ -16,10 +16,6 @@ export type SeedVideo = {
   poster: string;
   /** Keyframe prompts for the clip (gen:images, then gen:clips); without them the clip moves over the poster. */
   frames?: string[];
-  /** Marketplace words Muse may match because someone watched this ("denim purse"); code-checked. */
-  lookFor?: string[];
-  /** What in the video those items are like ("the shoulder bag"), for Muse's line. */
-  look?: string;
 };
 
 export const SEED_VIDEOS: readonly SeedVideo[] = raw as SeedVideo[];
@@ -54,4 +50,15 @@ export const ALEX_WATCH_HISTORY: readonly [string, number, number][] = [
   ['spot-vintage-denim', 180, 40],
   ['vinyl-dig', 420, 62],
   ['lamp-rewire', 240, 88],
+];
+
+/**
+ * Maya's watch history for the thrift demo: she saved the denim styling Reel and watched a thrift
+ * outfit Reel, so a denim bag at a pop-up sale is a Muse pick for her (and the jacket is Alex's).
+ */
+export const MAYA_WATCH_HISTORY: readonly [string, number, number][] = [
+  ['reel-denim-5-ways', 55, 3],
+  ['reel-denim-5-ways', 50, 20],
+  ['reel-thrift-outfit-40', 45, 30],
+  ['spot-vintage-denim', 170, 50],
 ];

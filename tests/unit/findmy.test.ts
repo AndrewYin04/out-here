@@ -33,7 +33,7 @@ describe('Find My: friend pins', () => {
 
   it('gives Maya the dumpling bubble and no home location for other people', async () => {
     const maya = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
-    expect(maya.bubble).toEqual({ emoji: '🥟', thought: 'craving dumplings', doing: 'lunch break for ~45 min', wantsTo: 'try Dumpling Den' });
+    expect(maya.bubble).toEqual({ emoji: '🧋', thought: 'free after class', doing: 'down for boba', wantsTo: null });
     expect(maya.walkingMinutes).not.toBeNull();
     expect(maya.friend.home).toBeNull();
   });
@@ -75,7 +75,7 @@ describe('Find My: editing my share', () => {
     expect(got.some((m) => m.channel === `user:${id('nina')}`)).toBe(false);
     const pin = (await store.friendPins(id('alex'))).find((p) => p.friend.id === id('maya'))!;
     expect(pin.bubble.thought).toBe('ramen instead?');
-    expect(pin.bubble.emoji).toBe('🥟');
+    expect(pin.bubble.emoji).toBe('🧋');
   });
 
   it('only_me hides the pin and still notifies the old audience', async () => {
@@ -108,15 +108,15 @@ describe('Find My: editing my share', () => {
     await expect(store.hangInvite(id('alex'), { toId: id('jordan'), message: 'hi' })).rejects.toMatchObject({ status: 403 });
   });
 
-  it('Want to hang? proposes Dumpling Den for Maya from her bubble, and the invite matches the preview', async () => {
+  it('Want to hang? proposes Bobalicious Corner (boba) for Maya from her bubble, and the invite matches the preview', async () => {
     const s = await store.hangSuggestion(id('alex'), id('maya'));
     expect(s?.kind).toBe('quest');
-    expect(s?.venueName).toBe('Dumpling Den');
-    expect(s?.reason).toContain("Maya's craving dumplings");
-    expect(s?.draft).toContain('Dumpling Den');
+    expect(s?.venueName).toBe('Bobalicious Corner');
+    expect(s?.reason).toMatch(/Maya's (free after class|down for boba)/);
+    expect(s?.draft).toContain('Bobalicious Corner');
     const { invite, suggestion } = await store.hangInvite(id('alex'), { toId: id('maya'), message: s!.draft, questId: s!.questId });
     expect(invite.questId).toBe(s!.questId);
-    expect(suggestion).toContain('Dumplings');
+    expect(suggestion).toMatch(/boba/i);
     // a hidden friend gets no suggestion
     expect(await store.hangSuggestion(id('alex'), id('olivia'))).toBeNull();
   });

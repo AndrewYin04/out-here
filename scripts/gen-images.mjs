@@ -20,10 +20,7 @@ const NO_TEXT = "No text overlays, no captions, no logos, no brand names, no rea
 
 const data = JSON.parse(readFileSync(join(ROOT, "supabase", "seed-content.json"), "utf8"));
 const eventHint = Object.fromEntries(EVENTS.map((e) => [e[0], e[9]]));
-const listingHint = { ...Object.fromEntries(LISTINGS.map((l) => [l[0], l[5]])),
-  // "45 Minutes to Thrift" pop-up items (src/features/data/seed-build.ts POPUP_SALE)
-  p01: "navy zip-up track jacket with white stripes down the sleeves, on a hanger", p02: "small Y2K denim shoulder purse with a silver clasp",
-  p03: "brown corduroy bucket hat", p04: "faded black graphic band t-shirt, folded" };
+const listingHint = Object.fromEntries(LISTINGS.map((l) => [l[0], l[5]]));
 
 // ---------- jobs: [path, prompt, kind] ----------
 const jobs = [];

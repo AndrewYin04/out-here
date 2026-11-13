@@ -10,7 +10,7 @@ import {
   DAILY_PROMPTS, DEMO_AVAILABILITY, DEMO_QUESTS, NEVER_PRESEATED, PAST_HANGOUTS,
 } from '../../shared/seed/story';
 import { SEED_LOCATION_SHARES, SHARE_TTL_MIN } from '../../shared/seed/locations';
-import { ALEX_WATCH_HISTORY } from '../../shared/seed/videos';
+import { ALEX_WATCH_HISTORY, MAYA_WATCH_HISTORY } from '../../shared/seed/videos';
 import { REACTION_TYPES, type ProfileField, type Audience } from '../../shared/types';
 
 // ---------- content contract ----------
@@ -142,25 +142,8 @@ export const PICKUP_LISTINGS = [
 /** The watch Alex set with Muse yesterday; the pop-up's $20 track jacket fits it. */
 export const ALEX_WANT = {
   text: 'track jacket under $25',
-  item: 'track jacket', keywords: ['track jacket', 'jacket'], maxPrice: 25, maxDriveMin: null,
+  item: 'track jacket', keywords: ['track jacket', 'windbreaker', 'jacket'], maxPrice: 25, maxDriveMin: 15,
 };
-
-/**
- * "45 Minutes to Thrift": Leo's pop-up sale, prefilled as a draft (a pickup label and place, no
- * pickup window), so nobody sees it until Leo taps Go live. Ids are listings in seed-content.json.
- * The track jacket fits Alex's watch; the denim purse is like the bag in the Reel Maya watched.
- */
-export const POPUP_SALE = {
-  seller: 'leo', label: 'Campus Thrift Pop-Up', spot: 'Folding tables by the Hacker Way Courts',
-  place: 'Bobalicious Corner', meters: 260, bearing: 20,
-  items: ['p01', 'p02', 'p03', 'p04'],
-} as const;
-
-/** Reels Maya watched before the demo: [video key, seconds, hours ago]. */
-export const MAYA_WATCH_HISTORY: readonly [string, number, number][] = [
-  ['reel-denim-bag-styling', 58, 20],
-  ['reel-thrift-outfit-40', 60, 44],
-];
 
 const iso = (d: Date) => d.toISOString();
 const addMin = (d: Date, m: number) => new Date(d.getTime() + m * 60_000);
@@ -621,18 +604,6 @@ export function buildSeed(
       lat: at.lat, lng: at.lng, pickup_label: p.label, pickup_spot: p.spot,
       pickup_until: iso(addMin(demoNow, p.openMin)), created_at: iso(addMin(demoNow, -p.listedMinAgo)),
     });
-  }
-  // The pop-up sale: draft listings at one place, off the map until the seller goes live.
-  {
-    const at = offsetPoint(requirePlace(POPUP_SALE.place), POPUP_SALE.meters, POPUP_SALE.bearing);
-    for (const id of POPUP_SALE.items) {
-      const row = t.listings.find((r) => r.id === seedId('listing', id));
-      if (!row) { warnings.push(`pop-up listing ${id}: not in seed content, skipped`); continue; }
-      Object.assign(row, {
-        lat: Number(at.lat.toFixed(6)), lng: Number(at.lng.toFixed(6)), pickup_label: POPUP_SALE.label, pickup_spot: POPUP_SALE.spot,
-        pickup_until: null, created_at: iso(addMin(demoNow, -30)),
-      });
-    }
   }
   if (has('alex')) {
     t.muse_wants.push({

@@ -56,15 +56,6 @@ export async function recordWatch(store: CoreStore, viewerId: ID, videoKey: stri
   return { ok: true };
 }
 
-/** Reels the viewer watched that name things to look for on Marketplace (Muse finds on the map). */
-export async function watchedReels(store: CoreStore, viewerId: ID): Promise<{ key: string; title: string; lookFor: string[]; look: string }[]> {
-  const v = await store.view();
-  return historyOf(v, viewerId).flatMap((h) => {
-    const s = VIDEO_BY_KEY.get(h.videoKey);
-    return s && s.format === 'reel' && s.lookFor?.length ? [{ key: s.key, title: s.title, lookFor: s.lookFor, look: s.look ?? 'what you saw' }] : [];
-  });
-}
-
 // ---------- context for Muse's Marketplace picks ----------
 
 export type MarketplaceContext = {

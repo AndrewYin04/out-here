@@ -79,21 +79,7 @@ export async function parseWant(text: string, userId: ID | null): Promise<{ want
 
 // ---------- 2. match listings (code) ----------
 
-export type FindCandidate = Omit<MuseFind, 'line' | 'source'> & {
-  want: MuseWant | null;
-  /** For a Reel find: what in the Reel the listing is like ("the shoulder bag"). */
-  reelLook?: string | null;
-};
-
-/** A Reel the viewer watched, with what Muse may look for on Marketplace because of it. */
-export type WatchedReel = { key: string; title: string; lookFor: string[]; look: string };
-
-/** The pop-up sale a listing belongs to: its pickup label, when the seller has 2+ items there on the map. */
-export function saleOf(m: MapListing, listings: MapListing[]): string | null {
-  const label = m.listing.pickupLabel;
-  if (!label) return null;
-  return listings.filter((o) => o.listing.sellerId === m.listing.sellerId && o.listing.pickupLabel === label).length >= 2 ? label : null;
-}
+export type FindCandidate = Omit<MuseFind, 'line' | 'source'> & { want: MuseWant };
 
 /** Minutes of slack needed between arriving and the end of the pickup window. */
 export const ARRIVE_BEFORE_END_MIN = 5;
@@ -130,42 +116,10 @@ export function matchListings(
         listingId: l.id, wantId: w.id, title: cleanTitle(l.title), priceUsd: l.priceUsd, imageUrl: l.imageUrl,
         driveMin, pickupUntil: l.pickupUntil, sellerFirstName: m.seller.name.split(' ')[0] ?? m.seller.name,
         listedMinAgo: Math.max(0, Math.round((at.getTime() - new Date(l.createdAt).getTime()) / 60_000)), want: w,
-        via: 'want', sale: saleOf(m, listings), reelTitle: null,
       });
     }
   }
   // Newest first (a fresh listing is the news), then the shortest drive.
-  return out.sort((a, b) => a.listedMinAgo - b.listedMinAgo || a.driveMin - b.driveMin);
-}
-
-/**
- * Listings like something in a Reel the viewer watched (code only): the title has one of the
- * Reel's look-for words. Newest listing first. Muse never invents a listing or a Reel.
- */
-export function matchReels(
-  reels: WatchedReel[], listings: MapListing[], origin: LatLng, at: Date, viewerId: ID,
-): FindCandidate[] {
-  const out: FindCandidate[] = [];
-  const seen = new Set<string>();
-  for (const r of reels) {
-    if (r.lookFor.length === 0) continue;
-    for (const m of listings) {
-      const l = m.listing;
-      if (seen.has(l.id) || m.status !== 'available' || l.sellerId === viewerId || !l.location || !l.pickupUntil) continue;
-      if (m.myHold && (m.myHold.status === 'requested' || m.myHold.status === 'accepted')) continue;
-      if (!titleMatches(l.title, r.lookFor)) continue;
-      const driveMin = drivingMinutes(origin, l.location);
-      const left = (new Date(l.pickupUntil).getTime() - at.getTime()) / 60_000;
-      if (left < driveMin + ARRIVE_BEFORE_END_MIN) continue;
-      seen.add(l.id);
-      out.push({
-        listingId: l.id, wantId: null, title: cleanTitle(l.title), priceUsd: l.priceUsd, imageUrl: l.imageUrl,
-        driveMin, pickupUntil: l.pickupUntil, sellerFirstName: m.seller.name.split(' ')[0] ?? m.seller.name,
-        listedMinAgo: Math.max(0, Math.round((at.getTime() - new Date(l.createdAt).getTime()) / 60_000)),
-        want: null, via: 'reel', sale: saleOf(m, listings), reelTitle: r.title, reelLook: r.look,
-      });
-    }
-  }
   return out.sort((a, b) => a.listedMinAgo - b.listedMinAgo || a.driveMin - b.driveMin);
 }
 
@@ -175,22 +129,15 @@ const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 export function findFacts(c: FindCandidate): FindLineFacts {
   return {
-    title: c.title, price: money(c.priceUsd), budget: c.want && c.want.maxPrice !== null ? money(c.want.maxPrice) : null,
-    driveMin: c.driveMin, maxDriveMin: c.want?.maxDriveMin ?? null, availableUntil: formatDemoTime(c.pickupUntil),
-    listedMinAgo: c.listedMinAgo, sellerFirstName: c.sellerFirstName, wanted: c.want?.text ?? null,
-    via: c.via, sale: c.sale, reelTitle: c.reelTitle, reelLook: c.reelLook ?? null,
+    title: c.title, price: money(c.priceUsd), budget: c.want.maxPrice !== null ? money(c.want.maxPrice) : null,
+    driveMin: c.driveMin, maxDriveMin: c.want.maxDriveMin, availableUntil: formatDemoTime(c.pickupUntil),
+    listedMinAgo: c.listedMinAgo, sellerFirstName: c.sellerFirstName, wanted: c.want.text,
   };
 }
 
 /** The line code writes when Muse is off, slow, or wrote something unchecked. */
 export function codeLine(c: FindCandidate): string {
   const f = findFacts(c);
-  const what = f.title.toLowerCase();
-  if (c.via === 'reel') {
-    const at = c.sale ? `at ${c.sale}` : 'for pickup nearby';
-    return `There's a ${f.price} ${what} ${at}, like ${f.reelLook ?? 'what you saw'} in the Reel you watched.`;
-  }
-  if (c.sale) return `There's a ${f.price} ${what} at ${c.sale}. It fits the watch you set: ${f.wanted}.`;
   const fresh = c.listedMinAgo <= 15 ? 'was just listed' : c.listedMinAgo < 60 ? `was listed ${c.listedMinAgo} min ago` : 'is up for pickup';
   return `That ${f.price} ${f.title.toLowerCase()} ${fresh}. It's a ${f.driveMin}-minute drive, and the seller is around until ${f.availableUntil}.`;
 }
@@ -219,7 +166,7 @@ const lineCache = new Map<string, { line: string; source: MuseFind['source'] }>(
 
 export async function explainFind(c: FindCandidate, userId: ID | null): Promise<{ line: string; source: MuseFind['source'] }> {
   const f = findFacts(c);
-  const key = JSON.stringify([c.listingId, c.wantId, c.via, c.sale, f.driveMin, f.availableUntil, c.listedMinAgo <= 15]);
+  const key = JSON.stringify([c.listingId, c.wantId, f.driveMin, f.availableUntil, c.listedMinAgo <= 15]);
   const hit = lineCache.get(key);
   if (hit) return hit;
   const route = '/api/muse/finds';
@@ -249,10 +196,10 @@ export async function explainFind(c: FindCandidate, userId: ID | null): Promise<
 
 /** The viewer's best find (Muse explains it), or none. Code picks it; Muse only writes the line. */
 export async function museFinds(
-  wants: MuseWant[], listings: MapListing[], origin: LatLng, at: Date, viewerId: ID, reels: WatchedReel[] = [],
+  wants: MuseWant[], listings: MapListing[], origin: LatLng, at: Date, viewerId: ID,
 ): Promise<MuseFind[]> {
-  const best = matchListings(wants, listings, origin, at, viewerId)[0] ?? matchReels(reels, listings, origin, at, viewerId)[0];
+  const best = matchListings(wants, listings, origin, at, viewerId)[0];
   if (!best) return [];
-  const { want: _want, reelLook: _look, ...facts } = best;
+  const { want: _want, ...facts } = best;
   return [{ ...facts, ...(await explainFind(best, viewerId)) }];
 }

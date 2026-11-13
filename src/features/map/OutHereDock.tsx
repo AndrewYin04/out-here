@@ -44,6 +44,8 @@ type Props = {
   onSelect: (id: string) => void;
   /** The I'm free row hides while you walk; the tabs stay. */
   showActions?: boolean;
+  /** More action buttons beside Post (the Marketplace menu). */
+  extraActions?: ReactNode;
 };
 
 const SNAP_PX = 48;
@@ -53,7 +55,7 @@ const TAB = 'oh-press flex h-11 min-w-0 items-center justify-center gap-2 rounde
 const tabClass = (on: boolean) => cn(TAB, on ? 'min-w-fit grow-[2.4] bg-fb-blue-tint px-4 text-fb-blue' : 'grow text-fb-text-2 hover:bg-fb-hover');
 const ROUND = 'oh-press flex size-11 items-center justify-center rounded-full bg-fb-surface text-fb-text shadow-popover hover:bg-fb-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-fb-blue';
 
-export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCreate, quests, walkMinutes, now, onSelect, showActions = true }: Props) {
+export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCreate, quests, walkMinutes, now, onSelect, showActions = true, extraActions }: Props) {
   const [tab, setTab] = useState<DockTab>(mode);
   const [level, setLevel] = useState<Level>(0);
   const [editing, setEditing] = useState(false);
@@ -176,6 +178,7 @@ export function OutHereDock({ mode, onMode, view, onToggleView, onRecenter, onCr
               <span className="max-[419px]:sr-only">Post</span>
             </button>
           )}
+          {extraActions}
           <span className="flex-1" />
           <button type="button" data-testid="recenter" aria-label="Back to you" title="Back to you" onClick={onRecenter} className={cn(ROUND, 'shrink-0')}>
             <LocateFixed size={20} aria-hidden />

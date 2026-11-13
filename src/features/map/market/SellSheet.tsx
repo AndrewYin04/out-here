@@ -17,6 +17,26 @@ export type SellSheetProps = {
   now: Date;
   onClose: () => void;
   onPosted: (l: MapListing) => void;
+  /** A pop-up sale with its items filled in (the demo seller opens it with ?sell=popup). */
+  popUp?: PopUpSale | null;
+};
+
+export type PopUpSale = {
+  name: string;
+  spot: string;
+  items: { title: string; priceUsd: number; category: string; imageUrl: string | null; description: string }[];
+};
+
+/** The demo's pop-up: Alex's jacket want and Maya's denim Reel each match one item. */
+export const CAMPUS_THRIFT_POPUP: PopUpSale = {
+  name: 'Campus Thrift Pop-Up',
+  spot: 'Folding tables by the bike racks, Hacker Way entrance',
+  items: [
+    { title: 'Vintage track jacket', priceUsd: 20, category: 'Clothing', imageUrl: '/seed/listings/p01.webp',
+      description: 'Zip-up track jacket, size M, barely worn. At the Campus Thrift Pop-Up today only.' },
+    { title: 'Y2K denim shoulder bag', priceUsd: 15, category: 'Clothing', imageUrl: '/seed/listings/p02.webp',
+      description: 'Early-2000s denim purse with a short shoulder strap. At the Campus Thrift Pop-Up today only.' },
+  ],
 };
 
 /** "Available until" choices: +1 h, +2 h, +3 h (rounded to :00/:30) and 5:00 PM when it's 45 min to 12 h away. */
@@ -31,7 +51,80 @@ export function untilChoices(now: Date): Date[] {
   return [...new Map(out.map((d) => [d.getTime(), d])).values()].sort((a, b) => a.getTime() - b.getTime()).slice(0, 4);
 }
 
-export function SellSheet({ at, now, onClose, onPosted }: SellSheetProps) {
+export function SellSheet(props: SellSheetProps) {
+  return props.popUp ? <PopUpSheet {...props} popUp={props.popUp} /> : <SingleSellSheet {...props} />;
+}
+
+/** One tap opens the whole pop-up: every item goes on the map at the same pin and pickup spot. */
+function PopUpSheet({ at, now, onClose, onPosted, popUp }: SellSheetProps & { popUp: PopUpSale }) {
+  const choices = useMemo(() => untilChoices(now), [now]);
+  const until = (choices[1] ?? choices[0]).toISOString();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function open() {
+    setBusy(true);
+    setError(null);
+    try {
+      let first: MapListing | null = null;
+      for (const it of popUp.items) {
+        const body: CreateListingBody = {
+          title: it.title, priceUsd: it.priceUsd, category: it.category, imageUrl: it.imageUrl, description: it.description,
+          location: at, pickupLabel: popUp.name, pickupSpot: popUp.spot, pickupUntil: until,
+        };
+        const r = await apiPost<MapListingResponse>('/api/listings', body);
+        first ??= r.listing;
+      }
+      if (first) onPosted(first);
+    } catch (e) {
+      setError(e instanceof ApiFetchError ? e.message : 'Could not open the pop-up. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section
+      aria-label={popUp.name}
+      data-testid="popup-sheet"
+      className={cn(
+        'absolute inset-x-0 bottom-0 z-30 flex max-h-[78%] flex-col rounded-t-[16px] bg-fb-surface shadow-popover',
+        'md:inset-x-auto md:bottom-4 md:left-4 md:top-4 md:max-h-none md:w-[400px] md:rounded-card',
+      )}
+    >
+      <header className="flex shrink-0 items-start justify-between px-4 pb-1 pt-3">
+        <div>
+          <h2 className="text-[20px] font-bold text-fb-text">{popUp.name}</h2>
+          <p className="text-[13px] text-fb-text-2">Pin dropped. Drag it to where you&apos;re set up.</p>
+        </div>
+        <IconButton label="Close" size="md" onClick={onClose}><X size={20} aria-hidden /></IconButton>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-4 pt-1">
+        <ul className="flex flex-col gap-2">
+          {popUp.items.map((it) => (
+            <li key={it.title} className="flex items-center gap-3 rounded-card bg-fb-input p-2">
+              {it.imageUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={it.imageUrl} alt="" className="size-12 rounded-btn object-cover" />
+                : <span className="flex size-12 items-center justify-center rounded-btn bg-fb-surface text-[24px]" aria-hidden>👜</span>}
+              <span className="min-w-0 flex-1 text-[15px] font-semibold text-fb-text">{it.title}</span>
+              <span className="text-[15px] font-semibold text-fb-text">${it.priceUsd}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[13px] leading-4 text-fb-text-2">
+          Open until {formatDemoTime(until)} · Pickup: {popUp.spot}. Everyone sees the pop-up; only buyers you accept get the exact spot.
+        </p>
+        {error && <p role="alert" className="text-[13px] text-fb-red">{error}</p>}
+        <Button data-testid="popup-open" block disabled={busy} onClick={() => void open()}>
+          {busy ? 'Opening…' : 'Open the pop-up'}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function SingleSellSheet({ at, now, onClose, onPosted }: SellSheetProps) {
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState<string>('Furniture');

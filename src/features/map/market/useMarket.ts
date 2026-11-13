@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useApi, type ApiState } from '@/features/data';
 import type { LatLng } from '@/shared';
-import type { MapListing, MapListingResponse, MapListingsResponse, MuseFindsResponse, MuseWantsResponse } from '@/shared/api';
+import type { MapListing, MapListingResponse, MapListingsResponse, MarketplacePicksResponse, MuseFind, MuseFindsResponse, MuseWantsResponse } from '@/shared/api';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   furniture: '🪑', electronics: '🖥️', home: '🏠', clothing: '🧥', sports: '🏐', books: '📚',
@@ -13,7 +13,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
 const TITLE_EMOJI: [RegExp, string][] = [
   [/chair|stool/i, '🪑'], [/desk|table/i, '🪵'], [/lamp/i, '💡'], [/bike/i, '🚲'], [/monitor|tv|screen/i, '🖥️'],
   [/plant|monstera/i, '🪴'], [/rice cooker|pan|pot|mixer/i, '🍳'], [/shelf|bookshelf/i, '📚'], [/camera/i, '📷'],
-  [/jacket|shirt|sneaker|shoe/i, '🧥'],
+  [/jacket|shirt|sneaker|shoe/i, '🧥'], [/bag|purse|tote/i, '👜'],
 ];
 
 export function listingEmoji(title: string, category: string): string {
@@ -72,6 +72,34 @@ export function useMuseFinds(origin: LatLng | null, listings: MapListing[] | und
     void refetch();
   }, [wantsKey, refetch]);
   return api;
+}
+
+/** Listings newer than this can surface as a find from what the viewer watches. */
+const WATCH_FIND_MAX_AGE_MIN = 60;
+
+/**
+ * Muse's picks from the viewer's watch history (Reels and videos they saved or watched), shown
+ * as map finds when a matching listing has just gone up nearby. Same card as a want find; the
+ * line is Muse's reason ("like the denim Reel you saved"). Refetches when a listing goes up.
+ */
+export function useWatchFinds(origin: LatLng | null, listings: MapListing[] | undefined): MuseFind[] {
+  const path = origin ? `/api/muse/marketplace-picks?lat=${origin.lat.toFixed(5)}&lng=${origin.lng.toFixed(5)}` : null;
+  const api = useApi<MarketplacePicksResponse>(path, ['listings:new']);
+  return useMemo(() => {
+    const onMap = new Map((listings ?? []).map((l) => [l.listing.id, l]));
+    const t = Date.now();
+    return (api.data?.picks ?? []).flatMap((p): MuseFind[] => {
+      const l = onMap.get(p.listing.id);
+      if (!l || l.listing.status !== 'available' || !l.listing.pickupUntil) return [];
+      const ageMin = Math.max(0, Math.round((t - new Date(l.listing.createdAt).getTime()) / 60_000));
+      if (ageMin > WATCH_FIND_MAX_AGE_MIN) return [];
+      return [{
+        listingId: l.listing.id, wantId: `watch:${p.topic}`, title: cleanTitle(l.listing.title), priceUsd: l.listing.priceUsd,
+        imageUrl: l.listing.imageUrl, driveMin: p.driveMin ?? 0, pickupUntil: l.listing.pickupUntil, listedMinAgo: ageMin,
+        sellerFirstName: p.seller.name.split(' ')[0] ?? p.seller.name, line: p.reason, source: api.data?.source ?? 'fallback',
+      }];
+    });
+  }, [api.data, listings]);
 }
 
 /** "12 min" / "1 h 5 min" until `iso`, never negative. */

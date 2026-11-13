@@ -32,18 +32,10 @@ export type FindLineFacts = {
   availableUntil: string;
   listedMinAgo: number;
   sellerFirstName: string;
-  /** The watch the user set ("track jacket under $25"); null for a Reel find. */
-  wanted: string | null;
-  via: 'want' | 'reel';
-  /** The pop-up sale the item is part of, or null. */
-  sale: string | null;
-  reelTitle: string | null;
-  /** What in the Reel it is like ("the shoulder bag"). */
-  reelLook: string | null;
+  wanted: string;
 };
 
 export function findLineMessages(f: FindLineFacts): MuseMessage[] {
-  if (f.sale || f.via === 'reel') return saleLineMessages(f);
   return [
     {
       role: 'system',
@@ -57,36 +49,5 @@ export function findLineMessages(f: FindLineFacts): MuseMessage[] {
       ].join('\n'),
     },
     { role: 'user', content: JSON.stringify(f) },
-  ];
-}
-
-/** A pop-up sale or a Reel find: name the sale and the real reason (the watch, or the Reel). */
-function saleLineMessages(f: FindLineFacts): MuseMessage[] {
-  const why = f.via === 'reel'
-    ? 'The reason: it is like something in a Reel they watched (reelTitle, reelLook). Say "like <reelLook> in the Reel you watched".'
-    : 'The reason: it fits the watch they set with you earlier (wanted). Say "It fits the watch you set".';
-  const example = f.via === 'reel'
-    ? '"There’s a $18 Y2K denim purse at the Campus Thrift Pop-Up, like the shoulder bag in the Reel you watched."'
-    : '"There’s a $20 track jacket at the Campus Thrift Pop-Up. It fits the watch you set."';
-  return [
-    {
-      role: 'system',
-      content: [
-        'You are Muse, a friendly assistant inside Facebook. A nearby pop-up sale just went live and one item matches this person.',
-        'Write one or two short sentences (under 30 words), like a friend would.',
-        'Use only these facts: the item title, the price, the sale name, and the reason.',
-        why,
-        'Write the price exactly as given. Do not mention anything else: no condition, colors, sizes, times, distances, other people or promises.',
-        'No emojis, no hype words.',
-        `Example: ${example}`,
-      ].join('\n'),
-    },
-    {
-      role: 'user',
-      content: JSON.stringify({
-        title: f.title, price: f.price, sale: f.sale, budget: f.budget,
-        ...(f.via === 'reel' ? { reelTitle: f.reelTitle, reelLook: f.reelLook } : { wanted: f.wanted }),
-      }),
-    },
   ];
 }
