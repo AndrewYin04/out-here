@@ -51,17 +51,17 @@ What must be on screen at 0:00: Alex's Out Here map (Friends tab), Maya's phone 
 | | |
 |---|---|
 | Screen | Leo, then Alex and Maya, then Leo, then Alex |
-| Click | Leo: **Open the pop-up**. Alex: **View** on the Muse card → **Reserve for pickup** → **Send request**. Leo: **Accept** on the request card at the top. |
+| Click | Leo: **Open the pop-up**. Alex: **View** on the Muse card → **Reserve for pickup** → **Send request**. Leo: **Accept** (in the jacket's sheet, which stays open after Open the pop-up, or on the request card at the top of the map). |
 | Type | nothing |
 | Say | "While they walk, a student opens a thrift pop-up on campus. Muse knows Alex set a watch for a track jacket under $25, and Maya saved a denim styling Reel. Same public sale, a different reason for each of them. Alex reserves the jacket, the seller accepts, and it's held for him." |
-| Audience sees | The pop-up's pin appears on every map within about 2 s. Alex: a Muse card about the $20 track jacket matching his watch. Maya: a Muse card about the Y2K denim bag, citing the denim Reel she saved. Alex's sheet: "Requested", then "Held for you · N min left" with the countdown. |
+| Audience sees | The pop-up's pin appears on every map within a few seconds (the Muse cards take 4 to 6 s: Muse writes each line live). Alex: a Muse card about the $20 track jacket matching his watch. Maya: a Muse card about the Y2K denim bag, citing the denim Reel she saved. Alex's sheet: "Requested", then "Held for you · N min left" with the countdown. |
 
 ### Beat 4. Fit check into Memories (2:15 to 2:45)
 
 | | |
 |---|---|
 | Screen | Alex, then Maya |
-| Click | Alex: when the photo prompt opens at Bobalicious Corner ("You made it"), take or upload the fit-check photo and tap **Save**. Then show Maya's phone. |
+| Click | Alex: close the jacket's sheet (X), tap **Let's go** on Up next (the walk resumes in 3D and arrives in about 10 s). When "You made it" opens, tap **Take a photo together** (or **Choose a photo**), then **Save to crew album**, then **Ask Muse for a caption** → **Use suggested caption** → **Save caption**. Then Maya's phone: Menu → **Memories**. |
 | Type | nothing |
 | Say | "They made it. One fit check, the jacket and the drinks, saved to their shared album. Muse writes the caption, and offers to get the group together again." |
 | Audience sees | The photo in the shared album on both screens, the ✨ Muse caption on it, and "Get this group together again". |
@@ -75,7 +75,9 @@ Say: "Forty-five minutes, one sentence to Muse, a friend, a find, and a memory. 
 - **Muse is slow (no draft card after about 8 s):** keep talking over the "Muse is working" steps; the warmed cache normally answers in under 2 s. If nothing after 20 s, tap **Change** and send the same text again.
 - **No Muse card about the jacket or the bag (beat 3):** the team's fallback. On Alex, switch the dashboard to Explore, tap the jacket's pin, and run **Reserve for pickup** on it as a single listing. Say Muse's reason yourself.
 - **The walking view stalls or renders blank:** tap the **3D** button to return to the map and continue there; the plan, the pop-up and the photo all work on the flat map.
-- **The photo prompt does not open on arrival:** open the plan from Up next (or Explore) and tap the camera tile (**Take a photo together**).
+- **The photo prompt does not open on arrival:** tap **Take a photo together** on Up next, or open the plan's pin and tap **Add a moment**.
+- **The find card covers the walk:** tapping **View** on a Muse card leaves the 3D walk for the map. That is expected; beat 4 starts with **Let's go** on Up next, which resumes the walk.
+- **Leo's tab shows no request after Alex sends it:** Leo taps the $20 pin (Explore) to open its sheet; the request is there with Accept.
 - **Invite does not arrive on Maya's phone within 3 s:** pull down or reload Maya's tab; the invite is in Out Here and in Notifications.
 - **Anything is left over from a rehearsal:** Reset demo (Setup step 2) and reload all three tabs.
 
