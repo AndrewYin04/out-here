@@ -42,7 +42,7 @@ type Actor = {
   /** Jolly's sparkle trail on the ground, and whether his thinking effect is on. */
   sparkles: SparkleWake | null;
   processing: 'off' | 'pending' | 'success' | 'fade';
-  /** A warm golden glow behind Jolly, so he stands out from grey streets. */
+  /** A Muse-blue glow behind Jolly, so he stands out from the street. */
   halo: THREE.Sprite | null;
 };
 export type BeaconSpec = {
@@ -67,7 +67,10 @@ const GOLD = '#F5B800';
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
-/** Jolly's halo: warm gold in the middle, fading out (drawn additively behind him). */
+/** Off: no glow around Jolly (asked for). The cool back light still separates him from the street. */
+const SHOW_HALO = false;
+
+/** Jolly's halo: Muse blue, bright cyan in the middle, fading out (drawn additively behind him). */
 function haloTexture(): THREE.Texture {
   if (typeof document === 'undefined') return new THREE.Texture();
   const c = document.createElement('canvas');
@@ -75,9 +78,9 @@ function haloTexture(): THREE.Texture {
   const g = c.getContext('2d');
   if (g) {
     const grad = g.createRadialGradient(32, 32, 4, 32, 32, 31);
-    grad.addColorStop(0, 'rgba(255, 214, 120, 0.75)');
-    grad.addColorStop(0.45, 'rgba(255, 190, 80, 0.38)');
-    grad.addColorStop(1, 'rgba(255, 170, 60, 0)');
+    grad.addColorStop(0, 'rgba(140, 220, 255, 0.8)');
+    grad.addColorStop(0.45, 'rgba(35, 160, 255, 0.42)');
+    grad.addColorStop(1, 'rgba(8, 102, 255, 0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
   }
@@ -170,7 +173,7 @@ export class WorldLayer implements CustomLayerInterface {
     const m=this.originMerc.meterInMercatorCoordinateUnits();
     this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
     // Golden hour: a warm sky fill and a low golden sun from the south-west.
-    this.scene.add(new THREE.HemisphereLight('#FFE6BD', '#B9A27A', .85));
+    this.scene.add(new THREE.HemisphereLight('#FFF0D6', '#C9B48A', 1.15));
     this.charScene.add(new THREE.HemisphereLight('#FFE6BD', '#B9A27A', .85));
     const sun2 = new THREE.DirectionalLight('#FFC86E', 3.1);
     sun2.position.set(-6,5,6);
@@ -216,7 +219,7 @@ export class WorldLayer implements CustomLayerInterface {
       this.scene.add(shadow);
     }
     let halo: THREE.Sprite | null = null;
-    if (kind === 'pet') {
+    if (kind === 'pet' && SHOW_HALO) {
       halo = new THREE.Sprite(this.haloMat);
       halo.renderOrder = -1;
       halo.frustumCulled = false;

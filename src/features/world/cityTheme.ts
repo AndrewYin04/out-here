@@ -98,7 +98,7 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     add({
       id: BUILDINGS_ID, type: 'fill-extrusion', source, 'source-layer': 'building', minzoom: 14.5,
       paint: {
-        'fill-extrusion-color': ['match',['%',['to-number',['id'],0],7],0,'#F4B28B',1,'#80C6BA',2,'#F1C967',3,'#7DB7D0',4,'#D99CAF',5,'#A0C38A','#C99A79'],
+        'fill-extrusion-color': ['match',['%',['to-number',['id'],0],9],0,'#E86A3A',1,'#3D7DCA',2,'#F2C14E',3,'#2A9D8F',4,'#F07C6C',5,'#6EC6F0',6,'#C8553D',7,'#F6A04D','#8FD3B6'],
         'fill-extrusion-height': ['max', 3.5, ['coalesce', ['get', 'render_height'], 8]],
         'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
         'fill-extrusion-vertical-gradient': true,

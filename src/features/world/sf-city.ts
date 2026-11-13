@@ -21,7 +21,9 @@ export type CityPlacement = {
   size: number; tint?: string; building?: boolean;
 };
 // Bright, saturated tints (they multiply the kit's colour atlas, so pastels read dusty).
-const TINTS = ['#FF9A76', '#5FE0D2', '#FFD966', '#79B8FF', '#FF9ED8', '#9BE07A'];
+// From the reference cities: Kenney orange, brick and brownstone, pastel row houses, toy-town brights.
+// Fully saturated, since they multiply the kit's light walls.
+const TINTS = ['#E86A3A', '#3D7DCA', '#F2C14E', '#2A9D8F', '#F07C6C', '#6EC6F0', '#C8553D', '#8FD3B6', '#F6A04D', '#F28FAD', '#9ED36A', '#E8E28A'];
 const SHOPS: Asset[] = ['shopA', 'shopC', 'shopF', 'shopH', 'shopK', 'shopM'];
 const HOUSES: Asset[] = ['houseB', 'houseF', 'houseJ'];
 const TOWERS: Asset[] = ['towerA', 'towerB', 'towerD'];
@@ -119,7 +121,7 @@ export async function buildSfCity(origin: LatLng, centers: readonly CityCenter[]
   for (const [name, prototype] of loaded) {
     const geometry = prototype.geometry.clone(), material = prototype.material.clone();
     material.roughness = .82; material.metalness = 0; material.side = THREE.FrontSide;
-    material.emissive.set('#FFF4D8'); material.emissiveIntensity = .14;
+    material.emissive.set('#FFF4D8'); material.emissiveIntensity = .03;
     if (material.map) { material.map = material.map.clone(); material.map.needsUpdate = true; textures.add(material.map); }
     geometries.add(geometry); materials.add(material); protos.set(name, { geometry, material, bounds: prototype.bounds });
   }
@@ -152,7 +154,8 @@ export async function buildSfCity(origin: LatLng, centers: readonly CityCenter[]
         quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, p.rotation);
         matrix.compose(position.set(p.x, y - prototype.bounds.min.y * factor, p.z), quaternion, size.setScalar(factor));
         mesh.setMatrixAt(i, matrix);
-        mesh.setColorAt(i, new THREE.Color(p.tint ?? '#FFFFFF'));
+        // Tints multiply the kit's walls, which darkens them: lift tinted colours above 1 so they stay bright.
+        mesh.setColorAt(i, p.tint ? new THREE.Color(p.tint).multiplyScalar(1.55) : new THREE.Color('#FFFFFF'));
         if (p.building) {
           const box = prototype.bounds.clone().applyMatrix4(matrix).translate(block.position);
           box.expandByScalar(.5); collisions.push(box);
