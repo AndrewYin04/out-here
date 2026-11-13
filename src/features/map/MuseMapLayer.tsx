@@ -15,6 +15,8 @@ import { MuseOrb, attachMuseWorld, finishAgentEncounter, useAgentEncounter, useM
 import type { FriendPin, LatLng, Quest } from '@/shared';
 
 type Pt = { x: number; y: number };
+/** Off: one Jolly speaks in 2D, the Muse button (MuseDockButton); the map keeps the rings and tags. */
+const SHOW_MAP_JOLLY = false;
 // The dots from Jolly's head up to the cloud: x, y (px from his centre) and size.
 const DOTS: [number, number, number][] = [[9, -27, 6], [13, -37, 9]];
 
@@ -92,7 +94,8 @@ export function MuseMapLayer({ map, me, quests, friendPins }: { map: MapLibreMap
         <MuseHandoff me={clamp(mePt)} friend={friendAt(encounter.recipient.id)} project={project} clamp={clamp}
           name={encounter.recipient.name.split(' ')[0]} messages={encounter.messages} outcome={encounter.outcome} />
       )}
-      {focus?.kind !== 'encounter' && (
+      {/* Jolly is the Muse button in the control row; his thought clouds pop out of him there. */}
+      {SHOW_MAP_JOLLY && focus?.kind !== 'encounter' && (
         <div className="muse-map-jolly" style={{ transform: `translate(${perch.x}px, ${perch.y}px)` }}>
           <span key={`j:${c.key}`} className="muse-map-hop"><MuseOrb state={snap.state} size={44} className="rounded-full shadow-popover" /></span>
           {text && <ThoughtCloud key={`t:${c.key}`} text={text} />}

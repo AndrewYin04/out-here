@@ -97,9 +97,9 @@ function shadowTexture(): THREE.Texture {
   const g = c.getContext('2d');
   if (g) {
     const grad = g.createRadialGradient(32, 32, 2, 32, 32, 31);
-    grad.addColorStop(0, 'rgba(40, 22, 8, 0.66)');
-    grad.addColorStop(0.5, 'rgba(40, 22, 8, 0.38)');
-    grad.addColorStop(1, 'rgba(40, 22, 8, 0)');
+    grad.addColorStop(0, 'rgba(15, 22, 38, 0.6)');
+    grad.addColorStop(0.5, 'rgba(15, 22, 38, 0.34)');
+    grad.addColorStop(1, 'rgba(15, 22, 38, 0)');
     g.fillStyle = grad;
     g.fillRect(0, 0, 64, 64);
   }
@@ -172,17 +172,17 @@ export class WorldLayer implements CustomLayerInterface {
     this.originMerc = MercatorCoordinate.fromLngLat([origin.lng, origin.lat], 0);
     const m=this.originMerc.meterInMercatorCoordinateUnits();
     this.modelMatrix.makeTranslation(this.originMerc.x,this.originMerc.y,this.originMerc.z??0).scale(new THREE.Vector3(m,-m,m)).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
-    // Golden hour: a warm sky fill and a low golden sun from the south-west.
-    this.scene.add(new THREE.HemisphereLight('#FFF0D6', '#C9B48A', 1.15));
-    this.charScene.add(new THREE.HemisphereLight('#FFE6BD', '#B9A27A', .85));
-    const sun2 = new THREE.DirectionalLight('#FFC86E', 3.1);
+    // Clear daylight: a bright sky fill and a sun from the south-west (shadows fall north-east).
+    this.scene.add(new THREE.HemisphereLight('#EAF4FF', '#D3D8C6', 1.2));
+    this.charScene.add(new THREE.HemisphereLight('#EAF4FF', '#D3D8C6', .95));
+    const sun2 = new THREE.DirectionalLight('#FFF7EC', 2.7);
     sun2.position.set(-6,5,6);
     this.charScene.add(sun2);
     // A soft cool back light outlines the characters against the warm street.
     const rim = new THREE.DirectionalLight('#BFD8FF', 1.4);
     rim.position.set(5,4,-7);
     this.charScene.add(rim);
-    const sun = new THREE.DirectionalLight('#FFC86E', 2.9);
+    const sun = new THREE.DirectionalLight('#FFF7EC', 2.6);
     sun.position.set(-6,5,6);
     this.scene.add(sun);
   }
@@ -488,7 +488,7 @@ export class WorldLayer implements CustomLayerInterface {
         a.shadow.position.set(o.east, 0.04, -o.north);
         // Jolly's footprint is smaller, and his shadow shrinks as he lifts off the ground.
         const foot = a.kind === 'pet' ? 0.62 * Math.max(0.35, 1 - a.altitude * 0.45) : 1.05;
-        // Cast by the low golden sun (south-west): stretched and pushed toward the north-east.
+        // Cast by the sun (south-west): stretched and pushed toward the north-east.
         const k = s * foot * (a.boost || 1);
         a.shadow.scale.set(k * 1.15, k * 1.5, 1);
         a.shadow.rotation.z = Math.PI / 4;

@@ -4,8 +4,13 @@
 // (Memories) get the floating version at the side. Both:
 //  - open the Muse chat,
 //  - catch Jolly flying out of the 3D world when you leave it (he lands here),
-//  - show Muse speaking up (a friend just got free) in a card that pops out of him.
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+//  - show Muse speaking up (a friend just got free) in a card that pops out of him,
+//  - and, everywhere but the 3D world (where Jolly talks in the street), Jolly's speech bubble (a
+//    hello, or the plan that's up next) and his thought clouds (Muse's live commentary) pop out of him.
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useViewer } from '@/features/data';
+import { useUpNext } from '@/features/outhere';
+import { useMuseCommentary } from './commentary';
 import { backendTransport } from '@/features/muse-encounters';
 import { usePlanOpen } from '@/features/outhere/plan-state';
 import { cn } from '@/features/ui';
@@ -14,6 +19,8 @@ import {
 } from './controller';
 import { MuseOrb } from './MuseOrb';
 
+let greeting = { text: '', until: 0 };
+
 export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
   const snap = useMuseSnapshot();
   const planOpen = usePlanOpen();
@@ -21,6 +28,29 @@ export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
   const nudge = useMuseNudge();
   const ref = useRef<HTMLButtonElement>(null);
   const row = variant === 'row';
+  const { viewer } = useViewer();
+  const upNext = useUpNext();
+  const commentary = useMuseCommentary();
+
+  // A hello when you arrive (once per visit), the way Jolly greets you in 3D. Shared by both Jollys
+  // (the floating one can mount for a moment before the row's), so whichever is showing says it.
+  const [hello, setHello] = useState<string | null>(null);
+  useEffect(() => {
+    if (inWorld) { setHello(null); return; }
+    let seen = false;
+    try { seen = sessionStorage.getItem('oh:muse-hello') === viewer.id; sessionStorage.setItem('oh:muse-hello', viewer.id); } catch { /* not remembered */ }
+    if (!seen) {
+      const first = viewer.name.split(' ')[0];
+      const mins = upNext ? Math.round((Date.parse(upNext.quest.startsAt) - Date.now()) / 60_000) : 0;
+      greeting = { text: upNext ? `${upNext.quest.title} ${mins <= 0 ? 'is happening now' : `starts in ${mins} min`}. Tap Let’s go and we’ll walk there.`
+        : `Hi ${first}. Tap me and I’ll find something nearby.`, until: Date.now() + 6500 };
+    }
+    const left = greeting.until - Date.now();
+    if (left <= 0) return;
+    setHello(greeting.text);
+    const t = window.setTimeout(() => setHello(null), left);
+    return () => window.clearTimeout(t);
+  }, [inWorld, viewer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The row's Jolly replaces the floating one while it is on screen.
   useEffect(() => (row ? registerMuseDockSlot() : undefined), [row]);
@@ -64,6 +94,10 @@ export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
   // The floating one steps aside while the chat or the "I'm free" sheet is up; the row's stays put.
   if (!row && (snap.open || planOpen)) return null;
   const showNudge = !!nudge && !snap.open && !planOpen;
+  // Not in 3D (Jolly speaks in the street there). The nudge card wins; then thoughts; then hello.
+  const thought = !inWorld && !showNudge && commentary.open ? commentary.current?.text ?? null : null;
+  const speech = !inWorld && !showNudge && !thought && !snap.open && !planOpen ? hello : null;
+  const above = row ? 'bottom-full right-0 mb-3' : 'bottom-full right-0 mb-4';
 
   return (
     <div className={cn(row ? 'relative shrink-0' : 'fixed bottom-[136px] right-3 z-30 max-md:bottom-[318px]')}>
@@ -92,6 +126,21 @@ export function MuseDockButton({ variant }: { variant: 'row' | 'floating' }) {
           <span className="muse-dock-tag pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-card transition-transform group-hover:-translate-x-0.5 max-md:sr-only">Ask Muse</span>
         )}
       </button>
+      {thought && (
+        // Muse's live commentary as a thought cloud, joined to Jolly by two dots.
+        <div key={`t:${commentary.key}`} data-testid="muse-dock-thought" aria-hidden className={cn('pointer-events-none absolute z-30', above)}>
+          <span className="muse-dock-cloud">{thought}</span>
+          <i className="muse-dock-cloud-dot" style={{ right: 26, bottom: -9, width: 9, height: 9 }} />
+          <i className="muse-dock-cloud-dot" style={{ right: 18, bottom: -17, width: 6, height: 6 }} />
+        </div>
+      )}
+      {speech && (
+        <button type="button" key={speech} data-testid="muse-dock-speech" onClick={() => openChat()}
+          className={cn('muse-dock-speech absolute z-30 text-left', above)}>
+          <span className="mb-0.5 flex items-center gap-1 text-[12px] font-bold text-fb-blue"><span aria-hidden>✨</span>Muse</span>
+          {speech}
+        </button>
+      )}
       {showNudge && (
         // Muse speaking up, from a real event (a friend just shared that they're free).
         <div key={nudge.id} role="status" data-testid="muse-nudge"
