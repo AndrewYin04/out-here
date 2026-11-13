@@ -24,13 +24,13 @@ export function MuseStepsLoading() {
   }, []);
 
   return (
-    <div data-testid="muse-steps-loading" className="mb-2 rounded-card bg-fb-surface p-3 shadow-card">
+    <div data-testid="muse-steps-loading" className="mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card">
       <p className="mb-1.5 text-[15px] font-semibold text-fb-text">✨ Muse is working</p>
       <ul className="flex flex-col gap-1">
         {LOADING_STEPS.slice(0, shown).map((label, i) => {
           const current = i === shown - 1;
           return (
-            <li key={label} className={cn('flex items-center gap-2 text-[13px]', current ? 'text-fb-text' : 'text-fb-text-2')}>
+            <li key={label} className={cn('flex animate-step-in items-center gap-2 text-[13px]', current ? 'text-fb-text' : 'text-fb-text-2')}>
               {current
                 ? <Loader2 size={14} className="shrink-0 animate-spin text-fb-blue" aria-hidden />
                 : <span className="mx-[5px] size-1 shrink-0 rounded-full bg-fb-text-2" aria-hidden />}
