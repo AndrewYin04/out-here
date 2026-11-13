@@ -192,6 +192,32 @@ describe('SupabaseBackend partial refresh (plan routes)', () => {
   });
 });
 
+describe('SupabaseBackend live location writes', () => {
+  it('a walk step patches the shared snapshot instead of making the next read reload every table', async () => {
+    const { fake, backend, store } = setup();
+    const before = await store.view();
+    const share = before.db.locationShares[0];
+    expect(share).toBeTruthy();
+    const moved = { ...share, location: { lat: share.location.lat + 0.001, lng: share.location.lng } };
+    const selects = fake.selects;
+    await runInScope(newScope(true, []), () => backend.upsert('locationShares', [moved]));
+    await sleep(5);
+    const after = await store.view();
+    expect(fake.selects - selects).toBeLessThanOrEqual(1); // no full reload (a fresh write request may read once)
+    expect(after.db.locationShares.find((s) => s.userId === share.userId)?.location).toEqual(moved.location);
+  });
+
+  it('other writes still drop the snapshot', async () => {
+    const { fake, store } = setup();
+    await store.view();
+    const selects = fake.selects;
+    await store.joinQuest(maya, dumplings);
+    const v = await store.view();
+    expect(fake.selects - selects).toBeGreaterThanOrEqual(TABLE_KEYS.length);
+    expect(v.questMemberIds(dumplings)).toContain(maya);
+  });
+});
+
 describe('SupabaseBackend request cost (E3)', () => {
   it('createInvite + respondInvite each load the tables once, and their Broadcasts go out in one call', async () => {
     vi.stubEnv('OUTHERE_STORE', '');

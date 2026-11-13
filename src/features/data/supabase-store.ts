@@ -16,6 +16,8 @@ const PAGE = 1000;
 export const SNAPSHOT_TTL_MS = 10_000;
 /** Ordinary reads may serve a snapshot up to this old while one background reload runs. */
 export const SNAPSHOT_STALE_MS = 60_000;
+/** Writes to these tables patch the shared snapshot instead of dropping it (see write()). */
+const PATCH_IN_PLACE: ReadonlySet<TableKey> = new Set<TableKey>(['locationShares']);
 const snake = (k: string) => k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
 
 type DbError = { message: string; code?: string } | null;
@@ -166,18 +168,27 @@ export class SupabaseBackend implements Backend {
     return { ...(await scope.working) };
   }
 
-  /** Runs one database write, then applies it to the request's working snapshot. */
+  /**
+   * Runs one database write, then applies it to the request's working snapshot. A write normally
+   * bumps `gen`, which drops the shared cache. Tables in PATCH_IN_PLACE (live locations, sent
+   * every few seconds during a walk) patch the shared cache instead, so a walk does not make
+   * every other read reload all the tables.
+   */
   private async write(table: TableKey, run: () => PromiseLike<{ error: DbError }>, apply: (db: Db) => void): Promise<void> {
     const scope = currentScope();
-    this.gen++;
+    const patch = PATCH_IN_PLACE.has(table);
+    if (!patch) this.gen++;
     try {
       if (scope) scope.queries++;
       const { error } = await run();
       fail(TABLE_NAMES[table], error);
     } finally {
-      this.gen++;
+      if (!patch) this.gen++;
     }
     if (scope?.working) apply(await scope.working);
+    // The apply helpers replace the table's array, so readers holding the old snapshot are
+    // unaffected. A load still in flight is patched when it lands (re-applying is harmless).
+    if (patch && this.cache) void this.cache.db.then(apply, () => undefined);
   }
 
   private applyMatch<Q extends { eq: (c: string, v: unknown) => Q; in: (c: string, v: unknown[]) => Q }>(
