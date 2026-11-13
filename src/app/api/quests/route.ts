@@ -42,6 +42,7 @@ const CreateZ = z.object({
   posterUrl: PosterUrlZ.nullable().default(null),
   bubbleText: z.string().trim().max(80).nullable().default(null),
   inviteIds: z.array(IdZ).max(20).default([]),
+  inviteMessage: z.string().trim().min(1).max(300).optional(),
 }).refine((b) => b.visibility !== 'group' || !!b.groupId, { message: 'pick a group for a group plan', path: ['groupId'] })
   .refine((b) => b.visibility !== 'friends' || b.inviteIds.length > 0, { message: 'invite at least one friend', path: ['inviteIds'] });
 
