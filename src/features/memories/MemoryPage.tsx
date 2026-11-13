@@ -12,6 +12,7 @@ import type { Crew, Memory } from '@/shared';
 import type { PersonCard, PostView } from '@/shared/api';
 import { MEMORY_SAVED, requestRating } from './arrival';
 import { SelfieCamera } from './SelfieCamera';
+import { SelfieReview } from './SelfieReview';
 import { crewFor, saveToAlbum } from './together-api';
 
 const first = (n: string) => n.split(' ')[0] ?? n;
@@ -37,6 +38,8 @@ export function MemoryPage({ id }: { id: string }) {
   const [story, setStory] = useState('');
   const [coverId, setCoverId] = useState<string | null>(null);
   const [camera, setCamera] = useState(false);
+  const [shot, setShot] = useState<File | null>(null);
+  const [museCaption, setMuseCaption] = useState('');
   const [busy, setBusy] = useState<'photo' | 'save' | null>(null);
   const [feeling, setFeeling] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -81,6 +84,7 @@ export function MemoryPage({ id }: { id: string }) {
       .then((r) => {
         if (cancelled) return;
         setStory((s) => s || r.caption);
+        setMuseCaption(r.caption);
         const short = r.caption.split(/[,.!—–-]/)[0]?.trim();
         if (short && short.length <= 40) setSuggestions([short, ...base]);
       })
@@ -88,11 +92,11 @@ export function MemoryPage({ id }: { id: string }) {
     return () => { cancelled = true; };
   }, [q, people, viewer.id]);
 
-  const addPhoto = async (file: File | null | undefined, asCover = false) => {
+  const addPhoto = async (file: File | null | undefined, asCover = false, caption?: string) => {
     if (!file || !q) return;
     setBusy('photo');
     try {
-      const m = await saveToAlbum(q.id, file, asCover ? story : '');
+      const m = await saveToAlbum(q.id, file, asCover ? (caption ?? story) : '');
       if (asCover) setCoverId(m.id);
       await memories.refetch();
       if (!crew) await crews.refetch();
@@ -160,9 +164,18 @@ export function MemoryPage({ id }: { id: string }) {
 
       <article className="space-y-4 bg-fb-surface px-4 pb-5 pt-3 md:rounded-[24px] md:shadow-card">
         {/* Cover: the group selfie, or any photo from the hangout */}
-        {camera ? (
+        {shot ? (
+          <SelfieReview file={shot} people={people} viewerId={viewer.id} caption={museCaption || story} emoji={q.emoji} saving={busy === 'photo'}
+            onRetake={() => { setShot(null); setCamera(true); }}
+            onSave={(c, reactions) => void (async () => {
+              setStory(c);
+              await addPhoto(shot, true, c);
+              setShot(null);
+              if (reactions.length) void apiPost(`/api/quests/${id}/posts`, { text: reactions.join(' ') }).then(() => posts.refetch()).catch(() => {});
+            })()} />
+        ) : camera ? (
           <SelfieCamera here={people} quest={q}
-            onTake={(f) => { flash(); setCamera(false); void addPhoto(f, true); }}
+            onTake={(f) => { flash(); setCamera(false); setShot(f); }}
             onPickFile={() => addRef.current?.click()} />
         ) : cover ? (
           <div className="relative overflow-hidden rounded-[22px]">

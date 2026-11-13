@@ -9,7 +9,10 @@ import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { OPEN_SELFIE, TogetherMoment } from '@/features/memories';
 import { setPlanOpen, usePlanOpen, usePlanStatus, useUpNext } from '@/features/outhere';
+import { useApi } from '@/features/data';
 import { cn, useDemoTools } from '@/features/ui';
+import type { ThreadView } from '@/shared/api';
+import { FriendChat, type ChatFriend } from './FriendChat';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
 import { applyCityTheme, BUILDINGS_ID, tileSourceId } from './cityTheme';
@@ -35,7 +38,8 @@ export type World3DProps = {
   selectedId: string | null;
   friendPins: FriendPin[];
   onSelect: (questId: string | null) => void;
-  onOpenFriend: (friendId: string) => void;
+  /** Unused since tapping a friend opens the chat sheet; kept so callers still compile. */
+  onOpenFriend?: (friendId: string) => void;
   /** 3D could not run well here; the parent switches back to the map. */
   onExit: (reason: 'slow') => void;
   /** A hand pinch/scroll ended zoomed out past EXIT_3D_ZOOM. */
@@ -78,7 +82,7 @@ function helloLine(name: string, next: ReturnType<typeof useUpNext>): string {
   return `${next.quest.emoji} ${clip(next.quest.title, 28)} ${when}. Tap Let’s go and we’ll walk there.`;
 }
 
-export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onOpenFriend, onExit, onZoomOut, walkTo = null, onWalkStop, onArrive }: World3DProps) {
+export function World3D({ map, viewer, home, quests, picks, selectedId, friendPins, onSelect, onExit, onZoomOut, walkTo = null, onWalkStop, onArrive }: World3DProps) {
   const layerRef = useRef<WorldLayer | null>(null);
   const [ready, setReady] = useState(false);
   // Until the tilted map has drawn its first frame of streets, show a loading veil instead of a
@@ -123,7 +127,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const stopWalk = useCallback(() => {
     const questId = walkRef.current?.questId;
     setWalk(null);
-    if (questId) onWalkStop?.(questId);
+    if (questId && !questId.startsWith('f:')) onWalkStop?.(questId);
   }, [onWalkStop, setWalk]);
   const [walkMin, setWalkMin] = useState<number | null>(null);
   const [arrival, setArrival] = useState<{ id: string; text: string } | null>(null);
@@ -566,8 +570,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             moving = false;
             arrived.current.add(w.questId);
             layer.setState('me', 'wave');
-            setArrival({ id: w.questId, text: `You’re at ${w.emoji} ${w.title}` });
-            if (w.questId !== requestedWalk.current?.id) onSelect(w.questId);
+            setArrival({ id: w.questId, text: w.questId.startsWith('f:') ? `You found ${w.title} ${w.emoji}` : `You’re at ${w.emoji} ${w.title}` });
+            if (w.questId !== requestedWalk.current?.id && !w.questId.startsWith('f:')) onSelect(w.questId);
           }
         }
       }
@@ -776,7 +780,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   }, []);
 
   useEffect(() => {
-    if (arrival) onArrive?.(arrival.id);
+    if (arrival && !arrival.id.startsWith('f:')) onArrive?.(arrival.id);
   }, [arrival, onArrive]);
 
   useEffect(() => {
@@ -794,6 +798,65 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     setWalk({ questId: walkTo.id, title: walkTo.title, emoji: walkTo.emoji, to: walkTo.location });
     setFollow(true);
   }, [walkTo, setFollow, setWalk]);
+
+  // ---- Tap a friend: the chat sheet, their replies over their head, walking to them ----
+  const [chat, setChat] = useState<{ id: string; incoming: boolean } | null>(null);
+  const [said, setSaid] = useState<Record<string, string>>({});
+  const saidTimers = useRef(new Map<string, number>());
+  const onReply = useCallback((id: string, text: string) => {
+    setSaid((m) => ({ ...m, [id]: text }));
+    window.clearTimeout(saidTimers.current.get(id));
+    saidTimers.current.set(id, window.setTimeout(() => setSaid((m) => { const n = { ...m }; delete n[id]; return n; }), 25_000));
+  }, []);
+  useEffect(() => () => { for (const t of saidTimers.current.values()) window.clearTimeout(t); }, []);
+  const openChat = useCallback((id: string) => {
+    layerRef.current?.setState('me', 'wave');
+    layerRef.current?.setState(`f:${id}`, 'wave');
+    setChat({ id, incoming: false });
+  }, []);
+  // A friend's message coming in opens the same sheet on this side, with replies.
+  const threads = useApi<{ threads: ThreadView[] }>('/api/threads', [`user:${viewer.id}`]);
+  const seenMsg = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const list = threads.data?.threads;
+    if (!list) return;
+    const fresh = list
+      .filter((t) => !t.isGroup && t.lastMessage && t.lastMessage.fromId !== viewer.id && t.unreadCount > 0 && Date.now() - Date.parse(t.lastMessage.createdAt) < 3 * 60_000)
+      .sort((a, b) => Date.parse(b.lastMessage!.createdAt) - Date.parse(a.lastMessage!.createdAt))[0];
+    const id = fresh?.lastMessage?.id ?? null;
+    if (seenMsg.current === undefined) { seenMsg.current = id; return; } // not on first load
+    if (!fresh || id === seenMsg.current) return;
+    seenMsg.current = id;
+    const from = fresh.lastMessage!.fromId;
+    onReply(from, fresh.lastMessage!.text);
+    setChat((c) => (c?.id === from ? c : { id: from, incoming: true }));
+  }, [threads.data, viewer.id, onReply]);
+  const chatFriend: ChatFriend | null = useMemo(() => {
+    if (!chat) return null;
+    const p = friendPins.find((x) => x.friend.id === chat.id);
+    const person = p?.friend ?? threads.data?.threads.flatMap((t) => t.members).find((m) => m.id === chat.id);
+    if (!person) return null;
+    const b = p?.bubble;
+    return {
+      id: person.id, name: person.name, handle: 'handle' in person ? (person.handle as string) : undefined, avatarUrl: person.avatarUrl,
+      place: p ? `${b?.emoji ? `${b.emoji} ` : ''}${p.placeLabel ?? b?.doing ?? 'Nearby'}` : null,
+      walkMin: p ? minutesLeft(pos.current, p.location) : null,
+      thought: b?.thought ?? null, emoji: b?.emoji ?? null, wantsTo: b?.wantsTo ?? null,
+      free: !!p?.availability || !!b?.thought,
+    };
+  }, [chat, friendPins, threads.data]);
+  const walkToFriend = useMemo(() => {
+    const p = chat ? friendPins.find((x) => x.friend.id === chat.id) : null;
+    if (!p) return null;
+    return () => {
+      setArrival(null);
+      arrived.current.delete(`f:${p.friend.id}`);
+      sourceRef.current = 'demo';
+      setSourceState('demo');
+      setWalk({ questId: `f:${p.friend.id}`, title: firstName(p.friend.name), emoji: '👋', to: p.location });
+      setFollow(true);
+    };
+  }, [chat, friendPins, setWalk, setFollow]);
 
   const bindLabel = useCallback((id: string, lift?: number) => (el: HTMLElement | null) => {
     layerRef.current?.bindLabel(id, el, lift);
@@ -879,6 +942,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         walkers={together.plan?.id === selfieQuest?.id ? together.walkers : []}
         onClose={closeSelfie}
       />
+      {chatFriend && !selfieQuest && (
+        <FriendChat friend={chatFriend} viewerId={viewer.id} incoming={chat?.incoming ?? false} onReply={onReply}
+          onWalk={walkToFriend} walking={walk?.questId === `f:${chatFriend.id}`} onClose={() => setChat(null)} />
+      )}
       {/* The blue home dot is replaced by the avatar while the 3D view is open. */}
       <style>{'[data-view3d] [data-map-marker="me"]{display:none}'}</style>
 
@@ -916,10 +983,13 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <button
               type="button"
               data-testid="world-friend"
-              onClick={() => { layerRef.current?.setState('me', 'wave'); layerRef.current?.setState(`f:${f.id}`, 'wave'); onOpenFriend(f.id); }}
-              className="pointer-events-auto whitespace-nowrap rounded-pill bg-fb-surface/95 px-2.5 py-1 text-[13px] font-semibold text-fb-text shadow-card hover:bg-fb-hover"
+              aria-label={`${f.label}: tap to message`}
+              onClick={() => openChat(f.id)}
+              className={cn('pointer-events-auto relative whitespace-nowrap rounded-pill px-2.5 py-1 text-[13px] font-semibold shadow-card transition-all',
+                said[f.id] ? 'animate-pop-in bg-fb-surface px-3.5 py-1.5 text-[15px] text-fb-text' : chat?.id === f.id ? 'bg-fb-surface text-fb-text ring-[3px] ring-fb-blue' : 'bg-fb-surface/95 text-fb-text hover:bg-fb-hover')}
             >
-              {f.label}
+              {said[f.id] ? <span data-testid="world-friend-said">{clip(said[f.id]!, 34)}</span> : f.label}
+              {said[f.id] && <span aria-hidden className="absolute -bottom-1.5 left-1/2 size-3 -translate-x-1/2 rotate-45 bg-fb-surface" />}
             </button>
           </div>
         ))}
