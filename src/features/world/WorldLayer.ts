@@ -50,9 +50,9 @@ type Beacon = {
 };
 
 /** Arena size in meters (real size; it sits on the street, like the HQ buildings). */
-const ARENA_R = 13;
-const TIER_STEP = 4.2;
-const STAND_H = 3.2;
+const ARENA_R = 10;
+const TIER_STEP = 3.4;
+const STAND_H = 2.6;
 const SEAT_OPEN = new THREE.Color('#FFFFFF');
 const GOLD = '#F5B800';
 
@@ -68,14 +68,14 @@ function arenaFloorTexture(color: string): THREE.CanvasTexture {
   const g = c.getContext('2d')!;
   const r = g.createRadialGradient(128, 128, 10, 128, 128, 128);
   r.addColorStop(0, '#FFFFFF');
-  r.addColorStop(0.62, '#FBF7F0');
-  r.addColorStop(0.8, color);
+  r.addColorStop(0.8, '#FBF8F2');
+  r.addColorStop(0.9, color);
   r.addColorStop(1, color);
   g.fillStyle = r;
   g.fillRect(0, 0, 256, 256);
-  g.globalAlpha = 0.55;
+  g.globalAlpha = 0.35;
   g.strokeStyle = color;
-  g.lineWidth = 5;
+  g.lineWidth = 4;
   g.beginPath(); g.arc(128, 128, 34, 0, Math.PI * 2); g.stroke();
   g.lineWidth = 2;
   g.beginPath(); g.moveTo(128, 30); g.lineTo(128, 226); g.stroke();
