@@ -58,6 +58,33 @@ const GOLD = '#F5B800';
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
+/** The arena floor: a pale court with the plan's color as a soft band at the rim and a center ring. */
+const floorTextures = new Map<string, THREE.CanvasTexture>();
+function arenaFloorTexture(color: string): THREE.CanvasTexture {
+  const hit = floorTextures.get(color);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  const r = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+  r.addColorStop(0, '#FFFFFF');
+  r.addColorStop(0.62, '#FBF7F0');
+  r.addColorStop(0.8, color);
+  r.addColorStop(1, color);
+  g.fillStyle = r;
+  g.fillRect(0, 0, 256, 256);
+  g.globalAlpha = 0.55;
+  g.strokeStyle = color;
+  g.lineWidth = 5;
+  g.beginPath(); g.arc(128, 128, 34, 0, Math.PI * 2); g.stroke();
+  g.lineWidth = 2;
+  g.beginPath(); g.moveTo(128, 30); g.lineTo(128, 226); g.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  floorTextures.set(color, t);
+  return t;
+}
+
 /** A soft round shadow: dark in the middle, fading to nothing at the edge. */
 function shadowTexture(): THREE.Texture {
   if (typeof document === 'undefined') return new THREE.Texture();
@@ -95,8 +122,9 @@ export class WorldLayer implements CustomLayerInterface {
   private ringGeo = new THREE.RingGeometry(0.75, 1, 32);
   private standGeo = new THREE.CylinderGeometry(ARENA_R + TIER_STEP * 2, ARENA_R - 0.5, 1, 32, 1, true);
   private floorGeo = new THREE.CircleGeometry(ARENA_R - 0.5, 32);
-  private seatGeo = new THREE.BoxGeometry(3, 1.8, 2.6);
-  private standMat = new THREE.MeshStandardMaterial({ color: '#E4E6EB', roughness: 0.8, side: THREE.DoubleSide });
+  // Round stools read as seats; boxes read as crates.
+  private seatGeo = new THREE.CylinderGeometry(0.9, 1.0, 1.1, 14);
+  private standMat = new THREE.MeshStandardMaterial({ color: '#F4F6FA', roughness: 0.6, side: THREE.DoubleSide });
   private seatMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.5, emissive: '#FFFFFF', emissiveIntensity: 0.25 });
   private origin: LatLng;
   private originMerc: MercatorCoordinate;
@@ -305,7 +333,10 @@ export class WorldLayer implements CustomLayerInterface {
       b.spec = spec;
       (b.beam.material as THREE.MeshBasicMaterial).color.set(spec.color);
       (b.ring.material as THREE.MeshBasicMaterial).color.set(spec.color);
-      ((b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.MeshStandardMaterial).color.set(spec.color);
+      const floorMat = (b.arena.getObjectByName('floor') as THREE.Mesh).material as THREE.MeshStandardMaterial;
+      floorMat.color.set('#FFFFFF');
+      const tex = arenaFloorTexture(spec.color);
+      if (floorMat.map !== tex) { floorMat.map = tex; floorMat.needsUpdate = true; }
       b.arena.visible = spec.capacity != null;
       b.gold.visible = !!spec.pick;
       this.setSeats(b);

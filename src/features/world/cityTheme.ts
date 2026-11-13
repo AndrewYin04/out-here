@@ -88,7 +88,7 @@ export function applyCityTheme(map: MapLibreMap): () => void {
     add({
       id: GRASS_ID, type: 'fill', source, 'source-layer': 'landcover',
       filter: ['match', ['get', 'class'], ['grass', 'wetland', 'farmland'], true, false],
-      paint: { 'fill-color': ['match',['get','class'],'wetland','#7FCBB0','farmland','#C8DC8A','#9FDB7C'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
+      paint: { 'fill-color': ['match',['get','class'],'wetland','#A6D99A','farmland','#C8DC8A','#9FDB7C'], 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 1] },
     }, firstRoad);
     add({
       id: PITCH_ID, type: 'fill', source, 'source-layer': 'landuse',

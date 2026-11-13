@@ -171,7 +171,7 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
           ))}
         </ul>
         <div className="mt-3 flex items-start gap-2.5">
-          <span aria-hidden className="mt-0.5 size-8 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-5px_9px_rgba(0,60,180,.45)]" />
+          <span aria-hidden className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[14px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
           <p className="min-w-0 flex-1 rounded-[16px] rounded-tl-md bg-fb-bg px-3 py-2 text-[14px] leading-5 text-fb-text">
             {allHere ? "You're both here. Snap one before you eat — I'll caption it." : `Almost together — ${onTheWay.map((p) => first(p.name)).join(' and ')} ${onTheWay.length === 1 ? 'is' : 'are'} on the way. Snap one when you're all here.`}
           </p>

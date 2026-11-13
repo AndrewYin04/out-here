@@ -21,6 +21,17 @@ type Shown = InviteView & { result?: string; error?: string; busy?: boolean };
  * user:<id> for {type:"invite"}, refetches /api/invites, and shows pending ones with Accept
  * (joins the quest, with the inviter when both seats fit) and Decline.
  */
+/**
+ * "Boba with Maya" sent to Maya reads "wants to get boba with you", not "boba with maya with you":
+ * drop a leading emoji and a trailing "with <you>", then lowercase only the first letter.
+ */
+function inviteWhat(title: string, viewerName: string): string {
+  const first = viewerName.split(' ')[0] ?? viewerName;
+  let t = title.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
+  t = t.replace(new RegExp(`\\s+(with|w/)\\s+${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b.*$`, 'i'), '');
+  return t ? t.charAt(0).toLowerCase() + t.slice(1) : 'hang out';
+}
+
 export function InviteInbox() {
   const { viewer } = useViewer();
   const [items, setItems] = useState<Shown[]>([]);
@@ -100,6 +111,7 @@ function InviteCard({ inv, onRespond, onDismiss }: {
   inv: Shown; onRespond: (i: Shown, s: 'accepted' | 'declined', from?: HTMLElement | null) => void; onDismiss: (id: string) => void;
 }) {
   const from = inv.from?.name.split(' ')[0] ?? 'A friend';
+  const { viewer } = useViewer();
   const letsGo = useLetsGo();
   // Live seats: the quest channel updates this card when someone else takes a seat.
   const live = useQuest(inv.quest?.id ?? null);
@@ -115,9 +127,9 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       className="pointer-events-auto animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover"
     >
       <div className="flex items-start gap-2.5">
-        <span aria-hidden className="mt-0.5 size-9 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-6px_10px_rgba(0,60,180,.45)]" />
+        <span aria-hidden className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[16px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
         <p className="min-w-0 flex-1 rounded-[18px] rounded-tl-md bg-fb-bg px-3 py-2 text-[15px] leading-5 text-fb-text">
-          <span className="font-semibold">{inv.from?.name ?? from} wants to get {inv.suggestionTitle.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').toLowerCase()} with you</span>
+          <span className="font-semibold">{inv.from?.name ?? from} wants to get {inviteWhat(inv.suggestionTitle, viewer.name)} with you</span>
           {q ? <> — {q.venueName}{seats !== null ? `, ${seats} spot${seats === 1 ? '' : 's'} left` : ''}. Say yes and you&apos;re both in.</> : '.'}
           {inv.message && <span className="mt-1 block text-[13px] text-fb-text-2">“{inv.message}”</span>}
         </p>
