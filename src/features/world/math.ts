@@ -13,8 +13,8 @@ export const STREET_PITCH = 60;
 export const CLOSE_ZOOM = 21.5;
 // Close behind the avatar the camera looks further ahead, toward the street and the horizon.
 export const CLOSE_PITCH = 72;
-/** Zoom the 3D view eases to when it opens: behind the avatar, high enough to see the street ahead. */
-export const ENTER_ZOOM = 20.7;
+/** Zoom the 3D view eases to when it opens: close behind the avatar. */
+export const ENTER_ZOOM = 21.3;
 export const MAX_3D_ZOOM = 22.5;
 export const MAX_3D_PITCH = 75;
 /** Characters and trees are hidden below this zoom; the 2D pins take over. */

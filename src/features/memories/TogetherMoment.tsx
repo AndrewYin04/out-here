@@ -173,7 +173,11 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
         <div className="mt-3 flex items-start gap-2.5">
           <span aria-hidden className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-[radial-gradient(circle_at_35%_30%,#7FC4FF,#0866FF_55%,#0047C2)] text-[14px] leading-none text-white shadow-[0_2px_8px_rgba(8,102,255,.35)] animate-pop-in">✦</span>
           <p className="min-w-0 flex-1 rounded-[16px] rounded-tl-md bg-fb-bg px-3 py-2 text-[14px] leading-5 text-fb-text">
-            {allHere ? "You're both here. Snap one before you eat — I'll caption it." : `Almost together — ${onTheWay.map((p) => first(p.name)).join(' and ')} ${onTheWay.length === 1 ? 'is' : 'are'} on the way. Snap one when you're all here.`}
+            {allHere
+              ? `You're ${here.length === 2 ? 'both' : 'all'} here. Snap one before you dig in — I'll caption it.`
+              : onTheWay.length > 0
+                ? `Almost together — ${onTheWay.map((p) => first(p.name)).join(' and ')} ${onTheWay.length === 1 ? 'is' : 'are'} on the way. Snap one when you're all here.`
+                : `You're the first one here. I'll let you know when ${notHere.slice(0, 2).map((p) => first(p.name)).join(' and ') || 'the others'} ${notHere.length === 1 ? 'is' : 'are'} close.`}
           </p>
         </div>
         {onTakePhoto && (
@@ -192,7 +196,7 @@ function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
         ) : (
           <div className="mt-2 flex items-center gap-3">
             <p data-testid="together-waiting" className="min-w-0 flex-1 text-[13px] font-semibold text-fb-text-2">
-              Waiting for {onTheWay.map((p) => `${first(p.name)}${p.minutes != null ? ` · ${Math.max(1, p.minutes)}m` : ''}`).join(', ')}
+              {onTheWay.length > 0 ? 'Waiting for ' : 'Not here yet: '}{(onTheWay.length > 0 ? onTheWay : notHere).slice(0, 3).map((p) => `${first(p.name)}${p.minutes != null ? ` · ${Math.max(1, p.minutes)}m` : ''}`).join(', ')}{(onTheWay.length > 0 ? onTheWay : notHere).length > 3 ? ` +${(onTheWay.length > 0 ? onTheWay : notHere).length - 3}` : ''}
             </p>
             <button type="button" onClick={() => setFolded(true)} className="shrink-0 text-[13px] font-semibold text-fb-blue hover:underline">Hang out</button>
           </div>
