@@ -15,9 +15,9 @@
 import * as THREE from 'three';
 import { filamentOffset, makeFilaments, type FilamentSpec } from './filaments';
 import {
-  clamp, DEFAULT_THRESHOLDS, defaultConfig, easeParams, effectiveConfig, hexToRgb01, isJump, MODE_PARAMS, modeForSpeed,
-  QUALITY_PRESETS, zeroParams, type ModeParams, type MuseTrailConfig, type MuseTrailMode, type MuseTrailModeSetting,
-  type MuseTrailQuality,
+  clamp, DEFAULT_THRESHOLDS, defaultConfig, easeParams, effectiveConfig, hexToRgb01, isJump, modeForSpeed,
+  QUALITY_PRESETS, STYLES, styledParams, zeroParams, type ModeParams, type MuseTrailConfig, type MuseTrailMode, type MuseTrailModeSetting,
+  type MuseTrailQuality, type MuseTrailStyle,
 } from './params';
 import { sampleWake, TrailHistory, WakeSamples } from './path';
 import { BILLBOARD_VERT, GLOW_FRAG, PARTICLE_FRAG, RIBBON_FRAG, RIBBON_VERT } from './shaders';
@@ -25,6 +25,12 @@ import { BILLBOARD_VERT, GLOW_FRAG, PARTICLE_FRAG, RIBBON_FRAG, RIBBON_VERT } fr
 export type TrailView = {
   /** Local-to-clip matrix (projection x view). Needed to face ribbons and sparks at the camera. */
   camera?: THREE.Matrix4;
+  /**
+   * Where the wake stems from, in world space (the map layer passes the platform under Muse's feet).
+   * Default: just behind Muse's centre. The wake leaves from the edge of this point away from the
+   * direction of travel.
+   */
+  anchor?: THREE.Vector3;
   /** World size of Muse (the character's scale). Trail widths, spacing and speeds are relative to it. */
   scale?: number;
   /**
@@ -37,6 +43,8 @@ export type TrailView = {
 export type MuseTrailOptions = {
   config?: Partial<MuseTrailConfig>;
   quality?: MuseTrailQuality;
+  /** 'walk' is the calm wake for the walking view; 'full' (default) is the showpiece. */
+  style?: MuseTrailStyle;
   /** true / false, or 'auto' (default) to follow the prefers-reduced-motion setting. */
   reducedMotion?: boolean | 'auto';
   /** Step the quality down once if the frame rate stays low. Default true. */
@@ -52,6 +60,7 @@ export type MuseTrailStats = {
   filaments: number;
   samples: number;
   quality: MuseTrailQuality;
+  style: MuseTrailStyle;
   reducedMotion: boolean;
   drawCalls: number;
   visible: boolean;
@@ -117,6 +126,7 @@ export class MuseTrail {
   // shared uniforms
   private u = {
     uTime: { value: 0 }, uIntensity: { value: 1 }, uCoreGain: { value: 0 }, uFilGain: { value: 0 }, uDiffGain: { value: 0 },
+    uFadePow: { value: 1.5 }, uTipFade: { value: 0.25 },
     uBlue: { value: new THREE.Vector3() }, uBright: { value: new THREE.Vector3() }, uCyan: { value: new THREE.Vector3() }, uPale: { value: new THREE.Vector3() },
     uRight: { value: new THREE.Vector3(1, 0, 0) }, uUp: { value: new THREE.Vector3(0, 1, 0) },
   };
@@ -148,7 +158,7 @@ export class MuseTrail {
 
   constructor(options: MuseTrailOptions = {}) {
     const quality = options.quality ?? options.config?.quality ?? 'medium';
-    this.cfg = effectiveConfig(defaultConfig(quality, options.config));
+    this.cfg = effectiveConfig(defaultConfig(quality, { ...(options.style ? { style: options.style } : {}), ...options.config }));
     this.opts = { adaptive: options.adaptiveQuality ?? true, reducedAuto: (options.reducedMotion ?? 'auto') === 'auto' };
     if (options.reducedMotion === true) this.cfg = effectiveConfig({ ...this.cfg, reducedMotion: true });
     this.history = new TrailHistory(QUALITY_PRESETS[this.cfg.quality].historyCap);
@@ -181,7 +191,7 @@ export class MuseTrail {
 
   setConfig(patch: Partial<MuseTrailConfig>): void {
     const next = effectiveConfig({ ...this.cfg, ...patch });
-    const rebuild = next.quality !== this.cfg.quality || next.filamentCount !== this.cfg.filamentCount
+    const rebuild = next.quality !== this.cfg.quality || next.style !== this.cfg.style || next.filamentCount !== this.cfg.filamentCount
       || next.particleBudget !== this.cfg.particleBudget || next.samples !== this.cfg.samples || next.seed !== this.cfg.seed;
     this.cfg = next;
     this.applyColors();
@@ -210,7 +220,7 @@ export class MuseTrail {
     return {
       mode: this.mode, speed: this.speed, historyPoints: this.history.length, particlesAlive: this.pAlive,
       particleBudget: this.cfg.particleBudget, filaments: this.filaments.length, samples: this.ribbon?.M ?? 0,
-      quality: this.cfg.quality, reducedMotion: this.cfg.reducedMotion, drawCalls: 3, visible: this.object.visible,
+      quality: this.cfg.quality, style: this.cfg.style, reducedMotion: this.cfg.reducedMotion, drawCalls: 3, visible: this.object.visible,
     };
   }
 
@@ -256,12 +266,14 @@ export class MuseTrail {
     const moving = speedRatio >= DEFAULT_THRESHOLDS.moving && this.mode !== 'off';
 
     // ---- smooth every layer toward what this mode asks for
-    const target = MODE_PARAMS[this.mode];
+    const target = styledParams(this.mode, this.cfg.style);
     this.params = easeParams(this.params, this.cfg.reducedMotion ? { ...target, ribbon: 0, filament: 0, diffuse: 0, particleRate: target.particleRate * 0.25 } : target, dt);
+    this.u.uFadePow.value = STYLES[this.cfg.style].fadePow;
+    this.u.uTipFade.value = STYLES[this.cfg.style].tipFade;
 
     // ---- anchor: near Muse's rear, from the direction of travel
-    this.a3.copy(position).addScaledVector(this.dir, -0.2 * scale);
-    this.a3.y -= 0.03 * scale;
+    if (view.anchor) this.a3.copy(view.anchor).addScaledVector(this.dir, -0.14 * scale); // the platform's rear edge
+    else { this.a3.copy(position).addScaledVector(this.dir, -0.2 * scale); this.a3.y -= 0.03 * scale; }
     // Low-pass the anchor so a sudden change of direction curves the wake behind Muse instead of
     // folding it (the path points are left in world space once emitted).
     if (!this.hasSmooth) { this.anchor.copy(this.a3); this.hasSmooth = true; }

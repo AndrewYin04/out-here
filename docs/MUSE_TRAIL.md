@@ -19,6 +19,12 @@ Built from the written brief; the three reference images did not come through wi
 
 Palette: `#0866FF` (body), `#168AFF` (bright), `#23D9F5` (cyan highlights), `#B8F7FF` (pale blue-white, the hottest point). Blending is premultiplied alpha: the saturated blue body stays visible on the bright map, and the pale highlights are added as extra light.
 
+## Styles: walk and full
+
+- **`walk`** is what the walking view uses: the wake stems from the **platform under Muse's feet** (not its back), and it is thin and faint with at most 4 strands and 40 sparks, a short lifetime, and a steep fade, so it disappears from the tip back toward the platform as Muse walks away (and, after Muse stops, retracts the same way).
+- **`full`** (default) is the showpiece wake from the lab and the later flights, deliveries and agent hand-offs.
+- Choose with `new MuseTrail({ style })` or `setConfig({ style })`. The emission point is the `anchor` passed to `update()`; without one the wake leaves just behind Muse's centre.
+
 ## Behaviour
 
 - **Mode follows speed** (`'auto'`): idle, float, fly, dash, from Muse's speed divided by its scale (character lengths per second). All layer strengths ease toward the mode's values, never jump.
@@ -52,15 +58,15 @@ A scripted flight (for example Muse delivering an envelope) calls `setMode('dash
 
 ## Files
 
-- `src/features/world/muse-trail/` (new, isolated): `params.ts` (modes, config, presets), `path.ts` (history and curve), `filaments.ts`, `shaders.ts`, `MuseTrail.ts`, `MuseTrailLab.tsx`, `index.ts`, `muse-trail.test.ts` (22 tests).
+- `src/features/world/muse-trail/` (new, isolated): `params.ts` (modes, config, presets), `path.ts` (history and curve), `filaments.ts`, `shaders.ts`, `MuseTrail.ts`, `MuseTrailLab.tsx`, `index.ts`, `muse-trail.test.ts` (24 tests).
 - `src/app/dev/muse-trail/page.tsx` (new): dev-only test lab, 404 in production builds.
-- `src/features/world/WorldLayer.ts` (the only existing file touched, **19 lines added, 1 changed**): creates a `MuseTrail` for each pet actor in the characters scene, feeds it Muse's world position and the layer's camera matrix every frame, hides it below the character zoom, disposes it with the actor, and adds `setTrailMode(id, mode)`.
+- `src/features/world/WorldLayer.ts` (the only existing file touched, about 47 lines added): creates a `MuseTrail` (style `walk`) for each pet actor in the characters scene, feeds it Muse's world position, the platform position as the anchor and the layer's camera matrix every frame, hides it below the character zoom, disposes it with the actor, and adds `setTrailMode(id, mode)`. It also draws a soft ground shadow under each avatar (a depth-tested plane in the main scene, so buildings still cover it).
 
-Minimal patch if `WorldLayer.ts` has changed upstream: add the import, a `trail: MuseTrail | null` field on `Actor`, create it in `upsertActor` when `kind === 'pet'` (`charScene.add(trail.object)`), call `a.trail.update(pos, dt, { camera: this.full, scale: s, verticalWeight: 0 })` after `a.char.update(...)` with `pos = (o.east, a.altitude * scale + a.char.height * s * 0.5, -o.north)`, and `a.trail?.dispose()` in `removeActor`.
+Minimal patch if `WorldLayer.ts` has changed upstream: add the import, a `trail: MuseTrail | null` field on `Actor`, create it in `upsertActor` when `kind === 'pet'` (`charScene.add(trail.object)`), call `a.trail.update(pos, dt, { camera: this.full, scale: s, verticalWeight: 0, anchor: platformPos })` after `a.char.update(...)` with `pos = (o.east, a.altitude * scale + a.char.height * s * 0.5, -o.north)`, and `a.trail?.dispose()` in `removeActor`.
 
 ## Test lab
 
-`npm run dev`, then open **http://localhost:3000/dev/muse-trail** (the real trail over the real Jolly model, loaded with the app's own `loadModels`, on a bright map-like ground). Buttons: Idle, Slow hover, Normal flight, Fast flight, Curved path, Sharp turn, Figure-eight, Spiral, Stop and fade; toggles for Reduced motion, Jolly, background (map / white / dark), quality, intensity and linger. Query parameters preselect: `?path=figure8&bg=map&quality=high&linger=3&reduced=1&jolly=0` (`jolly=0` skips the 30 MB model for a fast run).
+`npm run dev`, then open **http://localhost:3000/dev/muse-trail** (the real trail over the real Jolly model, loaded with the app's own `loadModels`, on a bright map-like ground). Buttons: Walk style / Full style, Idle, Slow hover, Normal flight, Fast flight, Curved path, Sharp turn, Figure-eight, Spiral, Stop and fade; toggles for Reduced motion, Jolly, background (map / white / dark), quality, intensity and linger. Query parameters preselect: `?path=figure8&bg=map&quality=high&style=walk&linger=3&reduced=1&jolly=0` (`jolly=0` skips the 30 MB model for a fast run).
 
 The lab is a test harness with its own small renderer; the app draws the trail inside the existing MapLibre/Three.js layer (no second renderer, no new dependency, no postprocessing).
 
@@ -73,7 +79,7 @@ The lab is a test harness with its own small renderer; the app draws the trail i
 
 ## Verification
 
-- Unit tests (22, no GPU needed): mode rules, config clamps, path ring buffer and Catmull-Rom smoothness, the camera basis against a real camera, filament variety and dispersion, idle emits nothing, bounded sparks, the wake lingers then disappears completely, a teleport clears the path, a hard 120 degree corner does not fold, reduced motion, dispose, adaptive quality, vertical weight.
+- Unit tests (24, no GPU needed): mode rules, config clamps, path ring buffer and Catmull-Rom smoothness, the camera basis against a real camera, filament variety and dispersion, idle emits nothing, bounded sparks, the wake lingers then disappears completely, a teleport clears the path, a hard 120 degree corner does not fold, reduced motion, dispose, adaptive quality, vertical weight.
 - Browser (headless Chromium for the lab, GPU Chrome for the app): the lab on map / white / dark grounds across every path with and without Jolly; the real 3D map with the avatar walking, turning, running straight and stopping. No console errors in any run.
 
 ## Known limits

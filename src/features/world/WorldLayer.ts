@@ -26,11 +26,32 @@ type Actor = {
   labelLift: number;
   /** Muse's energy wake (pets only). Lives in the characters scene, in world space. */
   trail: MuseTrail | null;
+  /** A soft ground shadow (avatars). Depth-tested in the main scene, so buildings still cover it. */
+  shadow: THREE.Mesh | null;
 };
 export type BeaconSpec = { id: string; pos: LatLng; color: string; height: number; strong: boolean };
 type Beacon = { spec: BeaconSpec; group: THREE.Group; beam: THREE.Mesh; ring: THREE.Mesh };
 
 const toRad = (d: number) => (d * Math.PI) / 180;
+
+/** A soft round shadow: dark in the middle, fading to nothing at the edge. */
+function shadowTexture(): THREE.Texture {
+  if (typeof document === 'undefined') return new THREE.Texture();
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (g) {
+    const grad = g.createRadialGradient(32, 32, 2, 32, 32, 31);
+    grad.addColorStop(0, 'rgba(10, 20, 35, 0.42)');
+    grad.addColorStop(0.55, 'rgba(10, 20, 35, 0.22)');
+    grad.addColorStop(1, 'rgba(10, 20, 35, 0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 export class WorldLayer implements CustomLayerInterface {
   readonly id = 'oh-world';
@@ -56,6 +77,11 @@ export class WorldLayer implements CustomLayerInterface {
   private full = new THREE.Matrix4();
   private tmp = new THREE.Vector4();
   private trailPos = new THREE.Vector3();
+  private trailAnchor = new THREE.Vector3();
+  private shadowGeo = new THREE.PlaneGeometry(1, 1);
+  private shadowMat = new THREE.MeshBasicMaterial({
+    map: shadowTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
   private trunkGeo = new THREE.CylinderGeometry(0.18, 0.26, 1, 6);
   private canopyGeo = new THREE.IcosahedronGeometry(1, 0);
   private trunkMat = new THREE.MeshStandardMaterial({ color: '#8A6A4F', roughness: 0.9 });
@@ -99,9 +125,18 @@ export class WorldLayer implements CustomLayerInterface {
     const char = kind === 'pet' ? makePet(this.models, seed) : makeAvatar(this.models, seed);
     char.root.traverse((o) => { o.frustumCulled = false; });
     this.charScene.add(char.root);
-    const trail = kind === 'pet' ? new MuseTrail() : null;
+    // The walking view gets the calm wake; the showpiece style is for flights and later animations.
+    const trail = kind === 'pet' ? new MuseTrail({ style: 'walk' }) : null;
     if (trail) this.charScene.add(trail.object);
-    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0, trail });
+    let shadow: THREE.Mesh | null = null;
+    if (kind === 'avatar') {
+      shadow = new THREE.Mesh(this.shadowGeo, this.shadowMat);
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.renderOrder = 1;
+      shadow.frustumCulled = false;
+      this.scene.add(shadow);
+    }
+    this.actors.set(id, { kind, seed, char, pos: this.origin, heading: 0, altitude: 0, label: null, labelLift: 0, trail, shadow });
   }
 
   removeActor(id: string) {
@@ -109,6 +144,7 @@ export class WorldLayer implements CustomLayerInterface {
     if (!a) return;
     this.charScene.remove(a.char.root);
     a.trail?.dispose();
+    if (a.shadow) this.scene.remove(a.shadow);
     a.char.dispose();
     if (a.label) a.label.style.visibility = 'hidden';
     this.actors.delete(id);
@@ -223,6 +259,7 @@ export class WorldLayer implements CustomLayerInterface {
     this.setBeacons([]);
     this.setTrees([]);
     for (const key of [...this.statics.keys()]) this.setStatic(key, null);
+    this.shadowGeo.dispose(); this.shadowMat.map?.dispose(); this.shadowMat.dispose();
     this.trunkGeo.dispose(); this.canopyGeo.dispose(); this.trunkMat.dispose(); this.canopyMat.dispose();
     this.beaconGeo.dispose();
     this.ringGeo.dispose();
@@ -266,12 +303,20 @@ export class WorldLayer implements CustomLayerInterface {
       a.char.root.rotation.set(0, Math.PI - toRad(a.heading), 0);
       a.char.root.scale.setScalar(s);
       a.char.update(dt, this.elapsed);
+      if (a.shadow) {
+        // Soft contact shadow on the ground under the avatar, sized to its footprint.
+        a.shadow.visible = showChars;
+        a.shadow.position.set(o.east, 0.04, -o.north);
+        a.shadow.scale.set(s * 1.05, s * 1.05, 1);
+      }
       if (a.trail) {
         if (showChars) {
           // Muse's actual world position (its centre), never a separate simulation. Vertical motion is
           // ignored: height here is altitude x zoom scale, which changes while zooming.
           this.trailPos.set(o.east, a.altitude * scale + a.char.height * s * 0.5, -o.north);
-          a.trail.update(this.trailPos, dt, { camera: this.full, scale: s, verticalWeight: 0 });
+          // The wake stems from the platform under Muse's feet (the character's origin), not its back.
+          this.trailAnchor.set(o.east, a.altitude * scale + 0.03 * s, -o.north);
+          a.trail.update(this.trailPos, dt, { camera: this.full, scale: s, verticalWeight: 0, anchor: this.trailAnchor });
         } else a.trail.object.visible = false;
       }
       if (a.label) {

@@ -19,7 +19,7 @@ void main() {
 
 export const RIBBON_FRAG = /* glsl */ `
 precision highp float;
-uniform float uTime, uIntensity, uCoreGain, uFilGain, uDiffGain;
+uniform float uTime, uIntensity, uCoreGain, uFilGain, uDiffGain, uFadePow, uTipFade;
 uniform vec3 uBlue, uBright, uCyan, uPale;
 varying vec4 vStyle;
 varying vec3 vInfo;
@@ -34,7 +34,8 @@ void main() {
   float isDiff = step(1.5, kind);
 
   float gain = isCore * uCoreGain + isFil * uFilGain + isDiff * uDiffGain;
-  float life = pow(1.0 - age, mix(1.5, 1.15, isDiff));
+  float life = pow(1.0 - age, mix(uFadePow, 1.15, isDiff));
+  float tip = 1.0 - uTipFade * smoothstep(0.2, 1.0, u);                // fades from the tip toward the stem
   float head = 1.0 + 1.2 * pow(1.0 - u, 3.0);                        // brightest at the leading end
   float shimmer = 1.0 + 0.2 * isFil * sin(u * 31.0 - uTime * 7.0 + vStyle.w * 6.2832);
   float edge = 1.0 - smoothstep(0.5, 1.0, across);                   // soft edges
@@ -49,8 +50,8 @@ void main() {
   float a = isCore * (0.38 * edge + 0.62 * core)
           + isFil * (0.22 * edge + 0.78 * core) * shimmer
           + isDiff * edge * edge * 0.34;
-  a = clamp(a * life * gain * vStyle.z * uIntensity * mix(head, 1.0, isDiff), 0.0, 1.0);
-  vec3 add = uPale * core * life * gain * uIntensity * 0.2 * head * (1.0 - isDiff);
+  a = clamp(a * life * tip * gain * vStyle.z * uIntensity * mix(head, 1.0, isDiff), 0.0, 1.0);
+  vec3 add = uPale * core * life * tip * gain * uIntensity * 0.2 * head * (1.0 - isDiff);
   gl_FragColor = vec4(col * a + add, a);
 }
 `;

@@ -5,6 +5,8 @@ export type MuseTrailMode = 'off' | 'idle' | 'float' | 'fly' | 'dash';
 /** `auto` picks idle / float / fly / dash from Muse's actual speed. */
 export type MuseTrailModeSetting = MuseTrailMode | 'auto';
 export type MuseTrailQuality = 'low' | 'medium' | 'high';
+/** `full` is the showpiece wake (flights, deliveries). `walk` is the calm one for the walking view. */
+export type MuseTrailStyle = 'full' | 'walk';
 
 export type MuseTrailConfig = {
   /** Main electric blue (Facebook blue). */
@@ -24,6 +26,7 @@ export type MuseTrailConfig = {
   /** Overall brightness, 0 to 2. */
   intensity: number;
   quality: MuseTrailQuality;
+  style: MuseTrailStyle;
   /** Samples along each ribbon. */
   samples: number;
   /** Shorten everything: no long wake, a few slow sparks, a soft halo. */
@@ -55,6 +58,7 @@ export function defaultConfig(quality: MuseTrailQuality = 'medium', overrides: P
     trailLifetime: 2.0,
     intensity: 1,
     quality,
+    style: 'full',
     samples: p.samples,
     reducedMotion: false,
     seed: 'muse',
@@ -73,6 +77,10 @@ export function effectiveConfig(c: MuseTrailConfig): MuseTrailConfig {
     intensity: clamp(c.intensity, 0, 2),
     samples: Math.round(clamp(c.samples, 8, p.samples + 16)),
   };
+  if (base.style === 'walk') {
+    base.filamentCount = Math.min(base.filamentCount, 4);
+    base.particleBudget = Math.min(base.particleBudget, 40);
+  }
   if (!base.reducedMotion) return base;
   return {
     ...base,
@@ -88,6 +96,34 @@ export const smoothstep = (a: number, b: number, v: number) => {
   const t = clamp((v - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
+
+// ---------------------------------------------------------------- styles
+/**
+ * How a style reshapes the mode values. `walk` is for the walking view: thinner, fainter, few
+ * strands and sparks, a short wake that fades from the tip toward the platform it stems from.
+ */
+export type StyleParams = {
+  ribbon: number; filament: number; sparks: number; glow: number; halo: number; diffuse: number;
+  /** Multiplier on the wake lifetime. */
+  lifetime: number;
+  /** How steeply a point fades with age (higher = the far end disappears sooner). */
+  fadePow: number;
+  /** 0..1 extra fade toward the tip, by position along the wake. */
+  tipFade: number;
+};
+export const STYLES: Record<MuseTrailStyle, StyleParams> = {
+  full: { ribbon: 1, filament: 1, sparks: 1, glow: 1, halo: 1, diffuse: 1, lifetime: 1, fadePow: 1.5, tipFade: 0.25 },
+  walk: { ribbon: 0.62, filament: 0.5, sparks: 0.3, glow: 0.45, halo: 0.3, diffuse: 0.42, lifetime: 0.55, fadePow: 2.3, tipFade: 0.9 },
+};
+
+/** A mode's values with a style applied. */
+export function styledParams(mode: MuseTrailMode, style: MuseTrailStyle): ModeParams {
+  const m = MODE_PARAMS[mode], s = STYLES[style];
+  return {
+    ribbon: m.ribbon * s.ribbon, filament: m.filament * s.filament, spread: m.spread, particleRate: m.particleRate * s.sparks,
+    glow: m.glow * s.glow, halo: m.halo * s.halo, lifetime: m.lifetime * s.lifetime, diffuse: m.diffuse * s.diffuse,
+  };
+}
 
 // ---------------------------------------------------------------- modes
 /** What each mode asks of every layer. All values are smoothed toward, never jumped to. */

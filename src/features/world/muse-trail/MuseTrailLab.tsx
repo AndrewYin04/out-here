@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { loadModels, makePet, type Character } from '../characters';
-import { MuseTrail, QUALITY_PRESETS, type MuseTrailQuality, type MuseTrailStats } from './index';
+import { MuseTrail, QUALITY_PRESETS, type MuseTrailQuality, type MuseTrailStats, type MuseTrailStyle } from './index';
 
 type PathId = 'idle' | 'hover' | 'normal' | 'fast' | 'curved' | 'sharp' | 'figure8' | 'spiral' | 'stopgo';
 type Bg = 'map' | 'white' | 'dark';
@@ -51,6 +51,7 @@ export function MuseTrailLab() {
   const [path, setPath] = useState<PathId>('normal');
   const [bg, setBg] = useState<Bg>('map');
   const [quality, setQuality] = useState<MuseTrailQuality>('high');
+  const [style, setStyle] = useState<MuseTrailStyle>('full');
   const [reduced, setReduced] = useState(false);
   const [showJolly, setShowJolly] = useState(true);
   const [intensity, setIntensity] = useState(1);
@@ -67,6 +68,7 @@ export function MuseTrailLab() {
   useEffect(() => {
     const p = readParam('path'); if (p && [...PATHS].some((x) => x.id === p)) setPath(p as PathId);
     const b = readParam('bg'); if (b === 'map' || b === 'white' || b === 'dark') setBg(b);
+    const st = readParam('style'); if (st === 'walk' || st === 'full') setStyle(st);
     const q = readParam('quality'); if (q === 'low' || q === 'medium' || q === 'high') setQuality(q);
     if (readParam('reduced') === '1') setReduced(true);
     const l = Number(readParam('linger')); if (l >= 0.6 && l <= 4) setLifetime(l);
@@ -100,7 +102,8 @@ export function MuseTrailLab() {
     scene.add(decor);
 
     const holder = api.current;
-    const trail = new MuseTrail({ quality, reducedMotion: false, adaptiveQuality: false, config: { seed: 'jolly' } });
+    const initialStyle = readParam('style') === 'walk' ? 'walk' : 'full';
+    const trail = new MuseTrail({ quality, style: initialStyle, reducedMotion: false, adaptiveQuality: false, config: { seed: 'jolly' } });
     holder.trail = trail;
     scene.add(trail.object);
 
@@ -126,7 +129,7 @@ export function MuseTrailLab() {
 
     const pos = new THREE.Vector3(0, 0, 0);
     const viewProj = new THREE.Matrix4();
-    const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+    const platform = new THREE.Vector3();
     let phase = 0, last = performance.now(), t = 0, frames = 0, fpsAt = last, raf = 0, prevPath: PathId | null = null;
     let heading = 0;
 
@@ -171,8 +174,9 @@ export function MuseTrailLab() {
 
       camera.updateMatrixWorld();
       viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-      void tmpA; void tmpB;
-      trail.update(pos, dt, { camera: viewProj, scale: SCALE * 0.9 });
+      // the wake stems from the platform under Muse's feet, like in the map layer
+      platform.set(pos.x, jolly ? pos.y - jolly.height * SCALE * 0.9 * 0.4 + 0.03 * SCALE : pos.y - 0.5 * SCALE, pos.z);
+      trail.update(pos, dt, { camera: viewProj, scale: SCALE * 0.9, anchor: platform });
       renderer.render(scene, camera);
 
       frames++;
@@ -202,6 +206,7 @@ export function MuseTrailLab() {
     api.current.trail?.setConfig({ quality, filamentCount: p.filamentCount, particleBudget: p.particleBudget, samples: p.samples });
   }, [quality]);
   useEffect(() => { api.current.trail?.setReducedMotion(reduced); }, [reduced]);
+  useEffect(() => { api.current.trail?.setConfig({ style }); }, [style]);
   useEffect(() => { api.current.trail?.setConfig({ intensity }); }, [intensity]);
   useEffect(() => { api.current.trail?.setConfig({ trailLifetime: lifetime }); }, [lifetime]);
 
@@ -215,6 +220,7 @@ export function MuseTrailLab() {
           {PATHS.map((p) => <button key={p.id} className={btn(path === p.id)} onClick={() => setPath(p.id)} data-testid={`path-${p.id}`}>{p.label}</button>)}
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-[13px]">
+          {(['walk', 'full'] as MuseTrailStyle[]).map((st) => <button key={st} className={btn(style === st)} onClick={() => setStyle(st)} data-testid={`style-${st}`}>{st === 'walk' ? 'Walk style' : 'Full style'}</button>)}
           <button className={btn(reduced)} onClick={() => setReduced((v) => !v)} data-testid="toggle-reduced">Reduced motion</button>
           <button className={btn(showJolly)} onClick={() => setShowJolly((v) => !v)} data-testid="toggle-jolly">Jolly</button>
           {(['map', 'white', 'dark'] as Bg[]).map((b) => <button key={b} className={btn(bg === b)} onClick={() => setBg(b)} data-testid={`bg-${b}`}>{b}</button>)}

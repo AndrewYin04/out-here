@@ -4,7 +4,7 @@ import { filamentOffset, makeFilaments } from './filaments';
 import { MuseTrail } from './MuseTrail';
 import {
   clamp, DEFAULT_THRESHOLDS, defaultConfig, easeParams, effectiveConfig, hexToRgb01, isJump, JUMP_LENGTHS, MODE_PARAMS, modeForSpeed,
-  QUALITY_PRESETS, zeroParams,
+  QUALITY_PRESETS, STYLES, styledParams, zeroParams,
 } from './params';
 import { catmullRom, sampleWake, TrailHistory, WakeSamples } from './path';
 
@@ -303,6 +303,46 @@ describe('MuseTrail', () => {
     for (let i = 0; i < 120; i++) t2.update(pos.set(0, 1 + i * 0.05, 0), 1 / 60, { scale: 1 });
     expect(t2.stats().historyPoints).toBeGreaterThan(0); // default: vertical flight leaves a wake
     t.dispose(); t2.dispose();
+  });
+
+  it('the walk style is calmer than the full one: fainter, fewer strands and sparks, a shorter wake', () => {
+    const full = styledParams('fly', 'full'), walk = styledParams('fly', 'walk');
+    expect(walk.ribbon).toBeLessThan(full.ribbon);
+    expect(walk.filament).toBeLessThan(full.filament);
+    expect(walk.particleRate).toBeLessThan(full.particleRate * 0.5);
+    expect(walk.lifetime).toBeLessThan(full.lifetime * 0.7);
+    expect(STYLES.walk.tipFade).toBeGreaterThan(STYLES.full.tipFade); // fades toward the tip more
+    const cfg = effectiveConfig(defaultConfig('high', { style: 'walk' }));
+    expect(cfg.filamentCount).toBeLessThanOrEqual(4);
+    expect(cfg.particleBudget).toBeLessThanOrEqual(40);
+
+    const wakeLength = (style: 'full' | 'walk') => {
+      const t = new MuseTrail({ style, quality: 'high', reducedMotion: false, adaptiveQuality: false });
+      let maxPoints = 0;
+      run(t, 5, (time) => { circle(8)(time); maxPoints = Math.max(maxPoints, t.stats().historyPoints); });
+      const s = t.stats();
+      t.dispose();
+      return { points: maxPoints, strands: s.filaments, style: s.style };
+    };
+    const f = wakeLength('full'), w = wakeLength('walk');
+    expect(w.style).toBe('walk');
+    expect(w.strands).toBeLessThanOrEqual(4);
+    expect(w.points).toBeLessThan(f.points * 0.8);
+  });
+
+  it('stems the wake from the given anchor (the platform), not from Muse\'s centre', () => {
+    const t = new MuseTrail({ style: 'walk', reducedMotion: false, adaptiveQuality: false });
+    const anchor = new THREE.Vector3();
+    for (let i = 0; i < 240; i++) {
+      const a = i / 60;
+      pos.set(Math.cos(a * 1.6) * 6, 1.2, Math.sin(a * 1.6) * 4); // Muse's centre is 1.2 above the platform
+      anchor.set(pos.x, 0.05, pos.z);
+      t.update(pos, 1 / 60, { scale: 1, anchor });
+    }
+    const h = (t as unknown as { history: TrailHistory }).history;
+    expect(h.length).toBeGreaterThan(3);
+    for (let i = 0; i < h.length; i++) expect(h.y(i)).toBeLessThan(0.3); // at platform height, never at Muse's back (y 1.2)
+    t.dispose();
   });
 });
 
