@@ -889,6 +889,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   // Arriving at a plan you joined opens the selfie (#47), once per plan in this visit.
   // A snapshot, not a live lookup: saving the photo completes the plan, which drops it from the map.
   const [selfieQuest, setSelfieQuestState] = useState<Quest | null>(null);
+  /** One arrival surface at a time: the moment sheet first, the selfie only on its photo tap. */
+  const [photoOpen, setPhotoOpen] = useState(false);
   const setSelfieQuest = useCallback((q: Quest | null | ((cur: Quest | null) => Quest | null)) => {
     setSelfieQuestState((cur) => {
       const next = typeof q === 'function' ? q(cur) : q;
@@ -920,6 +922,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
       e.preventDefault();
       selfieShown.current.add(q.id);
       setSelfieQuest(q);
+      setPhotoOpen(true);
     };
     window.addEventListener(OPEN_SELFIE, on);
     return () => window.removeEventListener(OPEN_SELFIE, on);
@@ -1087,6 +1090,11 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           {together.plan?.id === walk.questId && together.walkers.length > 0 && (
             <span data-testid="walk-with" className="sr-only">with {together.walkers.map((w) => firstName(w.name)).join(' and ')}</span>
           )}
+          {together.plan?.id === walk.questId && together.walkers.length > 0 && (
+            <span data-testid="walk-companion" className="hidden max-w-[180px] truncate text-[12px] font-semibold text-fb-text-2 min-[500px]:block">
+              {(() => { const w = [...together.walkers].sort((a, b) => a.minutesAway - b.minutesAway)[0]; return w.minutesAway <= 1 ? `${firstName(w.name)} is here with you` : `${firstName(w.name)} is ${w.minutesAway} min away — you'll arrive together`; })()}
+            </span>
+          )}
           <span className="shrink-0 text-[18px] font-bold tabular-nums text-fb-text">{walkMin <= 1 ? '<1m' : `${walkMin}m`}</span>
           <button type="button" onClick={stopWalk} aria-label="Stop walking" title="Stop"
             className="flex size-10 shrink-0 items-center justify-center rounded-full bg-fb-secondary-btn text-[18px] font-semibold text-fb-text hover:brightness-95">
@@ -1100,6 +1108,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         viewer={viewer}
         walkers={together.plan?.id === selfieQuest?.id ? together.walkers : []}
         onClose={closeSelfie}
+        onTakePhoto={() => setPhotoOpen(true)}
       />
       {chatFriend && !selfieQuest && (
         <FriendChat friend={chatFriend} viewerId={viewer.id} incoming={chat?.incoming ?? false} onReply={onReply}
@@ -1200,7 +1209,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
             <MapPin size={16} aria-hidden />{arrival.text}
           </button>
         )}
-        <ArrivalSelfie key={viewer.id} quest={selfieQuest} onClose={closeSelfie} />
+        <ArrivalSelfie key={viewer.id} quest={photoOpen ? selfieQuest : null} onClose={() => setPhotoOpen(false)} />
 
         {canWalk && selected && !walk && (
           // Phones: an open plan card covers this spot, and its own Let's go does the same.

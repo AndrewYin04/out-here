@@ -17,7 +17,7 @@ function prefersReducedMotion(): boolean {
  * While a Muse request runs: generic step names appear one by one. No results are claimed.
  * `steps` defaults to the plan's steps; other Muse helpers pass their own.
  */
-export function MuseStepsLoading({ steps = LOADING_STEPS, className }: { steps?: readonly string[]; className?: string } = {}) {
+export function MuseStepsLoading({ steps = LOADING_STEPS, className, title, sub }: { steps?: readonly string[]; className?: string; title?: string; sub?: string } = {}) {
   const [shown, setShown] = useState(1);
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -28,7 +28,10 @@ export function MuseStepsLoading({ steps = LOADING_STEPS, className }: { steps?:
 
   return (
     <div data-testid="muse-steps-loading" className={cn('mb-2 animate-rise rounded-card bg-fb-surface p-3 shadow-card', className)}>
-      <p className="mb-1.5 text-[15px] font-semibold text-fb-text">Muse is working…</p>
+      <p className="mb-1.5 flex items-center gap-2 text-[15px] font-semibold text-fb-text">
+        <span aria-hidden className="size-6 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-4px_7px_rgba(0,60,180,.45)]" />
+        <span>{title ?? 'Muse is working…'}{sub && <span className="block text-[13px] font-normal text-fb-text-2">{sub}</span>}</span>
+      </p>
       <ul className="flex flex-col gap-1">
         {steps.slice(0, shown).map((label, i) => {
           const current = i === shown - 1;

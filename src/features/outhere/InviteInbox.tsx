@@ -11,6 +11,9 @@ import { SeatsBadge } from './SuggestionCard';
 /** Invites older than this are left to Notifications and Messenger. */
 const RECENT_MS = 3 * 60 * 60_000;
 
+/** Quest ids with an invite card on screen right now (UpNext stays quiet for those plans). */
+export const pendingInviteQuests = new Set<string>();
+
 type Shown = InviteView & { result?: string; error?: string; busy?: boolean };
 
 /**
@@ -31,6 +34,8 @@ export function InviteInbox() {
         const kept = new Map(prev.filter((p) => p.result).map((p) => [p.id, p]));
         const pending = data.incoming.filter((i) => i.status === 'pending' && Date.parse(i.createdAt) > cutoff && !dismissed.current.has(i.id));
         for (const p of pending) if (!kept.has(p.id)) kept.set(p.id, p);
+        pendingInviteQuests.clear();
+        for (const p of pending) if (p.quest?.id) pendingInviteQuests.add(p.quest.id);
         return [...kept.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3);
       });
     } catch {
@@ -77,7 +82,7 @@ export function InviteInbox() {
 
   if (items.length === 0) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">
+    <div data-testid="invite-inbox" className="pointer-events-none fixed inset-x-2 bottom-[76px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:bottom-4 md:right-4 md:w-[380px]">
       {items.map((inv) => (
         <InviteCard key={inv.id} inv={inv} onRespond={respond} onDismiss={dismiss} />
       ))}
@@ -103,22 +108,20 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       aria-label={`Invite from ${from}`}
       className="pointer-events-auto animate-drop-in rounded-card bg-fb-surface p-3 shadow-popover"
     >
-      <div className="flex items-start gap-3">
-        <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={40} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] leading-5 text-fb-text">
-            <span className="font-semibold">{from} invited you:</span> {inv.suggestionTitle.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '')}
-          </p>
-          {inv.message && <p className="mt-1 line-clamp-3 text-[13px] text-fb-text-2">“{inv.message}”</p>}
-          {q && (
-            <p className="mt-1 flex items-center gap-2 text-[13px] text-fb-text-2">
-              {q.venueName}{seats !== null && <SeatsBadge seats={seats} />}
-            </p>
-          )}
-        </div>
+      <div className="flex items-start gap-2.5">
+        <span aria-hidden className="mt-0.5 size-9 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-6px_10px_rgba(0,60,180,.45)]" />
+        <p className="min-w-0 flex-1 rounded-[18px] rounded-tl-md bg-fb-bg px-3 py-2 text-[15px] leading-5 text-fb-text">
+          <span className="font-semibold">{inv.from?.name ?? from} wants to get {inv.suggestionTitle.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').toLowerCase()} with you</span>
+          {q ? <> — {q.venueName}{seats !== null ? `, ${seats} spot${seats === 1 ? '' : 's'} left` : ''}. Say yes and you&apos;re both in.</> : '.'}
+          {inv.message && <span className="mt-1 block text-[13px] text-fb-text-2">“{inv.message}”</span>}
+        </p>
         <IconButton label="Dismiss" size="sm" onClick={() => onDismiss(inv.id)}>
           <X size={16} aria-hidden />
         </IconButton>
+      </div>
+      <div className="mt-2.5 flex items-center gap-2 pl-11">
+        <Avatar src={inv.from?.avatarUrl} name={inv.from?.name ?? from} size={28} />
+        <span className="min-w-0 flex-1 truncate text-[13px] text-fb-text-2">{inv.from?.name ?? from}{seats !== null && <> · <SeatsBadge seats={seats} /></>}</span>
       </div>
       {alone && seats! > 0 && (
         <p data-testid="invite-one-seat" className="mt-2 text-[13px] text-fb-text-2">
@@ -142,9 +145,9 @@ function InviteCard({ inv, onRespond, onDismiss }: {
       ) : (
         <div className="mt-3 flex gap-2">
           <Button block disabled={inv.busy || seats === 0} onClick={(e) => onRespond(inv, 'accepted', e.currentTarget)}>
-            {seats === 0 ? 'Full' : alone ? `Join without ${from}` : 'Accept'}
+            {seats === 0 ? 'Full' : alone ? `Join without ${from}` : "I'm in"}
           </Button>
-          <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Decline</Button>
+          <Button block variant="secondary" disabled={inv.busy} onClick={() => onRespond(inv, 'declined')}>Not now</Button>
         </div>
       )}
     </section>

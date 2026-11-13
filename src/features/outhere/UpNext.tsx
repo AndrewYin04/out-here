@@ -7,6 +7,7 @@ import { requestSelfie } from '@/features/memories';
 import { Avatar, CategoryIcon, cn, useToast } from '@/features/ui';
 
 import { formatDemoTime, type YourPlan, type YourPlansResponse } from '@/shared';
+import { pendingInviteQuests } from './InviteInbox';
 
 const first = (name: string) => name.split(' ')[0] ?? name;
 
@@ -68,6 +69,8 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
   const reminded = useRef<string | null>(null);
   useEffect(() => {
     if (phase !== 'go' || arrived || reminded.current === q.id) return;
+    // One voice at a time: while Maya's invite card is up for this plan, it owns the moment.
+    if (pendingInviteQuests.has(q.id)) { reminded.current = q.id; return; }
     reminded.current = q.id;
     toast.show(`Time to go: leave now for ${q.title} (${plan.walkMinutes} min walk)`);
     // toast is stable for the provider's lifetime
@@ -97,6 +100,10 @@ export function UpNextCard({ plan, arrived, walking, onGo, onSee, className }: {
             {when} · {leave}
           </p>
         </div>
+        <button type="button" data-testid="up-next-see" onClick={() => onSee(q.id)}
+          className="shrink-0 text-[13px] font-semibold text-fb-blue hover:underline">
+          See plan
+        </button>
         {!arrived && (
           <button type="button" data-testid="up-next-go" disabled={walking} onClick={() => onGo(q.id)}
             className="oh-press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-fb-blue px-4 text-[14px] font-semibold text-white hover:bg-fb-blue-hover disabled:opacity-60">

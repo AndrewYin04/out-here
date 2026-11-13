@@ -22,19 +22,21 @@ const first = (n: string) => n.split(' ')[0] ?? n;
 /** "Make the memory" starts to pulse this close to the end. */
 const NUDGE_BEFORE_END_MS = 15 * 60_000;
 
-export function TogetherMoment({ quest, viewer, walkers, onClose }: {
+export function TogetherMoment({ quest, viewer, walkers, onClose, onTakePhoto }: {
   quest: Quest | null;
   viewer: { id: string; name: string; avatarUrl?: string };
   /** People walking to this plan, with minutes left (from the walk-together share). */
   walkers: Walker[];
   onClose: () => void;
+  /** The one photo action: opens the arrival selfie (World3D owns that surface). */
+  onTakePhoto?: () => void;
 }) {
   // Rendered at the map's top level: the 3D layer sits under the map's own buttons (I'm free, the
   // control stack), which would otherwise cover this and catch its taps.
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => { setHost(document.querySelector<HTMLElement>('[data-testid="out-here-map"]') ?? document.body); }, []);
   if (!quest || !host) return null;
-  return createPortal(<Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} />, host);
+  return createPortal(<Moment key={quest.id} quest={quest} viewer={viewer} walkers={walkers} onClose={onClose} onTakePhoto={onTakePhoto} />, host);
 }
 
 function useClock(ms = 15_000) {
@@ -43,8 +45,8 @@ function useClock(ms = 15_000) {
   return t;
 }
 
-function Moment({ quest, viewer, walkers, onClose }: {
-  quest: Quest; viewer: { id: string; name: string; avatarUrl?: string }; walkers: Walker[]; onClose: () => void;
+function Moment({ quest, viewer, walkers, onClose, onTakePhoto }: {
+  quest: Quest; viewer: { id: string; name: string; avatarUrl?: string }; walkers: Walker[]; onClose: () => void; onTakePhoto?: () => void;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -158,6 +160,18 @@ function Moment({ quest, viewer, walkers, onClose }: {
             </li>
           ))}
         </ul>
+        <div className="mt-3 flex items-start gap-2.5">
+          <span aria-hidden className="mt-0.5 size-8 shrink-0 rounded-full bg-fb-blue shadow-[inset_0_-5px_9px_rgba(0,60,180,.45)]" />
+          <p className="min-w-0 flex-1 rounded-[16px] rounded-tl-md bg-fb-bg px-3 py-2 text-[14px] leading-5 text-fb-text">
+            {allHere ? "You're both here. Snap one before you eat — I'll caption it." : `Almost together — ${onTheWay.map((p) => first(p.name)).join(' and ')} ${onTheWay.length === 1 ? 'is' : 'are'} on the way. Snap one when you're all here.`}
+          </p>
+        </div>
+        {onTakePhoto && (
+          <button type="button" data-testid="together-take-photo" onClick={onTakePhoto}
+            className="oh-press mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-fb-blue text-[16px] font-semibold text-white hover:bg-fb-blue-hover">
+            <Camera size={19} aria-hidden /> Take our photo
+          </button>
+        )}
         {allHere ? (
           <div className="mt-2 flex items-center gap-3 rounded-[16px] bg-[#EFEBFF] p-3" data-testid="together-phones-down">
             <span aria-hidden className="text-[24px]">✨</span>
