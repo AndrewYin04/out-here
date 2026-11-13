@@ -1168,6 +1168,27 @@ export class CoreStore {
     return m;
   }
 
+  /** The memory page's title: the crew's name. Crew members only. */
+  async renameCrew(viewerId: ID, crewId: ID, name: string): Promise<Crew> {
+    const v = await this.view();
+    const crew = v.db.crews.find((c) => c.id === crewId);
+    if (!crew || !v.crewMemberIds(crew.id).includes(viewerId)) throw forbidden('crew members only');
+    await this.backend.update('crews', { id: crewId }, { name });
+    for (const member of v.crewMemberIds(crewId)) await publish(`user:${member}`, { type: 'memory', id: crewId });
+    const after = await this.view();
+    return after.crew(after.db.crews.find((c) => c.id === crewId)!);
+  }
+
+  /** The memory page's story lives on its cover photo's caption. Crew members only. */
+  async captionMemory(viewerId: ID, memoryId: ID, caption: string): Promise<Memory> {
+    const v = await this.view();
+    const memory = v.db.memories.find((m) => m.id === memoryId);
+    if (!memory || !v.crewMemberIds(memory.crewId).includes(viewerId)) throw forbidden('crew members only');
+    await this.backend.update('memories', { id: memoryId }, { caption });
+    for (const member of v.crewMemberIds(memory.crewId)) if (member !== viewerId) await publish(`user:${member}`, { type: 'memory', id: memoryId });
+    return { ...memory, caption };
+  }
+
   async memoryPhoto(viewerId: ID, id: ID): Promise<Blob> {
     const v = await this.view();
     const memory = v.db.memories.find((m) => m.id === id);

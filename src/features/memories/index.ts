@@ -10,3 +10,6 @@ export {
 } from './regroup';
 export type { RegroupCandidate, RegroupContext, RegroupMember, RegroupResult, RegroupSuggestion } from './regroup';
 export { TogetherMoment } from './TogetherMoment';
+export { SelfieCamera, samplePhoto, type Face } from './SelfieCamera';
+export { crewFor, saveToAlbum } from './together-api';
+export { MemoryPage } from './MemoryPage';
