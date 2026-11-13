@@ -455,10 +455,17 @@ export function OutHereView() {
         </>
       )}
 
-      {/* "You and Maya are both free": under the toggle (and under the Friends filter chip). */}
-      {!selectedId && (
-        <div className={cn('pointer-events-none absolute inset-x-3 z-20 flex justify-center', mode === 'friends' && visible.length > 0 ? 'top-[96px]' : 'top-[60px]')}>
-          <BothFreeNudge className="pointer-events-auto w-full max-w-[440px]" />
+      {/* Dock the availability card along the edge so it leaves room for the map and avatar. */}
+      {!selectedId && !creating && (
+        <div className={cn(
+          'pointer-events-none absolute right-3 z-20 w-[calc(100%-24px)] max-w-[340px] md:left-4 md:right-auto md:top-16 md:max-w-[380px]',
+          show3d
+            ? mode === 'friends' && visible.length > 0
+              ? filter.on ? 'top-32' : 'top-24'
+              : filter.on ? 'top-24' : 'top-[60px]'
+            : 'bottom-[136px] md:bottom-auto',
+        )}>
+          <BothFreeNudge className="pointer-events-auto w-full" />
         </div>
       )}
 
