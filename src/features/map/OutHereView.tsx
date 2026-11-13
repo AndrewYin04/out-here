@@ -8,11 +8,17 @@ import { useApi, useQuests, useViewer } from '@/features/data';
 import { FriendsLayer, useFriendPins } from '@/features/map/friends';
 import { BothFreeNudge, MuseLabel, PlanSheet, TogetherSheet, UpNextCard, listenLetsGo, setPlanOpen, useMuseFilter, usePlanAsk, usePlanOpen, usePlanSuggestions, useTogetherId, useUpNext } from '@/features/outhere';
 import { Button, CategoryIcon, cn, EmptyState, rememberCategories, useDemoTools, useToast } from '@/features/ui';
-import { DEMO_CENTER, DEMO_QUESTS, seedId, type LatLng, type Quest } from '@/shared';
+import { DEMO_CENTER, DEMO_QUESTS, drivingMinutes, seedId, type LatLng, type Quest } from '@/shared';
+import type { MapListing } from '@/shared/api';
 import { FallbackList } from './FallbackList';
 import { MapAttribution } from './MapAttribution';
 import { OutHereDock } from './OutHereDock';
 import { CreatePlanSheet } from './create/CreatePlanSheet';
+import { ListingSheet } from './market/ListingSheet';
+import { ListingsLayer } from './market/ListingsLayer';
+import { MarketMenu, MuseFindCard } from './market/MuseFind';
+import { SellSheet } from './market/SellSheet';
+import { useMapListings, useMuseFinds, useMuseWants } from './market/useMarket';
 import { QuestPanel } from './QuestPanel';
 import type { FriendFace, MapContext, MapMode } from './types';
 import { initialView, shouldEnter3d, type MapView } from './view3d';
@@ -62,6 +68,14 @@ function setQuestParam(id: string | null) {
   else window.history.replaceState(state, '', url.toString());
 }
 
+/** ?listing=<id>: the open Marketplace listing (replaces the entry; Back is for plans). */
+function setListingParam(id: string | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set('listing', id);
+  else url.searchParams.delete('listing');
+  window.history.replaceState(window.history.state, '', url.toString());
+}
+
 export function OutHereView() {
   const { viewer: persona } = useViewer();
   const now = useNow();
@@ -82,6 +96,12 @@ export function OutHereView() {
   }, []);
   // "Post a plan": the draft pin's spot and emoji while the create sheet is open.
   const [creating, setCreating] = useState<{ at: LatLng; category: string } | null>(null);
+  // Marketplace pickup (#58): the open listing, whether listings show, dismissed Muse finds, and
+  // the "Sell for pickup" draft spot.
+  const [listingId, setListingId] = useState<string | null>(null);
+  const [showListings, setShowListings] = useState(true);
+  const [dismissedFinds, setDismissedFinds] = useState<ReadonlySet<string>>(() => new Set());
+  const [selling, setSelling] = useState<LatLng | null>(null);
   const planOpen = usePlanOpen();
   const toast = useToast();
   const tools = useDemoTools();
@@ -91,6 +111,8 @@ export function OutHereView() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('quest');
     if (id) setSelectedId(id);
+    const lid = params.get('listing');
+    if (lid) { setListingId(lid); setMode('explore'); }
     const m = params.get('mode');
     if (m === 'friends' || m === 'explore') setMode(m);
     // ?view=3d|map opens that view (the demo link); otherwise this tab's last one, else 3D.
@@ -207,7 +229,15 @@ export function OutHereView() {
     return pts.length > 0 ? pts : null;
   }, [planPicks, mode, friendPins.data]);
 
-  const select = useCallback((id: string | null) => { setSelectedId(id); setQuestParam(id); }, []);
+  const openListing = useCallback((id: string | null) => {
+    setListingId(id);
+    setListingParam(id);
+    if (id) { setSelectedId(null); setQuestParam(null); }
+  }, []);
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id); setQuestParam(id);
+    if (id) { setListingId(null); setListingParam(null); }
+  }, []);
   // Back and Forward: the plan in the URL is the plan on screen.
   useEffect(() => {
     const onPop = () => setSelectedId(new URLSearchParams(window.location.search).get('quest'));
@@ -228,6 +258,39 @@ export function OutHereView() {
     window.addEventListener('outhere:select-quest', on);
     return () => window.removeEventListener('outhere:select-quest', on);
   }, [select]);
+
+  // Marketplace pickup on the map (Explore only), and what Muse found for the viewer's wants.
+  const listingsApi = useMapListings(mode === 'explore' && showListings);
+  const mapListings: MapListing[] = useMemo(
+    () => (mode === 'explore' && showListings ? listingsApi.data?.listings ?? [] : []), [mode, showListings, listingsApi.data],
+  );
+  const wantsApi = useMuseWants();
+  const wants = useMemo(() => wantsApi.data?.wants ?? [], [wantsApi.data]);
+  const findsApi = useMuseFinds(ctx?.origin ?? null, listingsApi.data?.listings, wants.map((w) => w.id).join(','));
+  const find = (findsApi.data?.finds ?? []).find((f) => !dismissedFinds.has(f.listingId)) ?? null;
+  const viewFind = useCallback((id: string, at: LatLng | null) => {
+    setMode('explore');
+    setShowListings(true);
+    openListing(id);
+    if (map && at) map.easeTo({ center: [at.lng, at.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 700 });
+  }, [map, openListing]);
+  const openedListing = listingId ? listingsApi.data?.listings.find((l) => l.listing.id === listingId) ?? null : null;
+  const driveMin = openedListing?.listing.location && ctx?.origin ? drivingMinutes(ctx.origin, openedListing.listing.location) : null;
+  const startSell = useCallback(() => {
+    const c = map?.getCenter();
+    setPlanOpen(false);
+    select(null);
+    openListing(null);
+    setSelling(c ? { lat: c.lat, lng: c.lng } : DEMO_CENTER);
+  }, [map, select, openListing]);
+  const onListed = useCallback((l: MapListing) => {
+    setSelling(null);
+    setMode('explore');
+    setShowListings(true);
+    void listingsApi.refetch();
+    openListing(l.listing.id);
+    toast.show('Your listing is on the map.');
+  }, [listingsApi, openListing, toast]);
 
   // Long-press / right-click on the map, or the ＋ button (map centre): start a new plan there.
   const startCreate = useCallback((at?: LatLng) => {
@@ -545,8 +608,25 @@ export function OutHereView() {
 
       {/* The dashboard: Out Here's tabs and lists, I'm free, Post, Back to you and 3D. It steps aside
           for the I'm free and Post sheets, and on phones for an open plan (one panel at a time). */}
-      {!unsupported && !creating && !sheetOpen && (
-        <div className={cn(selectedId && 'max-md:hidden')}>
+      {mode === 'explore' && !unsupported && (
+        <ListingsLayer map={map} listings={mapListings} selectedId={listingId} foundId={find?.listingId ?? null}
+          onSelect={(id) => (creating || selling ? undefined : openListing(id))} />
+      )}
+
+      {/* Muse found something the viewer is looking for (a watch): above the dock. */}
+      {find && !creating && !selling && !sheetOpen && !listingId && !selectedId && (
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex justify-center md:inset-x-auto md:left-4 md:max-w-[380px]">
+          <MuseFindCard
+            key={find.listingId}
+            find={find}
+            onView={() => viewFind(find.listingId, listingsApi.data?.listings.find((l) => l.listing.id === find.listingId)?.listing.location ?? null)}
+            onDismiss={() => setDismissedFinds((d) => new Set([...d, find.listingId]))}
+          />
+        </div>
+      )}
+
+      {!unsupported && !creating && !selling && !sheetOpen && (
+        <div className={cn((selectedId || listingId) && 'max-md:hidden')}>
           <OutHereDock
             mode={mode}
             onMode={setMode}
@@ -559,6 +639,15 @@ export function OutHereView() {
             now={now}
             onSelect={select}
             showActions={!walkingNow}
+            extraActions={(
+              <MarketMenu
+                wants={wants}
+                onWantsChanged={() => { void wantsApi.refetch(); }}
+                onSell={startSell}
+                showListings={showListings}
+                onShowListings={(on) => { setShowListings(on); if (on) setMode('explore'); }}
+              />
+            )}
           />
         </div>
       )}
@@ -583,8 +672,24 @@ export function OutHereView() {
         />
       )}
 
+      {selling && (
+        <SellSheet at={selling} now={now} onClose={() => setSelling(null)} onPosted={onListed} />
+      )}
+
       {!unsupported && (
-        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', selectedId && 'max-md:hidden')} />
+        <MapAttribution className={cn('absolute right-0 max-md:top-0 md:bottom-0', (selectedId || listingId) && 'max-md:hidden')} />
+      )}
+
+      {listingId && !creating && !selling && (
+        <ListingSheet
+          key={listingId}
+          listingId={listingId}
+          viewerId={persona.id}
+          driveMin={driveMin}
+          museLine={find?.listingId === listingId ? find.line : (findsApi.data?.finds ?? []).find((f) => f.listingId === listingId)?.line ?? null}
+          onClose={() => openListing(null)}
+          onChanged={() => { void listingsApi.refetch(); }}
+        />
       )}
 
       {selectedId && !creating && (
