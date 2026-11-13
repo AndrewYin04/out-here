@@ -8,6 +8,7 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from 'react';
 import { setPlanOpen, usePlanOpen, usePlanStatus } from '@/features/outhere';
+import { LocateFixed } from 'lucide-react';
 import { cn } from '@/features/ui';
 import { DEMO_CENTER, haversineMeters, type FriendPin, type LatLng, type Quest } from '@/shared';
 import { loadModels } from './characters';
@@ -95,6 +96,8 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
   const [arrival, setArrival] = useState<{ id: string; text: string } | null>(null);
   const arrived = useRef(new Set<string>());
   const [source, setSourceState] = useState<Source>('demo');
+  // Demo-only controls (the HQ tour, Demo walk / Live GPS) show with ?tools=1. The demo walk is the default.
+  const [tools] = useState(() => new URLSearchParams(window.location.search).has('tools'));
   const sourceRef = useRef<Source>('demo');
   const gps = useGps(source === 'gps');
   const [farKm, setFarKm] = useState<number | null>(null);
@@ -140,7 +143,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
           : planOpen
             ? { text: 'What are you up for?', tone: 'plain' }
             : hello
-              ? { text: `Hi ${firstName(viewer.name)}! Tap ✨ I’m free and I’ll find something nearby.`, tone: 'plain' }
+              ? { text: `Hi ${firstName(viewer.name)}. Tap I’m free and I’ll find something nearby.`, tone: 'plain' }
               : null;
   const nextPetMode: PetMode = planOpen || plan.state === 'loading' || cheer ? 'front' : 'follow';
   const nextPetState = cheer ? 'happy' : plan.state === 'loading' ? 'think' : bubble && nextPetMode === 'front' ? 'talk' : 'hover';
@@ -286,7 +289,7 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
     if (!fresh) return;
     const q = quests.find((x) => x.id === fresh);
     layerRef.current?.setState('me', 'celebrate');
-    setCheer(q ? `You’re in! ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in!');
+    setCheer(q ? `You’re in: ${q.emoji} ${q.title}. I’ll keep your seat.` : 'You’re in.');
   }, [quests, viewer.id]);
 
   /** One step of free walking that slides along walls instead of entering a building. */
@@ -714,19 +717,18 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
         )}
         {walk && walkMin != null && (
           <div role="status" data-testid="walk-countdown" className="pointer-events-auto flex items-center gap-2 rounded-pill bg-fb-surface px-3 py-1.5 text-[14px] font-semibold text-fb-text shadow-popover">
-            <span aria-hidden>🚶</span>
             <span>{walkMin <= 1 ? 'Almost there' : `${walkMin} min`} to {walk.emoji} {clip(walk.title, 28)}</span>
             <button type="button" onClick={() => setWalk(null)} className="ml-1 font-semibold text-fb-blue hover:underline">Stop</button>
           </div>
         )}
         {arrival && !walk && (
           <div role="status" data-testid="arrival" className="pointer-events-auto rounded-pill bg-[#24A148] px-3 py-1.5 text-[14px] font-semibold text-white shadow-popover">
-            📍 {arrival.text}
+            {arrival.text}
           </div>
         )}
         {canWalk && selected && !walk && (
           <button type="button" data-testid="walk-there" onClick={startWalk} className="pointer-events-auto h-10 rounded-pill bg-fb-blue px-4 text-[15px] font-semibold text-white shadow-popover hover:bg-fb-blue-hover">
-            🚶 Walk there · {selectedMin} min
+            Walk there · {selectedMin} min
           </button>
         )}
         {farKm != null && (
@@ -740,17 +742,17 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
 
       {/* Bottom right: the HQ tour, "Back to me", and the location source. */}
       <div className="absolute bottom-10 right-3 flex flex-col items-end gap-2 max-md:bottom-[136px]">
-        {hqLabels.length > 0 && !tour && (
+        {tools && hqLabels.length > 0 && !tour && (
           <button type="button" data-testid="hq-tour" onClick={() => void startTour()} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            🏢 Tour Meta HQ
+            Tour Meta HQ
           </button>
         )}
         {!follow && (
-          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto h-10 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
-            ◎ Back to me
+          <button type="button" data-testid="back-to-me" onClick={() => { stopTour(); entering.current = true; setFollow(true); }} className="pointer-events-auto inline-flex h-10 items-center gap-1.5 rounded-pill bg-fb-surface px-3 text-[14px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover">
+            <LocateFixed size={16} aria-hidden /> Back to me
           </button>
         )}
-        <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
+        {(tools || source === 'gps') && <div role="group" aria-label="Where you are" className="pointer-events-auto flex gap-1 rounded-pill bg-fb-surface p-1 shadow-card">
           {(['demo', 'gps'] as const).map((s) => (
             <button
               key={s}
@@ -760,10 +762,10 @@ export function World3D({ map, viewer, home, quests, picks, selectedId, friendPi
               onClick={() => void chooseSource(s)}
               className={cn('h-8 rounded-pill px-3 text-[13px] font-semibold', source === s ? 'bg-fb-blue-tint text-fb-blue' : 'text-fb-text-2 hover:bg-fb-hover')}
             >
-              {s === 'demo' ? '🕹️ Demo walk' : '📡 Live GPS'}
+              {s === 'demo' ? 'Demo walk' : 'Live GPS'}
             </button>
           ))}
-        </div>
+        </div>}
         {gpsLine && <p className="rounded-pill bg-fb-surface px-2.5 py-1 text-[12px] text-fb-text-2 shadow-card">{gpsLine} · stays on this device</p>}
       </div>
 
