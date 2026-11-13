@@ -118,7 +118,7 @@ export type SeedTables = Record<(typeof TABLE_ORDER)[number], Row[]>;
 export const TABLE_ORDER = [
   'profiles', 'places', 'groups', 'group_members', 'friendships', 'friend_lists', 'friend_list_members',
   'quests', 'quest_members', 'quest_checkins', 'quest_reports', 'availability', 'invites', 'crews', 'crew_members', 'memories',
-  'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
+  'hangout_ratings', 'hang_again', 'daily_quests', 'daily_entries', 'events', 'event_rsvps', 'posts', 'comments', 'reactions',
   'stories', 'threads', 'thread_members', 'messages', 'notifications', 'listings', 'reels', 'location_shares',
   'intro_profiles', 'intros',
   'listing_holds', 'muse_wants',
@@ -330,6 +330,50 @@ export function buildSeed(
     });
   }
 
+  // Post-hangout ratings (docs/HANGOUT_RATINGS.md) for the 3 crewed past hangouts: every member
+  // rates the hangout, and answers "hang out again?" about each other member. Alex and Maya are a
+  // mutual yes; Alex says no about one non-demo persona, so Muse's "never pair" rule has a case.
+  const SEED_RATINGS: Record<string, { verdict: 'loved' | 'fine' | 'meh'; score: number; highlights: string[]; note?: string }[]> = {
+    // index 0 is Alex, then the other members in order (repeating the last entry)
+    'past-dumplings': [
+      { verdict: 'loved', score: 9.2, highlights: ['good food', 'great conversation', 'want to go back'], note: 'Best $12 I have spent here.' },
+      { verdict: 'loved', score: 8.8, highlights: ['good food', 'good vibe'] },
+      { verdict: 'loved', score: 7.4, highlights: ['good food', 'met someone new'] },
+    ],
+    'past-show': [
+      { verdict: 'loved', score: 8.0, highlights: ['good vibe', 'met someone new', 'too loud'] },
+      { verdict: 'loved', score: 7.9, highlights: ['good vibe', 'too loud'] },
+      { verdict: 'fine', score: 5.8, highlights: ['too crowded'] },
+    ],
+    'past-sunset': [
+      { verdict: 'fine', score: 5.5, highlights: ['easy to find', 'ran late'], note: 'Nice walk, but the group never really clicked.' },
+      { verdict: 'loved', score: 7.1, highlights: ['good vibe', 'easy to find'] },
+      { verdict: 'fine', score: 4.6, highlights: ['ran late'] },
+    ],
+  };
+  const isPersona = (hdl: string) => (PERSONA_HANDLES as readonly string[]).includes(hdl);
+  function seedRatings(key: string, questId: string, members: string[], ends: Date) {
+    const specs = SEED_RATINGS[key];
+    if (!specs) return;
+    // The one "no": Alex about the first non-demo persona on the sunset walk.
+    const alexNo = key === 'past-sunset' ? members.find((m) => m !== 'alex' && !isPersona(m)) : undefined;
+    members.forEach((rater, ri) => {
+      const s = specs[Math.min(ri, specs.length - 1)];
+      const at = iso(addMin(ends, 30 + ri * 7));
+      t.hangout_ratings.push({
+        id: seedId('hangout-rating', `${key}:${rater}`), quest_id: questId, rater_id: pid(rater),
+        verdict: s.verdict, score: s.score, highlights: s.highlights, note: s.note ?? '',
+        photo_ids: t.memories.filter((m) => m.quest_id === questId && m.uploader_id === pid(rater)).map((m) => m.id),
+        created_at: at, updated_at: at,
+      });
+      for (const subject of members) {
+        if (subject === rater) continue;
+        const again = !(rater === 'alex' && subject === alexNo);
+        t.hang_again.push({ quest_id: questId, rater_id: pid(rater), subject_id: pid(subject), again, created_at: at });
+      }
+    });
+  }
+
   // past hangouts: one a week for 6 weeks; the 3 most recent formed crews with memories
   const imagePool = content.posts.map((p) => p.image).filter((x): x is string => !!x).sort();
   const photo = (i: number) => imagePool.length ? imagePool[i % imagePool.length] : '/seed/posts/p001.webp';
@@ -366,6 +410,7 @@ export function buildSeed(
         uploader_id: pid(members[ci % members.length]), photo_url: photo(photoIndex++), caption,
         created_at: iso(addMin(ends, -10 + ci)),
       }));
+      seedRatings(h.key, id, members, ends);
     }
   });
 
