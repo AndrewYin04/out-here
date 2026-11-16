@@ -1,5 +1,7 @@
 # Out Here
 
+<img src="public/out-here-logo.png" alt="Out Here logo: Jolly, the Muse companion, in headphones" width="160">
+
 **Say you're free. Muse turns it into a real plan with a friend, and a map of people you can join right now.**
 
 Built for Meta's Closer Together AI Hackathon in November 2026. It was invite-only, with 75 people admitted, and Meta funded travel and stay. No award or placement is claimed here.
@@ -21,12 +23,12 @@ Out Here is for that window. It is a Facebook-style app about fictional people i
 **I'm free → Muse finds a plan that fits → you join, and the seat count updates → you take a photo together → Muse can get that group together again.**
 
 1. **You're on a map of plans happening soon.** Explore shows public plans with open seats (a dumpling counter, a 5K, a thrift walk). Friends shows people who chose to share where they are, with a short status ("craving dumplings"). Both views are the same data.
-2. **You can walk it in 3D.** A third-person camera follows your character through a stylized downtown. Jolly, the Muse companion, walks with you. Friends nearby show up as people on the street. Zooming out returns to the flat map. Arrow keys, WASD, or the on-screen joystick move you. The default is the demo city, not your GPS.
+2. **You can walk it in 3D.** A third-person camera follows your character through a stylized downtown. Jolly, the Muse companion, walks with you. Friends nearby show up as people on the street. If you walk to a plan with someone else, their steps come back, so you see their character moving too. Zooming out returns to the flat map. Arrow keys, WASD, or the on-screen joystick move you. The default is the demo city, not your GPS.
 3. **You tell Muse you're free, in your own words.** "I've got 45 minutes. Can I grab boba with someone nearby?" Muse reads the time, the budget, and what you're in the mood for. Code then keeps only plans you can actually reach, afford, and still get a seat at, including the walk. Muse ranks those and explains the pick. If nothing posted fits, it can draft a new plan with a friend who is free.
 4. **You join, and the seat is real.** Joining is one write. A full plan stays full. A friend can be invited; the invite shows up for that persona. The exact meeting spot is hidden until you join. The public pin is offset by roughly 120–200 meters.
 5. **Afterwards it remembers the group.** People who went are a crew. Photos go in a shared album, you can rate the hangout in private, and "Get this group together again" asks Muse for a next plan that still fits the crew.
 
-Around that loop, the shell has a Home feed, profiles, friends, groups, notifications, Marketplace, and a Video page. Marketplace can rank listings from what that persona watched. Search, the Events discover grid, and the Messenger inbox are still loading layouts. Your own plans are under Events → Going.
+Around that loop, the shell has a Home feed, profiles, friends, groups, notifications, Marketplace, and a Video page. Marketplace can rank listings from what that persona watched. A seller can also open a pop-up on the map. Muse can match a new listing to a watch you set or a Reel you watched, and the card shows what it noticed, what code checked, and what it decided. Search, the Events discover grid, and the Messenger inbox are still loading layouts. Your own plans are under Events → Going.
 
 A daily prompt and a weekly hangout streak exist as seed data and API routes. They do not have their own screens. A monthly "Wrapped" recap is named in the API types only.
 
@@ -67,22 +69,24 @@ Muse is a model API (Ember and Spark, through one server-side adapter). The prod
 | Step | What Muse does | What code guarantees |
 |---|---|---|
 | Understand | Turns a messy sentence into an intent: activity, budget, time window, how far you'll walk | The intent has to match a schema. If it doesn't, the plan stops |
-| Fit | | Only real plans and friends that fit the window, including walking time, budget, and open seats, become candidates |
+| Fit | | Only real plans and friends that fit the window, including walking time, budget, and open seats, become candidates. A plan Muse drafts has to be a real place that is open for that window |
 | Match and explain | Ranks those candidates and says why in plain language, including a friend when one is actually free | Muse can only choose from those candidates. It cannot invent a person, place, price, or time |
 | Coordinate | Drafts the invite. If nothing posted fits, drafts a new plan | Joining takes a seat in one step. The last seat cannot be taken twice |
 | Continue | Suggests a next plan for a crew, and can caption a photo you saved | The suggestion has to name a real plan the crew can still fit into. A caption you didn't accept is not saved |
 | Create | Turns a short idea ("boba after class at 4") into a plan draft | The place and the numbers are checked before the plan exists |
 
+Finds and the "for you" chips use the same split on the card: **Noticed** (a status, a watch, a Reel, a rating), **Checked** (code: walk, price, seats, open hours, whether a nearby plan backs the chip), and **Decided** (one sentence from Muse). Each call is logged with its model, latency, tokens, and output.
+
 Without `MUSE_API_KEY`, or with `MUSE_MOCK=1`, the same screens run on a deterministic stand-in. Those answers are labeled offline. Photo understanding does not invent a description in that mode.
 
-Ranking uses the fast model unless `MUSE_RANK_ROLE=smart`. Model ids, prices, and request shape are in [docs/muse-api.md](docs/muse-api.md).
+Ranking uses Ember (`muse-ember-1.0`) unless `MUSE_RANK_ROLE=smart`. The switch is recorded in [docs/DECISIONS.md](docs/DECISIONS.md): Spark at minimal effort took 5.7–7.0 s for the same top pick Ember reached in 2.5–3.3 s, and Spark timed out at 12 s on 30 Marketplace listings. Model ids and request shape are in [docs/muse-api.md](docs/muse-api.md).
 
 ## Safety and privacy
 
 The people, posts, and venues are fictional. There is no real account system: each tab picks a persona (`?as=alex`, or the account menu).
 
 - Location sharing is a choice: who can see you, exact or approximate, and pause. Approximate is the center of an ~800 m cell, not your point. A share expires after 4 hours unless it is refreshed.
-- Someone who is not on the plan sees the fuzzed pin (about 120–200 m off). The sheet tells you the exact spot is shared after you join.
+- Someone who is not on the plan sees the fuzzed pin (about 120–200 m off). The sheet tells you the exact spot is shared after you join. If none of your friends are already in a plan, Muse drops it unless the plan's size is at least 3.
 - A plan can be reported from its sheet.
 - The browser never holds the database service key or the Muse key. Clients hear that something changed, then refetch. A location update does not include where the person is.
 - GPS is off until you switch to Here or Live GPS. The demo walk does not read your location.
@@ -93,7 +97,7 @@ The people, posts, and venues are fictional. There is no real account system: ea
 From `package.json` and the code, not a wishlist:
 
 - **Next.js 15** (App Router) and **React 19**, TypeScript, Tailwind CSS 4
-- **Supabase** (Postgres, realtime, storage) when it is configured. With no Supabase env, the same store runs in memory from the committed seed
+- **Supabase** (Postgres, realtime, storage) when it is configured. Row-level security is on, and there are no anonymous table policies: the browser does not query tables. With no Supabase env, the same store runs in memory from the committed seed
 - **MapLibre GL** and [OpenFreeMap](https://openfreemap.org) tiles. No map API key
 - **three.js** for the characters, Jolly, and the street scenery, drawn in the map's WebGL context
 - **Muse** through the `openai` package pointed at Meta's API. **Zod** checks model output
@@ -122,7 +126,7 @@ npm run dev
 
 Open [http://localhost:3000/out-here?as=alex&view=3d](http://localhost:3000/out-here?as=alex&view=3d).
 
-`?as=` picks a persona for that tab (`alex`, `maya`, `jordan`, `priya`, `sam`, `leo`, `nina`, `kai`). `?view=map` is the flat map. `?mode=explore` lists every public plan. Use two tabs with two personas to invite and join.
+`?as=` picks a persona for that tab (`alex`, `maya`, `jordan`, `priya`, `sam`, `leo`, `nina`, `kai`). `?view=map` is the flat map. `?mode=explore` lists every public plan. Use two tabs with two personas to invite and join. `/out-here?as=leo&sell=popup` opens Leo's seller pop-up with the items filled in.
 
 To point the app at Supabase and live Muse, copy `.env.example` to `.env.local`, fill it in, then `npm run db:migrate:dev` and `npm run seed`. `npm run seed:demo` writes the demo project. Never commit `.env.local`. The key names and model ids are in [docs/muse-api.md](docs/muse-api.md).
 
@@ -130,6 +134,7 @@ To point the app at Supabase and live Muse, copy `.env.example` to `.env.local`,
 npm run typecheck
 npm run lint
 npm test
+npm run test:e2e
 npm run build
 ```
 
