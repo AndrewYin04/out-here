@@ -140,9 +140,9 @@ Roles are a short read of the commit history and `docs/TEAM.md`. They are a draf
 | Name | GitHub | Role (draft) |
 |---|---|---|
 | Andrew Yin | [AndrewYin04](https://github.com/AndrewYin04) | Facebook shell, data, seed |
-| Alan Nguyen | [alnnguyen](https://github.com/alnnguyen) | 3D street, map UI |
+| Alan Nguyen | [alnnguyen](https://github.com/alnnguyen) | 3D street, map |
 | Alex Nguyen | [alwxngn](https://github.com/alwxngn) | Muse plans, invites |
-| Ally Chen | [allyytc](https://github.com/allyytc) | 3D world, Muse companion |
+| Ally Chen | [allyytc](https://github.com/allyytc) | UI design, 3D world, Muse companion |
 | Rishab-Mal | [Rishab-Mal](https://github.com/Rishab-Mal) | Marketplace, plans, Video |
 
 Rishab-Mal's GitHub profile has no display name, and the repo doesn't give one, so the table uses the handle.
