@@ -79,7 +79,7 @@ Ranking uses the fast model unless `MUSE_RANK_ROLE=smart`. Model ids, prices, an
 
 ## Safety and privacy
 
-The people, posts, and venues are fictional. A footer says so. There is no real account system: each tab picks a persona (`?as=alex`, or the account menu).
+The people, posts, and venues are fictional. There is no real account system: each tab picks a persona (`?as=alex`, or the account menu).
 
 - Location sharing is a choice: who can see you, exact or approximate, and pause. Approximate is the center of an ~800 m cell, not your point. A share expires after 4 hours unless it is refreshed.
 - Someone who is not on the plan sees the fuzzed pin (about 120–200 m off). The sheet tells you the exact spot is shared after you join.
@@ -149,4 +149,8 @@ Rishab-Mal's GitHub profile has no display name, and the repo doesn't give one, 
 
 How we built it: the team coordinated an AI coding agent overnight. The run book, board protocol, and demo script are in [docs/BUILD_PROCESS.md](docs/BUILD_PROCESS.md). The rest of the docs are indexed in [docs/README.md](docs/README.md).
 
-Image and model credits: [CREDITS.md](CREDITS.md).
+## Credits
+
+Out Here was built at Meta's Closer Together AI Hackathon, an invite-only event hosted by Meta (75 participants admitted). It uses a neutral wordmark instead of Facebook's logo.
+
+The people, posts, and venues are fictional. Portraits and other seed images were generated with Meta Muse Image. Map tiles are [OpenFreeMap](https://openfreemap.org), © OpenMapTiles, data from OpenStreetMap. The person model and street kits are from Kenney under CC0. Details are in [CREDITS.md](CREDITS.md).
