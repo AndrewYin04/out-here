@@ -319,7 +319,7 @@ test.describe('mobile 390', () => {
     await expect(page.getByRole('heading', { name: 'Menu' })).toBeVisible();
     const footer = page.locator('main#main').getByTestId('brand-footer');
     await expect(footer).toBeVisible();
-    await expect(footer).toContainText('Images generated with Meta Muse Image');
+    await expect(footer).toContainText('Not affiliated with Meta');
     await page.getByRole('navigation', { name: 'Shortcuts' }).getByRole('link', { name: 'Events' }).click();
     await expect(page).toHaveURL(/\/events$/);
     expect(errors).toEqual([]);
