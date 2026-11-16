@@ -163,7 +163,8 @@ function paintFaces(p: PinRefs, faces: FriendFace[]) {
   });
 }
 
-/** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. mine: the viewer joined this plan, so it reads "You're going" and stands out. */
+/** picked: null when no Muse plan is on screen; otherwise whether this quest is one of its picks. */
+/** mine: the viewer joined this plan, so it reads "You're going" and stands out (docs/UX_PLAN.md). */
 function paintPin(p: PinRefs, q: Quest, selected: boolean, now: Date, faces: FriendFace[], picked: boolean | null, mine = false) {
   const seats = seatsLeftOf(q);
   const seatText = seatBadge(seats);

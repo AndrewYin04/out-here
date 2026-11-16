@@ -1,4 +1,5 @@
-// Skeleton layouts for a page's main column, shown while that page's data is loading.
+// Loading layouts for each surface's main column. Surface builders replace them with real
+// content; until then every route shows the shape of what will load there.
 import type { ReactNode } from 'react';
 import { Card, Divider, Skeleton, SkeletonGroup, cn } from '@/features/ui';
 

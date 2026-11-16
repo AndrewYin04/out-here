@@ -22,6 +22,7 @@ import { MuseOrb, MuseStyles } from './MuseOrb';
 
 const firstName = (n: string) => n.split(' ')[0] ?? n;
 
+/** Out Here and Memories are where the companion lives. */
 /** Every page of the app: Muse introduces each one and can be asked anywhere. */
 const SHOWN_ON = /^\//;
 

@@ -304,7 +304,8 @@ export function endPhotoAnalysis(id:number, outcome:'live'|'mock'|'error'|'cance
   if(outcome==='live')arm({type:'ACTION_ENDED'},600);
 }
 
-/** A view that shows encounters (the 3D world, or the 2D map's hand-off) keeps a finished one on screen until it calls finishAgentEncounter. Attaching does not own or cancel the request. */
+/** Presentation ownership never owns or cancels an API request. */
+/** A view that shows encounters (the 3D world, or the 2D map's hand-off) keeps a finished one on screen until it calls finishAgentEncounter. */
 export function attachMuseWorld(kind:'world'|'map'='world'):()=>void {
   worldOwners++;if(kind==='world')worldViews++;let attached=true;emit();
   return()=>{if(!attached)return;attached=false;worldOwners=Math.max(0,worldOwners-1);if(kind==='world')worldViews=Math.max(0,worldViews-1);if(!worldOwners&&store.encounter)store={...store,encounter:null};emit();};
