@@ -8,7 +8,7 @@ Built for Meta's Closer Together AI Hackathon in November 2026. It was invite-on
 
 The hackathon deploy is [out-here-three.vercel.app](https://out-here-three.vercel.app). The screenshots below are from a local run of this repo.
 
-![Third-person view down a stylized San Francisco street. Your character walks with Jolly, the Muse companion, who offers to find something nearby. Friends and a plan pin stand further up the block.](docs/screenshots/01-3d-street.png)
+![Third-person view from behind the avatar on the demo street, at the start of the follow camera. Jolly stands to the right and says “Hi Alex. Tap me and I’ll find something nearby.” Friends and a plan pin are farther up the block.](docs/screenshots/out-here-3d-street-follow.png)
 
 ## The problem
 
