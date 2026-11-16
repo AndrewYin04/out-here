@@ -7,7 +7,7 @@ export const BRAND = {
   wordmark: 'fb·demo',
   /** Facebook-style primary blue. */
   primaryColor: '#0866FF',
-  footer: 'Demo. Fictional people. Images generated with Meta Muse Image. Not affiliated with Meta.',
+  footer: 'Demo. Fictional people. Images generated with Meta Muse Image.',
 } as const;
 
 export type Brand = typeof BRAND;

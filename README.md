@@ -1,173 +1,161 @@
-<p align="center">
-  <img src="public/out-here-logo.png" alt="Out Here" width="180">
-</p>
+# Out Here
 
-<p align="center">
-  <b>A live map inside Facebook for plans you can join right now.</b><br>
-  Muse turns "I'm free" into a real plan, with a friend you have and a chance to meet people you don't know yet.
-</p>
+<img src="public/out-here-logo.png" alt="Out Here logo: Jolly, the Muse companion, in headphones" width="160">
 
-<p align="center">
-  <a href="https://youtu.be/5RyUiRBquXs"><b>▶ Watch the demo</b></a> ·
-  <a href="https://out-here-three.vercel.app">Live demo</a> ·
-  <a href="#run-it-locally">Run it locally</a> ·
-  <a href="#how-we-use-muse">How we use Muse</a>
-</p>
+**Say you're free. Muse turns it into a real plan with a friend, and a map of people you can join right now.**
 
-![Out Here: the San Francisco demo city in 3D](docs/screenshots/hero-3d-city.jpg)
+Built for Meta's Closer Together AI Hackathon in November 2026. It was invite-only, with 75 people admitted, and Meta funded travel and stay. No award or placement is claimed here.
 
-Built for the **Facebook Closer Together AI Hackathon 2026**. Every person in the app is fictional.
+**Demo (3 minutes):** [out here (Meta AI Hackathon 2026)](https://youtu.be/5RyUiRBquXs)
+
+The hackathon deploy is [out-here-three.vercel.app](https://out-here-three.vercel.app). The screenshots below are from a local run of this repo.
+
+![Third-person view from behind the avatar on the demo street, at the start of the follow camera. Jolly stands to the right and says “Hi Alex. Tap me and I’ll find something nearby.” Friends and a plan pin are farther up the block.](docs/screenshots/out-here-3d-street-follow.png)
 
 ## The problem
 
-You moved to a new city, you're three weeks into a new job, and you have 45 free minutes. You'd happily spend them with someone, but by the time a group chat answers, the time is gone.
+You have 40 minutes, you'd like to spend them with someone, and the group chat will not answer in time. Event apps list what was scheduled last week. They don't know that Maya is free after class, that you both want boba, and that a place you can walk to still has room.
 
-The tools we already use don't help with that moment. Find My shows **where** your friends are, but not who's free or what they'd be up for. Event apps are built for things scheduled days ahead.
-
-## The goal
-
-Turn "I'm free" into a real plan in minutes. Start with someone you know, leave room for people you don't know yet, and give the group a reason to do it again.
+Out Here is for that window. It is a Facebook-style app about fictional people in San Francisco. Out Here is one tab in it: a live map of small, joinable plans, with Muse in the middle of the loop.
 
 ## What it does
 
-Out Here is one tab in a working Facebook-style web app. Its loop is: **I'm free → Muse finds the plan → go together → photo → do it again.**
+**I'm free → Muse finds a plan that fits → you join, and the seat count updates → you take a photo together → Muse can get that group together again.**
 
-- **Find My for friends.** Friends who share with you appear on a live map. Each one has a status bubble that says what they're doing and what they'd be up for ("craving dumplings", "free after class, down for boba"). You choose who sees you, whether your location is exact or approximate, and when to pause. Shared locations expire on their own.
-- **I'm free.** Tell Muse what you want in plain words: *"I've got 45 minutes. Can I grab boba with someone nearby?"* Muse checks which friends are free, which places are open, and what fits your time window including the walk there. Then it suggests a plan, or drafts a new one with a friend when nothing posted fits.
-- **Invite and go.** The invite arrives like any Facebook invite. When your friend accepts, seat counts update live on every screen.
-- **Something pops up nearby.** When a seller opens a Marketplace pop-up, it appears on every map nearby. Muse matches each item to what each person cares about, such as a watch Alex set for a track jacket or a denim Reel Maya watched, and says why. You can reserve an item for pickup, and the seller accepts in real time.
-- **Walk there together.** The map turns into a 3D city. You see your friend walking too, and plans float over the street with open seats and walking minutes counting down.
-- **Take one photo together.** When everyone arrives, Muse looks at the photo, writes a caption, and saves it to an album shared by the people who were there.
-- **Do it again.** The group becomes a crew. One tap on **Get this group together again** and Muse proposes the next plan that fits everyone.
+1. **You're on a map of plans happening soon.** Explore shows public plans with open seats (a dumpling counter, a 5K, a thrift walk). Friends shows people who chose to share where they are, with a short status ("craving dumplings"). Both views are the same data.
+2. **You can walk it in 3D.** A third-person camera follows your character through a stylized downtown. Jolly, the Muse companion, walks with you. Friends nearby show up as people on the street. If you walk to a plan with someone else, their steps come back, so you see their character moving too. Zooming out returns to the flat map. Arrow keys, WASD, or the on-screen joystick move you. The default is the demo city, not your GPS.
+3. **You tell Muse you're free, in your own words.** "I've got 45 minutes. Can I grab boba with someone nearby?" Muse reads the time, the budget, and what you're in the mood for. Code then keeps only plans you can actually reach, afford, and still get a seat at, including the walk. Muse ranks those and explains the pick. If nothing posted fits, it can draft a new plan with a friend who is free.
+4. **You join, and the seat is real.** Joining is one write. A full plan stays full. A friend can be invited; the invite shows up for that persona. The exact meeting spot is hidden until you join. The public pin is offset by roughly 120–200 meters.
+5. **Afterwards it remembers the group.** People who went are a crew. Photos go in a shared album, you can rate the hangout in private, and "Get this group together again" asks Muse for a next plan that still fits the crew.
 
-Around the tab is a Facebook-style app with Feed, Friends, Groups, Marketplace, Events, Messenger and Notifications. It's seeded with about 60 fictional young adults in downtown San Francisco, so invites, notifications and Group hangouts arrive the way Facebook delivers things.
+Around that loop, the shell has a Home feed, profiles, friends, groups, notifications, Marketplace, and a Video page. Marketplace can rank listings from what that persona watched. A seller can also open a pop-up on the map. Muse can match a new listing to a watch you set or a Reel you watched, and the card shows what it noticed, what code checked, and what it decided. Search, the Events discover grid, and the Messenger inbox are still loading layouts. Your own plans are under Events → Going.
 
-## Screenshots
+A daily prompt and a weekly hangout streak exist as seed data and API routes. They do not have their own screens. A monthly "Wrapped" recap is named in the API types only.
 
-<table>
-  <tr>
-    <td align="center" width="20%"><img src="docs/screenshots/01-find-my-map.jpg" alt="Find My map"><br><sub>Friends on the map</sub></td>
-    <td align="center" width="20%"><img src="docs/screenshots/02-friend-card.jpg" alt="Friend card"><br><sub>A friend's bubble</sub></td>
-    <td align="center" width="20%"><img src="docs/screenshots/05-muse-drafts-plan.jpg" alt="Muse drafts a plan"><br><sub>Muse drafts a plan</sub></td>
-    <td align="center" width="20%"><img src="docs/screenshots/06-invite-arrives.jpg" alt="Invite arrives"><br><sub>The invite arrives</sub></td>
-    <td align="center" width="20%"><img src="docs/screenshots/08-muse-find-jacket.jpg" alt="Muse find"><br><sub>A Muse find, with reasons</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/screenshots/09-muse-find-bag.jpg" alt="A different find for Maya"><br><sub>Same sale, Maya's reason</sub></td>
-    <td align="center"><img src="docs/screenshots/12-walk-together-3d.jpg" alt="3D walk"><br><sub>Walking there in 3D</sub></td>
-    <td align="center"><img src="docs/screenshots/14-youre-all-here.jpg" alt="You're all here"><br><sub>Everyone arrived</sub></td>
-    <td align="center"><img src="docs/screenshots/15-muse-caption.jpg" alt="Muse caption"><br><sub>Muse writes the caption</sub></td>
-    <td align="center"><img src="docs/screenshots/17-do-it-again.jpg" alt="Do it again"><br><sub>The next plan</sub></td>
-  </tr>
-</table>
+## Screens
 
-## How we use Muse
+The 3D street, pulled back. Plans and friends stay on the same block as your character.
 
-Muse makes the decisions that need judgment. Code handles every fact. Each Muse answer follows the same three steps, and the app shows all three on the card:
+![Wider 3D view of the demo city: colorful low-poly blocks, your character and Jolly in the street, Maya's status, and a frisbee plan with seats left.](docs/screenshots/03-3d-block.png)
 
-1. **Noticed:** real data from the app, such as a friend's status, a watch you set, a Reel you watched, or a place you rated.
-2. **Checked:** code, not the model, works out the walking time, opening hours, price, open seats and whether it fits your window.
-3. **Decided:** Muse picks from what code handed it and explains the choice in one sentence.
+A friend who shared their status, standing on the same street.
 
-| Where | What Muse does |
-|---|---|
-| I'm free | Turns free text into a structured intent (activities, budget, time window, walking limit), ranks the real candidates, and explains the top picks |
-| Draft a plan | When nothing posted fits, picks a real open place near both friends and writes the invite |
-| Marketplace finds | Matches new listings to each person's watches and the Reels they watched, and explains the match |
-| For you | Orders the activity chips from your past ratings and watch history |
-| Photo caption | Looks at the photo and writes the caption for the shared album |
-| Get together again | Proposes the next plan from the crew's shared interests, status bubbles and free time |
-| Seed content | Muse Image generated every portrait and photo; Muse wrote the fictional people's bios and posts |
+![Closer 3D view. A friend ahead has a status bubble, Maya is labeled as craving dumplings, and a plan pin shows seats left.](docs/screenshots/02-3d-closer.png)
 
-**Keeping it grounded.**
-- Muse only chooses from ids that code hands it.
-- Code then recomputes walking times, prices and seats, and drops anything that doesn't fit.
-- If an answer names a place, price or person that isn't in the data, it's thrown out and a plain fallback is shown instead.
-- Every call is logged with its model, latency, tokens and output, so we can show why Muse suggested anything.
+Explore: public plans on the San Francisco map, with seats left and when they start.
 
-**Why Ember.** We use `muse-ember-1.0` for the live paths. In our measurements it ranked plans in 2.5 to 3.3 s with the same top pick that `muse-spark-1.3` took 5.7 to 7.0 s to reach, and Spark timed out at 12 s on 30 Marketplace listings. When someone says "I'm free", speed matters more than size. See [`docs/DECISIONS.md`](docs/DECISIONS.md).
+![Flat map of San Francisco centered on Union Square, with plan pins such as frisbee, ramen, a 5K, and an art walk, each badged with seats left.](docs/screenshots/04-map-explore.png)
 
-**Offline mode.** Without a Muse key, a deterministic mock stands in for each step, so the app and its tests run offline.
+"I'm free," with a time and what you're up for, before Muse answers.
 
-More detail: [`docs/muse-api.md`](docs/muse-api.md), [`docs/MUSE_INTEGRATION.md`](docs/MUSE_INTEGRATION.md).
+![The I'm free composer over the map. Duration chips, activity chips, and the typed line "I've got 45 minutes. Can I grab boba with someone nearby?"](docs/screenshots/06-im-free.png)
 
-## Privacy and safety
+The plan Muse (or, without an API key, the offline stand-in) comes back with. This shot is the offline stand-in: same sheet, and the label says so. Walking time, price, and who is free are computed in code either way.
 
-- Availability is visible to friends only, and only after you tap "I'm free".
-- Location sharing uses the same audience settings as posts: friends, Close friends, a custom list, or nobody. It can be exact or approximate, can be paused, and expires on its own.
-- A plan's exact spot stays fuzzed by about 200 m until you join. Plans are only at public places.
-- Joining with a friend is the default. Plans with strangers need at least 3 people, and every plan has report and block.
-- Muse only uses interests people chose to share, and never reveals private connections.
+![A plan card, Boba with Maya at Bobalicious Corner, with walk times, about $7, an invite line, and Make this plan. The header says the answer is the offline stand-in.](docs/screenshots/07-muse-plan.png)
+
+Open a plan to see who is going, what it costs, and how many seats are left. Join takes one.
+
+![The Dumplings before the rush card over the map: 12:19, a 9 minute walk, up to $12, 2 of 4 seats taken, and a Join button.](docs/screenshots/05-quest-seats.png)
+
+The crew album after a hangout, with a private rating and a way to plan the next one.
+
+![Memories page. The Dumpling Den crew album shows two photos, a 9.2 rating, and Get this group together again.](docs/screenshots/08-memories.png)
+
+## How Muse does the work
+
+Muse is a model API (Ember and Spark, through one server-side adapter). The product is the split: the model writes language, and code keeps the facts.
+
+| Step | What Muse does | What code guarantees |
+|---|---|---|
+| Understand | Turns a messy sentence into an intent: activity, budget, time window, how far you'll walk | The intent has to match a schema. If it doesn't, the plan stops |
+| Fit | | Only real plans and friends that fit the window, including walking time, budget, and open seats, become candidates. A plan Muse drafts has to be a real place that is open for that window |
+| Match and explain | Ranks those candidates and says why in plain language, including a friend when one is actually free | Muse can only choose from those candidates. It cannot invent a person, place, price, or time |
+| Coordinate | Drafts the invite. If nothing posted fits, drafts a new plan | Joining takes a seat in one step. The last seat cannot be taken twice |
+| Continue | Suggests a next plan for a crew, and can caption a photo you saved | The suggestion has to name a real plan the crew can still fit into. A caption you didn't accept is not saved |
+| Create | Turns a short idea ("boba after class at 4") into a plan draft | The place and the numbers are checked before the plan exists |
+
+Finds and the "for you" chips use the same split on the card: **Noticed** (a status, a watch, a Reel, a rating), **Checked** (code: walk, price, seats, open hours, whether a nearby plan backs the chip), and **Decided** (one sentence from Muse). Each call is logged with its model, latency, tokens, and output.
+
+Without `MUSE_API_KEY`, or with `MUSE_MOCK=1`, the same screens run on a deterministic stand-in. Those answers are labeled offline. Photo understanding does not invent a description in that mode.
+
+Ranking uses Ember (`muse-ember-1.0`) unless `MUSE_RANK_ROLE=smart`. The switch is recorded in [docs/DECISIONS.md](docs/DECISIONS.md): Spark at minimal effort took 5.7–7.0 s for the same top pick Ember reached in 2.5–3.3 s, and Spark timed out at 12 s on 30 Marketplace listings. Model ids and request shape are in [docs/muse-api.md](docs/muse-api.md).
+
+## Safety and privacy
+
+The people, posts, and venues are fictional. There is no real account system: each tab picks a persona (`?as=alex`, or the account menu).
+
+- Location sharing is a choice: who can see you, exact or approximate, and pause. Approximate is the center of an ~800 m cell, not your point. A share expires after 4 hours unless it is refreshed.
+- Someone who is not on the plan sees the fuzzed pin (about 120–200 m off). The sheet tells you the exact spot is shared after you join. If none of your friends are already in a plan, Muse drops it unless the plan's size is at least 3.
+- A plan can be reported from its sheet.
+- The browser never holds the database service key or the Muse key. Clients hear that something changed, then refetch. A location update does not include where the person is.
+- GPS is off until you switch to Here or Live GPS. The demo walk does not read your location.
+- The app does not read a calendar.
 
 ## Tech stack
 
-- **[Next.js 15](https://nextjs.org)** (App Router, TypeScript, Tailwind CSS)
-- **[Supabase](https://supabase.com):** Postgres, Storage and Realtime Broadcast.
-  - The browser never queries tables. Route handlers apply the visibility rules.
-  - Row-level security is on, with no anonymous policies.
-  - Joining a plan is one atomic Postgres function, so the last seat can't be double-booked.
-- **[MapLibre GL JS](https://maplibre.org)** with **[OpenFreeMap](https://openfreemap.org)** tiles for the map
-- **[three.js](https://threejs.org)** for the 3D city, built with [Kenney](https://kenney.nl) assets
-- **Muse:** Ember, Spark and Muse Image, through the `openai` SDK pointed at the Muse API
-- **Vitest** and **Playwright** for tests; deployed on **Vercel**
+From `package.json` and the code, not a wishlist:
 
-## Run it locally
+- **Next.js 15** (App Router) and **React 19**, TypeScript, Tailwind CSS 4
+- **Supabase** (Postgres, realtime, storage) when it is configured. Row-level security is on, and there are no anonymous table policies: the browser does not query tables. With no Supabase env, the same store runs in memory from the committed seed
+- **MapLibre GL** and [OpenFreeMap](https://openfreemap.org) tiles. No map API key
+- **three.js** for the characters, Jolly, and the street scenery, drawn in the map's WebGL context
+- **Muse** through the `openai` package pointed at Meta's API. **Zod** checks model output
+- Vitest and Playwright. Deployed on Vercel for the hackathon
 
-You need Node 20 or newer.
+Node 22 or newer.
+
+## Architecture
+
+`src/features/` is split by area: `map`, `world` (3D), `outhere` (the "I'm free" sheet), `muse`, `muse-companion`, `memories`, `fb`, and `data`. Screens live in `src/app/`. Shared types and the demo clock live in `src/shared/`.
+
+One `DataStore` serves every page. `getStore()` uses Supabase when the URL and service key for `DATA_TARGET` are set, and the in-memory seed otherwise. Both go through the same rules for who can see a row.
+
+The flat map and the 3D view read the same quests and friend pins. 3D changes the camera and draws characters on top. It is not a second database.
+
+Muse never runs in the browser. `src/features/muse/client.ts` is the only caller. Each step returns structured JSON, and the route rejects output that names something the code did not already allow.
+
+## Run locally
+
+No keys required. You get the fictional city, the 3D view, and labeled offline Muse answers.
 
 ```bash
 npm install
 npm run dev
 ```
 
-With no keys set, the app runs on seeded in-memory data and the offline Muse mock. Open two tabs as two different people:
+Open [http://localhost:3000/out-here?as=alex&view=3d](http://localhost:3000/out-here?as=alex&view=3d).
 
-- http://localhost:3000/out-here?as=alex
-- http://localhost:3000/out-here?as=maya
+`?as=` picks a persona for that tab (`alex`, `maya`, `jordan`, `priya`, `sam`, `leo`, `nina`, `kai`). `?view=map` is the flat map. `?mode=explore` lists every public plan. Use two tabs with two personas to invite and join. `/out-here?as=leo&sell=popup` opens Leo's seller pop-up with the items filled in.
 
-Other personas: `jordan`, `priya`, `sam`, `leo`, `nina`, `kai`. To see a seller's pop-up, open `/out-here?as=leo&sell=popup`.
-
-**With real Muse and Supabase:**
-
-1. Copy `.env.example` to `.env.local`, then fill in the Muse key and your Supabase project.
-2. Set up the database and the seed data:
-   ```bash
-   npm run db:migrate:dev
-   npm run seed
-   ```
-3. Start the app with `npm run dev`.
-
-**Checks:**
+To point the app at Supabase and live Muse, copy `.env.example` to `.env.local`, fill it in, then `npm run db:migrate:dev` and `npm run seed`. `npm run seed:demo` writes the demo project. Never commit `.env.local`. The key names and model ids are in [docs/muse-api.md](docs/muse-api.md).
 
 ```bash
-npm run typecheck && npm run lint && npm test
+npm run typecheck
+npm run lint
+npm test
 npm run test:e2e
-```
-
-## Project structure
-
-```
-src/
-  app/              routes and API handlers (Next.js App Router)
-  features/
-    map/            the Out Here map, I'm free, plans, Marketplace pop-ups
-    muse/           Muse client, prompts, candidates, validation, mock mode
-    world/          the 3D city, characters and the Muse companion
-    memories/       arrival photo, crew albums, "get this group together again"
-    fb/             the Facebook-style app around it
-    data/           data store (Supabase or in-memory), realtime hooks
-  shared/           shared types, API contracts, seed story
-supabase/           migrations and seed content
-scripts/            seeding, migrations, image generation, Muse evals
-tests/e2e/          Playwright flows
+npm run build
 ```
 
 ## Team
 
-[@AndrewYin04](https://github.com/AndrewYin04) · [@alnnguyen](https://github.com/alnnguyen) · [@alwxngn](https://github.com/alwxngn) · [@allyytc](https://github.com/allyytc) · [@Rishab-Mal](https://github.com/Rishab-Mal)
+Roles are a short read of the commit history and `docs/TEAM.md`. They are a draft, not job titles.
+
+| Name | GitHub | Role (draft) |
+|---|---|---|
+| Andrew Yin | [AndrewYin04](https://github.com/AndrewYin04) | Facebook shell, data, seed |
+| Alan Nguyen | [alnnguyen](https://github.com/alnnguyen) | 3D street, map |
+| Alex Nguyen | [alwxngn](https://github.com/alwxngn) | Muse plans, invites |
+| Ally Chen | [allyytc](https://github.com/allyytc) | UI design, 3D world, Muse companion |
+| Rishab-Mal | [Rishab-Mal](https://github.com/Rishab-Mal) | Marketplace, plans, Video |
+
+Rishab-Mal's GitHub profile has no display name, and the repo doesn't give one, so the table uses the handle.
+
+How we built it: the team coordinated an AI coding agent overnight. The run book, board protocol, and demo script are in [docs/BUILD_PROCESS.md](docs/BUILD_PROCESS.md). The rest of the docs are indexed in [docs/README.md](docs/README.md).
 
 ## Credits
 
-Out Here is a hackathon prototype and is not affiliated with Meta. It uses a neutral wordmark instead of Facebook's logo.
+Out Here was built at Meta's Closer Together AI Hackathon, an invite-only event hosted by Meta (75 participants admitted). It uses a neutral wordmark instead of Facebook's logo.
 
-All people are fictional, and their photos were generated with Meta Muse Image. Maps are © OpenStreetMap contributors via OpenFreeMap and OpenMapTiles. The 3D assets are from Kenney (CC0). Full list: [`CREDITS.md`](CREDITS.md).
+The people, posts, and venues are fictional. Portraits and other seed images were generated with Meta Muse Image. Map tiles are [OpenFreeMap](https://openfreemap.org), © OpenMapTiles, data from OpenStreetMap. The person model and street kits are from Kenney under CC0. Details are in [CREDITS.md](CREDITS.md).
