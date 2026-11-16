@@ -1,7 +1,7 @@
 // Friend locations ("Find My" inside Facebook): pins for a viewer, the viewer's own share, and
 // "Want to hang?" invites. Server-only; CoreStore exposes these as store methods.
 //
-// Rules (00-mission P0 1a and the overnight spec review):
+// Who sees a pin, how an approximate share is rounded, and what a location update broadcasts:
 // - A pin is shown only to an accepted friend for whom canSee(audience) holds; paused and
 //   expired shares are hidden.
 // - Approximate shares return the centre of an ~800 m grid cell, a city or neighbourhood label,
