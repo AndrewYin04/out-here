@@ -4,7 +4,7 @@
 
 **Say you're free. Muse turns it into a real plan with a friend, and a map of people you can join right now.**
 
-Built for Meta's Closer Together AI Hackathon in November 2026. It was invite-only, with 75 people admitted, and Meta funded travel and stay. No award or placement is claimed here.
+Built for Meta's Closer Together AI Hackathon in November 2026, invite-only, with 75 people admitted.
 
 **Demo (3 minutes):** [out here (Meta AI Hackathon 2026)](https://youtu.be/5RyUiRBquXs)
 
