@@ -21,7 +21,8 @@ test('saved-photo analysis preserves the photo; only an explicit caption edit ch
   expect((await request.post('/api/muse/caption',{headers,data:{memoryId:memory.id}})).status()).toBe(400);
   const updated=await request.patch(`/api/memories/${memory.id}`,{headers,data:{caption:`My edited photo ${info.project.name}`}});
   expect(updated.status()).toBe(200);expect((await updated.json()).memory.photoUrl).toBe(memory.photoUrl);
-  expect((await request.patch(`/api/memories/${memory.id}`,{headers:{'x-persona':'maya'},data:{caption:'Unwanted'}})).status()).toBe(404);
+  // PATCH is the crew's shared story (MemoryPage), so any crew member may edit it; someone outside the crew may not.
+  expect((await request.patch(`/api/memories/${memory.id}`,{headers:{'x-persona':'jordan'},data:{caption:'Unwanted'}})).status()).toBe(403);
   const rows=await(await request.get(`/api/memories?crewId=${crew.id}`,{headers})).json();expect(rows.memories.filter((m:{id:string})=>m.id===memory.id)).toHaveLength(1);
   await page.goto(`/memories?as=alex#crew-${crew.id}`);
   await expect(page.getByRole('img',{name:`My edited photo ${info.project.name}`,exact:true})).toBeVisible({timeout:20000});

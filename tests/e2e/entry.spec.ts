@@ -26,7 +26,7 @@ for (const width of [390, 1440]) {
       test.skip((width === 390) !== (info.project.name === 'phone'), 'one width per project');
     });
 
-    test("Feed I'm free opens the composer on /out-here, focused and empty", async ({ page }) => {
+    test("Feed I'm free opens the composer on /out-here, empty",async ({ page }) => {
       await page.setViewportSize({ width, height: width < 800 ? 844 : 900 });
       await page.goto('/?as=alex');
       const button = page.getByTestId('home-outhere-free-button');
@@ -35,9 +35,11 @@ for (const width of [390, 1440]) {
       await expect(page).toHaveURL(/\/out-here/);
       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
       const composer = page.locator('#imfree-text');
-      await expect(composer).toBeFocused();
+      // PlanSheet opens without focus on purpose: a phone keyboard would cover the chips.
+      await expect(composer).toBeVisible();
+      await expect(composer).not.toBeFocused();
       await expect(composer).toHaveValue('');
-      await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      await expect(composer).toHaveAttribute('placeholder', /Or tell Muse/);
       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
       await expect(page.getByTestId('plan-summary')).toHaveCount(0);
       // The param is consumed so a reload does not reopen the sheet.

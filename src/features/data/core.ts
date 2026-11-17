@@ -53,8 +53,9 @@ export type QuestDetail = {
   group: { slug: string; name: string } | null;
 };
 
-/** How many plans one person can post in a rolling 24 hours. */
-export const EVENTS_PER_DAY = 5;
+/** How many plans one person can post in a rolling 24 hours. 50, not 5: the e2e suite and demo rehearsals post
+ *  more than 5 plans as Alex on one server, and a lower cap locked "Post a plan" before the live demo. */
+export const EVENTS_PER_DAY = 50;
 /** Check-in must be this close to the exact spot. */
 export const CHECKIN_RADIUS_M = 150;
 /** Check-in opens this long before the start. */
