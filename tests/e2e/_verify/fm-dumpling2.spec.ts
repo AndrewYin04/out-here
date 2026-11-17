@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+test('after Maya saves her status, Alex taps Dumpling Den in Friends at 390', async ({ browser, request }) => {
+  const put = await request.put('/api/locations/me', { headers: { 'x-persona': 'maya' }, data: { bubble: { thought: 'craving dumplings' } } });
+  expect(put.ok()).toBe(true);
+  const g = async () => ((await (await request.get('/api/locations/friends', { headers: { 'x-persona': 'alex' } })).json()).pins.find((p: { friend: { handle: string } }) => p.friend.handle === 'maya')).location;
+  console.log('maya seen by alex, seed:', JSON.stringify(await g()));
+  await request.put('/api/locations/me', { headers: { 'x-persona': 'maya' }, data: { precision: 'exact' } });
+  console.log('maya exact:', JSON.stringify(await g()));
+  await request.put('/api/locations/me', { headers: { 'x-persona': 'maya' }, data: { precision: 'approximate' } });
+  console.log('maya approx again:', JSON.stringify(await g()));
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await ctx.newPage();
+  await page.goto('/out-here/friends?as=alex');
+  await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends', { timeout: 20_000 });
+  const pin = page.getByTestId('quest-pin-dumplings');
+  await expect(pin).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  const box = await pin.boundingBox();
+  const cx = box!.x + box!.width / 2, cy = box!.y + box!.height / 2;
+  const tid = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); const t = e ? e.closest('[data-testid]') : null; return t ? (t.getAttribute('data-testid') + ' ' + (t.getAttribute('data-handle') || '')) : null; }, [cx, cy]);
+  console.log('top element at quest pin center:', tid, JSON.stringify(box));
+  await page.screenshot({ path: 'test-results/verify-dumpling2-before.png' });
+  await page.touchscreen.tap(cx, cy);
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: 'test-results/verify-dumpling2-after.png' });
+  console.log('quest panel open:', await page.getByText('Dumplings before the rush').count(), 'friend card open:', await page.getByTestId('friend-card').count());
+  await expect(page.getByText('Dumplings before the rush').first()).toBeVisible();
+  await ctx.close();
+});
