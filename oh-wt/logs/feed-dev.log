@@ -1,0 +1,71 @@
+
+> out-here@0.1.0 dev
+> next dev -p 3000 -p 3121
+
+   ▲ Next.js 15.5.29
+   - Local:        http://localhost:3121
+   - Network:      http://100.74.151.61:3121
+
+ ✓ Starting...
+ ✓ Ready in 6.6s
+ ○ Compiling / ...
+ ✓ Compiled / in 3.9s (1038 modules)
+ GET / 200 in 5185ms
+ GET /?as=alex 200 in 188ms
+ ○ Compiling /api/realtime/config ...
+ ✓ Compiled /api/realtime/config in 1745ms (1211 modules)
+ GET /api/quests?lat=37.4847&lng=-122.1477&radiusM=3000 200 in 2532ms
+ GET /api/feed 200 in 2570ms
+ GET /api/realtime/config 200 in 2723ms
+ GET /api/stories 200 in 2915ms
+ ✓ Compiled /api/realtime in 494ms (1213 modules)
+ GET /?as=alex 200 in 2030ms
+ GET /api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability 200 in 3959ms
+ GET /api/realtime?channels=post%3A112dc578-b387-4de3-a89e-c4e3f6e4117d%2Cpost%3A2fa89ac8-897b-452f-b254-fa54e3ee8447%2Cpost%3A3f671c13-7fd0-4132-962c-aba2ef9eefb8%2Cpost%3A61e898c9-588a-4e59-acf8-de8582e89a98%2Cpost%3A85199b88-a357-405f-b206-f7dedeb121ee%2Cpost%3Aa52f5935-1e72-4ba5-b94a-667481521f91%2Cpost%3Aaaabfa65-a3ab-47b7-9a2e-0abd4ef7c9ab%2Cpost%3Ab97fc288-ec9c-4871-8fe1-ecffb17f9c0c%2Cpost%3Af070099a-3474-47ce-810c-517484c16c52%2Cpost%3Af1aa7467-6ffd-4b37-ba30-3a15a89f8aa4%2Cquest%3A0153011d-c74e-4cd2-a676-e835cd22979c%2Cquest%3A057b246f-e018-4b36-ae16-7c3d5074d488%2Cquest%3A1552512b-4e2c-42d8-8d86-4063a71b40ca%2Cquest%3A1f6d84c7-aea3-41de-a044-a0eb93686dff%2Cquest%3A49e7bd9b-8bf1-4c0f-a538-482e16f4920f%2Cquest%3A6abc5851-568d-49fc-93bb-1095844fa108%2Cquest%3A833068eb-bfd1-4e65-850e-d2dbeb07db23%2Cquest%3A938c8a40-14b9-4ed1-8bc1-21a335659a3e%2Cquest%3Aa59c47f4-2c24-47a7-ae91-1eea373d568d%2Cquest%3Aba792ca9-e5fc-4fa2-9d32-890ed0740482%2Cquest%3Ac3110c84-4c77-414d-8a4e-bbdd11bdf754%2Cquest%3Ad0f3eb9f-ef85-41c6-9343-c90752488ca3%2Cquest%3Ae36824a5-bbcb-4d63-bb97-b1ef3e2fac94%2Cquest%3Aefaf16ba-f6d8-4550-aa51-a3087d450be0%2Cquest%3Af8dfc309-4d5e-4064-9ef7-9d898025d35a%2Cquest%3Af99603dc-ffe6-4357-9b68-922a985381c1%2Cquest%3Af9fe40b2-b7a9-4ee4-bf78-8318a98b86ce%2Cuser%3A48110c3e-2928-472f-ac20-0c93bdbfd7ad&as=alex 200 in 4342ms
+ GET /?as=alex 200 in 387ms
+ GET /api/stories 200 in 78ms
+ GET /api/quests?lat=37.4847&lng=-122.1477&radiusM=3000 200 in 132ms
+ GET /api/feed 200 in 160ms
+ GET /api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability 200 in 372ms
+ GET /api/realtime/config 200 in 72ms
+ GET /api/realtime?channels=post%3A112dc578-b387-4de3-a89e-c4e3f6e4117d%2Cpost%3A2fa89ac8-897b-452f-b254-fa54e3ee8447%2Cpost%3A3f671c13-7fd0-4132-962c-aba2ef9eefb8%2Cpost%3A61e898c9-588a-4e59-acf8-de8582e89a98%2Cpost%3A85199b88-a357-405f-b206-f7dedeb121ee%2Cpost%3Aa52f5935-1e72-4ba5-b94a-667481521f91%2Cpost%3Aaaabfa65-a3ab-47b7-9a2e-0abd4ef7c9ab%2Cpost%3Ab97fc288-ec9c-4871-8fe1-ecffb17f9c0c%2Cpost%3Af070099a-3474-47ce-810c-517484c16c52%2Cpost%3Af1aa7467-6ffd-4b37-ba30-3a15a89f8aa4%2Cquest%3A0153011d-c74e-4cd2-a676-e835cd22979c%2Cquest%3A057b246f-e018-4b36-ae16-7c3d5074d488%2Cquest%3A1552512b-4e2c-42d8-8d86-4063a71b40ca%2Cquest%3A1f6d84c7-aea3-41de-a044-a0eb93686dff%2Cquest%3A49e7bd9b-8bf1-4c0f-a538-482e16f4920f%2Cquest%3A6abc5851-568d-49fc-93bb-1095844fa108%2Cquest%3A833068eb-bfd1-4e65-850e-d2dbeb07db23%2Cquest%3A938c8a40-14b9-4ed1-8bc1-21a335659a3e%2Cquest%3Aa59c47f4-2c24-47a7-ae91-1eea373d568d%2Cquest%3Aba792ca9-e5fc-4fa2-9d32-890ed0740482%2Cquest%3Ac3110c84-4c77-414d-8a4e-bbdd11bdf754%2Cquest%3Ad0f3eb9f-ef85-41c6-9343-c90752488ca3%2Cquest%3Ae36824a5-bbcb-4d63-bb97-b1ef3e2fac94%2Cquest%3Aefaf16ba-f6d8-4550-aa51-a3087d450be0%2Cquest%3Af8dfc309-4d5e-4064-9ef7-9d898025d35a%2Cquest%3Af99603dc-ffe6-4357-9b68-922a985381c1%2Cquest%3Af9fe40b2-b7a9-4ee4-bf78-8318a98b86ce%2Cuser%3A48110c3e-2928-472f-ac20-0c93bdbfd7ad&as=alex 200 in 2452ms
+ ⨯ ./src/features/fb/feed/OutHereCard.tsx
+Error:   [31mx[0m Expression expected
+    ,-[[36;1;4mC:\oh-wt\feed\src\features\fb\feed\OutHereCard.tsx[0m:30:1]
+ [2m27[0m | 
+ [2m28[0m | /** "free till 6:00 PM" when the window is open now, else "free 5:15 PM - 6:00 PM". */
+ [2m29[0m | function windowLabel(startsAt: string, endsAt: string): string {
+ [2m30[0m |   return minutesUntil(startsAt) > 0 ?  : ;
+    : [35;1m                                       ^[0m
+ [2m31[0m | }
+ [2m32[0m | 
+ [2m33[0m | function startsLabel(iso: string): string {
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/features/fb/feed/OutHereCard.tsx
+./src/features/fb/feed/index.ts
+./src/app/(fb)/page.tsx
+ ✓ Compiled in 654ms (1213 modules)
+ ✓ Compiled in 431ms (1227 modules)
+ ✓ Compiled in 447ms (1227 modules)
+ GET /?as=alex 200 in 597ms
+ GET /api/stories 200 in 253ms
+ GET /api/feed 200 in 273ms
+ GET /api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability 200 in 504ms
+ GET /api/quests?lat=37.4847&lng=-122.1477&radiusM=3000 200 in 534ms
+ GET /api/realtime/config 200 in 72ms
+ GET /api/realtime?channels=post%3A112dc578-b387-4de3-a89e-c4e3f6e4117d%2Cpost%3A2fa89ac8-897b-452f-b254-fa54e3ee8447%2Cpost%3A3f671c13-7fd0-4132-962c-aba2ef9eefb8%2Cpost%3A61e898c9-588a-4e59-acf8-de8582e89a98%2Cpost%3A85199b88-a357-405f-b206-f7dedeb121ee%2Cpost%3Aa52f5935-1e72-4ba5-b94a-667481521f91%2Cpost%3Aaaabfa65-a3ab-47b7-9a2e-0abd4ef7c9ab%2Cpost%3Ab97fc288-ec9c-4871-8fe1-ecffb17f9c0c%2Cpost%3Af070099a-3474-47ce-810c-517484c16c52%2Cpost%3Af1aa7467-6ffd-4b37-ba30-3a15a89f8aa4%2Cquest%3A0153011d-c74e-4cd2-a676-e835cd22979c%2Cquest%3A057b246f-e018-4b36-ae16-7c3d5074d488%2Cquest%3A1552512b-4e2c-42d8-8d86-4063a71b40ca%2Cquest%3A1f6d84c7-aea3-41de-a044-a0eb93686dff%2Cquest%3A49e7bd9b-8bf1-4c0f-a538-482e16f4920f%2Cquest%3A6abc5851-568d-49fc-93bb-1095844fa108%2Cquest%3A833068eb-bfd1-4e65-850e-d2dbeb07db23%2Cquest%3A938c8a40-14b9-4ed1-8bc1-21a335659a3e%2Cquest%3Aa59c47f4-2c24-47a7-ae91-1eea373d568d%2Cquest%3Aba792ca9-e5fc-4fa2-9d32-890ed0740482%2Cquest%3Ac3110c84-4c77-414d-8a4e-bbdd11bdf754%2Cquest%3Ad0f3eb9f-ef85-41c6-9343-c90752488ca3%2Cquest%3Ae36824a5-bbcb-4d63-bb97-b1ef3e2fac94%2Cquest%3Aefaf16ba-f6d8-4550-aa51-a3087d450be0%2Cquest%3Af8dfc309-4d5e-4064-9ef7-9d898025d35a%2Cquest%3Af99603dc-ffe6-4357-9b68-922a985381c1%2Cquest%3Af9fe40b2-b7a9-4ee4-bf78-8318a98b86ce%2Cuser%3A48110c3e-2928-472f-ac20-0c93bdbfd7ad&as=alex 200 in 3391ms
+ GET /?as=alex 200 in 317ms
+ GET /api/stories 200 in 88ms
+ GET /api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability 200 in 498ms
+ GET /api/quests?lat=37.4847&lng=-122.1477&radiusM=3000 200 in 521ms
+ GET /api/feed 200 in 585ms
+ GET /api/realtime/config 200 in 82ms
+ GET /api/realtime?channels=quest%3A0153011d-c74e-4cd2-a676-e835cd22979c%2Cquest%3A057b246f-e018-4b36-ae16-7c3d5074d488%2Cquest%3A1552512b-4e2c-42d8-8d86-4063a71b40ca%2Cquest%3A1f6d84c7-aea3-41de-a044-a0eb93686dff%2Cquest%3A49e7bd9b-8bf1-4c0f-a538-482e16f4920f%2Cquest%3A6abc5851-568d-49fc-93bb-1095844fa108%2Cquest%3A833068eb-bfd1-4e65-850e-d2dbeb07db23%2Cquest%3A938c8a40-14b9-4ed1-8bc1-21a335659a3e%2Cquest%3Aa59c47f4-2c24-47a7-ae91-1eea373d568d%2Cquest%3Aba792ca9-e5fc-4fa2-9d32-890ed0740482%2Cquest%3Ac3110c84-4c77-414d-8a4e-bbdd11bdf754%2Cquest%3Ad0f3eb9f-ef85-41c6-9343-c90752488ca3%2Cquest%3Ae36824a5-bbcb-4d63-bb97-b1ef3e2fac94%2Cquest%3Aefaf16ba-f6d8-4550-aa51-a3087d450be0%2Cquest%3Af8dfc309-4d5e-4064-9ef7-9d898025d35a%2Cquest%3Af99603dc-ffe6-4357-9b68-922a985381c1%2Cquest%3Af9fe40b2-b7a9-4ee4-bf78-8318a98b86ce%2Cuser%3A48110c3e-2928-472f-ac20-0c93bdbfd7ad&as=alex 200 in 252ms
+ GET /api/realtime?channels=post%3A112dc578-b387-4de3-a89e-c4e3f6e4117d%2Cpost%3A2fa89ac8-897b-452f-b254-fa54e3ee8447%2Cpost%3A3f671c13-7fd0-4132-962c-aba2ef9eefb8%2Cpost%3A61e898c9-588a-4e59-acf8-de8582e89a98%2Cpost%3A85199b88-a357-405f-b206-f7dedeb121ee%2Cpost%3Aa52f5935-1e72-4ba5-b94a-667481521f91%2Cpost%3Aaaabfa65-a3ab-47b7-9a2e-0abd4ef7c9ab%2Cpost%3Ab97fc288-ec9c-4871-8fe1-ecffb17f9c0c%2Cpost%3Af070099a-3474-47ce-810c-517484c16c52%2Cpost%3Af1aa7467-6ffd-4b37-ba30-3a15a89f8aa4%2Cquest%3A0153011d-c74e-4cd2-a676-e835cd22979c%2Cquest%3A057b246f-e018-4b36-ae16-7c3d5074d488%2Cquest%3A1552512b-4e2c-42d8-8d86-4063a71b40ca%2Cquest%3A1f6d84c7-aea3-41de-a044-a0eb93686dff%2Cquest%3A49e7bd9b-8bf1-4c0f-a538-482e16f4920f%2Cquest%3A6abc5851-568d-49fc-93bb-1095844fa108%2Cquest%3A833068eb-bfd1-4e65-850e-d2dbeb07db23%2Cquest%3A938c8a40-14b9-4ed1-8bc1-21a335659a3e%2Cquest%3Aa59c47f4-2c24-47a7-ae91-1eea373d568d%2Cquest%3Aba792ca9-e5fc-4fa2-9d32-890ed0740482%2Cquest%3Ac3110c84-4c77-414d-8a4e-bbdd11bdf754%2Cquest%3Ad0f3eb9f-ef85-41c6-9343-c90752488ca3%2Cquest%3Ae36824a5-bbcb-4d63-bb97-b1ef3e2fac94%2Cquest%3Aefaf16ba-f6d8-4550-aa51-a3087d450be0%2Cquest%3Af8dfc309-4d5e-4064-9ef7-9d898025d35a%2Cquest%3Af99603dc-ffe6-4357-9b68-922a985381c1%2Cquest%3Af9fe40b2-b7a9-4ee4-bf78-8318a98b86ce%2Cuser%3A48110c3e-2928-472f-ac20-0c93bdbfd7ad&as=alex 200 in 2184ms
+ ✓ Compiled in 265ms (404 modules)
+[?25h

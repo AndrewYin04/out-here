@@ -1,0 +1,25 @@
+
+Running 1 test using 1 worker
+
+DRAFT {"draft":null,"friend":{"id":"947e7bbe-880e-4ae8-9f90-9a5694ff267d","handle":"maya","name":"Maya Chen","avatarUrl":"/seed/people/maya.webp","mutualFriendCount":4,"isFriend":true,"online":false},"others":[],"reason":"no_place_fits"}
+WORK 0 
+  x  1 [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route (1.5m)
+
+
+  1) [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route ─────────
+
+    Test timeout of 90000ms exceeded.
+
+    Error Context: test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route ──────────
+e2e exit 1

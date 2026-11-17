@@ -1,0 +1,204 @@
+
+Running 66 tests using 10 workers
+
+[1/66] [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[2/66] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[3/66] [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[4/66] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[5/66] [phone] › tests\e2e\findmy.spec.ts:41:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[6/66] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[7/66] [desktop] › tests\e2e\findmy.spec.ts:41:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[8/66] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile and Want to hang?, and no dead Message link
+[9/66] [phone] › tests\e2e\findmy.spec.ts:50:3 › API › sharing with the public is rejected
+[10/66] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[11/66] [phone] › tests\e2e\findmy.spec.ts:56:3 › API › profiles of other people carry no home location
+[12/66] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[13/66] [phone] › tests\e2e\findmy.spec.ts:69:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[14/66] [desktop] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[15/66] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[16/66] [desktop] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[17/66] [desktop] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[18/66] [desktop] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+[19/66] [desktop] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[20/66] [desktop] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[21/66] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[22/66] [desktop] › tests\e2e\findmy.spec.ts:50:3 › API › sharing with the public is rejected
+[23/66] [desktop] › tests\e2e\findmy.spec.ts:56:3 › API › profiles of other people carry no home location
+[24/66] [desktop] › tests\e2e\findmy.spec.ts:69:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[25/66] [desktop] › tests\e2e\findmy.spec.ts:105:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap
+[26/66] [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[27/66] [desktop] › tests\e2e\findmy.spec.ts:146:5 › at 390px › sharing settings open from the map
+[28/66] [desktop] › tests\e2e\findmy.spec.ts:69:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[29/66] [phone] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+[30/66] [desktop] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[31/66] [desktop] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+[32/66] [phone] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[33/66] [desktop] › tests\e2e\findmy.spec.ts:105:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap
+[34/66] [phone] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[35/66] [phone] › tests\e2e\findmy.spec.ts:105:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap
+[36/66] [desktop] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[37/66] [phone] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[38/66] [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[39/66] [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[40/66] [phone] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[41/66] [desktop] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+  1) [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  locator('#imfree-text')
+    Expected: focused
+    Received: inactive
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeFocused" locator('#imfree-text') with timeout 5000ms
+      - waiting for locator('#imfree-text')
+        13 × locator resolved to <textarea rows="1" maxlength="280" id="imfree-text" placeholder="Or tell Muse… e.g. with someone who likes comics" class="block max-h-20 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"></textarea>
+           - unexpected value "inactive"
+
+
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+    > 38 |       await expect(composer).toBeFocused();
+         |                              ^
+      39 |       await expect(composer).toHaveValue('');
+      40 |       await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      41 |       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
+        at C:\oh-wt\main-baseline\tests\e2e\entry.spec.ts:38:30
+
+    Error Context: test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(page).toHaveURL(expected) failed
+
+    Expected pattern: /\/out-here/
+    Received string:  "http://localhost:3179/?as=alex"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveURL" with timeout 5000ms
+        13 × locator resolved to <html lang="en">…</html>
+           - unexpected value "http://localhost:3179/?as=alex"
+
+
+      33 |       await expect(button).toHaveAttribute('href', '/out-here?free=1');
+      34 |       await button.click();
+    > 35 |       await expect(page).toHaveURL(/\/out-here/);
+         |                          ^
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+      38 |       await expect(composer).toBeFocused();
+        at C:\oh-wt\main-baseline\tests\e2e\entry.spec.ts:35:26
+
+    Error Context: test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  3) [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 332.265625
+    Received:    342
+
+      36 |       const box = await pill.boundingBox();
+      37 |       if (!box || !sheet) continue;
+    > 38 |       if ((page.viewportSize()?.width ?? 1440) < 768) expect(box.y + box.height + 40).toBeLessThanOrEqual(sheet.y);
+         |                                                                                       ^
+      39 |     }
+      40 |     await page.screenshot({ path: test.info().outputPath("plan.png") });
+      41 |
+        at C:\oh-wt\main-baseline\tests\e2e\musemap.spec.ts:38:87
+
+    Error Context: test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[42/66] [phone] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[43/66] [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+[44/66] [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[45/66] [phone] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[46/66] [desktop] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[47/66] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile and Want to hang?, and no dead Message link
+[48/66] [phone] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile and Want to hang?, and no dead Message link
+[49/66] [phone] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[50/66] [phone] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[51/66] [phone] › tests\e2e\findmy.spec.ts:146:5 › at 390px › sharing settings open from the map
+[52/66] [desktop] › tests\e2e\findmy.spec.ts:146:5 › at 1440px › sharing settings open from the map
+[53/66] [phone] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[54/66] [phone] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[55/66] [phone] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[56/66] [phone] › tests\e2e\findmy.spec.ts:69:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[57/66] [phone] › tests\e2e\findmy.spec.ts:105:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap
+[58/66] [phone] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[59/66] [phone] › tests\e2e\findmy.spec.ts:146:5 › at 1440px › sharing settings open from the map
+[60/66] [phone] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[61/66] [desktop] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[62/66] [phone] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[63/66] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[64/66] [phone] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[65/66] [phone] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile and Want to hang?, and no dead Message link
+[66/66] [phone] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: full thought on desktop, short text on phones, never emoji only
+  4) [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+
+    Error: locator.click: Error: strict mode violation: getByTestId('invite-card').getByRole('button', { name: 'Accept' }) resolved to 3 elements:
+        1) <button type="button" class="oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold disabled:cursor-not-allowed disabled:opacity-50 bg-fb-blue text-white hover:bg-fb-blue-hover active:brightness-95 h-9 px-3 text-[15px] gap-2 w-full">Accept</button> aka getByRole('button', { name: 'Accept' }).first()
+        2) <button type="button" class="oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold disabled:cursor-not-allowed disabled:opacity-50 bg-fb-blue text-white hover:bg-fb-blue-hover active:brightness-95 h-9 px-3 text-[15px] gap-2 w-full">Accept</button> aka getByRole('button', { name: 'Accept' }).nth(1)
+        3) <button type="button" class="oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold disabled:cursor-not-allowed disabled:opacity-50 bg-fb-blue text-white hover:bg-fb-blue-hover active:brightness-95 h-9 px-3 text-[15px] gap-2 w-full">Accept</button> aka getByRole('button', { name: 'Accept' }).nth(2)
+
+    Call log:
+      - waiting for getByTestId('invite-card').getByRole('button', { name: 'Accept' })
+
+
+      192 |     // Alex took a seat when he sent it ("Go with" = join + invite), so one is left for Maya
+      193 |     await expect(card.getByTestId("seats-left")).toHaveText("1 left");
+    > 194 |     await card.getByRole("button", { name: "Accept" }).click();
+          |                                                        ^
+      195 |     await expect(card.getByTestId("invite-result")).toContainText("You're in with Alex");
+      196 |     await expect(card.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
+      197 |     await expect(top.getByTestId("seats-left")).toHaveText("Full", { timeout: 3_000 });
+        at C:\oh-wt\main-baseline\tests\e2e\outhere.spec.ts:194:56
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4 failed
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+  27 skipped
+  35 passed (2.4m)

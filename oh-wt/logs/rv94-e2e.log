@@ -1,0 +1,8 @@
+
+Running 2 tests using 1 worker
+
+  ok 1 [phone] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it (2.2s)
+  ok 2 [desktop] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it (2.3s)
+
+  2 passed (1.7m)
+e2e exit 0

@@ -1,0 +1,16 @@
+RUN 1
+  3 failed
+  69 skipped
+  172 passed (11.5m)
+    [phone] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex 
+    [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests 
+    [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+RUN 2
+  4 failed
+  69 skipped
+  171 passed (15.5m)
+    [phone] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists ─────────────────
+    [desktop] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post ─
+    [desktop] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat 
+    [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+ALLDONE

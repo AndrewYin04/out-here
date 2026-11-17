@@ -1,0 +1,65 @@
+
+Running 60 tests using 2 workers
+
+[1/60] [phone] › tests\e2e\findmy.spec.ts:50:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[2/60] [phone] › tests\e2e\findmy.spec.ts:59:3 › API › sharing with the public is rejected
+[3/60] [phone] › tests\e2e\findmy.spec.ts:65:3 › API › profiles of other people carry no home location
+[4/60] [phone] › tests\e2e\findmy.spec.ts:82:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[5/60] [desktop] › tests\e2e\findmy.spec.ts:50:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[6/60] [phone] › tests\e2e\findmy.spec.ts:118:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[7/60] [phone] › tests\e2e\findmy.spec.ts:138:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[8/60] [phone] › tests\e2e\findmy.spec.ts:161:5 › at 390px › tapping a status chip opens the card, like the avatar
+[9/60] [phone] › tests\e2e\findmy.spec.ts:172:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[10/60] [phone] › tests\e2e\findmy.spec.ts:195:5 › at 390px › sharing settings open from the map
+[11/60] [desktop] › tests\e2e\findmy.spec.ts:59:3 › API › sharing with the public is rejected
+[12/60] [desktop] › tests\e2e\findmy.spec.ts:65:3 › API › profiles of other people carry no home location
+[13/60] [desktop] › tests\e2e\findmy.spec.ts:82:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[14/60] [phone] › tests\e2e\findmy.spec.ts:209:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[15/60] [phone] › tests\e2e\findmy.spec.ts:82:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[16/60] [phone] › tests\e2e\findmy.spec.ts:118:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[17/60] [phone] › tests\e2e\findmy.spec.ts:138:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[18/60] [phone] › tests\e2e\findmy.spec.ts:161:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[19/60] [phone] › tests\e2e\findmy.spec.ts:172:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[20/60] [phone] › tests\e2e\findmy.spec.ts:195:5 › at 1440px › sharing settings open from the map
+[21/60] [phone] › tests\e2e\findmy.spec.ts:209:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[22/60] [desktop] › tests\e2e\findmy.spec.ts:118:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[23/60] [phone] › tests\e2e\findmy.spec.ts:225:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[24/60] [phone] › tests\e2e\findmy.spec.ts:252:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[25/60] [phone] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[26/60] [desktop] › tests\e2e\findmy.spec.ts:138:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[27/60] [desktop] › tests\e2e\findmy.spec.ts:161:5 › at 390px › tapping a status chip opens the card, like the avatar
+[28/60] [desktop] › tests\e2e\findmy.spec.ts:172:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[29/60] [desktop] › tests\e2e\findmy.spec.ts:195:5 › at 390px › sharing settings open from the map
+[30/60] [desktop] › tests\e2e\findmy.spec.ts:209:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[31/60] [desktop] › tests\e2e\findmy.spec.ts:82:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[32/60] [phone] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+[33/60] [phone] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[34/60] [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+[35/60] [phone] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[36/60] [desktop] › tests\e2e\findmy.spec.ts:118:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[37/60] [phone] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[38/60] [desktop] › tests\e2e\findmy.spec.ts:138:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[39/60] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[40/60] [desktop] › tests\e2e\findmy.spec.ts:161:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[41/60] [phone] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[42/60] [desktop] › tests\e2e\findmy.spec.ts:172:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[43/60] [phone] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[44/60] [desktop] › tests\e2e\findmy.spec.ts:195:5 › at 1440px › sharing settings open from the map
+[45/60] [phone] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[46/60] [desktop] › tests\e2e\findmy.spec.ts:209:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[47/60] [phone] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[48/60] [desktop] › tests\e2e\findmy.spec.ts:225:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[49/60] [desktop] › tests\e2e\findmy.spec.ts:252:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[50/60] [desktop] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[51/60] [desktop] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+[52/60] [desktop] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[53/60] [desktop] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+[54/60] [desktop] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[55/60] [desktop] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[56/60] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[57/60] [desktop] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[58/60] [desktop] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[59/60] [desktop] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[60/60] [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+  20 skipped
+  40 passed (8.3m)

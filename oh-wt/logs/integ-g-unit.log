@@ -1,0 +1,47 @@
+
+> out-here@0.1.0 test
+> vitest run
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.1.0 C:/oh-wt/integrate-findmy-b
+
+ ❯ tests/unit/intros-hardening.test.ts (25 tests | 2 failed) 5196ms
+   ❯ atomic accept (Supabase backend, one working snapshot per request) (2)
+     × conditional update: the second of two identical transitions changes nothing 279ms
+     × two simultaneous B accepts in separate requests: accepted once, one Muse note, both cards connected 276ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/intros-hardening.test.ts > atomic accept (Supabase backend, one working snapshot per request) > conditional update: the second of two identical transitions changes nothing
+ FAIL  tests/unit/intros-hardening.test.ts > atomic accept (Supabase backend, one working snapshot per request) > two simultaneous B accepts in separate requests: accepted once, one Muse note, both cards connected
+TypeError: q.range(...).abortSignal is not a function
+ ❯ page src/features/data/supabase-store.ts:120:45
+    118|       for (const col of order) q = q.order(col, { ascending: true });
+    119|       if (scope) scope.queries++;
+    120|       return q.range(from, from + PAGE - 1).abortSignal(signal);
+       |                                             ^
+    121|     };
+    122|     // First page also returns the exact row count; the remaining page…
+ ❯ SupabaseBackend.loadTablePages src/features/data/supabase-store.ts:125:23
+ ❯ SupabaseBackend.loadTable src/features/data/supabase-store.ts:107:23
+ ❯ SupabaseBackend.loadAndCache src/features/data/supabase-store.ts:162:76
+ ❯ SupabaseBackend.sharedTable src/features/data/supabase-store.ts:196:17
+ ❯ src/features/data/supabase-store.ts:222:18
+ ❯ SupabaseBackend.snapshot src/features/data/supabase-store.ts:217:28
+ ❯ CoreStore.view src/features/data/core.ts:85:40
+ ❯ CoreStore.museContext src/features/data/core.ts:1295:29
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 75 passed (76)
+      Tests  2 failed | 630 passed (632)
+   Start at  06:36:04
+   Duration  21.36s (tests 38%, transform 32%, import 30%, worker 1%)
+
+    Isolate  76 workers spawned · ~1.11s startup each (spawn + environment, per file)
+             at least ~3.32s faster with isolate: false — reuses workers across files instead of one per file
+

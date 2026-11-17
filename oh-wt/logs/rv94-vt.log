@@ -1,0 +1,38 @@
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.1.0 C:/oh-wt/rv94
+
+ ❯ src/features/muse-encounters/server/orchestrator.test.ts (14 tests | 1 failed) 4924ms
+   ❯ separate agents and code-enforced privacy (8)
+     × makes two distinct calls and emits only actual persisted message facts 701ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/muse-encounters/server/orchestrator.test.ts > separate agents and code-enforced privacy > makes two distinct calls and emits only actual persisted message facts
+AssertionError: expected 'I couldn’t confirm Maya’s availabilit…' to contain 'can’t confirm'
+
+Expected: "can’t confirm"
+Received: "I couldn’t confirm Maya’s availability from the shared information. You can send Maya an invitation to check. Maya still needs to approve; no invitation has been sent."
+
+ ❯ src/features/muse-encounters/server/orchestrator.test.ts:37:31
+     35|     expect(done.messages.map(m => m.senderAgentId)).toEqual([`muse:${a…
+     36|     expect(done.result).toMatchObject({ mode: 'live', approvalRequired…
+     37|     expect(done.result?.text).toContain('can’t confirm');
+       |                               ^
+     38|     expect(done.result?.suggestions[0].friendIds).toEqual([maya]);
+     39|     expect((await repo.get(done.id, alex))?.messages).toEqual(done.mes…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 72 passed (73)
+      Tests  1 failed | 565 passed (566)
+   Start at  09:39:16
+   Duration  22.65s (tests 36%, import 34%, transform 29%, worker 1%)
+
+    Isolate  73 workers spawned · ~1.25s startup each (spawn + environment, per file)
+             at least ~3.56s faster with isolate: false — reuses workers across files instead of one per file
+
+vt exit 1

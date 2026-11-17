@@ -1,0 +1,116 @@
+// GET  /api/muse/regroup -> { viewerId, crews: { crewId, members: PersonCard[], originTitle, threadId }[] }
+//      (the viewer's crews with member cards and the crew's group thread, for the Memories page)
+// POST /api/muse/regroup  body: { crewId, now? } -> { suggestion: { questId|null, title, whenText, reason }, message }
+//      Context comes from the store (members, shared interests, visible availability and Find My
+//      bubbles, upcoming quests nearby). Muse (fast model, strict schema) picks; code checks the
+//      quest id. Header x-muse-mode: mock|live. 502 { error } when Muse fails.
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { DEMO_CENTER, demoDate, formatDemoTime, minutesUntil, now as demoNow } from '@/shared';
+import { museJSON } from '@/features/muse';
+import { body, IdZ, route } from '@/lib/api';
+import {
+  commonInterests, crewFits, mockRegroup, questMatches, REGROUP_JSON_SCHEMA, RegroupZ, regroupMessages, validateRegroup,
+  type RegroupCandidate, type RegroupContext,
+} from '@/features/memories/server';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 20;
+
+const first = (name: string) => name.split(' ')[0] ?? name;
+
+function bubbleText(b: { emoji: string | null; thought: string | null; doing: string | null; wantsTo: string | null }): string | null {
+  const parts = [b.thought && `${b.emoji ? `${b.emoji} ` : ''}${b.thought}`, b.doing, b.wantsTo && `wants to ${b.wantsTo}`].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+function whenText(iso: string, at: Date): string {
+  const mins = minutesUntil(iso, at);
+  if (mins <= 0) return 'happening now';
+  if (mins < 60) return `in ${mins} min`;
+  const day = demoDate(new Date(iso)) === demoDate(at) ? 'today' : 'tomorrow';
+  return `${day} ${formatDemoTime(iso)}`;
+}
+
+export const GET = route(async ({ store, viewer }) => {
+  const crews = await store.crews(viewer.id);
+  const { view } = await store.museContext();
+  return {
+    viewerId: viewer.id,
+    crews: crews.map((c) => {
+      const members = view.people(viewer.id, c.memberIds);
+      const set = new Set(c.memberIds);
+      const thread = view.db.threads.find((t) => {
+        const ms = view.threadMemberIds(t.id);
+        return t.isGroup && ms.length === set.size && ms.every((m) => set.has(m));
+      });
+      return { crewId: c.id, members, originTitle: view.questById.get(c.originQuestId)?.title ?? null, threadId: thread?.id ?? null };
+    }),
+  };
+});
+
+export const POST = route(async ({ store, viewer, req }) => {
+  const b = await body(req, z.object({ crewId: IdZ, now: z.string().datetime({ offset: true }).optional() }));
+  const at = b.now ? new Date(b.now) : demoNow();
+  const crew = (await store.crews(viewer.id)).find((c) => c.id === b.crewId);
+  if (!crew) return NextResponse.json({ error: 'crew not found' }, { status: 404 });
+
+  const [{ view }, pins, availability, mine] = await Promise.all([
+    store.museContext(), store.friendPins(viewer.id), store.friendAvailability(viewer.id), store.myLocation(viewer.id),
+  ]);
+  const others = crew.memberIds.filter((id) => id !== viewer.id);
+  const profiles = crew.memberIds.map((id) => view.profileById.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+  const members = others.flatMap((id) => {
+    const p = view.profileById.get(id);
+    if (!p) return [];
+    const free = availability.find((a) => a.userId === id) ?? null;
+    const pin = pins.find((x) => x.friend.id === id) ?? null;
+    return [{
+      id, firstName: first(p.name), interests: p.interests,
+      free: free ? { text: free.text, startsAt: free.startsAt, endsAt: free.endsAt } : null,
+      bubble: pin ? bubbleText(pin.bubble) : null,
+    }];
+  });
+  const sharedInterests = commonInterests(profiles.map((p) => p.interests));
+  const wanted = [...crew.sharedPrefs, ...sharedInterests];
+  const center = mine?.location ?? viewer.home ?? DEMO_CENTER;
+  const quests = await store.questsNear(viewer.id, center, 3000);
+  const candidates: RegroupCandidate[] = quests
+    .filter((q) => q.status === 'open' && !q.memberIds.includes(viewer.id))
+    .flatMap((q) => {
+      const row = view.questById.get(q.id);
+      const seatsLeft = row ? view.seatsLeft(row) : Math.max(q.capacity - q.memberIds.length, 0);
+      // The whole crew must fit: a 4-person crew is never sent to a 2-seat plan.
+      return crewFits(seatsLeft, crew.memberIds, q.memberIds) ? [{ q, seatsLeft }] : [];
+    })
+    .map(({ q, seatsLeft }) => {
+      return {
+        questId: q.id, title: q.title, emoji: q.emoji, venueName: q.venueName, startsAt: q.startsAt,
+        whenText: whenText(q.startsAt, at), seatsLeft,
+        priceMax: q.priceMax, tags: q.tags, matches: questMatches(q, wanted),
+      };
+    })
+    .filter((c) => c.seatsLeft > 0)
+    .sort((a, b2) => b2.matches.length - a.matches.length || a.startsAt.localeCompare(b2.startsAt))
+    .slice(0, 6);
+
+  const ctx: RegroupContext = {
+    crewId: crew.id, crewName: crew.name, originTitle: view.questById.get(crew.originQuestId)?.title ?? null,
+    lastHangoutText: demoDate(new Date(crew.lastHangoutAt)), viewerFirstName: first(viewer.name),
+    sharedPrefs: crew.sharedPrefs, sharedInterests, members, candidates,
+  };
+
+  try {
+    const res = await museJSON({
+      schemaName: 'regroup', schema: RegroupZ, jsonSchema: REGROUP_JSON_SCHEMA,
+      messages: regroupMessages(ctx), model: 'fast', effort: 'minimal',
+      mock: () => mockRegroup(ctx), route: '/api/muse/regroup', userId: viewer.id, deadline: Date.now() + 12_000,
+    });
+    const out = validateRegroup(res.data, ctx);
+    return NextResponse.json(out, { headers: { 'x-muse-mode': res.mock ? 'mock' : 'live', 'x-muse-model': res.model } });
+  } catch (err) {
+    console.error('[muse/regroup] failed:', String((err as Error)?.message ?? err).slice(0, 200));
+    return NextResponse.json({ error: 'Muse is busy, try again' }, { status: 502 });
+  }
+});

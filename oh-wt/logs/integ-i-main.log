@@ -1,0 +1,7 @@
+
+Running 2 tests using 2 workers
+
+[1/2] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[2/2] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+  1 skipped
+  1 passed (1.9m)

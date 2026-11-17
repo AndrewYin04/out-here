@@ -1,0 +1,1150 @@
+
+Running 210 tests using 10 workers
+
+[1/210] [phone] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse drafts from one line
+[2/210] [phone] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+[3/210] [phone] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[4/210] [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[5/210] [phone] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[6/210] [phone] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[7/210] [phone] › tests\e2e\findmy.spec.ts:28:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[8/210] [phone] › tests\e2e\findmy.spec.ts:37:3 › API › sharing with the public is rejected
+[9/210] [phone] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[10/210] [phone] › tests\e2e\findmy.spec.ts:43:3 › API › profiles of other people carry no home location
+[11/210] [phone] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[12/210] [phone] › tests\e2e\findmy.spec.ts:56:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[13/210] [phone] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[14/210] [phone] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[15/210] [phone] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[16/210] [phone] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[17/210] [phone] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[18/210] [phone] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[19/210] [phone] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[20/210] [phone] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[21/210] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[22/210] [phone] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[23/210] [phone] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[24/210] [phone] › tests\e2e\memories.spec.ts:5:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[25/210] [phone] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+[26/210] [phone] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+[27/210] [phone] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[28/210] [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[29/210] [phone] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[30/210] [phone] › tests\e2e\create-event.spec.ts:40:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[31/210] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[32/210] [phone] › tests\e2e\memories.spec.ts:19:3 › Memories › regroup API returns a suggestion with a real quest id or null
+[33/210] [phone] › tests\e2e\memories.spec.ts:32:3 › Memories › Send to crew delivers invites
+[34/210] [phone] › tests\e2e\memories.spec.ts:41:3 › Memories › a persona with no crews sees the empty state
+[35/210] [phone] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile and Want to hang?, and no dead Message link
+[36/210] [phone] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[37/210] [phone] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[38/210] [phone] › tests\e2e\memories.spec.ts:47:3 › Memories › Notifications show Out Here items for alex
+[39/210] [phone] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[40/210] [phone] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[41/210] [phone] › tests\e2e\musefilter.spec.ts:67:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+[42/210] [phone] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[43/210] [phone] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+[44/210] [phone] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[45/210] [phone] › tests\e2e\map.spec.ts:93:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[46/210] [phone] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: full thought on desktop, short text on phones, never emoji only
+  1) [phone] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' })
+    Expected: "/out-here"
+    Received: "/out-here?free=1"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' }) with timeout 5000ms
+      - waiting for getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' })
+        13 × locator resolved to <a href="/out-here?free=1" data-testid="home-outhere-free-button" class="oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold disabled:cursor-not-allowed disabled:opacity-50 bg-fb-blue text-white hover:bg-fb-blue-hover active:brightness-95 h-8 px-3 text-[13px] gap-1.5 flex-1">I'm free</a>
+           - unexpected value "/out-here?free=1"
+
+
+      52 |   await expect(card.getByTestId('home-outhere-free')).toContainText(/plans? near you/, { timeout: 15_000 });
+      53 |   await expect(card.getByTestId('home-outhere-seats')).toHaveText(/^\d+ seats? left$/);
+    > 54 |   await expect(card.getByRole('link', { name: "I'm free" })).toHaveAttribute('href', '/out-here');
+         |                                                              ^
+      55 |   await card.getByTestId('home-outhere-plan').click();
+      56 |   await expect(page).toHaveURL(/\/out-here\?quest=/);
+      57 | });
+        at C:\oh-wt\main-baseline\tests\e2e\feed.spec.ts:54:62
+
+    Error Context: test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[47/210] [phone] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[48/210] [phone] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[49/210] [phone] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[50/210] [phone] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+[51/210] [phone] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[52/210] [phone] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[53/210] [phone] › tests\e2e\map.spec.ts:113:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[54/210] [phone] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[55/210] [phone] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[56/210] [phone] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[57/210] [phone] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile and Want to hang?, and no dead Message link
+[58/210] [phone] › tests\e2e\shell.spec.ts:90:3 › desktop 1440 › left nav and menu grid links navigate
+[59/210] [phone] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[60/210] [phone] › tests\e2e\shell.spec.ts:116:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[61/210] [phone] › tests\e2e\shell.spec.ts:135:3 › desktop 1440 › about-this-demo dialog opens and closes
+[62/210] [phone] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[63/210] [phone] › tests\e2e\shell.spec.ts:144:3 › desktop 1440 › every shell route renders with no console errors
+[64/210] [phone] › tests\e2e\shell.spec.ts:155:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+[65/210] [phone] › tests\e2e\shell.spec.ts:190:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+[66/210] [phone] › tests\e2e\shell.spec.ts:221:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[67/210] [phone] › tests\e2e\musefilter.spec.ts:92:3 › Muse filter › Maya: the filter never empties her map
+[68/210] [phone] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[69/210] [phone] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+[70/210] [phone] › tests\e2e\shell.spec.ts:238:3 › mobile 390 › every bottom tab navigates to its route
+[71/210] [phone] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[72/210] [phone] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+[73/210] [phone] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[74/210] [phone] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[75/210] [phone] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[76/210] [phone] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[77/210] [phone] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined
+[78/210] [desktop] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[79/210] [phone] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[80/210] [desktop] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[81/210] [desktop] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse drafts from one line
+[82/210] [desktop] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[83/210] [desktop] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[84/210] [desktop] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[85/210] [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[86/210] [phone] › tests\e2e\shell.spec.ts:261:3 › mobile 390 › avatar menu lists the 8 personas
+[87/210] [desktop] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[88/210] [desktop] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[89/210] [desktop] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[90/210] [desktop] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[91/210] [phone] › tests\e2e\musefilter.spec.ts:103:3 › Muse filter › Friends view with the filter on shows Maya
+[92/210] [phone] › tests\e2e\shell.spec.ts:275:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[93/210] [desktop] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[94/210] [desktop] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+[95/210] [phone] › tests\e2e\feed.spec.ts:166:1 › comment and reply, seen live by a second persona
+[96/210] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[97/210] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile and Want to hang?, and no dead Message link
+[98/210] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[99/210] [desktop] › tests\e2e\create-event.spec.ts:40:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[100/210] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[101/210] [phone] › tests\e2e\feed.spec.ts:208:1 › share a post to the feed
+[102/210] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile and Want to hang?, and no dead Message link
+[103/210] [phone] › tests\e2e\feed.spec.ts:226:1 › hide a post and undo
+  2) [phone] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list ─────
+
+    Error: expect(page).toHaveURL(expected) failed
+
+    Expected pattern: /\/notifications/
+    Received string:  "http://localhost:3179/groups?as=alex"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveURL" with timeout 5000ms
+        13 × locator resolved to <html lang="en">…</html>
+           - unexpected value "http://localhost:3179/groups?as=alex"
+
+
+      144 |   await expect(tab.getByTestId('count-badge')).toHaveText(/\d+/);
+      145 |   await tab.click();
+    > 146 |   await expect(page).toHaveURL(/\/notifications/);
+          |                      ^
+      147 |   await expect(page.getByTestId('notification-row').first()).toBeVisible();
+      148 |   // Opening the list clears the bottom-bar badge, as on Facebook.
+      149 |   await expect(tab.getByTestId('count-badge')).toHaveCount(0);
+        at C:\oh-wt\main-baseline\tests\e2e\groups.spec.ts:146:22
+
+    Error Context: test-results\groups-phone-bottom-bar-Notifications-opens-the-list-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\groups-phone-bottom-bar-Notifications-opens-the-list-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\groups-phone-bottom-bar-Notifications-opens-the-list-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  3) [phone] › tests\e2e\shell.spec.ts:275:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:3179/api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability",
+    + ]
+
+      294 |       expect(row!.x + row!.width, name).toBeLessThanOrEqual(390);
+      295 |     }
+    > 296 |     expect(errors).toEqual([]);
+          |                    ^
+      297 |   });
+      298 |
+      299 |   test('friends and groups show their section rows as chips', async ({ page }) => {
+        at C:\oh-wt\main-baseline\tests\e2e\shell.spec.ts:296:20
+
+    Error Context: test-results\shell-mobile-390-top-bar-i-4dd0b-account-menu-fits-on-screen-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\shell-mobile-390-top-bar-i-4dd0b-account-menu-fits-on-screen-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\shell-mobile-390-top-bar-i-4dd0b-account-menu-fits-on-screen-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[104/210] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: full thought on desktop, short text on phones, never emoji only
+[105/210] [phone] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[106/210] [desktop] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[107/210] [desktop] › tests\e2e\findmy.spec.ts:28:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[108/210] [desktop] › tests\e2e\findmy.spec.ts:37:3 › API › sharing with the public is rejected
+[109/210] [desktop] › tests\e2e\findmy.spec.ts:43:3 › API › profiles of other people carry no home location
+[110/210] [desktop] › tests\e2e\findmy.spec.ts:56:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[111/210] [phone] › tests\e2e\shell.spec.ts:299:3 › mobile 390 › friends and groups show their section rows as chips
+[112/210] [desktop] › tests\e2e\findmy.spec.ts:92:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap
+[113/210] [desktop] › tests\e2e\findmy.spec.ts:111:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[114/210] [desktop] › tests\e2e\findmy.spec.ts:133:5 › at 390px › sharing settings open from the map
+[115/210] [desktop] › tests\e2e\findmy.spec.ts:56:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[116/210] [phone] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[117/210] [phone] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+[118/210] [desktop] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[119/210] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[120/210] [desktop] › tests\e2e\map.spec.ts:93:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[121/210] [desktop] › tests\e2e\map.spec.ts:113:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[122/210] [desktop] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined
+[123/210] [desktop] › tests\e2e\map.spec.ts:152:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[124/210] [desktop] › tests\e2e\map.spec.ts:174:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[125/210] [desktop] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[126/210] [desktop] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[127/210] [phone] › tests\e2e\shell.spec.ts:316:3 › mobile 390 › menu page shows destinations and the brand footer
+[128/210] [desktop] › tests\e2e\memories.spec.ts:5:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[129/210] [desktop] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[130/210] [desktop] › tests\e2e\memories.spec.ts:19:3 › Memories › regroup API returns a suggestion with a real quest id or null
+[131/210] [desktop] › tests\e2e\memories.spec.ts:32:3 › Memories › Send to crew delivers invites
+[132/210] [desktop] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[133/210] [desktop] › tests\e2e\memories.spec.ts:41:3 › Memories › a persona with no crews sees the empty state
+[134/210] [desktop] › tests\e2e\memories.spec.ts:47:3 › Memories › Notifications show Out Here items for alex
+[135/210] [desktop] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+[136/210] [desktop] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[137/210] [desktop] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+[138/210] [desktop] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[139/210] [desktop] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[140/210] [desktop] › tests\e2e\musefilter.spec.ts:67:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+[141/210] [desktop] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[142/210] [desktop] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[143/210] [desktop] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+[144/210] [desktop] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[145/210] [desktop] › tests\e2e\map.spec.ts:204:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+  4) [desktop] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' })
+    Expected: "/out-here"
+    Received: "/out-here?free=1"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' }) with timeout 5000ms
+      - waiting for getByTestId('home-outhere').getByRole('link', { name: 'I\'m free' })
+        13 × locator resolved to <a href="/out-here?free=1" data-testid="home-outhere-free-button" class="oh-press inline-flex select-none items-center justify-center rounded-btn font-semibold disabled:cursor-not-allowed disabled:opacity-50 bg-fb-blue text-white hover:bg-fb-blue-hover active:brightness-95 h-8 px-3 text-[13px] gap-1.5 flex-1">I'm free</a>
+           - unexpected value "/out-here?free=1"
+
+
+      52 |   await expect(card.getByTestId('home-outhere-free')).toContainText(/plans? near you/, { timeout: 15_000 });
+      53 |   await expect(card.getByTestId('home-outhere-seats')).toHaveText(/^\d+ seats? left$/);
+    > 54 |   await expect(card.getByRole('link', { name: "I'm free" })).toHaveAttribute('href', '/out-here');
+         |                                                              ^
+      55 |   await card.getByTestId('home-outhere-plan').click();
+      56 |   await expect(page).toHaveURL(/\/out-here\?quest=/);
+      57 | });
+        at C:\oh-wt\main-baseline\tests\e2e\feed.spec.ts:54:62
+
+    Error Context: test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\feed-Out-Here-card-shows-l-c9a6b-pen-seats-and-opens-the-map-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[146/210] [desktop] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[147/210] [desktop] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[148/210] [desktop] › tests\e2e\musefilter.spec.ts:92:3 › Muse filter › Maya: the filter never empties her map
+[149/210] [desktop] › tests\e2e\map.spec.ts:221:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[150/210] [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[151/210] [desktop] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+  5) [phone] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('[data-map-marker="quest"]')
+    Expected: 19
+    Received: 18
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('[data-map-marker="quest"]') with timeout 5000ms
+      - waiting for locator('[data-map-marker="quest"]')
+        14 × locator resolved to 18 elements
+           - unexpected value "18"
+
+
+      147 |     await page.getByTestId('quest-sheet').getByRole('button', { name: 'Close' }).click();
+      148 |     await page.getByTestId('map-mode-explore').click();
+    > 149 |     await expect(page.locator('[data-map-marker="quest"]')).toHaveCount(all);
+          |                                                             ^
+      150 |   });
+      151 |
+      152 |   test('without WebGL the plans show as a list that opens the sheet', async ({ page }) => {
+        at C:\oh-wt\main-baseline\tests\e2e\map.spec.ts:149:61
+
+    Error Context: test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[152/210] [desktop] › tests\e2e\musefilter.spec.ts:103:3 › Muse filter › Friends view with the filter on shows Maya
+[153/210] [phone] › tests\e2e\map.spec.ts:152:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[154/210] [desktop] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[155/210] [desktop] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[156/210] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[157/210] [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[158/210] [desktop] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[159/210] [phone] › tests\e2e\map.spec.ts:174:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[160/210] [phone] › tests\e2e\map.spec.ts:204:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[161/210] [phone] › tests\e2e\map.spec.ts:221:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[162/210] [desktop] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[163/210] [desktop] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[164/210] [desktop] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+[165/210] [desktop] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[166/210] [desktop] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[167/210] [desktop] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[168/210] [desktop] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[169/210] [desktop] › tests\e2e\feed.spec.ts:166:1 › comment and reply, seen live by a second persona
+[170/210] [desktop] › tests\e2e\shell.spec.ts:90:3 › desktop 1440 › left nav and menu grid links navigate
+[171/210] [desktop] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[172/210] [desktop] › tests\e2e\feed.spec.ts:208:1 › share a post to the feed
+[173/210] [desktop] › tests\e2e\shell.spec.ts:116:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[174/210] [desktop] › tests\e2e\feed.spec.ts:226:1 › hide a post and undo
+[175/210] [desktop] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[176/210] [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[177/210] [desktop] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+  6) [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByTestId('mtab-notifications').getByTestId('count-badge')
+    Expected pattern: /1/
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" getByTestId('mtab-notifications').getByTestId('count-badge') with timeout 5000ms
+      - waiting for getByTestId('mtab-notifications').getByTestId('count-badge')
+
+
+      186 |   await expect(samRow.getByTestId('seats-badge')).toHaveText(`${before - 1} left`, { timeout: 5000 });
+      187 |   await expect(bell.getByTestId('count-badge')).toHaveText(/1/, { timeout: 5000 });
+    > 188 |   await expect(phoneTab.getByTestId('count-badge')).toHaveText(/1/, { timeout: 5000 });
+          |                                                     ^
+      189 |
+      190 |   await bell.click();
+      191 |   const row = sam.getByTestId('notifications-panel').getByTestId('notification-row').first();
+        at C:\oh-wt\main-baseline\tests\e2e\groups.spec.ts:188:53
+
+    Error Context: test-results\groups-desktop-two-persona-4bbaa-d-the-host-bell-update-live-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\groups-desktop-two-persona-4bbaa-d-the-host-bell-update-live-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\groups-desktop-two-persona-4bbaa-d-the-host-bell-update-live-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[178/210] [desktop] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+  7) [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see ────
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByRole('list', { name: 'Friends' }).getByTestId('profile-friend')
+    Expected: 11
+    Received: 12
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByRole('list', { name: 'Friends' }).getByTestId('profile-friend') with timeout 5000ms
+      - waiting for getByRole('list', { name: 'Friends' }).getByTestId('profile-friend')
+        14 × locator resolved to 12 elements
+           - unexpected value "12"
+
+
+      81 |   await expect(page.getByRole('list', { name: 'Mutual friends' }).getByTestId('profile-friend')).toHaveCount(1);
+      82 |   await page.getByRole('tab', { name: /All friends/ }).click();
+    > 83 |   await expect(page.getByRole('list', { name: 'Friends' }).getByTestId('profile-friend')).toHaveCount(11);
+         |                                                                                           ^
+      84 |
+      85 |   await page.getByRole('link', { name: 'Photos', exact: true }).click();
+      86 |   await expect(page.getByTestId('photos-tab').getByTestId('profile-photo').first()).toBeVisible();
+        at C:\oh-wt\main-baseline\tests\e2e\people.spec.ts:83:91
+
+    Error Context: test-results\people-Intro-shows-only-the-fields-the-viewer-can-see-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\people-Intro-shows-only-the-fields-the-viewer-can-see-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\people-Intro-shows-only-the-fields-the-viewer-can-see-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  8) [desktop] › tests\e2e\shell.spec.ts:116:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 4
+
+    - Array []
+    + Array [
+    +   "Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:3179/api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability",
+    +   "Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:3179/api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability",
+    + ]
+
+      130 |     await page.reload();
+      131 |     await expect(page.getByTestId('account-button')).toHaveAttribute('aria-label', 'Account: Maya Chen');
+    > 132 |     expect(errors).toEqual([]);
+          |                    ^
+      133 |   });
+      134 |
+      135 |   test('about-this-demo dialog opens and closes', async ({ page }) => {
+        at C:\oh-wt\main-baseline\tests\e2e\shell.spec.ts:132:20
+
+    Error Context: test-results\shell-desktop-1440-avatar--db84b-rsonas-and-switches-persona-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\shell-desktop-1440-avatar--db84b-rsonas-and-switches-persona-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\shell-desktop-1440-avatar--db84b-rsonas-and-switches-persona-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[179/210] [desktop] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[180/210] [desktop] › tests\e2e\shell.spec.ts:135:3 › desktop 1440 › about-this-demo dialog opens and closes
+[181/210] [desktop] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[182/210] [desktop] › tests\e2e\shell.spec.ts:144:3 › desktop 1440 › every shell route renders with no console errors
+  9) [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 1
+    Received: 2
+
+      184 |     const inv = await maya.request.get("/api/invites", { headers: { "x-persona": "maya" } });
+      185 |     const incoming = (await inv.json()).incoming.filter((i: { suggestionTitle: string; status: string }) => i.suggestionTitle === DUMPLINGS && i.status === "pending");
+    > 186 |     expect(incoming.length).toBe(1);
+          |                             ^
+      187 |
+      188 |     const card = maya.getByTestId("invite-card");
+      189 |     await expect(card).toContainText(`Alex invited you: 🥟 ${DUMPLINGS}`, { timeout: 5_000 });
+        at C:\oh-wt\main-baseline\tests\e2e\outhere.spec.ts:186:29
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[183/210] [desktop] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+[184/210] [desktop] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[185/210] [desktop] › tests\e2e\shell.spec.ts:155:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+  10) [phone] › tests\e2e\findmy.spec.ts:56:5 › at 390px › friend pins, card, Want to hang?, and the People list 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-yQoCYs --remote-debugging-pipe --no-startup-window
+    <launched> pid=43300
+    [pid=43300][err] [1113/035925.097:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=43300][err] [1113/035925.142:INFO:CONSOLE:0] "[.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=43300][err] [1113/035925.367:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=43300][err] [1113/035925.441:INFO:CONSOLE:0] "[.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=43300][err] [1113/035925.457:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=43300][err] [1113/035925.507:INFO:CONSOLE:0] "[.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=43300][err] [1113/035926.222:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+    [pid=43300][err] [1113/035926.330:INFO:CONSOLE:0] "[.WebGL-0x62a400625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=43300][err] [1113/035926.459:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=43300][err] [1113/035926.461:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=43300][err] [1113/035926.461:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=43300] <gracefully close start>
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+        - locator resolved to <button type="button" class="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        165 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      78 |       await expect(card).toHaveCount(0);
+      79 |
+    > 80 |       await page.getByRole('button', { name: /^People/ }).click();
+         |                                                           ^
+      81 |       const rows = page.getByTestId('people-row');
+      82 |       await expect(rows.first()).toBeVisible();
+      83 |       expect(await rows.count()).toBeGreaterThanOrEqual(20);
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:80:59
+
+    Error Context: test-results\findmy-at-390px-friend-pin-0544c-to-hang-and-the-People-list-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-friend-pin-0544c-to-hang-and-the-People-list-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-friend-pin-0544c-to-hang-and-the-People-list-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[186/210] [phone] › tests\e2e\findmy.spec.ts:92:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap
+[187/210] [desktop] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[188/210] [desktop] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[189/210] [desktop] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+  11) [desktop] › tests\e2e\shell.spec.ts:155:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByTestId('section-sidebar').getByRole('navigation', { name: 'Friends sections' }).getByRole('link')
+    Timeout: 5000ms
+    - Expected  - 0
+    + Received  + 1
+
+    @@ -2,6 +2,7 @@
+        "Home",
+        "Friend requests",
+        "Suggestions",
+        "All friends",
+        "Birthdays",
+    +   "Custom lists",
+      ]
+
+    Call log:
+      - Expect "toHaveText" getByTestId('section-sidebar').getByRole('navigation', { name: 'Friends sections' }).getByRole('link') with timeout 5000ms
+      - waiting for getByTestId('section-sidebar').getByRole('navigation', { name: 'Friends sections' }).getByRole('link')
+        14 × locator resolved to 6 elements
+
+
+      162 |     await expect(page.getByTestId('section-chips')).toBeHidden();
+      163 |     const friendsNav = sidebar.getByRole('navigation', { name: 'Friends sections' });
+    > 164 |     await expect(friendsNav.getByRole('link')).toHaveText(['Home', 'Friend requests', 'Suggestions', 'All friends', 'Birthdays']);
+          |                                                ^
+      165 |     await expect(friendsNav.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+      166 |     await friendsNav.getByRole('link', { name: 'Friend requests' }).click();
+      167 |     await expect(page).toHaveURL(/\/friends\?tab=requests$/);
+        at C:\oh-wt\main-baseline\tests\e2e\shell.spec.ts:164:48
+
+    Error Context: test-results\shell-desktop-1440-friends-0fc5c-the-home-nav-and-right-rail-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\shell-desktop-1440-friends-0fc5c-the-home-nav-and-right-rail-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\shell-desktop-1440-friends-0fc5c-the-home-nav-and-right-rail-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[190/210] [desktop] › tests\e2e\shell.spec.ts:190:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+  12) [desktop] › tests\e2e\shell.spec.ts:190:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "Failed to load resource: the server responded with a status of 403 (Forbidden) @ http://localhost:3179/api/friends/48110c3e-2928-472f-ac20-0c93bdbfd7ad/availability",
+    + ]
+
+      209 |     const labels = await page.evaluate(() => (window as unknown as { __accountLabels: string[] }).__accountLabels);
+      210 |     expect(labels.filter((l) => l.includes('Alex'))).toEqual([]);
+    > 211 |     expect(errors).toEqual([]);
+          |                    ^
+      212 |   });
+      213 | });
+      214 |
+        at C:\oh-wt\main-baseline\tests\e2e\shell.spec.ts:211:20
+
+    Error Context: test-results\shell-desktop-1440-a-perso-3bd20--in-HTML-or-while-hydrating-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\shell-desktop-1440-a-perso-3bd20--in-HTML-or-while-hydrating-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\shell-desktop-1440-a-perso-3bd20--in-HTML-or-while-hydrating-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  13) [phone] › tests\e2e\findmy.spec.ts:92:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  getByTestId('out-here-map')
+    Expected: "friends"
+    Received: "explore"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" getByTestId('out-here-map') with timeout 5000ms
+      - waiting for getByTestId('out-here-map')
+        13 × locator resolved to <div data-view="map" data-mode="explore" data-testid="out-here-map" class="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]">…</div>
+           - unexpected value "explore"
+
+
+      19 |   await page.goto(`${path}?as=${handle}`);
+      20 |   // /out-here/friends redirects to /out-here?mode=friends, which opens the map in Friends mode.
+    > 21 |   await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+         |                                                  ^
+      22 |   await expect(page.locator('[data-testid="friend-pin"]').first()).toBeVisible({ timeout: 15_000 });
+      23 | }
+      24 |
+        at openMap (C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:21:50)
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:93:7
+
+    Error Context: test-results\findmy-at-390px-the-Out-He-38f97-map-and-chips-never-overlap-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-the-Out-He-38f97-map-and-chips-never-overlap-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-the-Out-He-38f97-map-and-chips-never-overlap-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  14) [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-oO9cOY --remote-debugging-pipe --no-startup-window
+    <launched> pid=41500
+    [pid=41500][err] [1113/040006.135:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040016.380:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040025.061:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040039.268:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040046.859:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040050.427:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500][err] [1113/040102.076:INFO:CONSOLE:0] "The resource http://localhost:3179/_next/static/css/b929557758205abd.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.", source: http://localhost:3179/profile/maya?as=kai (0)
+    [pid=41500] <gracefully close start>
+    Call log:
+      - waiting for getByRole('menuitem', { name: 'Unfriend' })
+        - locator resolved to <button type="button" role="menuitem" class="flex w-full items-center gap-3 rounded-card px-2 py-2 text-left text-[15px] font-medium text-fb-text hover:bg-fb-hover focus-visible:bg-fb-hover">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <p class="text-[15px] leading-5 text-fb-text">…</p> from <div class="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <p class="text-[15px] leading-5 text-fb-text">…</p> from <div class="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        154 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <p class="text-[15px] leading-5 text-fb-text">…</p> from <div class="pointer-events-none fixed inset-x-2 top-[64px] z-[60] flex flex-col items-stretch gap-2 md:inset-x-auto md:right-4 md:w-[360px]">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      210 |   // Unfriend through the Friends menu, which restores the seed graph.
+      211 |   await actions.getByRole('button', { name: 'Friends' }).click();
+    > 212 |   await page.getByRole('menuitem', { name: 'Unfriend' }).click();
+          |                                                          ^
+      213 |   await expect(actions.getByRole('button', { name: 'Add friend' })).toBeVisible();
+      214 |   expect(errors).toEqual([]);
+      215 | });
+        at C:\oh-wt\main-baseline\tests\e2e\people.spec.ts:212:58
+
+    Error Context: test-results\people-two-personas-Add-fr-5755c-onfirm-from-Friend-requests-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\people-two-personas-Add-fr-5755c-onfirm-from-Friend-requests-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\people-two-personas-Add-fr-5755c-onfirm-from-Friend-requests-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[191/210] [desktop] › tests\e2e\shell.spec.ts:221:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[192/210] [phone] › tests\e2e\findmy.spec.ts:111:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[193/210] [phone] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[194/210] [desktop] › tests\e2e\shell.spec.ts:238:3 › mobile 390 › every bottom tab navigates to its route
+[195/210] [desktop] › tests\e2e\shell.spec.ts:261:3 › mobile 390 › avatar menu lists the 8 personas
+[196/210] [desktop] › tests\e2e\shell.spec.ts:275:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[197/210] [desktop] › tests\e2e\shell.spec.ts:299:3 › mobile 390 › friends and groups show their section rows as chips
+[198/210] [desktop] › tests\e2e\shell.spec.ts:316:3 › mobile 390 › menu page shows destinations and the brand footer
+[199/210] [phone] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[200/210] [phone] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+  15) [desktop] › tests\e2e\findmy.spec.ts:56:5 › at 1440px › friend pins, card, Want to hang?, and the People list 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-ezG9ql --remote-debugging-pipe --no-startup-window
+    <launched> pid=3768
+    [pid=3768][err] [1113/040018.983:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=3768][err] [1113/040019.022:INFO:CONSOLE:0] "[.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=3768][err] [1113/040019.852:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=3768][err] [1113/040019.917:INFO:CONSOLE:0] "[.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=3768][err] [1113/040019.927:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=3768][err] [1113/040019.958:INFO:CONSOLE:0] "[.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=3768][err] [1113/040019.983:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+    [pid=3768][err] [1113/040020.008:INFO:CONSOLE:0] "[.WebGL-0x637c00f55600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=3768][err] [1113/040020.264:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=3768][err] [1113/040020.268:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=3768][err] [1113/040020.270:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=3768] <gracefully close start>
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+        - locator resolved to <button type="button" class="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="ready" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="ready" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        167 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="ready" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      78 |       await expect(card).toHaveCount(0);
+      79 |
+    > 80 |       await page.getByRole('button', { name: /^People/ }).click();
+         |                                                           ^
+      81 |       const rows = page.getByTestId('people-row');
+      82 |       await expect(rows.first()).toBeVisible();
+      83 |       expect(await rows.count()).toBeGreaterThanOrEqual(20);
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:80:59
+
+    Error Context: test-results\findmy-at-1440px-friend-pi-0cbed-to-hang-and-the-People-list-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-friend-pi-0cbed-to-hang-and-the-People-list-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-friend-pi-0cbed-to-hang-and-the-People-list-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[201/210] [desktop] › tests\e2e\findmy.spec.ts:92:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap
+  16) [desktop] › tests\e2e\findmy.spec.ts:92:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator:  getByTestId('out-here-map')
+    Expected: "friends"
+    Received: "explore"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" getByTestId('out-here-map') with timeout 5000ms
+      - waiting for getByTestId('out-here-map')
+        13 × locator resolved to <div data-view="map" data-mode="explore" data-testid="out-here-map" class="relative h-[calc(100dvh-112px)] overflow-hidden bg-[#EEF0F2] md:h-[calc(100dvh-56px)]">…</div>
+           - unexpected value "explore"
+
+
+      19 |   await page.goto(`${path}?as=${handle}`);
+      20 |   // /out-here/friends redirects to /out-here?mode=friends, which opens the map in Friends mode.
+    > 21 |   await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+         |                                                  ^
+      22 |   await expect(page.locator('[data-testid="friend-pin"]').first()).toBeVisible({ timeout: 15_000 });
+      23 | }
+      24 |
+        at openMap (C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:21:50)
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:93:7
+
+    Error Context: test-results\findmy-at-1440px-the-Out-H-3df52-map-and-chips-never-overlap-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-the-Out-H-3df52-map-and-chips-never-overlap-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-the-Out-H-3df52-map-and-chips-never-overlap-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[202/210] [desktop] › tests\e2e\findmy.spec.ts:111:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+  17) [desktop] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: browserContext.close: Target page, context or browser has been closed
+
+      64 |     expect((await request.get(photoPath, { headers: as('alex') })).headers()['content-type']).toBe('image/jpeg');
+      65 |   } finally {
+    > 66 |     await mayaContext.close();
+         |     ^
+      67 |   }
+      68 | });
+      69 |
+        at C:\oh-wt\main-baseline\tests\e2e\your-plans.spec.ts:66:5
+
+    Error Context: test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  18) [phone] › tests\e2e\findmy.spec.ts:111:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-3IZsRI --remote-debugging-pipe --no-startup-window
+    <launched> pid=26276
+    [pid=26276][err] [1113/040148.789:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=26276][err] [1113/040148.840:INFO:CONSOLE:0] "[.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=26276][err] [1113/040149.201:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=26276][err] [1113/040149.276:INFO:CONSOLE:0] "[.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=26276][err] [1113/040149.286:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=26276][err] [1113/040149.346:INFO:CONSOLE:0] "[.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=26276][err] [1113/040149.362:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+    [pid=26276][err] [1113/040149.413:INFO:CONSOLE:0] "[.WebGL-0x607402760600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=26276][err] [1113/040149.568:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=26276][err] [1113/040149.570:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=26276][err] [1113/040149.572:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=26276] <gracefully close start>
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+        - locator resolved to <button type="button" class="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        156 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <button type="button" aria-pressed="false" data-testid="map-mode-explore" class="h-8 rounded-pill px-4 text-[15px] font-semibold transition-colors text-fb-text-2 hover:bg-fb-hover">Explore</button> from <div class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-2">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      111 |     test('Want to hang? with Maya proposes Dumpling Den from her bubble before sending', async ({ page }) => {
+      112 |       await openMap(page, 'alex', width);
+    > 113 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      114 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      115 |       const card = page.getByTestId('friend-card');
+      116 |       await expect(card).toContainText('craving dumplings');
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:113:59
+
+    Error Context: test-results\findmy-at-390px-Want-to-ha-344f4-m-her-bubble-before-sending-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-Want-to-ha-344f4-m-her-bubble-before-sending-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-Want-to-ha-344f4-m-her-bubble-before-sending-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[203/210] [phone] › tests\e2e\findmy.spec.ts:133:5 › at 390px › sharing settings open from the map
+  19) [desktop] › tests\e2e\findmy.spec.ts:111:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-j9gxqt --remote-debugging-pipe --no-startup-window
+    <launched> pid=40320
+    [pid=40320][err] [1113/040258.241:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=40320][err] [1113/040258.287:INFO:CONSOLE:0] "[.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=40320][err] [1113/040259.777:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=40320][err] [1113/040259.849:INFO:CONSOLE:0] "[.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=40320][err] [1113/040259.855:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=40320][err] [1113/040259.882:INFO:CONSOLE:0] "[.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=40320][err] [1113/040259.892:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+    [pid=40320][err] [1113/040259.915:INFO:CONSOLE:0] "[.WebGL-0x7c3400622c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)", source: http://localhost:3179/out-here?as=alex&mode=friends (0)
+    [pid=40320][err] [1113/040300.064:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=40320][err] [1113/040300.064:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=40320][err] [1113/040300.064:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3179/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=40320] <gracefully close start>
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+        - locator resolved to <button type="button" class="flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-[#F2F4F7]">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="loading" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="loading" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="loading" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 500ms
+        158 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <canvas tabindex="0" width="1440" height="844" role="region" aria-label="Map" class="maplibregl-canvas"></canvas> from <div data-tiles="ready" class="absolute inset-0 bg-[#EEF0F2]">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      111 |     test('Want to hang? with Maya proposes Dumpling Den from her bubble before sending', async ({ page }) => {
+      112 |       await openMap(page, 'alex', width);
+    > 113 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      114 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      115 |       const card = page.getByTestId('friend-card');
+      116 |       await expect(card).toContainText('craving dumplings');
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:113:59
+
+    Error Context: test-results\findmy-at-1440px-Want-to-h-2e78b-m-her-bubble-before-sending-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-Want-to-h-2e78b-m-her-bubble-before-sending-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-Want-to-h-2e78b-m-her-bubble-before-sending-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[204/210] [desktop] › tests\e2e\findmy.spec.ts:133:5 › at 1440px › sharing settings open from the map
+  20) [phone] › tests\e2e\findmy.spec.ts:133:5 › at 390px › sharing settings open from the map ─────
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Your status' })
+
+
+      133 |     test('sharing settings open from the map', async ({ page }) => {
+      134 |       await openMap(page, 'alex', width);
+    > 135 |       await page.getByRole('button', { name: 'Your status' }).click();
+          |                                                               ^
+      136 |       const form = page.getByTestId('sharing-form');
+      137 |       await expect(form).toBeVisible();
+      138 |       await expect(page.getByLabel("What's on your mind?")).toHaveValue('new here, say hi');
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:135:63
+
+    Error Context: test-results\findmy-at-390px-sharing-settings-open-from-the-map-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-sharing-settings-open-from-the-map-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-sharing-settings-open-from-the-map-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[205/210] [phone] › tests\e2e\findmy.spec.ts:56:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[206/210] [phone] › tests\e2e\findmy.spec.ts:92:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap
+[207/210] [phone] › tests\e2e\findmy.spec.ts:111:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[208/210] [phone] › tests\e2e\findmy.spec.ts:133:5 › at 1440px › sharing settings open from the map
+[209/210] [phone] › tests\e2e\findmy.spec.ts:150:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+  21) [desktop] › tests\e2e\findmy.spec.ts:133:5 › at 1440px › sharing settings open from the map ──
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Your status' })
+
+
+      133 |     test('sharing settings open from the map', async ({ page }) => {
+      134 |       await openMap(page, 'alex', width);
+    > 135 |       await page.getByRole('button', { name: 'Your status' }).click();
+          |                                                               ^
+      136 |       const form = page.getByTestId('sharing-form');
+      137 |       await expect(form).toBeVisible();
+      138 |       await expect(page.getByLabel("What's on your mind?")).toHaveValue('new here, say hi');
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:135:63
+
+    Error Context: test-results\findmy-at-1440px-sharing-settings-open-from-the-map-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-sharing-settings-open-from-the-map-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-sharing-settings-open-from-the-map-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[210/210] [desktop] › tests\e2e\findmy.spec.ts:150:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+  22) [desktop] › tests\e2e\findmy.spec.ts:150:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: apiRequestContext.put: Target page, context or browser has been closed
+
+      168 |       await expect(mayaPin).toHaveCount(0, { timeout: 2_000 });
+      169 |     } finally {
+    > 170 |       await request.put('/api/locations/me', {
+          |                     ^
+      171 |         headers: asPersona('maya'),
+      172 |         data: { audience: 'friends', paused: false, bubble: { emoji: '🥟', thought: 'craving dumplings' } },
+      173 |       });
+        at C:\oh-wt\main-baseline\tests\e2e\findmy.spec.ts:170:21
+
+    Error Context: test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  22 failed
+    [phone] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+    [phone] › tests\e2e\findmy.spec.ts:56:5 › at 390px › friend pins, card, Want to hang?, and the People list 
+    [phone] › tests\e2e\findmy.spec.ts:92:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap 
+    [phone] › tests\e2e\findmy.spec.ts:111:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending 
+    [phone] › tests\e2e\findmy.spec.ts:133:5 › at 390px › sharing settings open from the map ───────
+    [phone] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list ──────
+    [phone] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined 
+    [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests 
+    [phone] › tests\e2e\shell.spec.ts:275:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen 
+    [desktop] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+    [desktop] › tests\e2e\findmy.spec.ts:56:5 › at 1440px › friend pins, card, Want to hang?, and the People list 
+    [desktop] › tests\e2e\findmy.spec.ts:92:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap 
+    [desktop] › tests\e2e\findmy.spec.ts:111:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending 
+    [desktop] › tests\e2e\findmy.spec.ts:133:5 › at 1440px › sharing settings open from the map ────
+    [desktop] › tests\e2e\findmy.spec.ts:150:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s 
+    [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live 
+    [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+    [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see ─────
+    [desktop] › tests\e2e\shell.spec.ts:116:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona 
+    [desktop] › tests\e2e\shell.spec.ts:155:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail 
+    [desktop] › tests\e2e\shell.spec.ts:190:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating 
+    [desktop] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+  58 skipped
+  130 passed (9.8m)

@@ -1,0 +1,481 @@
+
+Running 80 tests using 2 workers
+
+[1/80] [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[2/80] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[3/80] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[4/80] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[5/80] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+  1) [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  locator('#imfree-text')
+    Expected: focused
+    Received: inactive
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toBeFocused" locator('#imfree-text') with timeout 10000ms
+      - waiting for locator('#imfree-text')
+        23 × locator resolved to <textarea rows="1" maxlength="280" id="imfree-text" placeholder="Or tell Muse… e.g. with someone who likes comics" class="block max-h-20 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"></textarea>
+           - unexpected value "inactive"
+
+
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+    > 38 |       await expect(composer).toBeFocused();
+         |                              ^
+      39 |       await expect(composer).toHaveValue('');
+      40 |       await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      41 |       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\entry.spec.ts:38:30
+
+    Error Context: test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  locator('#imfree-text')
+    Expected: focused
+    Received: inactive
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toBeFocused" locator('#imfree-text') with timeout 10000ms
+      - waiting for locator('#imfree-text')
+        23 × locator resolved to <textarea rows="1" maxlength="280" id="imfree-text" placeholder="Or tell Muse… e.g. with someone who likes comics" class="block max-h-20 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"></textarea>
+           - unexpected value "inactive"
+
+
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+    > 38 |       await expect(composer).toBeFocused();
+         |                              ^
+      39 |       await expect(composer).toHaveValue('');
+      40 |       await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      41 |       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\entry.spec.ts:38:30
+
+    Error Context: test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[6/80] [phone] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[7/80] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[8/80] [phone] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[9/80] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[10/80] [phone] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[11/80] [phone] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[12/80] [phone] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[13/80] [phone] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[14/80] [phone] › tests\e2e\findmy.spec.ts:72:3 › API › sharing with the public is rejected
+[15/80] [phone] › tests\e2e\findmy.spec.ts:78:3 › API › profiles of other people carry no home location
+[16/80] [phone] › tests\e2e\findmy.spec.ts:95:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[17/80] [desktop] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[18/80] [phone] › tests\e2e\findmy.spec.ts:131:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[19/80] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[20/80] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 390px › tapping a status chip opens the card, like the avatar
+[21/80] [phone] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+  3) [desktop] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares 
+
+    Test timeout of 210000ms exceeded while running "beforeEach" hook.
+
+      59 |
+      60 | test.describe('API', () => {
+    > 61 |   test.beforeEach(({}, info) => { test.skip(info.project.name !== 'desktop', 'API checks run once'); });
+         |        ^
+      62 |
+      63 |   test('alex sees local friends with bubbles, never non-friends, paused or expired shares', async ({ request }) => {
+      64 |     const pins = await pinsFor(request, 'alex');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:61:8
+
+    Error Context: test-results\findmy-API-alex-sees-local-d440a-ds-paused-or-expired-shares-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-API-alex-sees-local-d440a-ds-paused-or-expired-shares-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-API-alex-sees-local-d440a-ds-paused-or-expired-shares-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[22/80] [desktop] › tests\e2e\findmy.spec.ts:72:3 › API › sharing with the public is rejected
+[23/80] [desktop] › tests\e2e\findmy.spec.ts:78:3 › API › profiles of other people carry no home location
+[24/80] [desktop] › tests\e2e\findmy.spec.ts:95:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[25/80] [desktop] › tests\e2e\findmy.spec.ts:131:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[26/80] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[27/80] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 390px › tapping a status chip opens the card, like the avatar
+[28/80] [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[29/80] [desktop] › tests\e2e\findmy.spec.ts:208:5 › at 390px › sharing settings open from the map
+[30/80] [desktop] › tests\e2e\findmy.spec.ts:222:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[31/80] [desktop] › tests\e2e\findmy.spec.ts:95:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[32/80] [desktop] › tests\e2e\findmy.spec.ts:131:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[33/80] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+  4) [phone] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card 
+
+    Test timeout of 210000ms exceeded.
+
+    Error: locator.click: Test timeout of 210000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+
+
+      188 |       await page.getByTestId('map-mode-friends').click();
+      189 |       await expect(page).toHaveURL(/[?&]mode=friends/);
+    > 190 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      191 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      192 |       const card = page.getByTestId('friend-card');
+      193 |       await expect(card).toBeVisible();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:190:59
+
+    Error Context: test-results\findmy-at-390px-the-toggle-f0a0d-ssenger-returns-to-the-card-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-the-toggle-f0a0d-ssenger-returns-to-the-card-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-the-toggle-f0a0d-ssenger-returns-to-the-card-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[34/80] [phone] › tests\e2e\findmy.spec.ts:208:5 › at 390px › sharing settings open from the map
+[35/80] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[36/80] [phone] › tests\e2e\findmy.spec.ts:222:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[37/80] [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+  5) [phone] › tests\e2e\findmy.spec.ts:222:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time 
+
+    Test timeout of 210000ms exceeded.
+
+    Error: locator.click: Test timeout of 210000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+
+
+      222 |     test('a friend in another city gets Message, not Want to hang?, and no walk time', async ({ page }) => {
+      223 |       await openMap(page, 'alex', width);
+    > 224 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      225 |       await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
+      226 |       const card = page.getByTestId('friend-card');
+      227 |       await expect(card.getByTestId('friend-far-note')).toContainText('Ben is in New York, NY');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:224:59
+
+    Error Context: test-results\findmy-at-390px-a-friend-i-00773-nt-to-hang-and-no-walk-time-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-a-friend-i-00773-nt-to-hang-and-no-walk-time-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-a-friend-i-00773-nt-to-hang-and-no-walk-time-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[38/80] [phone] › tests\e2e\findmy.spec.ts:95:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[39/80] [phone] › tests\e2e\findmy.spec.ts:131:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[40/80] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[41/80] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[42/80] [phone] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[43/80] [phone] › tests\e2e\findmy.spec.ts:208:5 › at 1440px › sharing settings open from the map
+[44/80] [phone] › tests\e2e\findmy.spec.ts:222:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[45/80] [phone] › tests\e2e\findmy.spec.ts:238:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+  6) [phone] › tests\e2e\findmy.spec.ts:238:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('quest-sheet')
+    Expected substring: "Dumplings before the rush"
+    Received string:    "OpenFreeMap © OpenMapTiles Data from OpenStreetMapThis plan isn't available anymore."
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('quest-sheet') with timeout 10000ms
+      - waiting for getByTestId('quest-sheet')
+        22 × locator resolved to <section aria-label="Plan details" data-testid="quest-sheet" class="absolute inset-x-0 bottom-0 z-20 flex max-h-[68%] animate-sheet-up flex-col rounded-t-[24px] bg-fb-surface shadow-popover md:bottom-auto md:left-4 md:right-auto md:top-4 md:max-h-[calc(100%-32px)] md:w-[400px] md:animate-panel-in md:rounded-[24px]">…</section>
+           - unexpected value "OpenFreeMap © OpenMapTiles Data from OpenStreetMapThis plan isn't available anymore."
+
+
+      252 |       expect(top).toBe('quest-pin-dumplings');
+      253 |       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    > 254 |       await expect(page.getByTestId('quest-sheet')).toContainText('Dumplings before the rush');
+          |                                                     ^
+      255 |       await expect(page.getByTestId('friend-card')).toHaveCount(0);
+      256 |     } finally {
+      257 |       await put({ precision: 'exact' });
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:254:53
+
+    Error Context: test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[46/80] [phone] › tests\e2e\findmy.spec.ts:265:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[47/80] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[48/80] [phone] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[49/80] [phone] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[50/80] [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+[51/80] [phone] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[52/80] [phone] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[53/80] [phone] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[54/80] [phone] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[55/80] [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+  7) [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 332.265625
+    Received:    363
+
+      36 |       const box = await pill.boundingBox();
+      37 |       if (!box || !sheet) continue;
+    > 38 |       if ((page.viewportSize()?.width ?? 1440) < 768) expect(box.y + box.height + 40).toBeLessThanOrEqual(sheet.y);
+         |                                                                                       ^
+      39 |     }
+      40 |     await page.screenshot({ path: test.info().outputPath("plan.png") });
+      41 |
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\musemap.spec.ts:38:87
+
+    Error Context: test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[56/80] [phone] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[57/80] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+  8) [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Dumplings before the rush')
+    Expected: 0
+    Received: 2
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" getByText('Dumplings before the rush') with timeout 10000ms
+      - waiting for getByText('Dumplings before the rush')
+        23 × locator resolved to 2 elements
+           - unexpected value "2"
+
+
+      43 |
+      44 |     await ask(page, "hungry, 15 min");
+    > 45 |     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
+         |                                             ^
+      46 |     const cards = page.getByTestId("suggestion");
+      47 |     // nothing posted fits: the empty card, or (a friend is free too) Muse drafting a plan for you two
+      48 |     if ((await cards.count()) === 0) {
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\outhere.spec.ts:45:45
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[58/80] [phone] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+[59/80] [phone] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[60/80] [phone] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[61/80] [phone] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+  9) [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card 
+
+    Test timeout of 210000ms exceeded.
+
+    Error: locator.click: Test timeout of 210000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+        - waiting for "http://localhost:3175/out-here?as=alex&mode=friends" navigation to finish...
+        - navigated to "http://localhost:3175/out-here?as=alex&mode=friends"
+
+
+      188 |       await page.getByTestId('map-mode-friends').click();
+      189 |       await expect(page).toHaveURL(/[?&]mode=friends/);
+    > 190 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      191 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      192 |       const card = page.getByTestId('friend-card');
+      193 |       await expect(card).toBeVisible();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:190:59
+
+    Error Context: test-results\findmy-at-1440px-the-toggl-509fc-ssenger-returns-to-the-card-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-the-toggl-509fc-ssenger-returns-to-the-card-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-the-toggl-509fc-ssenger-returns-to-the-card-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[62/80] [desktop] › tests\e2e\findmy.spec.ts:208:5 › at 1440px › sharing settings open from the map
+[63/80] [desktop] › tests\e2e\findmy.spec.ts:222:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+  10) [desktop] › tests\e2e\findmy.spec.ts:222:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time 
+
+    Test timeout of 210000ms exceeded.
+
+    Error: locator.click: Test timeout of 210000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /^People/ })
+
+
+      222 |     test('a friend in another city gets Message, not Want to hang?, and no walk time', async ({ page }) => {
+      223 |       await openMap(page, 'alex', width);
+    > 224 |       await page.getByRole('button', { name: /^People/ }).click();
+          |                                                           ^
+      225 |       await page.locator('[data-testid="people-row"][data-handle="ben"]').click();
+      226 |       const card = page.getByTestId('friend-card');
+      227 |       await expect(card.getByTestId('friend-far-note')).toContainText('Ben is in New York, NY');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:224:59
+
+    Error Context: test-results\findmy-at-1440px-a-friend--9e6c6-nt-to-hang-and-no-walk-time-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-a-friend--9e6c6-nt-to-hang-and-no-walk-time-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-a-friend--9e6c6-nt-to-hang-and-no-walk-time-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[64/80] [desktop] › tests\e2e\findmy.spec.ts:238:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[65/80] [desktop] › tests\e2e\findmy.spec.ts:265:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[66/80] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[67/80] [desktop] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[68/80] [desktop] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[69/80] [desktop] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+[70/80] [desktop] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[71/80] [desktop] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[72/80] [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[73/80] [desktop] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[74/80] [desktop] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[75/80] [desktop] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[76/80] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+  11) [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Dumplings before the rush')
+    Expected: 0
+    Received: 2
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" getByText('Dumplings before the rush') with timeout 10000ms
+      - waiting for getByText('Dumplings before the rush')
+        23 × locator resolved to 2 elements
+           - unexpected value "2"
+
+
+      43 |
+      44 |     await ask(page, "hungry, 15 min");
+    > 45 |     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
+         |                                             ^
+      46 |     const cards = page.getByTestId("suggestion");
+      47 |     // nothing posted fits: the empty card, or (a friend is free too) Muse drafting a plan for you two
+      48 |     if ((await cards.count()) === 0) {
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\outhere.spec.ts:45:45
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[77/80] [desktop] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+[78/80] [desktop] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[79/80] [desktop] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[80/80] [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+  12) [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('suggestion').first()
+    Expected substring: "Dumplings before the rush"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" getByTestId('suggestion').first() with timeout 10000ms
+      - waiting for getByTestId('suggestion').first()
+
+
+      157 |
+      158 |     const top = page.getByTestId("suggestion").first();
+    > 159 |     await expect(top).toContainText(DUMPLINGS);
+          |                       ^
+      160 |     await expect(top).toContainText("Maya");
+      161 |     await expect(top.getByTestId("seats-left")).toHaveText("2 left");
+      162 |     // ✨ Muse only on live model text; offline (mock) text is labelled as such
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\outhere.spec.ts:159:23
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-39b10-ccepts-both-see-seats-2---0-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  12 failed
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card 
+    [phone] › tests\e2e\findmy.spec.ts:222:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time 
+    [phone] › tests\e2e\findmy.spec.ts:238:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares 
+    [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card 
+    [desktop] › tests\e2e\findmy.spec.ts:222:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time 
+    [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+  34 skipped
+  34 passed (18.1m)

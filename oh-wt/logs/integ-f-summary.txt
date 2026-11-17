@@ -1,0 +1,77 @@
+RUN 1
+  37 failed
+  71 skipped
+  170 passed (13.9m)
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible 
+    [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined 
+    [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker 
+    [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody 
+    [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible 
+    [desktop] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion 
+    [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [phone-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+    [phone-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [phone-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it 
+    [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:48:1 › stream failure uses existing error UI and releases the peer 
+    [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [desktop-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+    [desktop-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [desktop-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [desktop-parallel] › tests\e2e\navigation.spec.ts:21:3 › Out Here navigation › the dashboard: tabs, three heights, keyboard and Escape 
+    [desktop-parallel] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here 
+    [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+RUN 2
+  31 failed
+  71 skipped
+  176 passed (8.3m)
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\findmy.spec.ts:239:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens 
+    [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible 
+    [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined 
+    [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [phone] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live 
+    [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [phone-parallel] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it 
+    [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [phone-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:3:1 › a finished 2D agent request releases the next ordinary chat request 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [phone-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [phone-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it 
+    [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [desktop-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [desktop-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+ALLDONE

@@ -1,0 +1,20 @@
+
+> out-here@0.1.0 lint
+> eslint .
+
+
+C:\oh-wt\rev-87\src\features\map\create\CreatePlanSheet.tsx
+  5:48  warning  'ChevronDown' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\oh-wt\rev-87\src\features\muse\finds.ts
+  208:17  warning  '_want' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\oh-wt\rev-87\src\features\outhere\UpNext.tsx
+    6:10  warning  'requestSelfie' is defined but never used       @typescript-eslint/no-unused-vars
+    7:10  warning  'Avatar' is defined but never used              @typescript-eslint/no-unused-vars
+   67:60  warning  'onSee' is defined but never used               @typescript-eslint/no-unused-vars
+  101:9   warning  'withShort' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 6 problems (0 errors, 6 warnings)
+
+lint 0

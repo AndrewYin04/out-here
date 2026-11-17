@@ -1,0 +1,22 @@
+
+Running 18 tests using 2 workers
+
+[1/18] [phone-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[2/18] [desktop-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[3/18] [phone-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[4/18] [desktop-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[5/18] [phone-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[6/18] [desktop-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[7/18] [desktop-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[8/18] [phone-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[9/18] [desktop-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[10/18] [phone-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[11/18] [desktop-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[12/18] [phone-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[13/18] [phone-parallel] › tests\e2e\feed.spec.ts:167:1 › comment and reply, seen live by a second persona
+[14/18] [desktop-parallel] › tests\e2e\feed.spec.ts:167:1 › comment and reply, seen live by a second persona
+[15/18] [phone-parallel] › tests\e2e\feed.spec.ts:209:1 › share a post to the feed
+[16/18] [desktop-parallel] › tests\e2e\feed.spec.ts:209:1 › share a post to the feed
+[17/18] [phone-parallel] › tests\e2e\feed.spec.ts:227:1 › hide a post and undo
+[18/18] [desktop-parallel] › tests\e2e\feed.spec.ts:227:1 › hide a post and undo
+  18 passed (1.8m)

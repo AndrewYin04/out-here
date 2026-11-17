@@ -1,0 +1,155 @@
+
+Running 38 tests using 1 worker
+
+  ok  1 [phone] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it (2.4s)
+  -   2 [phone] › tests\e2e\findmy.spec.ts:41:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+  -   3 [phone] › tests\e2e\findmy.spec.ts:50:3 › API › sharing with the public is rejected
+  -   4 [phone] › tests\e2e\findmy.spec.ts:56:3 › API › profiles of other people carry no home location
+  ok  5 [phone] › tests\e2e\findmy.spec.ts:69:5 › at 390px › friend pins, card, Want to hang?, and the People list (7.7s)
+  ok  6 [phone] › tests\e2e\findmy.spec.ts:105:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap (2.9s)
+  x   7 [phone] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes boba from her bubble before sending (8.0s)
+  ok  8 [phone] › tests\e2e\findmy.spec.ts:146:5 › at 390px › sharing settings open from the map (1.7s)
+  -   9 [phone] › tests\e2e\findmy.spec.ts:69:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+  -  10 [phone] › tests\e2e\findmy.spec.ts:105:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap
+  -  11 [phone] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes boba from her bubble before sending
+  -  12 [phone] › tests\e2e\findmy.spec.ts:146:5 › at 1440px › sharing settings open from the map
+  -  13 [phone] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+  ok 14 [phone] › tests\e2e\memories.spec.ts:5:3 › Memories › alex sees a crew album and gets a regroup suggestion (763ms)
+  ok 15 [phone] › tests\e2e\memories.spec.ts:19:3 › Memories › the first load reads the cache, not a forced reload of every table (#65) (523ms)
+  ok 16 [phone] › tests\e2e\memories.spec.ts:29:3 › Memories › regroup API returns a suggestion with a real quest id or null (62ms)
+  -  17 [phone] › tests\e2e\memories.spec.ts:42:3 › Memories › Send to crew delivers invites
+  ok 18 [phone] › tests\e2e\memories.spec.ts:51:3 › Memories › a persona with no crews sees the empty state (428ms)
+  ok 19 [phone] › tests\e2e\memories.spec.ts:57:3 › Memories › Notifications show Out Here items for alex (15ms)
+  ok 20 [desktop] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it (2.7s)
+  ok 21 [desktop] › tests\e2e\findmy.spec.ts:41:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares (48ms)
+  ok 22 [desktop] › tests\e2e\findmy.spec.ts:50:3 › API › sharing with the public is rejected (21ms)
+  ok 23 [desktop] › tests\e2e\findmy.spec.ts:56:3 › API › profiles of other people carry no home location (17ms)
+  -  24 [desktop] › tests\e2e\findmy.spec.ts:69:5 › at 390px › friend pins, card, Want to hang?, and the People list
+  -  25 [desktop] › tests\e2e\findmy.spec.ts:105:5 › at 390px › the Out Here tab opens the Friends map, and chips never overlap
+  -  26 [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes boba from her bubble before sending
+  -  27 [desktop] › tests\e2e\findmy.spec.ts:146:5 › at 390px › sharing settings open from the map
+  ok 28 [desktop] › tests\e2e\findmy.spec.ts:69:5 › at 1440px › friend pins, card, Want to hang?, and the People list (4.0s)
+  ok 29 [desktop] › tests\e2e\findmy.spec.ts:105:5 › at 1440px › the Out Here tab opens the Friends map, and chips never overlap (2.6s)
+  x  30 [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes boba from her bubble before sending (7.2s)
+  ok 31 [desktop] › tests\e2e\findmy.spec.ts:146:5 › at 1440px › sharing settings open from the map (1.7s)
+  x  32 [desktop] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s (6.7s)
+  ok 33 [desktop] › tests\e2e\memories.spec.ts:5:3 › Memories › alex sees a crew album and gets a regroup suggestion (978ms)
+  ok 34 [desktop] › tests\e2e\memories.spec.ts:19:3 › Memories › the first load reads the cache, not a forced reload of every table (#65) (624ms)
+  ok 35 [desktop] › tests\e2e\memories.spec.ts:29:3 › Memories › regroup API returns a suggestion with a real quest id or null (58ms)
+  ok 36 [desktop] › tests\e2e\memories.spec.ts:42:3 › Memories › Send to crew delivers invites (847ms)
+  ok 37 [desktop] › tests\e2e\memories.spec.ts:51:3 › Memories › a persona with no crews sees the empty state (564ms)
+  ok 38 [desktop] › tests\e2e\memories.spec.ts:57:3 › Memories › Notifications show Out Here items for alex (15ms)
+
+
+  1) [phone] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes boba from her bubble before sending 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('friend-card')
+    Expected substring: "free after class"
+    Received string:    "near Willow Rd700 m · 11 min walkUpdated 3 min ago🧋Free after class · Down for bobaRight now: out of class, free for an hourWants to: grab bobaFree until 9:26 AM: “Free after class · down for boba”Want to hang?View profile"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('friend-card') with timeout 5000ms
+      - waiting for getByTestId('friend-card')
+        13 × locator resolved to <div data-testid="friend-card" class="flex flex-col gap-4">…</div>
+           - unexpected value "near Willow Rd700 m · 11 min walkUpdated 3 min ago🧋Free after class · Down for bobaRight now: out of class, free for an hourWants to: grab bobaFree until 9:26 AM: “Free after class · down for boba”Want to hang?View profile"
+
+
+      127 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      128 |       const card = page.getByTestId('friend-card');
+    > 129 |       await expect(card).toContainText('free after class');
+          |                          ^
+      130 |       if (width > 800) {
+      131 |         const box = await page.getByRole('dialog').boundingBox();
+      132 |         expect(box!.x + box!.width).toBeLessThanOrEqual(width - 12);
+        at C:\oh-wt\rv93\tests\e2e\findmy.spec.ts:129:26
+
+    Error Context: test-results\findmy-at-390px-Want-to-ha-03501-m-her-bubble-before-sending-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-390px-Want-to-ha-03501-m-her-bubble-before-sending-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-390px-Want-to-ha-03501-m-her-bubble-before-sending-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes boba from her bubble before sending 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('friend-card')
+    Expected substring: "free after class"
+    Received string:    "near Willow Rd700 m · 11 min walkUpdated 4 min ago🧋Free after class · Down for bobaRight now: out of class, free for an hourWants to: grab bobaFree until 9:26 AM: “Free after class · down for boba”Want to hang?View profile"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('friend-card') with timeout 5000ms
+      - waiting for getByTestId('friend-card')
+        13 × locator resolved to <div data-testid="friend-card" class="flex flex-col gap-4">…</div>
+           - unexpected value "near Willow Rd700 m · 11 min walkUpdated 4 min ago🧋Free after class · Down for bobaRight now: out of class, free for an hourWants to: grab bobaFree until 9:26 AM: “Free after class · down for boba”Want to hang?View profile"
+
+
+      127 |       await page.locator('[data-testid="people-row"][data-handle="maya"]').click();
+      128 |       const card = page.getByTestId('friend-card');
+    > 129 |       await expect(card).toContainText('free after class');
+          |                          ^
+      130 |       if (width > 800) {
+      131 |         const box = await page.getByRole('dialog').boundingBox();
+      132 |         expect(box!.x + box!.width).toBeLessThanOrEqual(width - 12);
+        at C:\oh-wt\rv93\tests\e2e\findmy.spec.ts:129:26
+
+    Error Context: test-results\findmy-at-1440px-Want-to-h-2ee25-m-her-bubble-before-sending-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-at-1440px-Want-to-h-2ee25-m-her-bubble-before-sending-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-at-1440px-Want-to-h-2ee25-m-her-bubble-before-sending-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [desktop] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s 
+
+    Error: expect(locator).toHaveAttribute(expected) failed
+
+    Locator: locator('[data-testid="friend-pin"][data-handle="maya"]')
+    Expected pattern: /free after class/
+    Received string:  "Maya Chen, Free till 9:26 AM, 🧋 Free after class · Down for boba, updated 4 min ago"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toHaveAttribute" locator('[data-testid="friend-pin"][data-handle="maya"]') with timeout 5000ms
+      - waiting for locator('[data-testid="friend-pin"][data-handle="maya"]')
+        13 × locator resolved to <button type="button" data-chip="full" data-handle="maya" data-chip-side="above" data-testid="friend-pin" class="group relative flex flex-col items-center outline-none" aria-label="Maya Chen, Free till 9:26 AM, 🧋 Free after class · Down for boba, updated 4 min ago">…</button>
+           - unexpected value "Maya Chen, Free till 9:26 AM, 🧋 Free after class · Down for boba, updated 4 min ago"
+
+
+      167 |       await openMap(a, 'alex', 1440);
+      168 |       const mayaPin = a.locator('[data-testid="friend-pin"][data-handle="maya"]');
+    > 169 |       await expect(mayaPin).toHaveAttribute('aria-label', /free after class/);
+          |                             ^
+      170 |
+      171 |       await openMap(b, 'maya', 1440);
+      172 |       await editStatus(b);
+        at C:\oh-wt\rv93\tests\e2e\findmy.spec.ts:169:29
+
+    Error Context: test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-two-personas-live-M-59484-f-Alex-sees-both-within-2-s-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3 failed
+    [phone] › tests\e2e\findmy.spec.ts:124:5 › at 390px › Want to hang? with Maya proposes boba from her bubble before sending 
+    [desktop] › tests\e2e\findmy.spec.ts:124:5 › at 1440px › Want to hang? with Maya proposes boba from her bubble before sending 
+    [desktop] › tests\e2e\findmy.spec.ts:163:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s 
+  13 skipped
+  22 passed (2.3m)
+e2e exit 1

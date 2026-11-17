@@ -1,0 +1,137 @@
+
+> out-here@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.29
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 91s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/51) ...
+   Generating static pages (1/51) 
+   Generating static pages (12/51) 
+   Generating static pages (25/51) 
+   Generating static pages (38/51) 
+ ✓ Generating static pages (51/51)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                     Size  First Load JS
+┌ ○ /                                          797 B         210 kB
+├ ○ /_not-found                                997 B         104 kB
+├ ƒ /api/availability                          339 B         103 kB
+├ ƒ /api/availability/free-with-me             339 B         103 kB
+├ ƒ /api/crews                                 339 B         103 kB
+├ ƒ /api/daily                                 339 B         103 kB
+├ ƒ /api/daily/entry                           339 B         103 kB
+├ ƒ /api/demo/reset                            339 B         103 kB
+├ ƒ /api/events                                339 B         103 kB
+├ ƒ /api/events/[slug]                         339 B         103 kB
+├ ƒ /api/events/[slug]/rsvp                    339 B         103 kB
+├ ƒ /api/feed                                  339 B         103 kB
+├ ƒ /api/friend-lists                          339 B         103 kB
+├ ƒ /api/friend-lists/[id]                     339 B         103 kB
+├ ƒ /api/friend-lists/[id]/members             339 B         103 kB
+├ ƒ /api/friend-lists/[id]/members/[userId]    339 B         103 kB
+├ ƒ /api/friends                               339 B         103 kB
+├ ƒ /api/friends/[userId]                      339 B         103 kB
+├ ƒ /api/friends/[userId]/availability         339 B         103 kB
+├ ƒ /api/friends/mutual/[userId]               339 B         103 kB
+├ ƒ /api/friends/requests                      339 B         103 kB
+├ ƒ /api/friends/requests/respond              339 B         103 kB
+├ ƒ /api/friends/suggestions                   339 B         103 kB
+├ ƒ /api/groups                                339 B         103 kB
+├ ƒ /api/groups/[slug]                         339 B         103 kB
+├ ƒ /api/groups/[slug]/hangouts                339 B         103 kB
+├ ƒ /api/groups/[slug]/join                    339 B         103 kB
+├ ƒ /api/groups/[slug]/leave                   339 B         103 kB
+├ ƒ /api/groups/[slug]/members                 339 B         103 kB
+├ ƒ /api/groups/[slug]/posts                   339 B         103 kB
+├ ƒ /api/intros                                339 B         103 kB
+├ ƒ /api/intros/[id]/pick                      339 B         103 kB
+├ ƒ /api/intros/[id]/plan                      339 B         103 kB
+├ ƒ /api/intros/[id]/respond                   339 B         103 kB
+├ ƒ /api/intros/profile                        339 B         103 kB
+├ ƒ /api/intros/request                        339 B         103 kB
+├ ƒ /api/intros/reset                          339 B         103 kB
+├ ƒ /api/intros/run                            339 B         103 kB
+├ ƒ /api/invites                               339 B         103 kB
+├ ƒ /api/invites/[id]                          339 B         103 kB
+├ ƒ /api/invites/[id]/respond                  339 B         103 kB
+├ ƒ /api/listings                              339 B         103 kB
+├ ƒ /api/listings/[id]                         339 B         103 kB
+├ ƒ /api/locations/friends                     339 B         103 kB
+├ ƒ /api/locations/hang                        339 B         103 kB
+├ ƒ /api/locations/me                          339 B         103 kB
+├ ƒ /api/me/[userId]/streak                    339 B         103 kB
+├ ƒ /api/memories                              339 B         103 kB
+├ ƒ /api/memories/[id]/photo                   339 B         103 kB
+├ ƒ /api/muse/caption                          339 B         103 kB
+├ ƒ /api/muse/create-quest                     339 B         103 kB
+├ ƒ /api/muse/filter                           339 B         103 kB
+├ ƒ /api/muse/plan                             339 B         103 kB
+├ ƒ /api/muse/regroup                          339 B         103 kB
+├ ƒ /api/notifications                         339 B         103 kB
+├ ƒ /api/notifications/read                    339 B         103 kB
+├ ƒ /api/posts                                 339 B         103 kB
+├ ƒ /api/posts/[id]                            339 B         103 kB
+├ ƒ /api/posts/[id]/comments                   339 B         103 kB
+├ ƒ /api/posts/[id]/reactions                  339 B         103 kB
+├ ƒ /api/profile/[handle]                      339 B         103 kB
+├ ƒ /api/profile/[handle]/friends              339 B         103 kB
+├ ƒ /api/profile/[handle]/photos               339 B         103 kB
+├ ƒ /api/profile/[handle]/posts                339 B         103 kB
+├ ƒ /api/profile/me                            339 B         103 kB
+├ ƒ /api/quests                                339 B         103 kB
+├ ƒ /api/quests/[id]                           339 B         103 kB
+├ ƒ /api/quests/[id]/checkin                   339 B         103 kB
+├ ƒ /api/quests/[id]/complete                  339 B         103 kB
+├ ƒ /api/quests/[id]/join                      339 B         103 kB
+├ ƒ /api/quests/[id]/leave                     339 B         103 kB
+├ ƒ /api/quests/[id]/posts                     339 B         103 kB
+├ ƒ /api/quests/[id]/report                    339 B         103 kB
+├ ƒ /api/quests/[id]/walk                      339 B         103 kB
+├ ƒ /api/quests/mine                           339 B         103 kB
+├ ƒ /api/realtime                              339 B         103 kB
+├ ƒ /api/realtime/config                       339 B         103 kB
+├ ƒ /api/realtime/presence                     339 B         103 kB
+├ ƒ /api/reels                                 339 B         103 kB
+├ ƒ /api/search                                339 B         103 kB
+├ ƒ /api/stories                               339 B         103 kB
+├ ƒ /api/threads                               339 B         103 kB
+├ ƒ /api/threads/[id]/messages                 339 B         103 kB
+├ ƒ /api/together                              339 B         103 kB
+├ ƒ /api/together/[id]                         339 B         103 kB
+├ ƒ /api/together/[id]/vote                    339 B         103 kB
+├ ƒ /api/uploads                               339 B         103 kB
+├ ƒ /api/uploads/[id]                          339 B         103 kB
+├ ƒ /api/users                                 339 B         103 kB
+├ ƒ /events                                    280 B         197 kB
+├ ƒ /friends                                   277 B         202 kB
+├ ƒ /groups                                    290 B         205 kB
+├ ƒ /groups/[slug]                           1.58 kB         135 kB
+├ ○ /intros                                  7.39 kB         129 kB
+├ ○ /marketplace                             2.25 kB         199 kB
+├ ƒ /marketplace/[id]                        2.15 kB         199 kB
+├ ○ /memories                                  200 B         197 kB
+├ ○ /menu                                      272 B         197 kB
+├ ○ /messages                                1.13 kB         134 kB
+├ ○ /notifications                           1.34 kB         127 kB
+├ ○ /out-here                                  151 B         236 kB
+├ ƒ /out-here/context                          339 B         103 kB
+├ ƒ /out-here/friends                          339 B         103 kB
+├ ƒ /out-here/plan/[id]                        151 B         236 kB
+├ ƒ /posts/[id]                              1.58 kB         135 kB
+├ ƒ /profile/[handle]                        8.67 kB         211 kB
+├ ○ /saved                                     272 B         197 kB
+└ ƒ /search                                    272 B         197 kB
++ First Load JS shared by all                 103 kB
+  ├ chunks/1255-b84741b894bb9354.js          46.6 kB
+  ├ chunks/4bd1b696-f785427dddbba9fb.js      54.2 kB
+  └ other shared chunks (total)              2.32 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,0 +1,11 @@
+
+Running 4 tests using 1 worker
+
+  -  1 [phone] › tests\e2e\market-pickup.spec.ts:37:1 › beat 3: pop-up goes live, Alex reserves the jacket, Leo accepts, Maya gets the denim find
+  ok 2 [phone] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached (2.1s)
+  ok 3 [desktop] › tests\e2e\market-pickup.spec.ts:37:1 › beat 3: pop-up goes live, Alex reserves the jacket, Leo accepts, Maya gets the denim find (10.9s)
+  ok 4 [desktop] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached (1.9s)
+
+  1 skipped
+  3 passed (1.7m)
+e2e exit 0

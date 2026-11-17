@@ -1,0 +1,172 @@
+
+> out-here@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.29
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 8.3s
+   Linting and checking validity of types ...
+
+./src/features/map/create/CreatePlanSheet.tsx
+5:48  Warning: 'ChevronDown' is defined but never used.  @typescript-eslint/no-unused-vars
+
+./src/features/muse/finds.ts
+203:17  Warning: '_want' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+./src/features/outhere/UpNext.tsx
+6:10  Warning: 'requestSelfie' is defined but never used.  @typescript-eslint/no-unused-vars
+7:10  Warning: 'Avatar' is defined but never used.  @typescript-eslint/no-unused-vars
+67:60  Warning: 'onSee' is defined but never used.  @typescript-eslint/no-unused-vars
+101:9  Warning: 'withShort' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/56) ...
+   Generating static pages (14/56) 
+   Generating static pages (28/56) 
+   Generating static pages (42/56) 
+ ✓ Generating static pages (56/56)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                     Size  First Load JS
+┌ ○ /                                          747 B         248 kB
+├ ○ /_not-found                                 1 kB         104 kB
+├ ƒ /api/availability                          386 B         103 kB
+├ ƒ /api/availability/free-with-me             386 B         103 kB
+├ ƒ /api/crews                                 386 B         103 kB
+├ ƒ /api/crews/[id]                            386 B         103 kB
+├ ƒ /api/daily                                 386 B         103 kB
+├ ƒ /api/daily/entry                           386 B         103 kB
+├ ƒ /api/demo/reset                            386 B         103 kB
+├ ƒ /api/events                                386 B         103 kB
+├ ƒ /api/events/[slug]                         386 B         103 kB
+├ ƒ /api/events/[slug]/rsvp                    386 B         103 kB
+├ ƒ /api/feed                                  386 B         103 kB
+├ ƒ /api/friend-lists                          386 B         103 kB
+├ ƒ /api/friend-lists/[id]                     386 B         103 kB
+├ ƒ /api/friend-lists/[id]/members             386 B         103 kB
+├ ƒ /api/friend-lists/[id]/members/[userId]    386 B         103 kB
+├ ƒ /api/friends                               386 B         103 kB
+├ ƒ /api/friends/[userId]                      386 B         103 kB
+├ ƒ /api/friends/[userId]/availability         386 B         103 kB
+├ ƒ /api/friends/mutual/[userId]               386 B         103 kB
+├ ƒ /api/friends/requests                      386 B         103 kB
+├ ƒ /api/friends/requests/respond              386 B         103 kB
+├ ƒ /api/friends/suggestions                   386 B         103 kB
+├ ƒ /api/groups                                386 B         103 kB
+├ ƒ /api/groups/[slug]                         386 B         103 kB
+├ ƒ /api/groups/[slug]/hangouts                386 B         103 kB
+├ ƒ /api/groups/[slug]/join                    386 B         103 kB
+├ ƒ /api/groups/[slug]/leave                   386 B         103 kB
+├ ƒ /api/groups/[slug]/members                 386 B         103 kB
+├ ƒ /api/groups/[slug]/posts                   386 B         103 kB
+├ ƒ /api/intros                                386 B         103 kB
+├ ƒ /api/intros/[id]/plan                      386 B         103 kB
+├ ƒ /api/intros/[id]/respond                   386 B         103 kB
+├ ƒ /api/intros/profile                        386 B         103 kB
+├ ƒ /api/intros/request                        386 B         103 kB
+├ ƒ /api/intros/reset                          386 B         103 kB
+├ ƒ /api/intros/run                            386 B         103 kB
+├ ƒ /api/invites                               386 B         103 kB
+├ ƒ /api/invites/[id]                          386 B         103 kB
+├ ƒ /api/invites/[id]/respond                  386 B         103 kB
+├ ƒ /api/listing-holds/[id]/release            386 B         103 kB
+├ ƒ /api/listing-holds/[id]/respond            386 B         103 kB
+├ ƒ /api/listings                              386 B         103 kB
+├ ƒ /api/listings/[id]                         386 B         103 kB
+├ ƒ /api/listings/[id]/holds                   386 B         103 kB
+├ ƒ /api/listings/[id]/pickup                  386 B         103 kB
+├ ƒ /api/listings/[id]/sold                    386 B         103 kB
+├ ƒ /api/listings/map                          386 B         103 kB
+├ ƒ /api/locations/friends                     386 B         103 kB
+├ ƒ /api/locations/hang                        386 B         103 kB
+├ ƒ /api/locations/me                          386 B         103 kB
+├ ƒ /api/me/[userId]/streak                    386 B         103 kB
+├ ƒ /api/me/ratings                            386 B         103 kB
+├ ƒ /api/memories                              386 B         103 kB
+├ ƒ /api/memories/[id]                         386 B         103 kB
+├ ƒ /api/memories/[id]/photo                   386 B         103 kB
+├ ƒ /api/muse/caption                          386 B         103 kB
+├ ƒ /api/muse/create-quest                     386 B         103 kB
+├ ƒ /api/muse/draft-hang                       386 B         103 kB
+├ ƒ /api/muse/encounters                       386 B         103 kB
+├ ƒ /api/muse/encounters/[id]                  386 B         103 kB
+├ ƒ /api/muse/filter                           386 B         103 kB
+├ ƒ /api/muse/finds                            386 B         103 kB
+├ ƒ /api/muse/marketplace-picks                386 B         103 kB
+├ ƒ /api/muse/plan                             386 B         103 kB
+├ ƒ /api/muse/prebake                          386 B         103 kB
+├ ƒ /api/muse/rating-takeaway                  386 B         103 kB
+├ ƒ /api/muse/regroup                          386 B         103 kB
+├ ƒ /api/muse/wants                            386 B         103 kB
+├ ƒ /api/notifications                         386 B         103 kB
+├ ƒ /api/notifications/read                    386 B         103 kB
+├ ƒ /api/posts                                 386 B         103 kB
+├ ƒ /api/posts/[id]                            386 B         103 kB
+├ ƒ /api/posts/[id]/comments                   386 B         103 kB
+├ ƒ /api/posts/[id]/reactions                  386 B         103 kB
+├ ƒ /api/profile/[handle]                      386 B         103 kB
+├ ƒ /api/profile/[handle]/friends              386 B         103 kB
+├ ƒ /api/profile/[handle]/photos               386 B         103 kB
+├ ƒ /api/profile/[handle]/posts                386 B         103 kB
+├ ƒ /api/profile/me                            386 B         103 kB
+├ ƒ /api/quests                                386 B         103 kB
+├ ƒ /api/quests/[id]                           386 B         103 kB
+├ ƒ /api/quests/[id]/checkin                   386 B         103 kB
+├ ƒ /api/quests/[id]/complete                  386 B         103 kB
+├ ƒ /api/quests/[id]/join                      386 B         103 kB
+├ ƒ /api/quests/[id]/leave                     386 B         103 kB
+├ ƒ /api/quests/[id]/posts                     386 B         103 kB
+├ ƒ /api/quests/[id]/rating                    386 B         103 kB
+├ ƒ /api/quests/[id]/recap                     386 B         103 kB
+├ ƒ /api/quests/[id]/report                    386 B         103 kB
+├ ƒ /api/quests/[id]/walk                      386 B         103 kB
+├ ƒ /api/quests/mine                           386 B         103 kB
+├ ƒ /api/realtime                              386 B         103 kB
+├ ƒ /api/realtime/config                       386 B         103 kB
+├ ƒ /api/realtime/presence                     386 B         103 kB
+├ ƒ /api/reels                                 386 B         103 kB
+├ ƒ /api/search                                386 B         103 kB
+├ ƒ /api/stories                               386 B         103 kB
+├ ƒ /api/threads                               386 B         103 kB
+├ ƒ /api/threads/[id]/messages                 386 B         103 kB
+├ ƒ /api/together                              386 B         103 kB
+├ ƒ /api/together/[id]                         386 B         103 kB
+├ ƒ /api/together/[id]/vote                    386 B         103 kB
+├ ƒ /api/uploads                               386 B         103 kB
+├ ƒ /api/uploads/[id]                          386 B         103 kB
+├ ƒ /api/users                                 386 B         103 kB
+├ ƒ /api/watch                                 386 B         103 kB
+├ ƒ /api/watch/[key]/view                      386 B         103 kB
+├ ○ /dev/muse-trail                           186 kB         296 kB
+├ ƒ /events                                    322 B         236 kB
+├ ƒ /friends                                   299 B         241 kB
+├ ƒ /groups                                    312 B         243 kB
+├ ƒ /groups/[slug]                           1.98 kB         142 kB
+├ ○ /intros                                  6.48 kB         135 kB
+├ ○ /marketplace                             3.52 kB         239 kB
+├ ○ /memories                                  235 B         236 kB
+├ ○ /menu                                      288 B         236 kB
+├ ○ /messages                                1.15 kB         140 kB
+├ ○ /notifications                           1.68 kB         134 kB
+├ ○ /out-here                                  155 B         281 kB
+├ ƒ /out-here/context                          386 B         103 kB
+├ ƒ /out-here/friends                          386 B         103 kB
+├ ƒ /out-here/plan/[id]                        155 B         281 kB
+├ ƒ /out-here/plan/[id]/memory                 235 B         236 kB
+├ ƒ /posts/[id]                              1.98 kB         142 kB
+├ ƒ /profile/[handle]                        8.64 kB         249 kB
+├ ○ /saved                                     288 B         236 kB
+├ ƒ /search                                    288 B         236 kB
+└ ○ /watch                                   2.77 kB         238 kB
++ First Load JS shared by all                 103 kB
+  ├ chunks/1255-d8a1861c775d9bcc.js          46.3 kB
+  ├ chunks/4bd1b696-100b9d70ed4e49c1.js      54.2 kB
+  └ other shared chunks (total)              2.36 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

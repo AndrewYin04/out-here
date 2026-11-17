@@ -1,0 +1,45 @@
+
+Running 10 tests using 2 workers
+
+[1/10] [phone] › tests\e2e\zz-verify-findmy.spec.ts:13:1 › a: Maya chip shows at 390 with Ethan
+[2/10] [desktop] › tests\e2e\zz-verify-findmy.spec.ts:13:1 › a: Maya chip shows at 390 with Ethan
+[3/10] [desktop] › tests\e2e\zz-verify-findmy.spec.ts:23:1 › b: Undo restores Maya sharing on the server; Alex sees her again
+[4/10] [desktop] › tests\e2e\zz-verify-findmy.spec.ts:44:1 › c+d: incoming invite does not cover the open sheet, emoji once
+[5/10] [desktop] › tests\e2e\zz-verify-findmy.spec.ts:78:1 › e: Ben from People opens without flying away
+[6/10] [phone] › tests\e2e\zz-verify-findmy.spec.ts:23:1 › b: Undo restores Maya sharing on the server; Alex sees her again
+[7/10] [desktop] › tests\e2e\zz-verify-findmy.spec.ts:91:1 › f: Want to hang with Ethan uses board games
+[desktop] › tests\e2e\zz-verify-findmy.spec.ts:91:1 › f: Want to hang with Ethan uses board games
+ETHAN CARD: near Willow Rd |  | 300 m · 6 min walk |  | Updated 9 min ago |  | ☕ | need a second coffee |  | Right now: working from a cafe |  | Wants to: walk somewhere after |  | Free until 6:25 AM: “board games tonight?” |  | Want to hang? | View profile | Message
+
+ETHAN HANG: 🎲 |  | Board game night |  | Ravenswood Board Game Cafe |  | 4:25 AM | 13 min walk | 2 seats left |  | ✨ Muse [mock]Ethan's free note: “board games tonight?”, and Ravenswood Board Game Cafe is 10 min from Ethan.
+
+[8/10] [phone] › tests\e2e\zz-verify-findmy.spec.ts:44:1 › c+d: incoming invite does not cover the open sheet, emoji once
+  1) [phone] › tests\e2e\zz-verify-findmy.spec.ts:44:1 › c+d: incoming invite does not cover the open sheet, emoji once 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: page.goto: Test timeout of 90000ms exceeded.
+    Call log:
+      - navigating to "http://localhost:3175/messages?as=alex", waiting until "load"
+
+
+      69 |     expect((txt.match(/🥟/g) ?? []).length).toBeLessThanOrEqual(1);
+      70 |   }
+    > 71 |   await page.goto(`/messages?as=alex`);
+         |              ^
+      72 |   await page.waitForTimeout(2500);
+      73 |   const body = await page.locator('body').innerText();
+      74 |   expect(body).not.toContain('🥟 🥟');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\zz-verify-findmy.spec.ts:71:14
+
+    Test timeout of 90000ms exceeded.
+
+    Error Context: test-results\zz-verify-findmy-c-d-incom-8d9f5-r-the-open-sheet-emoji-once-phone\error-context.md
+
+
+[9/10] [phone] › tests\e2e\zz-verify-findmy.spec.ts:78:1 › e: Ben from People opens without flying away
+[10/10] [phone] › tests\e2e\zz-verify-findmy.spec.ts:91:1 › f: Want to hang with Ethan uses board games
+  1 failed
+    [phone] › tests\e2e\zz-verify-findmy.spec.ts:44:1 › c+d: incoming invite does not cover the open sheet, emoji once 
+  5 skipped
+  4 passed (9.1m)

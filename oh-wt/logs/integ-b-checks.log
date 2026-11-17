@@ -1,0 +1,33 @@
+
+> out-here@0.1.0 typecheck
+> tsc --noEmit
+
+
+> out-here@0.1.0 lint
+> eslint .
+
+
+C:\oh-wt\integrate-findmy-b\src\features\muse\finds.ts
+  203:17  warning  '_want' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (0 errors, 1 warning)
+
+
+> out-here@0.1.0 test
+> vitest run
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.1.0 C:/oh-wt/integrate-findmy-b
+
+
+ Test Files  48 passed (48)
+      Tests  442 passed (442)
+   Start at  03:22:06
+   Duration  15.62s (tests 45%, import 29%, transform 25%, worker 1%)
+
+    Isolate  48 workers spawned · ~1.47s startup each (spawn + environment, per file)
+             at least ~2.24s faster with isolate: false — reuses workers across files instead of one per file
+

@@ -1,0 +1,152 @@
+// Where trees go in the 3D view. OpenStreetMap tiles have grass, parks and woods but no single
+// trees, so trees are placed on a fixed grid (aligned to one origin, so tile overlaps give the
+// same points and every viewer sees the same trees) with a hashed jitter, inside green areas and
+// along streets, never inside a building. Pure functions; Vitest covers them.
+import { haversineMeters, type LatLng } from '@/shared';
+import { offsetMeters } from './math';
+
+export type TreeSpot = { lat: number; lng: number; height: number; tone: number };
+type Ring = number[][]; // [lng, lat][]
+export type Area = { rings: Ring[]; spacing: number };
+export type Street = { coords: number[][]; spacing: number; offset: number };
+
+const M_PER_DEG = 111_320;
+
+/** Stable 0..1 noise for an integer cell. */
+export function hash01(x: number, y: number, salt = 0): number {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(salt | 0, 2147483647)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+function fromOffset(origin: LatLng, east: number, north: number): LatLng {
+  return { lat: origin.lat + north / M_PER_DEG, lng: origin.lng + east / (M_PER_DEG * Math.cos((origin.lat * Math.PI) / 180)) };
+}
+
+/** Ray-casting point-in-ring on [lng, lat] pairs. */
+function inRing(p: LatLng, ring: Ring): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > p.lat) !== (yj > p.lat) && p.lng < ((xj - xi) * (p.lat - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Inside the outer ring and outside every hole. */
+export function inPolygon(p: LatLng, rings: Ring[]): boolean {
+  if (rings.length === 0 || !inRing(p, rings[0])) return false;
+  for (let i = 1; i < rings.length; i++) if (inRing(p, rings[i])) return false;
+  return true;
+}
+
+type Box = { minLng: number; minLat: number; maxLng: number; maxLat: number };
+function boxOf(rings: Ring[]): Box {
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+  for (const [lng, lat] of rings[0] ?? []) {
+    if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+  }
+  return { minLng, minLat, maxLng, maxLat };
+}
+const inBox = (p: LatLng, b: Box) => p.lng >= b.minLng && p.lng <= b.maxLng && p.lat >= b.minLat && p.lat <= b.maxLat;
+
+/**
+ * Trees for the area within `radiusM` of `center`: inside green `areas`, beside `streets`, and
+ * never inside a `blockers` polygon (buildings). The nearest `cap` are returned.
+ */
+export function placeTrees(opts: {
+  origin: LatLng; center: LatLng; radiusM: number; cap: number;
+  areas: Area[]; streets: Street[]; blockers: Ring[][];
+}): TreeSpot[] {
+  const { origin, center, radiusM, cap } = opts;
+  const blockers = opts.blockers.map((rings) => ({ rings, box: boxOf(rings) }));
+  const blocked = (p: LatLng) => blockers.some((b) => inBox(p, b.box) && inPolygon(p, b.rings));
+  const near = (p: LatLng) => haversineMeters(center, p) <= radiusM;
+  const out = new Map<string, TreeSpot & { d: number }>();
+  const keep = (p: LatLng, key: string, salt: number) => {
+    if (out.has(key) || !near(p) || blocked(p)) return;
+    out.set(key, { ...p, height: 7 + hash01(salt, key.length, 7) * 7, tone: hash01(salt, 3, key.length), d: haversineMeters(center, p) });
+  };
+
+  // Green areas: a grid in meters from the origin, one jittered tree per cell.
+  for (const a of opts.areas) {
+    const b = boxOf(a.rings);
+    if (!Number.isFinite(b.minLng)) continue;
+    const sw = offsetMeters(origin, { lat: b.minLat, lng: b.minLng });
+    const ne = offsetMeters(origin, { lat: b.maxLat, lng: b.maxLng });
+    const s = a.spacing;
+    const i0 = Math.floor(sw.east / s), i1 = Math.ceil(ne.east / s);
+    const j0 = Math.floor(sw.north / s), j1 = Math.ceil(ne.north / s);
+    if ((i1 - i0) * (j1 - j0) > 40_000) continue; // a huge polygon at low zoom: skip
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const p = fromOffset(origin, (i + 0.15 + hash01(i, j, 1) * 0.7) * s, (j + 0.15 + hash01(i, j, 2) * 0.7) * s);
+        if (inPolygon(p, a.rings)) keep(p, `a${s}:${i}:${j}`, i * 31 + j);
+      }
+    }
+  }
+
+  // Street trees: every `spacing` meters along each line, on both sides at `offset` meters.
+  for (const st of opts.streets) {
+    for (let k = 1; k < st.coords.length; k++) {
+      const a = offsetMeters(origin, { lng: st.coords[k - 1][0], lat: st.coords[k - 1][1] });
+      const b = offsetMeters(origin, { lng: st.coords[k][0], lat: st.coords[k][1] });
+      const dx = b.east - a.east, dy = b.north - a.north;
+      const len = Math.hypot(dx, dy);
+      if (len < 1) continue;
+      const nx = -dy / len, ny = dx / len;
+      for (let t = st.spacing / 2; t < len; t += st.spacing) {
+        const ex = a.east + (dx * t) / len, ny0 = a.north + (dy * t) / len;
+        for (const side of [-1, 1]) {
+          const e = ex + nx * st.offset * side, n = ny0 + ny * st.offset * side;
+          // Snap to a 6 m grid so the same street split across tiles gives the same trees.
+          const key = `s:${Math.round(e / 6)}:${Math.round(n / 6)}`;
+          keep(fromOffset(origin, e, n), key, Math.round(e) * 7 + Math.round(n));
+        }
+      }
+    }
+  }
+
+  return [...out.values()].sort((x, y) => x.d - y.d).slice(0, cap).map((t) => ({ lat: t.lat, lng: t.lng, height: t.height, tone: t.tone }));
+}
+
+/** A fast "is this point inside a building?" test over many polygons (bounding boxes first). */
+export function blockerTest(polys: Ring[][]): (p: LatLng) => boolean {
+  const items = polys.filter((r) => r.length && r[0].length > 2).map((rings) => ({ rings, box: boxOf(rings) }));
+  return (p) => items.some((b) => inBox(p, b.box) && inPolygon(p, b.rings));
+}
+
+/** The nearest point to `p` that is not blocked: rings of 24 directions, every 4 m out to 150 m. */
+export function nearestOpen(p: LatLng, blocked: (q: LatLng) => boolean): LatLng {
+  if (!blocked(p)) return p;
+  const origin = p;
+  for (let r = 4; r <= 150; r += 4) {
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      const q = fromOffset(origin, Math.sin(a) * r, Math.cos(a) * r);
+      if (!blocked(q)) return q;
+    }
+  }
+  return p;
+}
+
+/** The closest point to `p` on any of `lines` ([lng, lat] coords), if one is within `maxM` meters. */
+export function nearestOnLines(p: LatLng, lines: number[][][], maxM: number): LatLng | null {
+  let best: { e: number; n: number; d: number } | null = null;
+  for (const coords of lines) {
+    for (let k = 1; k < coords.length; k++) {
+      const a = offsetMeters(p, { lng: coords[k - 1][0], lat: coords[k - 1][1] });
+      const b = offsetMeters(p, { lng: coords[k][0], lat: coords[k][1] });
+      const dx = b.east - a.east, dy = b.north - a.north;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, -(a.east * dx + a.north * dy) / len2)) : 0;
+      const e = a.east + dx * t, n = a.north + dy * t;
+      const d = Math.hypot(e, n);
+      if (d <= maxM && (!best || d < best.d)) best = { e, n, d };
+    }
+  }
+  return best ? fromOffset(p, best.e, best.n) : null;
+}

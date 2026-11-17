@@ -1,0 +1,19 @@
+
+> out-here@0.1.0 test
+> vitest run
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.1.0 C:/oh-wt/integrate-findmy-b
+
+
+ Test Files  72 passed (72)
+      Tests  593 passed (593)
+   Start at  05:31:23
+   Duration  26.27s (tests 35%, transform 33%, import 31%, worker 1%)
+
+    Isolate  72 workers spawned · ~1.39s startup each (spawn + environment, per file)
+             at least ~3.88s faster with isolate: false — reuses workers across files instead of one per file
+

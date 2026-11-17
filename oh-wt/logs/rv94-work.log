@@ -1,0 +1,34 @@
+
+Running 2 tests using 1 worker
+
+DRAFT {"draft":{"friendId":"947e7bbe-880e-4ae8-9f90-9a5694ff267d","title":"Boba with Maya","emoji":"🧋","category":"food","description":"Meet at El Camino Coffee Works.","placeId":"2fb26bc2-031b-4041-9aca-5bfed70ad9a4","venueName":"El Camino Coffee Works","location":{"lat":37.478469,"lng":-122.152233},"startsAt":"2026-11-13T16:00:00.000Z","endsAt":"2026-11-13T16:31:59.234Z","priceMax":6,"myWalk":13,"theirWalk":8,"pitch":"El Camino Coffee Works is 13 min for you and 8 for Maya, and you're both free.","invite":"You're free too, want to meet at El Camino Coffee Works?"},"work":{"checked":18,"walkable":16,"inBudget":16,"timeFits":4,"open":1,"apartM":730,"myM":800,"theirM":490,"togetherMin":32,"until":"2026-11-13T16:31:59.234Z","alsoClose":[]},"friend":{"id":"947e7bbe-880e-4ae8-9f90-9a5694ff267d","handle":"maya","name":"Maya Chen","avatarUrl":"/seed/people/maya.webp","mutualFriendCount":4,"isFriend":true,"online":false},"others":[],"mode":"mock"}
+BTN {"x":24,"y":784.875,"width":259.984375,"height":40} {"width":412,"height":839}
+WORK 1 How Muse drafted this
+
+Checked 18 places near you two → 16 a short walk for both → 4 leave time together → 1 open then
+You and Maya are 730 m apart. El Camino Coffee Works is 800 m from you (13 min) and 490 m from Maya (8 min).
+32 min together before Maya’s free time ends at 8:31 AM.
+  ok 1 [phone] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route (7.7s)
+DRAFT {"draft":null,"friend":{"id":"947e7bbe-880e-4ae8-9f90-9a5694ff267d","handle":"maya","name":"Maya Chen","avatarUrl":"/seed/people/maya.webp","mutualFriendCount":4,"isFriend":true,"online":false},"others":[],"reason":"no_place_fits"}
+WORK 0 
+  x  2 [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route (1.5m)
+
+
+  1) [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route ─────────
+
+    Test timeout of 90000ms exceeded.
+
+    Error Context: test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\zz-rv-work-rv-work-panel-on-the-real-draft-route-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › tests\e2e\zz-rv-work.spec.ts:2:1 › rv: work panel on the real draft route ──────────
+  1 passed (3.0m)
+e2e exit 1

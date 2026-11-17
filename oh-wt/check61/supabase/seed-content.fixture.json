@@ -1,0 +1,32 @@
+{
+  "people": [
+    { "handle": "alex", "name": "Alex Rivera", "pronouns": "he/him", "age": 23, "school": "Fictional State University", "major": "Computer Science", "gradYear": 2025, "hometown": "Sacramento, CA", "currentCity": "Menlo Park, CA", "job": "Software engineer, 3 weeks in", "bio": "New to Menlo Park. Will walk anywhere for dumplings.", "interests": ["dumplings", "local bands", "walks"], "budgetMax": 15, "circles": ["college", "coworkers", "hometown-alex"], "isDemoUser": true, "avatar": "/seed/people/alex.webp" },
+    { "handle": "maya", "name": "Maya Okafor", "pronouns": "she/her", "age": 23, "school": "Fictional State University", "major": "Design", "gradYear": 2025, "hometown": "Fresno, CA", "currentCity": "Menlo Park, CA", "job": "Product designer", "bio": "Just moved here. Off at 5:15, free till 6.", "interests": ["dumplings", "local bands", "film photography"], "budgetMax": 20, "circles": ["college", "maya-roommates"], "isDemoUser": true, "avatar": "/seed/people/maya.webp" },
+    { "handle": "jordan", "name": "Jordan Park", "pronouns": "they/them", "age": 24, "school": "Fictional Tech", "major": "Data Science", "gradYear": 2024, "hometown": "San Jose, CA", "currentCity": "Menlo Park, CA", "job": "Data analyst", "bio": "Thrift bins and indie shows.", "interests": ["thrifting", "indie music"], "budgetMax": 20, "circles": ["coworkers", "local-shows"], "isDemoUser": true, "avatar": "/seed/people/jordan.webp" },
+    { "handle": "priya", "name": "Priya Raman", "pronouns": "she/her", "age": 25, "school": "Fictional Graduate School", "major": "Bioengineering", "gradYear": 2027, "hometown": "Austin, TX", "currentCity": "Palo Alto, CA", "job": "Grad student", "bio": "Climbing, then K-food.", "interests": ["climbing", "k-food"], "budgetMax": 18, "circles": ["coworkers", "climbing-gym"], "isDemoUser": true, "avatar": "/seed/people/priya.webp" },
+    { "handle": "tess", "name": "Tess Lindqvist", "pronouns": "she/her", "age": 22, "school": "Fictional Community College", "major": "Undeclared", "gradYear": 2026, "hometown": "Redwood City, CA", "currentCity": "Menlo Park, CA", "job": "Barista", "bio": "Volleyball most evenings.", "interests": ["volleyball", "thrifting"], "budgetMax": 12, "circles": ["volleyball", "thrift"], "isDemoUser": false, "avatar": "/seed/people/tess.webp" }
+  ],
+  "groups": [
+    { "slug": "cheap-eats-south-bay", "name": "Cheap Eats South Bay", "privacy": "public", "description": "Good food under $15. Post the spot, post the price.", "tags": ["food"], "cover": "/seed/groups/cheap-eats-south-bay.webp", "memberHandles": ["maya", "alex", "jordan", "tess"] },
+    { "slug": "bay-area-local-shows", "name": "Bay Area Local Shows", "privacy": "public", "description": "Small rooms, local bands, cheap tickets.", "tags": ["music"], "cover": "/seed/groups/bay-area-local-shows.webp", "memberHandles": ["jordan", "maya", "priya"] }
+  ],
+  "posts": [
+    { "id": "p001", "authorHandle": "maya", "target": { "type": "profile" }, "audience": "friends", "text": "Unpacked the last box. Menlo Park, I live here now.", "image": "/seed/posts/p001.webp", "hoursAgo": 3.5, "reactions": { "like": 3, "love": 1, "care": 0, "haha": 0, "wow": 0, "sad": 0, "angry": 0 }, "comments": [ { "authorHandle": "alex", "text": "Finally! Dumplings this week?", "minutesAfter": 20, "replies": [ { "authorHandle": "maya", "text": "Obviously.", "minutesAfter": 35 } ] } ] },
+    { "id": "p002", "authorHandle": "alex", "target": { "type": "profile" }, "audience": "public", "text": "Week 3 at the new job. Still learning where the good lunch is.", "image": null, "hoursAgo": 20, "reactions": { "like": 2, "love": 0, "care": 1, "haha": 0, "wow": 0, "sad": 0, "angry": 0 }, "comments": [ { "authorHandle": "jordan", "text": "Dumpling Den on Willow. Trust me.", "minutesAfter": 45, "replies": [] } ] },
+    { "id": "p003", "authorHandle": "jordan", "target": { "type": "group", "slug": "cheap-eats-south-bay" }, "audience": "public", "text": "Dumpling Den: 12 dumplings for $11. Counter seats only.", "image": "/seed/posts/p003.webp", "hoursAgo": 30, "reactions": { "like": 4, "love": 0, "care": 0, "haha": 0, "wow": 1, "sad": 0, "angry": 0 }, "comments": [] },
+    { "id": "p004", "authorHandle": "priya", "target": { "type": "group", "slug": "bay-area-local-shows" }, "audience": "public", "text": "Anyone going to The Signal Room Friday?", "image": null, "hoursAgo": 50, "reactions": { "like": 1, "love": 0, "care": 0, "haha": 0, "wow": 0, "sad": 0, "angry": 0 }, "comments": [ { "authorHandle": "maya", "text": "Me!", "minutesAfter": 10, "replies": [] } ] },
+    { "id": "p005", "authorHandle": "tess", "target": { "type": "profile" }, "audience": "public", "text": "Sand courts were perfect today.", "image": "/seed/posts/p005.webp", "hoursAgo": 70, "reactions": { "like": 2, "love": 0, "care": 0, "haha": 1, "wow": 0, "sad": 0, "angry": 0 }, "comments": [] }
+  ],
+  "stories": [
+    { "authorHandle": "maya", "image": "/seed/stories/1.webp", "hoursAgo": 2 }
+  ],
+  "threads": [
+    { "id": "t01", "name": null, "memberHandles": ["alex", "maya"], "messages": [ { "fromHandle": "maya", "text": "Free after work today?", "minutesAgo": 300 }, { "fromHandle": "alex", "text": "Maybe! Let me see what's around.", "minutesAgo": 290 } ] }
+  ],
+  "events": [
+    { "slug": "signal-room-friday", "title": "Local lineup at The Signal Room", "groupSlug": "bay-area-local-shows", "hostHandle": "jordan", "placeName": "The Signal Room", "startsInHours": 30, "durationHours": 3, "priceUsd": 12, "capacity": 80, "category": "music", "description": "Three local bands, all ages.", "cover": "/seed/events/signal-room-friday.webp", "goingHandles": ["jordan", "maya"], "interestedHandles": ["priya"] }
+  ],
+  "listings": [
+    { "id": "l01", "sellerHandle": "tess", "title": "Small desk lamp", "priceUsd": 10, "condition": "used - good", "category": "Furniture", "description": "Works, slightly scuffed.", "image": "/seed/listings/l01.webp", "hoursAgo": 20 }
+  ]
+}

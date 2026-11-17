@@ -1,0 +1,1664 @@
+
+Running 278 tests using 6 workers
+
+[1/278] [phone-parallel] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+[2/278] [phone-parallel] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the create sheet; Close leaves it
+[3/278] [phone] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[4/278] [phone] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[5/278] [phone] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[6/278] [phone] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[7/278] [phone] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[8/278] [phone] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[9/278] [phone] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[10/278] [phone] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[11/278] [phone] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[12/278] [phone] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[13/278] [desktop] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[14/278] [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[15/278] [phone-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[16/278] [phone-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[17/278] [desktop] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[18/278] [desktop] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[19/278] [desktop] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[20/278] [desktop] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[21/278] [desktop] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[22/278] [desktop] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[23/278] [desktop] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[24/278] [desktop] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[25/278] [phone-parallel] › tests\e2e\create-event.spec.ts:26:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse fills it in
+[26/278] [phone-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[27/278] [desktop] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[28/278] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[29/278] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[30/278] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[31/278] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[32/278] [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner
+[33/278] [phone-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[34/278] [phone-parallel] › tests\e2e\create-event.spec.ts:55:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[35/278] [phone-parallel] › tests\e2e\muse-encounter.spec.ts:5:1 › labelled encounter sends no messages, meets, and releases the extra actor
+[36/278] [phone-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:3:1 › a finished 2D agent request releases the next ordinary chat request
+[37/278] [phone-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[38/278] [phone-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption
+[39/278] [phone-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[40/278] [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map
+[41/278] [phone-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[42/278] [phone-parallel] › tests\e2e\feed.spec.ts:171:1 › comment and reply, seen live by a second persona
+[43/278] [phone-parallel] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[44/278] [phone-parallel] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[45/278] [phone-parallel] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+[46/278] [phone-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies
+  1) [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  locator('#imfree-text')
+    Expected: focused
+    Received: inactive
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toBeFocused" locator('#imfree-text') with timeout 10000ms
+      - waiting for locator('#imfree-text')
+        23 × locator resolved to <textarea rows="1" maxlength="280" id="imfree-text" placeholder="Or tell Muse… e.g. with someone who likes comics" class="block max-h-20 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"></textarea>
+           - unexpected value "inactive"
+
+
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+    > 38 |       await expect(composer).toBeFocused();
+         |                              ^
+      39 |       await expect(composer).toHaveValue('');
+      40 |       await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      41 |       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\entry.spec.ts:38:30
+
+    Error Context: test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-390px-Feed-I-m-fr-7eb14--out-here-focused-and-empty-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2) [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+
+    Error: expect(locator).toBeFocused() failed
+
+    Locator:  locator('#imfree-text')
+    Expected: focused
+    Received: inactive
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toBeFocused" locator('#imfree-text') with timeout 10000ms
+      - waiting for locator('#imfree-text')
+        23 × locator resolved to <textarea rows="1" maxlength="280" id="imfree-text" placeholder="Or tell Muse… e.g. with someone who likes comics" class="block max-h-20 min-h-6 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[15px] leading-6 text-fb-text outline-none placeholder:text-fb-text-2 focus:outline-none focus-visible:outline-none"></textarea>
+           - unexpected value "inactive"
+
+
+      36 |       await expect(page.getByTestId('plan-sheet')).toBeVisible({ timeout: 15_000 });
+      37 |       const composer = page.locator('#imfree-text');
+    > 38 |       await expect(composer).toBeFocused();
+         |                              ^
+      39 |       await expect(composer).toHaveValue('');
+      40 |       await expect(composer).toHaveAttribute('placeholder', /Anything else/);
+      41 |       await expect(page.getByTestId('plan-loading')).toHaveCount(0);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\entry.spec.ts:38:30
+
+    Error Context: test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\entry-at-1440px-Feed-I-m-f-06f2d--out-here-focused-and-empty-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[47/278] [phone-parallel] › tests\e2e\feed.spec.ts:213:1 › share a post to the feed
+[48/278] [phone] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[49/278] [phone-parallel] › tests\e2e\feed.spec.ts:231:1 › hide a post and undo
+[50/278] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[51/278] [phone-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record
+[52/278] [phone] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[53/278] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[54/278] [phone] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[55/278] [phone] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[56/278] [phone] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[57/278] [phone] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[58/278] [phone] › tests\e2e\findmy.spec.ts:72:3 › API › sharing with the public is rejected
+[59/278] [phone] › tests\e2e\findmy.spec.ts:78:3 › API › profiles of other people carry no home location
+[60/278] [phone] › tests\e2e\findmy.spec.ts:95:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[61/278] [desktop] › tests\e2e\findmy.spec.ts:63:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+  3) [phone-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 404
+    Received: 403
+
+      22 |   const updated=await request.patch(`/api/memories/${memory.id}`,{headers,data:{caption:`My edited photo ${info.project.name}`}});
+      23 |   expect(updated.status()).toBe(200);expect((await updated.json()).memory.photoUrl).toBe(memory.photoUrl);
+    > 24 |   expect((await request.patch(`/api/memories/${memory.id}`,{headers:{'x-persona':'maya'},data:{caption:'Unwanted'}})).status()).toBe(404);
+         |                                                                                                                                 ^
+      25 |   const rows=await(await request.get(`/api/memories?crewId=${crew.id}`,{headers})).json();expect(rows.memories.filter((m:{id:string})=>m.id===memory.id)).toHaveLength(1);
+      26 |   await page.goto(`/memories?as=alex#crew-${crew.id}`);
+      27 |   await expect(page.getByRole('img',{name:`My edited photo ${info.project.name}`,exact:true})).toBeVisible({timeout:20000});
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-vision.spec.ts:24:129
+
+    Error Context: test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  4) [phone-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('muse-thinking')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('muse-thinking') with timeout 10000ms
+      - waiting for getByTestId('muse-thinking')
+
+
+      41 |   await page.getByTestId('muse-input').fill('Cancel this');
+      42 |   await page.getByTestId('muse-send').click();
+    > 43 |   await expect(page.getByTestId('muse-thinking')).toBeVisible();
+         |                                                   ^
+      44 |   await page.getByTestId('muse-close').click();
+      45 |   cancelFinish();
+      46 |   await page.getByTestId('muse-launcher').click();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-processing.spec.ts:43:51
+
+    Error Context: test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5) [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: page.waitForResponse: Test timeout of 90000ms exceeded.
+
+      11 |   await expect(page.getByTestId('world-3d')).toBeVisible({ timeout:20000 });
+      12 |   await expect(page.getByTestId('world-3d')).toHaveAttribute('data-scene-ready', 'true', { timeout:20000 });
+    > 13 |   await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/friends')), page.getByTestId('muse-launcher').click()]);
+         |                           ^
+      14 |   const pending = page.waitForResponse(r => r.url().endsWith('/api/muse/encounters') && r.request().method() === 'POST');
+      15 |   await page.getByTestId('muse-input').fill('Is Maya free to get food tonight?');
+      16 |   await page.getByTestId('muse-send').click();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-agent-backend.spec.ts:13:27
+
+    Error Context: test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[62/278] [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:48:1 › stream failure uses existing error UI and releases the peer
+[63/278] [phone-parallel] › tests\e2e\navigation.spec.ts:21:3 › Out Here navigation › the dashboard: tabs, three heights, keyboard and Escape
+[64/278] [phone-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom
+  6) [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('walk-there')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('walk-there') with timeout 30000ms
+      - waiting for getByTestId('walk-there')
+
+
+      15 |   await page.goto(`/out-here?as=alex&view=3d&quest=${quest.id}`);
+      16 |   // Phones: the open plan card covers the 3D Walk there button; its Let's go starts the same walk.
+    > 17 |   const go=page.getByTestId(info.project.name==='phone'?'quest-lets-go':'walk-there');await expect(go).toBeVisible({timeout:30000});await go.click();
+         |                                                                                                        ^
+      18 |   const dialog=page.getByRole('dialog',{name:'You made it'});await expect(dialog).toBeVisible({timeout:30000});
+      19 |   await dialog.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');
+      20 |   await dialog.getByLabel('Caption (optional)').fill('Our comics meetup');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-integration.spec.ts:17:104
+
+    Error Context: test-results\muse-integration-arrival-photo-to-saved-memory-and-map-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-integration-arrival-photo-to-saved-memory-and-map-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-integration-arrival-photo-to-saved-memory-and-map-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[65/278] [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion
+[66/278] [phone-parallel] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+[67/278] [phone-parallel] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here
+[68/278] [phone] › tests\e2e\findmy.spec.ts:131:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[69/278] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[70/278] [phone-parallel] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[71/278] [phone-parallel] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[72/278] [phone-parallel] › tests\e2e\shell.spec.ts:91:3 › desktop 1440 › left nav and menu grid links navigate
+[73/278] [phone-parallel] › tests\e2e\shell.spec.ts:117:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[74/278] [phone-parallel] › tests\e2e\shell.spec.ts:136:3 › desktop 1440 › about-this-demo dialog opens and closes
+[75/278] [phone-parallel] › tests\e2e\navigation.spec.ts:84:3 › Out Here navigation › I'm free and Post close with Escape; a typed draft is kept
+[76/278] [phone-parallel] › tests\e2e\shell.spec.ts:145:3 › desktop 1440 › every shell route renders with no console errors
+[77/278] [phone-parallel] › tests\e2e\shell.spec.ts:156:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+[78/278] [phone-parallel] › tests\e2e\shell.spec.ts:191:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+[79/278] [phone-parallel] › tests\e2e\shell.spec.ts:222:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[80/278] [phone-parallel] › tests\e2e\shell.spec.ts:239:3 › mobile 390 › every bottom tab navigates to its route
+[81/278] [phone-parallel] › tests\e2e\navigation.spec.ts:107:3 › Out Here navigation › Memories and the plan page lead back to the map
+[82/278] [phone-parallel] › tests\e2e\shell.spec.ts:263:3 › mobile 390 › avatar menu lists the 8 personas
+[83/278] [desktop] › tests\e2e\findmy.spec.ts:72:3 › API › sharing with the public is rejected
+[84/278] [phone-parallel] › tests\e2e\shell.spec.ts:277:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[85/278] [phone-parallel] › tests\e2e\shell.spec.ts:301:3 › mobile 390 › friends and groups show their section rows as chips
+[86/278] [desktop] › tests\e2e\findmy.spec.ts:78:3 › API › profiles of other people carry no home location
+[87/278] [desktop] › tests\e2e\findmy.spec.ts:95:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[88/278] [desktop] › tests\e2e\findmy.spec.ts:131:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[89/278] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[90/278] [phone-parallel] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[91/278] [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+[92/278] [phone-parallel] › tests\e2e\shell.spec.ts:318:3 › mobile 390 › menu page shows destinations and the brand footer
+[93/278] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 390px › tapping a status chip opens the card, like the avatar
+[94/278] [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return
+[95/278] [phone] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[96/278] [phone] › tests\e2e\findmy.spec.ts:209:5 › at 390px › sharing settings open from the map
+[97/278] [phone] › tests\e2e\findmy.spec.ts:223:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[98/278] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 390px › tapping a status chip opens the card, like the avatar
+[99/278] [phone] › tests\e2e\findmy.spec.ts:95:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[100/278] [phone] › tests\e2e\findmy.spec.ts:131:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[101/278] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[102/278] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[103/278] [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[104/278] [phone] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[105/278] [phone] › tests\e2e\findmy.spec.ts:209:5 › at 1440px › sharing settings open from the map
+[106/278] [phone] › tests\e2e\findmy.spec.ts:223:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[107/278] [phone] › tests\e2e\findmy.spec.ts:239:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[108/278] [phone] › tests\e2e\findmy.spec.ts:266:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[109/278] [phone] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[110/278] [desktop] › tests\e2e\findmy.spec.ts:209:5 › at 390px › sharing settings open from the map
+[111/278] [desktop] › tests\e2e\findmy.spec.ts:223:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[112/278] [desktop] › tests\e2e\findmy.spec.ts:95:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[113/278] [phone] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[114/278] [phone] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[115/278] [desktop] › tests\e2e\findmy.spec.ts:131:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[116/278] [phone] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[117/278] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[118/278] [phone] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[119/278] [phone] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+  7) [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('walk-there')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('walk-there') with timeout 30000ms
+      - waiting for getByTestId('walk-there')
+
+
+      15 |   await page.goto(`/out-here?as=alex&view=3d&quest=${quest.id}`);
+      16 |   // Phones: the open plan card covers the 3D Walk there button; its Let's go starts the same walk.
+    > 17 |   const go=page.getByTestId(info.project.name==='phone'?'quest-lets-go':'walk-there');await expect(go).toBeVisible({timeout:30000});await go.click();
+         |                                                                                                        ^
+      18 |   const dialog=page.getByRole('dialog',{name:'You made it'});await expect(dialog).toBeVisible({timeout:30000});
+      19 |   await dialog.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');
+      20 |   await dialog.getByLabel('Caption (optional)').fill('Our comics meetup');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-integration.spec.ts:17:104
+
+    Error Context: test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[120/278] [phone] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[121/278] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[122/278] [phone] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[123/278] [phone-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[124/278] [phone] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[125/278] [phone] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[126/278] [phone] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+[127/278] [phone] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody
+[128/278] [phone] › tests\e2e\intros.spec.ts:174:3 › Muse Intros › a decline is silent: the person who said yes keeps waiting
+[129/278] [phone] › tests\e2e\intros.spec.ts:189:3 › Muse Intros › two accepts at once (a double click) connect once, with one Muse note
+[130/278] [desktop] › tests\e2e\findmy.spec.ts:185:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[131/278] [phone] › tests\e2e\intros.spec.ts:209:3 › Muse Intros › intro API is per viewer and validates input
+[132/278] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[133/278] [desktop] › tests\e2e\findmy.spec.ts:209:5 › at 1440px › sharing settings open from the map
+[134/278] [desktop] › tests\e2e\findmy.spec.ts:223:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+  8) [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('up-next').getByRole('button', { name: 'See plan' })
+
+
+      27 |   await expect(page.getByTestId('up-next-go')).toHaveText(/Let.s go/);
+      28 |
+    > 29 |   await card.getByRole('button', { name: 'See plan' }).click();
+         |                                                        ^
+      30 |   await expect(page.getByTestId('quest-sheet')).toBeVisible();
+      31 |
+      32 |   await request.post(`/api/quests/${STUDY}/leave`, { headers: { 'x-persona': persona }, data: {} });
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\up-next.spec.ts:29:56
+
+    Error Context: test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[135/278] [desktop-parallel] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the create sheet; Close leaves it
+  9) [phone-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        61 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      55 |   await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeGreaterThan(21.2);
+      56 |   const walkingZoom=Number(await world.getAttribute('data-zoom'));
+    > 57 |   await page.getByTestId('muse-launcher').click();
+         |                                           ^
+      58 |   const phone=(page.viewportSize()?.width ?? 1440)<768;
+      59 |   await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:15000}).toBeGreaterThan(phone ? 20.8 : 21.8);
+      60 |   await page.waitForTimeout(600);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-processing.spec.ts:57:43
+
+    Error Context: test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[136/278] [desktop] › tests\e2e\findmy.spec.ts:239:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[137/278] [desktop] › tests\e2e\findmy.spec.ts:266:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[138/278] [desktop-parallel] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+  10) [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        61 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+       7 |  await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);await expect(world).toHaveAttribute('data-agent-peers','0');await page.screenshot({path:info.outputPath('walking.png')});
+       8 |  const lat=await world.getAttribute('data-lat'),lng=await world.getAttribute('data-lng');await page.keyboard.down('ArrowUp');await expect.poll(async()=>`${await world.getAttribute('data-lat')}:${await world.getAttribute('data-lng')}`).not.toBe(`${lat}:${lng}`);await page.keyboard.up('ArrowUp');
+    >  9 |  await page.getByTestId('muse-launcher').click();await expect(page.getByTestId('muse-chat')).toBeVisible();await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:30000}).toBeGreaterThan(23);await page.screenshot({path:info.outputPath('muse-chat.png')});await page.getByTestId('muse-close').click();
+         |                                          ^
+      10 |  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:15000}).toBeLessThan(21.6);
+      11 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'Map',exact:true}).click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
+      12 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'3D',exact:true}).click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\world-visual.spec.ts:9:42
+
+    Error Context: test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[139/278] [desktop-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[140/278] [desktop-parallel] › tests\e2e\create-event.spec.ts:26:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse fills it in
+[141/278] [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion
+[142/278] [desktop-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[143/278] [desktop-parallel] › tests\e2e\create-event.spec.ts:55:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[144/278] [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[145/278] [desktop-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[146/278] [desktop-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[147/278] [desktop-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[148/278] [desktop] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[149/278] [desktop-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[150/278] [desktop] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[151/278] [desktop] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[152/278] [desktop-parallel] › tests\e2e\feed.spec.ts:171:1 › comment and reply, seen live by a second persona
+  11) [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it 
+
+    Error: expect(received).toBeTruthy()
+
+    Received: false
+
+      21 |     },
+      22 |   });
+    > 23 |   expect(created.ok()).toBeTruthy();
+         |                        ^
+      24 |   const { quest } = await created.json();
+      25 |   expect((await request.post(`/api/quests/${quest.id}/join`, { headers: as('maya'), data: {} })).ok()).toBeTruthy();
+      26 |
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\hangout-rating.spec.ts:23:24
+
+    Error Context: test-results\hangout-rating-two-attendees-complete-a-hangout-and-rate-it-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\hangout-rating-two-attendees-complete-a-hangout-and-rate-it-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\hangout-rating-two-attendees-complete-a-hangout-and-rate-it-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[153/278] [desktop] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[154/278] [desktop] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[155/278] [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner
+[156/278] [desktop-parallel] › tests\e2e\feed.spec.ts:213:1 › share a post to the feed
+[157/278] [desktop] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+[158/278] [desktop-parallel] › tests\e2e\muse-encounter.spec.ts:5:1 › labelled encounter sends no messages, meets, and releases the extra actor
+[159/278] [desktop-parallel] › tests\e2e\feed.spec.ts:231:1 › hide a post and undo
+[160/278] [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:3:1 › a finished 2D agent request releases the next ordinary chat request
+[161/278] [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map
+[162/278] [desktop] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[163/278] [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption
+[164/278] [desktop] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[165/278] [desktop] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[166/278] [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[167/278] [desktop] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+[168/278] [desktop] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody
+  12) [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption 
+
+    TypeError: Cannot read properties of undefined (reading 'id')
+
+      14 |   const headers={'x-persona':'alex'},title=`Photo lifecycle ${info.project.name} ${Date.now()}`;
+      15 |   const now=Date.now();const{quest}=await(await request.post('/api/quests',{headers,data:{title,category:'art',venueName:'Lifecycle courtyard',location:{lat:37.4847,lng:-122.1477},startsAt:new Date(now-60000).toISOString(),endsAt:new Date(now+600000).toISOString(),capacity:3,isPublic:false}})).json();
+    > 16 |   const{crew}=await(await request.post(`/api/quests/${quest.id}/complete`,{headers,data:{}})).json();
+         |                                                             ^
+      17 |   await page.goto('/events?tab=going&as=alex');const plan=page.getByRole('article',{name:title});await expect(plan).toBeVisible();
+      18 |   await plan.getByRole('button',{name:'Add a photo'}).click();await plan.getByLabel('Take a photo together').setInputFiles('public/seed/groups/boba-and-sketch.webp');await plan.getByLabel('Caption (optional)').fill('Original saved caption');
+      19 |   const upload=page.waitForResponse(r=>r.url().endsWith('/api/memories')&&r.request().method()==='POST');await plan.getByRole('button',{name:'Save to crew album'}).click();const{memory}=await(await upload).json();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-integration-lifecycle.spec.ts:16:61
+
+    Error Context: test-results\muse-integration-lifecycle-d4924-ed-photo-and-manual-caption-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-integration-lifecycle-d4924-ed-photo-and-manual-caption-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-integration-lifecycle-d4924-ed-photo-and-manual-caption-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  13) [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+
+    Error: expect(received).toBeTruthy()
+
+    Received: false
+
+      11 |   const title=`Comics meetup ${info.project.name} ${Date.now()}`;
+      12 |   const made=await request.post('/api/quests',{headers:{'x-persona':'alex'},data:{title,category:'art',venueName:'Test comics courtyard',location:{lat:lat+.00055,lng},startsAt:new Date(Date.now()-60000).toISOString(),endsAt:new Date(Date.now()+600000).toISOString(),capacity:3,isPublic:false}});
+    > 13 |   expect(made.ok()).toBeTruthy();const{quest}=await made.json();
+         |                     ^
+      14 |   expect((await request.post(`/api/quests/${quest.id}/join`,{headers:{'x-persona':'maya'},data:{}})).ok()).toBeTruthy();
+      15 |   await page.goto(`/out-here?as=alex&view=3d&quest=${quest.id}`);
+      16 |   // Phones: the open plan card covers the 3D Walk there button; its Let's go starts the same walk.
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-integration.spec.ts:13:21
+
+    Error Context: test-results\muse-integration-arrival-photo-to-saved-memory-and-map-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-integration-arrival-photo-to-saved-memory-and-map-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-integration-arrival-photo-to-saved-memory-and-map-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[169/278] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[170/278] [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion
+[171/278] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[172/278] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+  14) [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Browser logs:
+
+    <launching> C:\Users\andre\AppData\Local\ms-playwright\chromium_headless_shell-1254\chrome-headless-shell-win64\chrome-headless-shell.exe --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,DestroyProfileOnBrowserClose,HttpsUpgrades,HttpsFirstBalancedModeAutoEnable,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,AvoidCorsURLLoaderRestartOnRedirect,TcpPortRandomizationWin,OptimizationHints,NetworkTimeServiceQuerying,AimEnabled,PreconnectToSearch,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface,SkipListAccountsWithoutGaiaCookies --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --enable-unsafe-swiftshader --edge-skip-compat-layer-relaunch --disable-stack-profiler --disable-infobars --disable-sync --do-not-de-elevate --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --user-data-dir=C:\Users\andre\AppData\Local\Temp\playwright_chromiumdev_profile-TCrvOR --remote-debugging-pipe --no-startup-window
+    <launched> pid=21516
+    [pid=21516][err] [1113/060227.791:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x70c02653e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=21516][err] [1113/060227.842:INFO:CONSOLE:0] "[.WebGL-0x70c02653e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3175/out-here?as=alex&mode=friends (0)
+    [pid=21516][err] [1113/060229.307:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x70c02653e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=21516][err] [1113/060229.358:INFO:CONSOLE:0] "[.WebGL-0x70c02653e00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3175/out-here?as=alex&mode=friends&friend=maya (0)
+    [pid=21516][err] [1113/060231.607:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x42c400d66800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+    [pid=21516][err] [1113/060231.652:INFO:CONSOLE:0] "[.WebGL-0x42c400d66800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels", source: http://localhost:3175/out-here?as=alex&mode=friends (0)
+    [pid=21516][err] [1113/060236.586:ERROR:gpu\command_buffer\service\gl_utils.cc:431] [.WebGL-0x1c1c02625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+    [pid=21516][err] [1113/060236.634:INFO:CONSOLE:0] "[.WebGL-0x1c1c02625000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)", source: http://localhost:3175/out-here?as=alex&mode=friends (0)
+    [pid=21516][err] [1113/060247.289:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060247.291:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060247.291:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060300.866:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060300.866:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060300.866:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060326.565:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060326.565:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060326.565:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060335.491:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060335.491:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060335.492:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060341.120:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060341.120:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060341.120:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060343.732:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060343.732:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060343.732:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060353.131:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060353.132:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060353.132:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060403.778:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060403.779:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060403.782:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060417.100:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060417.101:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060417.101:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060514.571:INFO:CONSOLE:1] "layers[highway-shield-non-us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060514.572:INFO:CONSOLE:1] "layers[highway-shield-us-interstate].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516][err] [1113/060514.581:INFO:CONSOLE:1] "layers[road_shield_us].filter[1]: Expected value to be of type number, but found null instead. Falling back to false.", source: http://localhost:3175/_next/static/media/maplibre-gl-worker.90363c81.mjs (1)
+    [pid=21516] <gracefully close start>
+    Call log:
+      - waiting for getByTestId('quest-pin-dumplings')
+        - locator resolved to <button type="button" class="oh-quest-pin" aria-pressed="false" data-map-marker="quest" data-testid="quest-pin-dumplings" aria-label="Dumplings before the rush, starts in 20 min, 2 left">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - element is outside of the viewport
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - element is outside of the viewport
+        - retrying click action
+          - waiting 100ms
+        173 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - element is outside of the viewport
+          - retrying click action
+            - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+
+
+      62 |     }
+      63 |
+    > 64 |     await pin.click();
+         |               ^
+      65 |     const sheet = page.getByTestId('quest-sheet');
+      66 |     await expect(sheet.getByRole('heading', { name: 'Dumplings before the rush' })).toBeVisible();
+      67 |     await expect(sheet).toContainText('Dumpling Den');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\map.spec.ts:64:15
+
+    Error Context: test-results\map-phone-390-dumpling-pin-309fd-t-keeps-attribution-visible-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\map-phone-390-dumpling-pin-309fd-t-keeps-attribution-visible-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\map-phone-390-dumpling-pin-309fd-t-keeps-attribution-visible-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  15) [desktop] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: locator('[data-testid="intro-card"][data-handle="alex"]').getByTestId('intro-status')
+    Expected: "You're connected"
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" locator('[data-testid="intro-card"][data-handle="alex"]').getByTestId('intro-status') with timeout 10000ms
+      - waiting for locator('[data-testid="intro-card"][data-handle="alex"]').getByTestId('intro-status')
+
+
+      89 |       await expect(jCard.getByRole('button', { name: 'Accept' })).toBeInViewport();
+      90 |       await jCard.getByRole('button', { name: 'Accept' }).click();
+    > 91 |       await expect(jCard.getByTestId('intro-status')).toHaveText("You're connected");
+         |                                                       ^
+      92 |       await expect(jCard.getByRole('link', { name: 'Open chat' })).toBeVisible();
+      93 |
+      94 |       // Alex's tab updates live (user:<id> {type:"intro"}).
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\intros.spec.ts:91:55
+
+    Error Context: test-results\intros-Muse-Intros-round---2184b-dating-request-finds-nobody-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\intros-Muse-Intros-round---2184b-dating-request-finds-nobody-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\intros-Muse-Intros-round---2184b-dating-request-finds-nobody-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[173/278] [desktop-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies
+[174/278] [phone] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[175/278] [desktop] › tests\e2e\intros.spec.ts:174:3 › Muse Intros › a decline is silent: the person who said yes keeps waiting
+  16) [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        52 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+        - element is visible, enabled and stable
+        - scrolling into view if needed
+
+
+       7 |  await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);await expect(world).toHaveAttribute('data-agent-peers','0');await page.screenshot({path:info.outputPath('walking.png')});
+       8 |  const lat=await world.getAttribute('data-lat'),lng=await world.getAttribute('data-lng');await page.keyboard.down('ArrowUp');await expect.poll(async()=>`${await world.getAttribute('data-lat')}:${await world.getAttribute('data-lng')}`).not.toBe(`${lat}:${lng}`);await page.keyboard.up('ArrowUp');
+    >  9 |  await page.getByTestId('muse-launcher').click();await expect(page.getByTestId('muse-chat')).toBeVisible();await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:30000}).toBeGreaterThan(23);await page.screenshot({path:info.outputPath('muse-chat.png')});await page.getByTestId('muse-close').click();
+         |                                          ^
+      10 |  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:15000}).toBeLessThan(21.6);
+      11 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'Map',exact:true}).click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
+      12 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'3D',exact:true}).click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\world-visual.spec.ts:9:42
+
+    Error Context: test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  17) [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: page.waitForResponse: Test timeout of 90000ms exceeded.
+
+      11 |   await expect(page.getByTestId('world-3d')).toBeVisible({ timeout:20000 });
+      12 |   await expect(page.getByTestId('world-3d')).toHaveAttribute('data-scene-ready', 'true', { timeout:20000 });
+    > 13 |   await Promise.all([page.waitForResponse(r => r.url().endsWith('/api/friends')), page.getByTestId('muse-launcher').click()]);
+         |                           ^
+      14 |   const pending = page.waitForResponse(r => r.url().endsWith('/api/muse/encounters') && r.request().method() === 'POST');
+      15 |   await page.getByTestId('muse-input').fill('Is Maya free to get food tonight?');
+      16 |   await page.getByTestId('muse-send').click();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-agent-backend.spec.ts:13:27
+
+    Error Context: test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-agent-backend-ordinar-943c8-er-and-returns-to-the-owner-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[176/278] [desktop-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record
+[177/278] [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:48:1 › stream failure uses existing error UI and releases the peer
+[178/278] [phone] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[179/278] [desktop] › tests\e2e\intros.spec.ts:189:3 › Muse Intros › two accepts at once (a double click) connect once, with one Muse note
+[180/278] [desktop] › tests\e2e\intros.spec.ts:209:3 › Muse Intros › intro API is per viewer and validates input
+[181/278] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[182/278] [desktop] › tests\e2e\map.spec.ts:94:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[183/278] [desktop] › tests\e2e\map.spec.ts:114:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[184/278] [desktop] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+[185/278] [desktop] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[186/278] [desktop] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[187/278] [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined
+  18) [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+
+    Error: expect(received).toBeTruthy()
+
+    Received: false
+
+      11 |   const title=`Comics meetup ${info.project.name} ${Date.now()}`;
+      12 |   const made=await request.post('/api/quests',{headers:{'x-persona':'alex'},data:{title,category:'art',venueName:'Test comics courtyard',location:{lat:lat+.00055,lng},startsAt:new Date(Date.now()-60000).toISOString(),endsAt:new Date(Date.now()+600000).toISOString(),capacity:3,isPublic:false}});
+    > 13 |   expect(made.ok()).toBeTruthy();const{quest}=await made.json();
+         |                     ^
+      14 |   expect((await request.post(`/api/quests/${quest.id}/join`,{headers:{'x-persona':'maya'},data:{}})).ok()).toBeTruthy();
+      15 |   await page.goto(`/out-here?as=alex&view=3d&quest=${quest.id}`);
+      16 |   // Phones: the open plan card covers the 3D Walk there button; its Let's go starts the same walk.
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-integration.spec.ts:13:21
+
+    Error Context: test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-integration-arrival-p-030c5-and-map-with-reduced-motion-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  19) [desktop-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 404
+    Received: 200
+
+      22 |   const updated=await request.patch(`/api/memories/${memory.id}`,{headers,data:{caption:`My edited photo ${info.project.name}`}});
+      23 |   expect(updated.status()).toBe(200);expect((await updated.json()).memory.photoUrl).toBe(memory.photoUrl);
+    > 24 |   expect((await request.patch(`/api/memories/${memory.id}`,{headers:{'x-persona':'maya'},data:{caption:'Unwanted'}})).status()).toBe(404);
+         |                                                                                                                                 ^
+      25 |   const rows=await(await request.get(`/api/memories?crewId=${crew.id}`,{headers})).json();expect(rows.memories.filter((m:{id:string})=>m.id===memory.id)).toHaveLength(1);
+      26 |   await page.goto(`/memories?as=alex#crew-${crew.id}`);
+      27 |   await expect(page.getByRole('img',{name:`My edited photo ${info.project.name}`,exact:true})).toBeVisible({timeout:20000});
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-vision.spec.ts:24:129
+
+    Error Context: test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-vision-saved-photo-an-a720b-dit-changes-the-same-record-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[188/278] [desktop-parallel] › tests\e2e\navigation.spec.ts:21:3 › Out Here navigation › the dashboard: tabs, three heights, keyboard and Escape
+[189/278] [desktop-parallel] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+  20) [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:48:1 › stream failure uses existing error UI and releases the peer 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+    Call Log:
+    - Timeout 10000ms exceeded while waiting on the predicate
+
+      55 |   await expect(page.getByTestId('muse-thinking')).toHaveCount(0);
+      56 |   await page.getByRole('button', { name:'Retry', exact:true }).click();
+    > 57 |   await expect.poll(() => attempts).toBe(2);
+         |                                     ^
+      58 |   await expect(page.getByTestId('muse-error')).toBeVisible();
+      59 | });
+      60 |
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-agent-backend.spec.ts:57:37
+
+    Error Context: test-results\muse-agent-backend-stream--7b929-or-UI-and-releases-the-peer-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-agent-backend-stream--7b929-or-UI-and-releases-the-peer-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-agent-backend-stream--7b929-or-UI-and-releases-the-peer-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[190/278] [desktop-parallel] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[191/278] [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+  21) [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('quest-pin-dumplings')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('quest-pin-dumplings') with timeout 10000ms
+      - waiting for getByTestId('quest-pin-dumplings')
+
+
+      132 |   test('Friends view shows only plans friends joined', async ({ page }) => {
+      133 |     await openMap(page, 'alex');
+    > 134 |     await expect(page.getByTestId('quest-pin-dumplings')).toBeVisible();
+          |                                                           ^
+      135 |     const all = await page.locator('[data-map-marker="quest"]').count();
+      136 |     await page.getByTestId('map-mode-friends').click();
+      137 |     await expect(page.getByTestId('map-mode-friends')).toHaveAttribute('aria-pressed', 'true');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\map.spec.ts:134:59
+
+    Error Context: test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\map-phone-390-Friends-view-shows-only-plans-friends-joined-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[192/278] [phone] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[193/278] [desktop-parallel] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[194/278] [desktop-parallel] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[195/278] [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+  22) [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('quest-sheet').getByRole('heading', { name: 'Dumplings before the rush' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('quest-sheet').getByRole('heading', { name: 'Dumplings before the rush' }) with timeout 10000ms
+      - waiting for getByTestId('quest-sheet').getByRole('heading', { name: 'Dumplings before the rush' })
+
+
+      209 |     await openMap(page, 'alex', `&quest=${DUMPLINGS}`);
+      210 |     const sheet = page.getByTestId('quest-sheet');
+    > 211 |     await expect(sheet.getByRole('heading', { name: 'Dumplings before the rush' })).toBeVisible();
+          |                                                                                     ^
+      212 |     await expect(sheet.getByTestId('quest-walk')).toHaveText(/\d+ min walk/);
+      213 |     await expect(page.getByTestId('map-attribution').filter({ visible: true })).toHaveCount(1);
+      214 |     // The panel is only as tall as its content, and the map moves the pin out from under it.
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\map.spec.ts:211:85
+
+    Error Context: test-results\map-desktop-1440-quest-dee-fe04d-d-attribution-stays-visible-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\map-desktop-1440-quest-dee-fe04d-d-attribution-stays-visible-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\map-desktop-1440-quest-dee-fe04d-d-attribution-stays-visible-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[196/278] [phone] › tests\e2e\map.spec.ts:178:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[197/278] [phone] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[198/278] [phone] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[199/278] [desktop-parallel] › tests\e2e\shell.spec.ts:91:3 › desktop 1440 › left nav and menu grid links navigate
+[200/278] [phone] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[201/278] [phone] › tests\e2e\memories.spec.ts:20:3 › Memories › regroup API returns a suggestion with a real quest id or null
+[202/278] [desktop] › tests\e2e\map.spec.ts:227:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[203/278] [desktop-parallel] › tests\e2e\shell.spec.ts:117:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[204/278] [phone] › tests\e2e\memories.spec.ts:33:3 › Memories › Send to crew delivers invites
+[205/278] [phone] › tests\e2e\memories.spec.ts:45:3 › Memories › a persona with no crews sees the empty state
+[206/278] [phone] › tests\e2e\memories.spec.ts:51:3 › Memories › Notifications show Out Here items for alex
+[207/278] [phone] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[208/278] [phone] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+  23) [desktop-parallel] › tests\e2e\navigation.spec.ts:21:3 › Out Here navigation › the dashboard: tabs, three heights, keyboard and Escape 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('people-row').first()
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('people-row').first() with timeout 10000ms
+      - waiting for getByTestId('people-row').first()
+
+
+      49 |     await expect(page.getByTestId('out-here-map')).toHaveAttribute('data-mode', 'friends');
+      50 |     await friends.click();
+    > 51 |     await expect(page.getByTestId('people-row').first()).toBeVisible();
+         |                                                          ^
+      52 |
+      53 |     // Plans opens Your plans inside Out Here: the page does not change.
+      54 |     await page.getByTestId('out-here-dock').getByRole('button', { name: 'Plans', exact: true }).click();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\navigation.spec.ts:51:58
+
+    Error Context: test-results\navigation-Out-Here-naviga-97589-heights-keyboard-and-Escape-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\navigation-Out-Here-naviga-97589-heights-keyboard-and-Escape-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\navigation-Out-Here-naviga-97589-heights-keyboard-and-Escape-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[209/278] [desktop-parallel] › tests\e2e\shell.spec.ts:136:3 › desktop 1440 › about-this-demo dialog opens and closes
+[210/278] [phone] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[211/278] [desktop-parallel] › tests\e2e\shell.spec.ts:145:3 › desktop 1440 › every shell route renders with no console errors
+[212/278] [desktop-parallel] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here
+[213/278] [desktop] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[214/278] [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+  24) [desktop-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        68 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+        - element is visible, enabled and stable
+        - scrolling into view if needed
+        - done scrolling
+
+
+      30 |   await page.getByTestId('muse-view-on-map').click();
+      31 |   await expect(page.getByTestId('muse-chat')).toHaveCount(0);
+    > 32 |   await page.getByTestId('muse-launcher').click();
+         |                                           ^
+      33 |   await page.unroute('**/api/muse/plan');
+      34 |   await page.route('**/api/muse/plan', r => r.fulfill({ status:502, json:{error:'Muse unavailable'} }));
+      35 |   await page.getByTestId('muse-input').fill('A different plan');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-processing.spec.ts:32:43
+
+    Error Context: test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-processing-Muse-proce-697ae-t-and-cancels-stale-replies-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  25) [desktop] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('crew-card').first()
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('crew-card').first() with timeout 15000ms
+      - waiting for getByTestId('crew-card').first()
+
+
+       8 |     await expect(page.getByRole("heading", { name: "Memories", level: 1 })).toBeVisible();
+       9 |     const card = page.getByTestId("crew-card").first();
+    > 10 |     await expect(card).toBeVisible({ timeout: 15_000 });
+         |                        ^
+      11 |     await expect(card.locator("img").first()).toBeVisible();
+      12 |
+      13 |     await card.getByRole("button", { name: "Get this group together again" }).click();
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\memories.spec.ts:10:24
+
+    Error Context: test-results\memories-Memories-alex-see-9c435-d-gets-a-regroup-suggestion-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\memories-Memories-alex-see-9c435-d-gets-a-regroup-suggestion-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\memories-Memories-alex-see-9c435-d-gets-a-regroup-suggestion-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  26) [desktop-parallel] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here 
+
+    Error: expect(page).toHaveURL(expected) failed
+
+    Expected pattern: /\/out-here/
+    Received string:  "http://localhost:3175/?as=alex"
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toHaveURL" with timeout 10000ms
+        23 × locator resolved to <html lang="en">…</html>
+           - unexpected value "http://localhost:3175/?as=alex"
+
+
+       7 |   await page.goto('/?as=alex');
+       8 |   await page.getByRole('link', { name: /out here/i }).first().click();
+    >  9 |   await expect(page).toHaveURL(/\/out-here/);
+         |                      ^
+      10 |   await expect(page.getByTestId('out-here-dock')).toBeVisible({ timeout: 20_000 });
+      11 | }
+      12 |
+        at openMap (C:\oh-wt\integrate-findmy-b\tests\e2e\navigation.spec.ts:9:22)
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\navigation.spec.ts:60:5
+
+    Error Context: test-results\navigation-Out-Here-naviga-0457e-ck-without-leaving-Out-Here-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\navigation-Out-Here-naviga-0457e-ck-without-leaving-Out-Here-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\navigation-Out-Here-naviga-0457e-ck-without-leaving-Out-Here-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[215/278] [desktop-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom
+[216/278] [desktop] › tests\e2e\memories.spec.ts:20:3 › Memories › regroup API returns a suggestion with a real quest id or null
+  27) [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('new-message-person').first()
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('new-message-person').first() with timeout 10000ms
+      - waiting for getByTestId('new-message-person').first()
+
+
+      145 |     await expect(page.getByTestId('new-message-picker')).toBeVisible();
+      146 |     const person = page.getByTestId('new-message-person').first();
+    > 147 |     await expect(person).toBeVisible();
+          |                          ^
+      148 |     const name = (await person.textContent())?.trim() ?? '';
+      149 |     await page.getByTestId('new-message-to').fill(name.slice(0, 3));
+      150 |     await expect(page.getByTestId('new-message-person').first()).toHaveText(name);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\messenger.spec.ts:147:26
+
+    Error Context: test-results\messenger-Messenger-filter-c0894-menu-and-New-message-picker-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\messenger-Messenger-filter-c0894-menu-and-New-message-picker-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\messenger-Messenger-filter-c0894-menu-and-New-message-picker-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[217/278] [desktop] › tests\e2e\memories.spec.ts:33:3 › Memories › Send to crew delivers invites
+[218/278] [desktop-parallel] › tests\e2e\shell.spec.ts:156:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+[219/278] [desktop-parallel] › tests\e2e\navigation.spec.ts:84:3 › Out Here navigation › I'm free and Post close with Escape; a typed draft is kept
+[220/278] [phone] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[221/278] [desktop] › tests\e2e\memories.spec.ts:45:3 › Memories › a persona with no crews sees the empty state
+[222/278] [desktop-parallel] › tests\e2e\shell.spec.ts:191:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+[223/278] [desktop] › tests\e2e\memories.spec.ts:51:3 › Memories › Notifications show Out Here items for alex
+[224/278] [desktop] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[225/278] [desktop-parallel] › tests\e2e\shell.spec.ts:222:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[226/278] [desktop-parallel] › tests\e2e\shell.spec.ts:239:3 › mobile 390 › every bottom tab navigates to its route
+[227/278] [desktop] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+[228/278] [desktop-parallel] › tests\e2e\shell.spec.ts:263:3 › mobile 390 › avatar menu lists the 8 personas
+[229/278] [desktop-parallel] › tests\e2e\shell.spec.ts:277:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[230/278] [desktop-parallel] › tests\e2e\shell.spec.ts:301:3 › mobile 390 › friends and groups show their section rows as chips
+[231/278] [desktop-parallel] › tests\e2e\shell.spec.ts:318:3 › mobile 390 › menu page shows destinations and the brand footer
+[232/278] [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return
+[233/278] [phone] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[234/278] [desktop-parallel] › tests\e2e\navigation.spec.ts:107:3 › Out Here navigation › Memories and the plan page lead back to the map
+[235/278] [desktop] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[236/278] [phone] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+[237/278] [desktop] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+[238/278] [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+[239/278] [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[240/278] [desktop] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[241/278] [desktop] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[242/278] [desktop] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+  28) [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('up-next').getByRole('button', { name: 'See plan' })
+
+
+      27 |   await expect(page.getByTestId('up-next-go')).toHaveText(/Let.s go/);
+      28 |
+    > 29 |   await card.getByRole('button', { name: 'See plan' }).click();
+         |                                                        ^
+      30 |   await expect(page.getByTestId('quest-sheet')).toBeVisible();
+      31 |
+      32 |   await request.post(`/api/quests/${STUDY}/leave`, { headers: { 'x-persona': persona }, data: {} });
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\up-next.spec.ts:29:56
+
+    Error Context: test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\up-next-a-plan-you-joined--b8e0f--with-Let-s-go-and-See-plan-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[243/278] [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+  29) [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+
+    Error: expect(received).toBeTruthy()
+
+    Received: false
+
+      14 |     },
+      15 |   });
+    > 16 |   expect(created.ok()).toBeTruthy();
+         |                        ^
+      17 |   const { quest } = await created.json();
+      18 |
+      19 |   await page.goto('/out-here?as=alex&mode=explore');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\your-plans.spec.ts:16:24
+
+    Error Context: test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\your-plans-two-attendees-c-0b7dc-ut-and-share-one-crew-album-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  30) [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      76 |       const boxes = await questPins(page).evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
+      77 |       return boxes.every((b) => b.x >= mapBox.x && b.y >= mapBox.y && b.x + b.width <= mapBox.x + mapBox.width && b.y + b.height <= mapBox.y + mapBox.height);
+    > 78 |     }, { timeout: 5_000 }).toBe(true);
+         |                            ^
+      79 |
+      80 |     await page.getByTestId('muse-filter-why').click();
+      81 |     const items = page.getByTestId('muse-filter-reason-item');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\musefilter.spec.ts:78:28
+
+    Error Context: test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[244/278] [phone] › tests\e2e\musefilter.spec.ts:93:3 › Muse filter › Maya: the filter never empties her map
+[245/278] [phone] › tests\e2e\musefilter.spec.ts:104:3 › Muse filter › Friends view with the filter on shows Maya
+  31) [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      76 |       const boxes = await questPins(page).evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
+      77 |       return boxes.every((b) => b.x >= mapBox.x && b.y >= mapBox.y && b.x + b.width <= mapBox.x + mapBox.width && b.y + b.height <= mapBox.y + mapBox.height);
+    > 78 |     }, { timeout: 5_000 }).toBe(true);
+         |                            ^
+      79 |
+      80 |     await page.getByTestId('muse-filter-why').click();
+      81 |     const items = page.getByTestId('muse-filter-reason-item');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\musefilter.spec.ts:78:28
+
+    Error Context: test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\musefilter-Muse-filter-kep-14853-list-and-on-the-quest-sheet-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[246/278] [desktop] › tests\e2e\musefilter.spec.ts:93:3 › Muse filter › Maya: the filter never empties her map
+  32) [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        76 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+        - element is visible, enabled and stable
+        - scrolling into view if needed
+        - done scrolling
+
+
+       7 |  await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);await expect(world).toHaveAttribute('data-agent-peers','0');await page.screenshot({path:info.outputPath('walking.png')});
+       8 |  const lat=await world.getAttribute('data-lat'),lng=await world.getAttribute('data-lng');await page.keyboard.down('ArrowUp');await expect.poll(async()=>`${await world.getAttribute('data-lat')}:${await world.getAttribute('data-lng')}`).not.toBe(`${lat}:${lng}`);await page.keyboard.up('ArrowUp');
+    >  9 |  await page.getByTestId('muse-launcher').click();await expect(page.getByTestId('muse-chat')).toBeVisible();await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:30000}).toBeGreaterThan(23);await page.screenshot({path:info.outputPath('muse-chat.png')});await page.getByTestId('muse-close').click();
+         |                                          ^
+      10 |  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:15000}).toBeLessThan(21.6);
+      11 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'Map',exact:true}).click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
+      12 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'3D',exact:true}).click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\world-visual.spec.ts:9:42
+
+    Error Context: test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\world-visual-metre-scale-w-38a1c-anion-framing-and-2D-return-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  33) [desktop-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+
+    Test timeout of 90000ms exceeded.
+
+    Error: locator.click: Test timeout of 90000ms exceeded.
+    Call log:
+      - waiting for getByTestId('muse-launcher')
+        - locator resolved to <button type="button" aria-label="Ask Muse" data-testid="muse-launcher" class="oh-press fixed right-3 z-30 flex h-11 items-center gap-2 rounded-pill bg-fb-surface py-1 pl-1.5 pr-4 text-[15px] font-semibold text-fb-text shadow-popover hover:bg-fb-hover bottom-[136px] max-md:bottom-auto max-md:top-[128px] max-md:size-12 max-md:justify-center max-md:p-0">…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        75 × waiting for element to be visible, enabled and stable
+           - element is visible, enabled and stable
+           - scrolling into view if needed
+           - done scrolling
+           - <div aria-hidden="true" class="absolute inset-0 bg-white/80"></div> from <div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center">…</div> subtree intercepts pointer events
+         - retrying click action
+           - waiting 500ms
+        - waiting for element to be visible, enabled and stable
+        - element is visible, enabled and stable
+        - scrolling into view if needed
+        - done scrolling
+
+
+      55 |   await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:30000}).toBeGreaterThan(21.2);
+      56 |   const walkingZoom=Number(await world.getAttribute('data-zoom'));
+    > 57 |   await page.getByTestId('muse-launcher').click();
+         |                                           ^
+      58 |   const phone=(page.viewportSize()?.width ?? 1440)<768;
+      59 |   await expect.poll(async()=>Number(await world.getAttribute('data-zoom')), {timeout:15000}).toBeGreaterThan(phone ? 20.8 : 21.8);
+      60 |   await page.waitForTimeout(600);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\muse-processing.spec.ts:57:43
+
+    Error Context: test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\muse-processing-opening-ch-21d0c-g-restores-the-walking-zoom-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[247/278] [desktop] › tests\e2e\musefilter.spec.ts:104:3 › Muse filter › Friends view with the filter on shows Maya
+[248/278] [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion
+[249/278] [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[250/278] [desktop] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[251/278] [desktop] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+  34) [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 332.265625
+    Received:    363
+
+      36 |       const box = await pill.boundingBox();
+      37 |       if (!box || !sheet) continue;
+    > 38 |       if ((page.viewportSize()?.width ?? 1440) < 768) expect(box.y + box.height + 40).toBeLessThanOrEqual(sheet.y);
+         |                                                                                       ^
+      39 |     }
+      40 |     await page.screenshot({ path: test.info().outputPath("plan.png") });
+      41 |
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\musemap.spec.ts:38:87
+
+    Error Context: test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\musemap-Muse-picks-on-the--ed1ce--rest-closing-restores-them-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[252/278] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[253/278] [phone] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[254/278] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+  35) [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Dumplings before the rush')
+    Expected: 0
+    Received: 2
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" getByText('Dumplings before the rush') with timeout 10000ms
+      - waiting for getByText('Dumplings before the rush')
+        23 × locator resolved to 2 elements
+           - unexpected value "2"
+
+
+      43 |
+      44 |     await ask(page, "hungry, 15 min");
+    > 45 |     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
+         |                                             ^
+      46 |     const cards = page.getByTestId("suggestion");
+      47 |     // nothing posted fits: the empty card, or (a friend is free too) Muse drafting a plan for you two
+      48 |     if ((await cards.count()) === 0) {
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\outhere.spec.ts:45:45
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[255/278] [desktop] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+  36) [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Dumplings before the rush')
+    Expected: 0
+    Received: 2
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" getByText('Dumplings before the rush') with timeout 10000ms
+      - waiting for getByText('Dumplings before the rush')
+        23 × locator resolved to 2 elements
+           - unexpected value "2"
+
+
+      43 |
+      44 |     await ask(page, "hungry, 15 min");
+    > 45 |     await expect(page.getByText(DUMPLINGS)).toHaveCount(0);
+         |                                             ^
+      46 |     const cards = page.getByTestId("suggestion");
+      47 |     // nothing posted fits: the empty card, or (a friend is free too) Muse drafting a plan for you two
+      48 |     if ((await cards.count()) === 0) {
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\outhere.spec.ts:45:45
+
+    Error Context: test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\outhere-Out-Here-plan-shee-ca0c9-time-fit-and-why-not-others-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[256/278] [phone] › tests\e2e\outhere.spec.ts:73:3 › Out Here plan sheet › a new ask replaces one still in flight
+[257/278] [desktop] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[258/278] [desktop] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[259/278] [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[260/278] [phone] › tests\e2e\outhere.spec.ts:100:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[261/278] [phone] › tests\e2e\outhere.spec.ts:131:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[262/278] [phone] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[263/278] [phone] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[264/278] [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[265/278] [phone] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[266/278] [desktop] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[267/278] [phone] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[268/278] [desktop] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[269/278] [phone] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+  37) [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+
+    Error: Timeout 30000ms exceeded while waiting on the predicate
+
+       7 |  await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);await expect(world).toHaveAttribute('data-agent-peers','0');await page.screenshot({path:info.outputPath('walking.png')});
+       8 |  const lat=await world.getAttribute('data-lat'),lng=await world.getAttribute('data-lng');await page.keyboard.down('ArrowUp');await expect.poll(async()=>`${await world.getAttribute('data-lat')}:${await world.getAttribute('data-lng')}`).not.toBe(`${lat}:${lng}`);await page.keyboard.up('ArrowUp');
+    >  9 |  await page.getByTestId('muse-launcher').click();await expect(page.getByTestId('muse-chat')).toBeVisible();await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:30000}).toBeGreaterThan(23);await page.screenshot({path:info.outputPath('muse-chat.png')});await page.getByTestId('muse-close').click();
+         |                                                                                                                                                                                                      ^
+      10 |  await expect.poll(async()=>Number(await world.getAttribute('data-zoom')),{timeout:15000}).toBeLessThan(21.6);
+      11 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'Map',exact:true}).click();await expect(world).toHaveCount(0);await expect(page.locator('.maplibregl-canvas')).toHaveCount(1);
+      12 |  await page.getByRole('group',{name:'Camera'}).getByRole('button',{name:'3D',exact:true}).click();await expect(world).toHaveAttribute('data-scene-ready','true');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\world-visual.spec.ts:9:198
+
+    Error Context: test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\world-visual-metre-scale-w-a8090--return-with-reduced-motion-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[270/278] [desktop] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+[271/278] [desktop] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[272/278] [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[273/278] [phone] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[274/278] [desktop] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[275/278] [desktop] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[276/278] [phone] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[277/278] [desktop] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+[278/278] [phone] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+  37 failed
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible 
+    [phone] › tests\e2e\map.spec.ts:132:3 › phone 390 › Friends view shows only plans friends joined 
+    [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker 
+    [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody 
+    [desktop] › tests\e2e\map.spec.ts:208:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible 
+    [desktop] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion 
+    [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet 
+    [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others 
+    [phone-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [phone-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [phone-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+    [phone-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [phone-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [phone-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it 
+    [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [desktop-parallel] › tests\e2e\muse-agent-backend.spec.ts:48:1 › stream failure uses existing error UI and releases the peer 
+    [desktop-parallel] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map 
+    [desktop-parallel] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [desktop-parallel] › tests\e2e\muse-processing.spec.ts:6:1 › Muse processing follows requests, renders the existing result, and cancels stale replies 
+    [desktop-parallel] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [desktop-parallel] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [desktop-parallel] › tests\e2e\navigation.spec.ts:21:3 › Out Here navigation › the dashboard: tabs, three heights, keyboard and Escape 
+    [desktop-parallel] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here 
+    [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [desktop-parallel] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+  71 skipped
+  170 passed (13.9m)

@@ -1,0 +1,189 @@
+# 🗺️ Out Here
+
+**A live Facebook map of nearby plans you can join right now — and Muse turns "I'm free" into an actual plan.**
+
+Built for the **Facebook Closer Together AI Hackathon 2026** · Deadline **Thu Nov 13, 10:30 AM PT**
+
+---
+
+## The problem
+Young adults are juggling new cities, new friends, first jobs, and plans that die in the group chat. You have a free 40 minutes and you'd happily spend it with someone — but by the time you've texted around, it's gone. Event apps show what's *scheduled*; nothing helps with *right now*, with your friends, and with people you'd actually click with.
+
+## What Out Here does
+Out Here is one tab in Facebook: a live map of **side quests** — small real-world plans with open spots, like grabbing dumplings after a show, a thrift walk, or the last spot in a pickup game. Pins and seat counts update live as people join.
+
+**The loop:** **I'm free → Muse finds the plan → join live → photo together → do it again.**
+
+1. **Tap "I'm free" and say what you're up for** — *"hungry, got like 40 min, under $15."*
+2. **Muse works it out.** It parses your intent and time window, finds quests that actually fit **including the walk there** (micro-hangouts work even with 15–30 minutes), checks which friends shared overlapping free time, and explains the match in plain language:
+   > ✨ *"Maya's free after class till 6 and you both love dumplings — Dough Zone has 2 seats left, 9 min walk, ~$12. Want to go together?"*
+3. **Invite and join together.** Maya accepts, seats update live for everyone on the map. You start with someone you know and meet new people through something you both want to do.
+4. **Take a photo together.** When the hangout ends, everyone gets a "take a photo together" prompt. It lands in a private album shared only with the people who were there; Muse writes the caption.
+5. **Do it again.** The group becomes a crew automatically. One tap on **"Get this group together again"** and Muse finds the next time everyone's free and something you'd all like — no group chat or recurring event to manage.
+
+**Reasons to come back:** a **Daily Quest** prompt (one per day for everyone, Wordle/BeReal energy), **weekly IRL streaks** (weeks in a row you actually hung out — weekly so it never pushes people to game it), and **Out Here Wrapped**, a monthly recap of your quests, people, places and photos written by Muse.
+
+### Map views
+- **Explore** — public quests with open seats. Muse highlights the 2–3 worth walking to.
+- **Friends** — availability your friends chose to share, and quests they've joined.
+
+## Why AI is essential (not decorative)
+Muse does the work a search box can't:
+
+| Step | What Muse does | What code guarantees |
+|---|---|---|
+| **Understand** | Turns messy text ("before class", "something cheap", "meet people who climb") into a structured intent: activities, budget, time window, walking limit, vibe | Intent validated against a schema |
+| **Fit** | — | Only quests/friends that fit the window **including travel time**, budget and capacity become candidates |
+| **Match + explain** | Ranks candidates using shared interests, timing and what you're up for; explains why in plain language; adds a friend-bridge line when there's a public connection | Muse can only choose from real candidates — it can't invent people, places, prices or times |
+| **Coordinate** | Drafts the invite; turns two separate "I'm free" signals into one plan | Join is atomic — the last seat can't be double-booked |
+| **Continue** | Remembers crew preferences and proposes the next hangout; writes captions, daily prompts and Wrapped | — |
+| **Create** | Turns a vague idea ("someone to try pho with") into a quest with place, time, group size | — |
+
+## Why it fits Facebook
+Groups give people communities. Events give them a place to meet. Out Here connects both **in the moment**, using the one thing other social-discovery apps don't have: your actual friends. It's one focused surface, not another app inside the app.
+
+## Safety & privacy by design
+- Availability is shared with **friends only**, and only when you tap "I'm free".
+- Quest locations are **approximate (~200 m) until you join**; public venues only.
+- **Join with a friend** is the default path; stranger quests need a minimum group size.
+- Muse only uses interests you chose to share and never reveals private connections.
+- Report/block on every quest.
+- Deliberately **not** built: inferring where you are from your calendar + location.
+
+---
+
+
+## 🚀 Deploys (read this before deploying)
+Pushing a branch does **not** deploy it. The Vercel project is linked only from Andrew's laptop.
+To get a preview URL, push your branch and comment `DEPLOY <your-branch>` on the pinned issue [#4](https://github.com/AndrewYin04/out-here/issues/4). The overnight agent (or Andrew) deploys it and replies with the URL. Details: [`docs/DEPLOYS.md`](docs/DEPLOYS.md).
+
+## Tech
+- **Next.js 15** (App Router, TypeScript, Tailwind) · **Supabase** (Postgres, Realtime, Storage) · **Leaflet** + CARTO tiles · **Muse** (Spark / Wonder / Ember) · Vitest + Playwright · Vercel
+- Muse pipeline: **parse (Muse) → candidates (code: time window, walking time, budget, seats) → rank + explain + draft (Muse) → validate (code)**
+- Details: [`.claude/rules/10-architecture.md`](.claude/rules/10-architecture.md) (contracts, data model, folder ownership)
+
+### Run locally
+```bash
+npm install
+```
+```bash
+cp .env.example .env.local
+```
+Fill in `.env.local`, then:
+```bash
+npm run seed
+```
+```bash
+npm run dev
+```
+Open http://localhost:3000 — use the user switcher (top right) to be **Alex** in one window and **Maya** in another. `?demo=1` shows reset/time controls.
+
+---
+
+## 🌙 The overnight build
+
+Tonight **one Claude Code agent** builds the app from [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md), running subagents for parallel work. The team talks to it through a **pinned GitHub issue** (the board) from their phones.
+
+### How the pieces fit
+| File | Purpose |
+|---|---|
+| [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md) | The agent's run book: deadlines, milestones M0–M7, work loop, subagent briefs, blocker fallbacks, handoff |
+| [`CLAUDE.md`](CLAUDE.md) | Loaded automatically by every agent/subagent; points at the rules |
+| [`.claude/rules/`](.claude/rules/) | Mission & scope · architecture & ownership · git workflow · board protocol · safety |
+| [`scripts/board.sh`](scripts/board.sh) | The agent's only way to read/post on the board issue |
+| [`scripts/board.config`](scripts/board.config) | Board issue number, team logins, on-call login |
+| [`docs/muse-api.md`](docs/muse-api.md) | Muse API reference — **paste the docs here before the run** |
+| `docs/PLAN.md`, `docs/PROGRESS.md`, `docs/DECISIONS.md` | Written by the agent overnight — its memory across context resets |
+| `docs/HANDOFF.md`, `docs/DEVPOST.md` | Written by the agent before morning — demo script, Q&A prep, submission text |
+
+### Timeline (hours after kickoff; the agent rescales to the real start and the 07:00 PT freeze)
+| When | Milestone |
+|---|---|
+| +0:00 | Kickoff · **M0** scaffold |
+| +0:45 | **M1** contracts, Supabase schema + seed, Muse pipeline |
+| +1:30 | **M2** map, Explore/Friends, "I'm free" → Muse suggestions, live seats |
+| +3:00 | **M3** invite loop, end-to-end test, real Muse on deployed preview — **P0 checkpoint** |
+| +3:45 | **M4** photo prompt, crew album, "do this again", create-a-quest |
+| +5:00 | **M5** Daily Quest, weekly streaks, Wrapped (cut first if short on time) |
+| → 07:00 PT | **M6** polish, demo controls, review pass · **07:00 PT feature freeze** |
+| 07:00–08:00 PT | **M7** fixes only, `HANDOFF.md`, `DEVPOST.md`, screenshots, final PR |
+
+### ✅ Preflight — do all of this before going to sleep
+Run this on the agent's laptop until it says **Ready for kickoff**. It checks everything below and prints only names, never secret values:
+```bash
+scripts/preflight.sh
+```
+
+**Accounts & access (one person each, tonight):**
+- [ ] **Repo:** Andrew adds all teammates as collaborators on `AndrewYin04/out-here`. Turn on branch protection for `main` (require a PR) so the agent physically can't push there.
+- [ ] **Muse:** paste the API docs into [`docs/muse-api.md`](docs/muse-api.md) (endpoints, auth, model IDs for Spark/Wonder/Ember, JSON/tool output, image support, rate limits). The key goes **only** in `.env.local` and Vercel.
+- [ ] **Supabase:** create a project. Put URL, anon key, service-role key in `.env.local`. Create a public Storage bucket `memories`.
+- [ ] **Vercel:** import the repo, add the same env vars (Production + Preview), confirm a preview deploy builds.
+- [ ] **Board:** fill `TEAM_LOGINS` (all 5 GitHub logins) and `ONCALL` in [`scripts/board.config`](scripts/board.config), then run `scripts/board.sh init` once and commit the config.
+- [ ] Merge this setup branch (`setup/overnight-agent`) into `main` so the agent starts from it.
+
+**The agent's laptop:**
+- [ ] Node 20+, `gh` logged in with write access, `jq` (macOS has it):
+```bash
+gh auth login
+```
+- [ ] `.env.local` filled (see `.env.example`). Test the board:
+```bash
+scripts/board.sh post status "preflight test — ignore"
+```
+```bash
+scripts/board.sh read
+```
+- [ ] Plugged in, sleep disabled, and keep the machine awake for the whole run:
+```bash
+caffeinate -dimsu
+```
+- [ ] In the Claude desktop app: open a session in this repo, model **Opus**, high effort, **Auto** permission mode. The project allowlist in [`.claude/settings.json`](.claude/settings.json) blocks pushes to `main`, force-pushes, reading `.env` files, and destructive commands.
+- [ ] Turn off the laptop's automatic OS updates for tonight.
+
+### 🚀 Kickoff
+In the session, send:
+```
+/loop Follow docs/MASTER_PROMPT.md exactly. If docs/PROGRESS.md exists, you are resuming: re-read the plan and progress files and continue from where you left off.
+```
+`/loop` with no interval lets the agent pace itself and re-starts it after every turn, so the run survives turn endings and context summaries. If the session ever stops, send the same line again — the agent resumes from `docs/PROGRESS.md`.
+
+### 💬 Talking to the agent overnight
+Comment on the pinned board issue (GitHub app works fine). The agent checks at least every ~20 minutes and wakes up on new comments when it's waiting.
+
+| Start your comment with | Effect |
+|---|---|
+| `STOP` | Commits what's green and pauses until the next comment |
+| `PRIORITY: …` | Re-plans to do this next |
+| `ANSWER: …` | Answers a question the agent asked |
+| `FYI: …` | Context (e.g. "FYI: demo venue is Meta Menlo Park, not Seattle") |
+
+The agent posts `status` hourly and `milestone` when something ships. `question`, `blocked` and `alert` posts @mention the on-call teammate. **Every question includes the default the agent will take and when** — so nobody has to wake up for it to keep going. The issue body is a live dashboard.
+
+You can also type directly in the agent's session on the laptop.
+
+### ☀️ Morning checklist
+1. Read `docs/HANDOFF.md` and the board dashboard.
+2. Open the deployed preview, run through the demo script twice (two devices: Alex + Maya). Use `?demo=1` → reset between runs.
+3. Review and merge the `overnight → main` PR.
+4. Record the demo video (optional) from the script in `docs/HANDOFF.md`.
+5. Submit Devpost using `docs/DEVPOST.md` + `docs/screenshots/`, with the public repo link. **Before 10:30 AM PT.**
+
+---
+
+## 🎤 Demo script (5 min)
+1. **(0:00–0:30) Hook.** "You moved to a new city. You've got 40 minutes free and you'd love to spend it with someone — but by the time the group chat answers, it's gone."
+2. **(0:30–3:00) Live.** As Alex: "I'm free — hungry, 40 min, under $15." Muse checks who's free → 3 suggestions with reasons → the top one joins Maya's free window with the dumpling quest (2 seats left, 9 min walk). Invite Maya. Second device as Maya: accept. Both maps: seats drop to 1 live.
+3. **(3:00–4:00) After.** Host taps "We're done" → photo together → shared crew album with Muse caption → "Do this again" → Muse proposes Thursday's thrift walk that fits all three.
+4. **(4:00–5:00) Why.** Why Facebook (friends + Groups + Events, in the moment), why AI (parse → fit → match → explain → coordinate), safety by design, and what keeps people coming back (Daily Quest, weekly streaks, Wrapped).
+
+**Q&A prep** (full answers in `docs/HANDOFF.md` after the run): stranger safety · privacy of availability · how it differs from event apps · what happens with 500 pins · Muse latency/cost · cold start on a new campus.
+
+## Team
+| Name | GitHub | Role |
+|---|---|---|
+| _TBD_ | _TBD_ | |
+| _TBD_ | _TBD_ | |
+| _TBD_ | _TBD_ | |
+| _TBD_ | _TBD_ | |
+| _TBD_ | _TBD_ | |

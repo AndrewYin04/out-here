@@ -1,0 +1,349 @@
+
+Running 244 tests using 6 workers
+
+[1/244] [phone-parallel] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+[2/244] [phone-parallel] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse drafts from one line
+[3/244] [phone] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[4/244] [phone] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[5/244] [phone] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[6/244] [phone] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[7/244] [phone] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[8/244] [phone] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[9/244] [phone] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[10/244] [phone] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[11/244] [phone] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[12/244] [phone] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[13/244] [desktop] › tests\e2e\api.spec.ts:21:1 › persona header is required and must be a known handle
+[14/244] [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[15/244] [phone-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[16/244] [desktop] › tests\e2e\api.spec.ts:31:1 › feed as alex and maya differ and carry post view models
+[17/244] [phone-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[18/244] [desktop] › tests\e2e\api.spec.ts:42:1 › friends: alex and maya are friends, with symmetric mutual friends
+[19/244] [desktop] › tests\e2e\api.spec.ts:52:1 › bad input is a JSON 4xx
+[20/244] [desktop] › tests\e2e\api.spec.ts:58:1 › quest join and leave change seats for every viewer
+[21/244] [desktop] › tests\e2e\api.spec.ts:82:1 › SSE realtime: alex receives quest:<id> after maya joins
+[22/244] [desktop] › tests\e2e\api.spec.ts:117:1 › invite from alex to maya: accept auto-joins, last seats run out with 409
+[23/244] [desktop] › tests\e2e\api.spec.ts:141:1 › invite to the last seat: maya takes it alone, alex is told
+[24/244] [desktop] › tests\e2e\api.spec.ts:168:1 › notifications, threads, groups, events and search respond for a persona
+[25/244] [desktop] › tests\e2e\api.spec.ts:177:1 › every route reports Server-Timing (total, table loads, queries, broadcasts)
+[26/244] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty
+[27/244] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[28/244] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[29/244] [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[30/244] [phone-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[31/244] [phone-parallel] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[32/244] [phone] › tests\e2e\entry.spec.ts:48:5 › at 390px › the friend card offers View profile, Message and Want to hang?
+[33/244] [phone-parallel] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[34/244] [phone-parallel] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+[35/244] [phone-parallel] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+[36/244] [phone-parallel] › tests\e2e\create-event.spec.ts:40:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[37/244] [phone-parallel] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[38/244] [phone-parallel] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[39/244] [phone-parallel] › tests\e2e\shell.spec.ts:91:3 › desktop 1440 › left nav and menu grid links navigate
+[40/244] [phone-parallel] › tests\e2e\shell.spec.ts:117:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[41/244] [phone-parallel] › tests\e2e\shell.spec.ts:136:3 › desktop 1440 › about-this-demo dialog opens and closes
+[42/244] [phone-parallel] › tests\e2e\shell.spec.ts:145:3 › desktop 1440 › every shell route renders with no console errors
+[43/244] [phone-parallel] › tests\e2e\shell.spec.ts:156:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+[44/244] [phone-parallel] › tests\e2e\shell.spec.ts:191:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+[45/244] [phone-parallel] › tests\e2e\shell.spec.ts:222:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[46/244] [phone-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[47/244] [phone-parallel] › tests\e2e\shell.spec.ts:239:3 › mobile 390 › every bottom tab navigates to its route
+[48/244] [desktop] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[49/244] [phone-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[50/244] [phone] › tests\e2e\entry.spec.ts:61:5 › at 390px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[51/244] [phone-parallel] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[52/244] [phone-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+[53/244] [phone-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[54/244] [phone-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[55/244] [phone-parallel] › tests\e2e\shell.spec.ts:263:3 › mobile 390 › avatar menu lists the 8 personas
+[56/244] [desktop] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[57/244] [phone-parallel] › tests\e2e\shell.spec.ts:277:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[58/244] [phone] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty
+[59/244] [phone] › tests\e2e\entry.spec.ts:48:5 › at 1440px › the friend card offers View profile, Message and Want to hang?
+[60/244] [phone] › tests\e2e\entry.spec.ts:61:5 › at 1440px › status bubbles: the whole thought or none, never cut short or emoji only; phones show the nearest few
+[61/244] [phone] › tests\e2e\findmy.spec.ts:29:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[62/244] [phone-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[63/244] [phone] › tests\e2e\findmy.spec.ts:38:3 › API › sharing with the public is rejected
+[64/244] [phone] › tests\e2e\findmy.spec.ts:44:3 › API › profiles of other people carry no home location
+[65/244] [phone] › tests\e2e\findmy.spec.ts:61:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[66/244] [phone-parallel] › tests\e2e\shell.spec.ts:301:3 › mobile 390 › friends and groups show their section rows as chips
+[67/244] [phone-parallel] › tests\e2e\shell.spec.ts:318:3 › mobile 390 › menu page shows destinations and the brand footer
+[68/244] [desktop] › tests\e2e\findmy.spec.ts:29:3 › API › alex sees local friends with bubbles, never non-friends, paused or expired shares
+[69/244] [desktop] › tests\e2e\findmy.spec.ts:38:3 › API › sharing with the public is rejected
+[70/244] [desktop] › tests\e2e\findmy.spec.ts:44:3 › API › profiles of other people carry no home location
+[71/244] [desktop] › tests\e2e\findmy.spec.ts:61:5 › at 390px › friend pins, card, Want to hang?, and the People list
+[72/244] [desktop] › tests\e2e\findmy.spec.ts:97:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[73/244] [desktop] › tests\e2e\findmy.spec.ts:117:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[74/244] [desktop] › tests\e2e\findmy.spec.ts:140:5 › at 390px › tapping a status chip opens the card, like the avatar
+[75/244] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[76/244] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 390px › sharing settings open from the map
+[77/244] [desktop] › tests\e2e\findmy.spec.ts:188:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[78/244] [desktop] › tests\e2e\findmy.spec.ts:61:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[79/244] [desktop-parallel] › tests\e2e\create-event.spec.ts:16:3 › Post a plan › ＋ opens the sheet with a draft pin, and Muse drafts from one line
+[80/244] [desktop-parallel] › tests\e2e\draft-hang.spec.ts:6:1 › Muse drafts a plan with a free friend when nothing fits, and Make this plan creates it
+[81/244] [desktop-parallel] › tests\e2e\feed.spec.ts:32:1 › collapsed posts preview at most one comment and no replies
+[82/244] [phone] › tests\e2e\findmy.spec.ts:97:5 › at 390px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[83/244] [desktop-parallel] › tests\e2e\create-event.spec.ts:40:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in
+[84/244] [desktop-parallel] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map
+[85/244] [desktop-parallel] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it
+[86/244] [desktop] › tests\e2e\findmy.spec.ts:97:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[87/244] [phone] › tests\e2e\findmy.spec.ts:117:5 › at 390px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+  1) [phone-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it ────────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('reaction-picker')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('reaction-picker') with timeout 10000ms
+      - waiting for getByTestId('reaction-picker')
+
+
+      152 |   }
+      153 |   const picker = page.getByTestId('reaction-picker');
+    > 154 |   await expect(picker).toBeVisible();
+          |                        ^
+      155 |   await expect(picker.getByRole('button')).toHaveCount(7);
+      156 |   await picker.getByRole('button', { name: 'Love' }).click();
+      157 |   await expect(like).toHaveAttribute('aria-label', 'Remove Love');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\feed.spec.ts:154:24
+
+    Error Context: test-results\feed-like-pick-a-reaction-and-remove-it-phone-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\feed-like-pick-a-reaction-and-remove-it-phone-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\feed-like-pick-a-reaction-and-remove-it-phone-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[88/244] [desktop-parallel] › tests\e2e\feed.spec.ts:59:1 › feed renders composer, stories and posts
+[89/244] [phone-parallel] › tests\e2e\feed.spec.ts:167:1 › comment and reply, seen live by a second persona
+[90/244] [desktop-parallel] › tests\e2e\feed.spec.ts:75:1 › story viewer opens, advances and closes
+[91/244] [desktop] › tests\e2e\findmy.spec.ts:117:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[92/244] [desktop-parallel] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo
+[93/244] [phone] › tests\e2e\findmy.spec.ts:140:5 › at 390px › tapping a status chip opens the card, like the avatar
+[94/244] [desktop] › tests\e2e\findmy.spec.ts:140:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[95/244] [desktop-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it
+[96/244] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:5:3 › POST /api/muse/plan › demo sentence: Dumpling Den with Maya on top, ramen and sushi absent
+[97/244] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:32:3 › POST /api/muse/plan › nonsense input returns an empty plan, not an error
+[98/244] [desktop-parallel] › tests\e2e\muse-plan.spec.ts:40:3 › POST /api/muse/plan › bad input is a JSON 4xx
+[99/244] [desktop-parallel] › tests\e2e\rate-hangout-event.spec.ts:7:1 › outhere:rate-hangout opens the rating with the selfie attached
+[100/244] [phone-parallel] › tests\e2e\feed.spec.ts:209:1 › share a post to the feed
+[101/244] [desktop-parallel] › tests\e2e\shell.spec.ts:42:3 › desktop 1440 › top bar, left nav and right rail render
+[102/244] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 390px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[103/244] [desktop-parallel] › tests\e2e\shell.spec.ts:63:3 › desktop 1440 › every center tab navigates to its route
+[104/244] [desktop-parallel] › tests\e2e\smoke.spec.ts:3:1 › home page renders
+[105/244] [phone-parallel] › tests\e2e\feed.spec.ts:227:1 › hide a post and undo
+[106/244] [desktop] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[107/244] [desktop-parallel] › tests\e2e\up-next.spec.ts:8:1 › a plan you joined shows as Up next with Let's go and See plan
+[108/244] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 390px › sharing settings open from the map
+[109/244] [desktop-parallel] › tests\e2e\shell.spec.ts:91:3 › desktop 1440 › left nav and menu grid links navigate
+[110/244] [desktop] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › sharing settings open from the map
+[111/244] [phone] › tests\e2e\findmy.spec.ts:188:5 › at 390px › a friend in another city gets Message, not Want to hang?, and no walk time
+[112/244] [desktop] › tests\e2e\findmy.spec.ts:188:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[113/244] [desktop-parallel] › tests\e2e\shell.spec.ts:117:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona
+[114/244] [phone] › tests\e2e\findmy.spec.ts:61:5 › at 1440px › friend pins, card, Want to hang?, and the People list
+[115/244] [phone] › tests\e2e\findmy.spec.ts:97:5 › at 1440px › the Out Here tab in Friends mode shows the Friends map, and chips never overlap
+[116/244] [phone] › tests\e2e\findmy.spec.ts:117:5 › at 1440px › Want to hang? with Maya proposes Dumpling Den from her bubble before sending
+[117/244] [phone] › tests\e2e\findmy.spec.ts:140:5 › at 1440px › tapping a status chip opens the card, like the avatar
+[118/244] [phone] › tests\e2e\findmy.spec.ts:151:5 › at 1440px › the toggle and the open card live in the URL, so Back from Messenger returns to the card
+[119/244] [phone] › tests\e2e\findmy.spec.ts:174:5 › at 1440px › sharing settings open from the map
+[120/244] [desktop-parallel] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album
+[121/244] [phone] › tests\e2e\findmy.spec.ts:188:5 › at 1440px › a friend in another city gets Message, not Want to hang?, and no walk time
+[122/244] [phone] › tests\e2e\findmy.spec.ts:204:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[123/244] [desktop-parallel] › tests\e2e\shell.spec.ts:136:3 › desktop 1440 › about-this-demo dialog opens and closes
+[124/244] [desktop] › tests\e2e\findmy.spec.ts:204:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens
+[125/244] [desktop] › tests\e2e\findmy.spec.ts:228:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[126/244] [desktop-parallel] › tests\e2e\shell.spec.ts:145:3 › desktop 1440 › every shell route renders with no console errors
+  2) [desktop-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it ──────
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('reaction-picker')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('reaction-picker') with timeout 10000ms
+      - waiting for getByTestId('reaction-picker')
+
+
+      152 |   }
+      153 |   const picker = page.getByTestId('reaction-picker');
+    > 154 |   await expect(picker).toBeVisible();
+          |                        ^
+      155 |   await expect(picker.getByRole('button')).toHaveCount(7);
+      156 |   await picker.getByRole('button', { name: 'Love' }).click();
+      157 |   await expect(like).toHaveAttribute('aria-label', 'Remove Love');
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\feed.spec.ts:154:24
+
+    Error Context: test-results\feed-like-pick-a-reaction-and-remove-it-desktop-parallel\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\feed-like-pick-a-reaction-and-remove-it-desktop-parallel\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\feed-like-pick-a-reaction-and-remove-it-desktop-parallel\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[127/244] [desktop-parallel] › tests\e2e\feed.spec.ts:167:1 › comment and reply, seen live by a second persona
+  3) [phone] › tests\e2e\findmy.spec.ts:204:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: "quest-pin-dumplings"
+    Received: "up-next-go"
+
+      213 |       const top = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid]')?.getAttribute('data-testid') ?? null,
+      214 |         [box.x + box.width / 2, box.y + box.height / 2]);
+    > 215 |       expect(top).toBe('quest-pin-dumplings');
+          |                   ^
+      216 |       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      217 |       await expect(page.getByTestId('quest-sheet')).toContainText('Dumplings before the rush');
+      218 |       await expect(page.getByTestId('friend-card')).toHaveCount(0);
+        at C:\oh-wt\integrate-findmy-b\tests\e2e\findmy.spec.ts:215:19
+
+    Error Context: test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\findmy-quest-pins-stay-tap-bd754-est-pin-and-its-panel-opens-phone\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[128/244] [phone] › tests\e2e\findmy.spec.ts:228:3 › two personas, live › Maya edits her bubble and hides herself; Alex sees both within 2 s
+[129/244] [phone] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[130/244] [desktop-parallel] › tests\e2e\shell.spec.ts:156:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail
+[131/244] [desktop-parallel] › tests\e2e\feed.spec.ts:209:1 › share a post to the feed
+[132/244] [desktop-parallel] › tests\e2e\feed.spec.ts:227:1 › hide a post and undo
+[133/244] [phone] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[134/244] [desktop-parallel] › tests\e2e\shell.spec.ts:191:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating
+[135/244] [phone] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[136/244] [desktop-parallel] › tests\e2e\shell.spec.ts:222:3 › mobile 390 › top bar and bottom tab bar render; rails are hidden
+[137/244] [desktop-parallel] › tests\e2e\shell.spec.ts:239:3 › mobile 390 › every bottom tab navigates to its route
+[138/244] [desktop-parallel] › tests\e2e\shell.spec.ts:263:3 › mobile 390 › avatar menu lists the 8 personas
+[139/244] [desktop-parallel] › tests\e2e\shell.spec.ts:277:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen
+[140/244] [desktop] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left
+[141/244] [desktop-parallel] › tests\e2e\shell.spec.ts:301:3 › mobile 390 › friends and groups show their section rows as chips
+[142/244] [phone] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[143/244] [desktop-parallel] › tests\e2e\shell.spec.ts:318:3 › mobile 390 › menu page shows destinations and the brand footer
+[144/244] [desktop] › tests\e2e\groups.spec.ts:47:1 › Members tab lists friends first with the friend count
+[145/244] [phone] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[146/244] [desktop] › tests\e2e\groups.spec.ts:54:1 › Discussion shows group posts and a member can post
+[147/244] [phone] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+[148/244] [desktop] › tests\e2e\groups.spec.ts:65:1 › Join and leave a group from its page
+[149/244] [phone] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[150/244] [desktop] › tests\e2e\groups.spec.ts:82:1 › Groups index: feed, discover join, your groups
+[151/244] [phone] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[152/244] [phone] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[153/244] [phone] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[154/244] [phone] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+[155/244] [phone] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody
+[156/244] [phone] › tests\e2e\intros.spec.ts:174:3 › Muse Intros › a decline is silent: the person who said yes keeps waiting
+[157/244] [phone] › tests\e2e\intros.spec.ts:189:3 › Muse Intros › two accepts at once (a double click) connect once, with one Muse note
+[158/244] [phone] › tests\e2e\intros.spec.ts:209:3 › Muse Intros › intro API is per viewer and validates input
+[159/244] [phone] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[160/244] [desktop] › tests\e2e\groups.spec.ts:104:1 › Notifications page: Unread filter, click marks read and opens the post
+[161/244] [desktop] › tests\e2e\groups.spec.ts:130:1 › every notification row links to a page that loads
+[162/244] [desktop] › tests\e2e\groups.spec.ts:140:1 › phone: bottom bar Notifications opens the list
+[163/244] [desktop] › tests\e2e\groups.spec.ts:152:1 › group header: Share copies the group link
+[164/244] [desktop] › tests\e2e\groups.spec.ts:161:1 › desktop: two personas — join a hangout, seats and the host bell update live
+[165/244] [phone] › tests\e2e\map.spec.ts:93:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[166/244] [desktop] › tests\e2e\groups.spec.ts:203:1 › desktop: bell popover lists notifications and See all opens the page
+[167/244] [desktop] › tests\e2e\intros.spec.ts:24:3 › Muse Intros › round -> Jordan card -> both accept -> connected thread; dating request finds nobody
+[168/244] [phone] › tests\e2e\map.spec.ts:113:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[169/244] [phone] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined
+[170/244] [desktop] › tests\e2e\intros.spec.ts:174:3 › Muse Intros › a decline is silent: the person who said yes keeps waiting
+[171/244] [desktop] › tests\e2e\intros.spec.ts:189:3 › Muse Intros › two accepts at once (a double click) connect once, with one Muse note
+[172/244] [desktop] › tests\e2e\intros.spec.ts:209:3 › Muse Intros › intro API is per viewer and validates input
+[173/244] [desktop] › tests\e2e\map.spec.ts:41:3 › phone 390 › dumpling pin is clear of other markers and the sheet keeps attribution visible
+[174/244] [desktop] › tests\e2e\map.spec.ts:93:3 › phone 390 › a "+N" bubble zooms in on the plans it holds
+[175/244] [desktop] › tests\e2e\map.spec.ts:113:3 › phone 390 › join and leave update the seat count on the pin and in the sheet
+[176/244] [desktop] › tests\e2e\map.spec.ts:131:3 › phone 390 › Friends view shows only plans friends joined
+[177/244] [desktop] › tests\e2e\map.spec.ts:152:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[178/244] [desktop] › tests\e2e\map.spec.ts:174:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[179/244] [phone] › tests\e2e\map.spec.ts:152:3 › phone 390 › without WebGL the plans show as a list that opens the sheet
+[180/244] [phone] › tests\e2e\map.spec.ts:174:3 › desktop 1440 › a join by Maya updates the seat badge on Alex’s map live
+[181/244] [phone] › tests\e2e\map.spec.ts:204:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[182/244] [phone] › tests\e2e\map.spec.ts:221:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[183/244] [phone] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[184/244] [phone] › tests\e2e\memories.spec.ts:20:3 › Memories › regroup API returns a suggestion with a real quest id or null
+[185/244] [phone] › tests\e2e\memories.spec.ts:33:3 › Memories › Send to crew delivers invites
+[186/244] [phone] › tests\e2e\memories.spec.ts:45:3 › Memories › a persona with no crews sees the empty state
+[187/244] [phone] › tests\e2e\memories.spec.ts:51:3 › Memories › Notifications show Out Here items for alex
+[188/244] [phone] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[189/244] [phone] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+[190/244] [desktop] › tests\e2e\map.spec.ts:204:3 › desktop 1440 › ?quest= deep link opens the quest panel and attribution stays visible
+[191/244] [phone] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[192/244] [desktop] › tests\e2e\map.spec.ts:221:3 › desktop 1440 › when map tiles fail the pins stay up over a plain background
+[193/244] [phone] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+[194/244] [phone] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[195/244] [phone] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[196/244] [phone] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+[197/244] [desktop] › tests\e2e\memories.spec.ts:6:3 › Memories › alex sees a crew album and gets a regroup suggestion
+[198/244] [desktop] › tests\e2e\memories.spec.ts:20:3 › Memories › regroup API returns a suggestion with a real quest id or null
+[199/244] [desktop] › tests\e2e\memories.spec.ts:33:3 › Memories › Send to crew delivers invites
+[200/244] [phone] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+[201/244] [desktop] › tests\e2e\memories.spec.ts:45:3 › Memories › a persona with no crews sees the empty state
+[202/244] [desktop] › tests\e2e\memories.spec.ts:51:3 › Memories › Notifications show Out Here items for alex
+[203/244] [desktop] › tests\e2e\messenger.spec.ts:38:3 › Messenger › inbox lists seeded chats with snippets, newest first, and search filters
+[204/244] [desktop] › tests\e2e\messenger.spec.ts:55:3 › Messenger › opens the Alex and Maya chat with its history
+[205/244] [desktop] › tests\e2e\messenger.spec.ts:91:3 › Messenger › a message from alex appears for maya within 3 s
+[206/244] [phone] › tests\e2e\musefilter.spec.ts:93:3 › Muse filter › Maya: the filter never empties her map
+[207/244] [desktop] › tests\e2e\messenger.spec.ts:123:3 › Messenger › filter chips, options menu and New message picker
+[208/244] [phone] › tests\e2e\musefilter.spec.ts:104:3 › Muse filter › Friends view with the filter on shows Maya
+[209/244] [desktop] › tests\e2e\messenger.spec.ts:157:3 › Messenger › /messages?to=jordan opens or creates the 1:1 chat
+[210/244] [desktop] › tests\e2e\messenger.spec.ts:188:3 › Messenger › top-bar Messenger popover lists chats and navigates
+[211/244] [desktop] › tests\e2e\musefilter.spec.ts:23:3 › Muse filter › toggle filters quest pins, Show all brings them back, reload keeps it on
+[212/244] [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[213/244] [desktop] › tests\e2e\musefilter.spec.ts:68:3 › Muse filter › kept plans fit on screen, reasons show in the list and on the quest sheet
+[214/244] [phone] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[215/244] [phone] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[216/244] [desktop] › tests\e2e\musefilter.spec.ts:93:3 › Muse filter › Maya: the filter never empties her map
+[217/244] [desktop] › tests\e2e\musefilter.spec.ts:104:3 › Muse filter › Friends view with the filter on shows Maya
+[218/244] [phone] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[219/244] [desktop] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them
+[220/244] [phone] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[221/244] [desktop] › tests\e2e\musemap.spec.ts:47:3 › Muse picks on the map › ?mode=friends opens the Friends view; ?mode=explore opens Explore
+[222/244] [desktop] › tests\e2e\outhere.spec.ts:32:3 › Out Here plan sheet › composer, chips, 15-minute time-fit and why-not-others
+[223/244] [phone] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[224/244] [phone] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[225/244] [phone] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[226/244] [phone] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[227/244] [phone] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[228/244] [desktop] › tests\e2e\outhere.spec.ts:71:3 › Out Here plan sheet › a new ask replaces one still in flight
+[229/244] [phone] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+[230/244] [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[231/244] [desktop] › tests\e2e\outhere.spec.ts:98:3 › Out Here plan sheet › one seat left: Maya is told and can join without Alex
+[232/244] [desktop] › tests\e2e\outhere.spec.ts:129:3 › Out Here plan sheet › plan route: viewer from x-persona, 403 on a different userId, meta and headers
+[233/244] [desktop] › tests\e2e\outhere.spec.ts:151:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0
+[234/244] [phone] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[235/244] [phone] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[236/244] [phone] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+[237/244] [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see
+[238/244] [desktop] › tests\e2e\people.spec.ts:93:1 › Edit profile saves the bio and who can see a detail
+[239/244] [desktop] › tests\e2e\people.spec.ts:126:1 › two personas: a canceled request leaves the other side live
+[240/244] [desktop] › tests\e2e\people.spec.ts:167:1 › phone: the selected section chip is scrolled into view
+[241/244] [desktop] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests
+[242/244] [desktop] › tests\e2e\people.spec.ts:217:1 › Delete a friend request
+[243/244] [desktop] › tests\e2e\people.spec.ts:231:1 › Suggestions: Add friend, Cancel, Remove
+[244/244] [desktop] › tests\e2e\people.spec.ts:249:1 › All friends search and Custom lists
+  3 failed
+    [phone] › tests\e2e\findmy.spec.ts:204:3 › quest pins stay tappable under friends › Maya on Approximate lands near Dumpling Den; Alex taps the quest pin and its panel opens 
+    [phone-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it ─────────
+    [desktop-parallel] › tests\e2e\feed.spec.ts:128:1 › like, pick a reaction, and remove it ───────
+  69 skipped
+  172 passed (4.9m)
+exit=1

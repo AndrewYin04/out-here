@@ -1,0 +1,38 @@
+    [phone] › tests\e2e\entry.spec.ts:29:5 › at 390px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [phone] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+    [phone] › tests\e2e\feed.spec.ts:103:1 › create a post with audience and photo ─────────────────
+    [phone] › tests\e2e\map.spec.ts:156:3 › phone 390 › without WebGL the plans show as a list that opens the sheet 
+    [phone] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [phone] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map ──────
+    [phone] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [phone] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [phone] › tests\e2e\musefilter.spec.ts:92:3 › Muse filter › Maya: the filter never empties her map 
+    [phone] › tests\e2e\musefilter.spec.ts:103:3 › Muse filter › Friends view with the filter on shows Maya 
+    [phone] › tests\e2e\musemap.spec.ts:8:3 › Muse picks on the map › a plan highlights the dumpling pin and dims the rest; closing restores them 
+    [phone] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here 
+    [phone] › tests\e2e\people.spec.ts:181:1 › two personas: Add friend, then Confirm from Friend requests 
+    [phone] › tests\e2e\shell.spec.ts:275:3 › mobile 390 › top bar icons sit flush right and the account menu fits on screen 
+    [phone] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [phone] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop] › tests\e2e\create-event.spec.ts:55:3 › Post a plan › a Group plan: members see it live, others never; plan page, posts and check-in 
+    [desktop] › tests\e2e\entry.spec.ts:29:5 › at 1440px › Feed I'm free opens the composer on /out-here, focused and empty 
+    [desktop] › tests\e2e\feed.spec.ts:49:1 › Out Here card shows live friends and open seats, and opens the map 
+    [desktop] › tests\e2e\groups.spec.ts:30:1 › Cheap Eats Hangouts tab shows Dumpling Den with 2 left 
+    [desktop] › tests\e2e\hangout-rating.spec.ts:6:1 › two attendees complete a hangout and rate it 
+    [desktop] › tests\e2e\muse-agent-backend.spec.ts:5:1 › ordinary chat coordinates through the server ledger and returns to the owner 
+    [desktop] › tests\e2e\muse-integration-lifecycle.spec.ts:13:1 › photo cancellation, retry and delayed suggestions preserve the saved photo and manual caption 
+    [desktop] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map ────
+    [desktop] › tests\e2e\muse-integration.spec.ts:5:35 › arrival photo to saved memory and map with reduced motion 
+    [desktop] › tests\e2e\muse-processing.spec.ts:51:1 › opening chat frames Muse closely and closing restores the walking zoom 
+    [desktop] › tests\e2e\muse-vision.spec.ts:7:1 › saved-photo analysis preserves the photo; only an explicit caption edit changes the same record 
+    [desktop] › tests\e2e\musefilter.spec.ts:103:3 › Muse filter › Friends view with the filter on shows Maya 
+    [desktop] › tests\e2e\navigation.spec.ts:59:3 › Out Here navigation › a plan card closes with X, Escape and browser Back without leaving Out Here 
+    [desktop] › tests\e2e\outhere.spec.ts:153:3 › Out Here plan sheet › alex invites maya to Dumpling Den, maya accepts, both see seats 2 -> 0 
+    [desktop] › tests\e2e\people.spec.ts:44:1 › Intro shows only the fields the viewer can see ─────
+    [desktop] › tests\e2e\shell.spec.ts:116:3 › desktop 1440 › avatar menu lists the 8 personas and switches persona 
+    [desktop] › tests\e2e\shell.spec.ts:155:3 › desktop 1440 › friends and groups use a section sidebar instead of the home nav and right rail 
+    [desktop] › tests\e2e\shell.spec.ts:190:3 › desktop 1440 › a persona tab never shows the default persona, in HTML or while hydrating 
+    [desktop] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return 
+    [desktop] › tests\e2e\world-visual.spec.ts:3:35 › metre-scale world, companion framing and 2D return with reduced motion 
+    [desktop] › tests\e2e\your-plans.spec.ts:3:1 › two attendees can find a joined hangout and share one crew album 
+BASEDONE

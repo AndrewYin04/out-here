@@ -1,0 +1,50 @@
+{
+ "mayaBubble": {
+  "emoji": "🧋",
+  "thought": "free after class",
+  "doing": "down for boba",
+  "wantsTo": null
+ },
+ "alexWants": {
+  "wants": [
+   {
+    "id": "7394db1d-de1c-4911-b88e-04bab554d117",
+    "userId": "48110c3e-2928-472f-ac20-0c93bdbfd7ad",
+    "text": "Looking for a track jacket under $25, close enough to walk",
+    "item": "track jacket",
+    "keywords": [
+     "track jacket",
+     "windbreaker",
+     "jacket"
+    ],
+    "maxPrice": 25,
+    "maxDriveMin": 15,
+    "active": true,
+    "createdAt": "2026-11-12T11:29:00.000Z"
+   }
+  ]
+ },
+ "listings": 32,
+ "nonAvailable": [],
+ "popupListings": [
+  "Y2K denim shoulder bag:available",
+  "Vintage track jacket:available"
+ ],
+ "alexInvites": 0,
+ "alexTogether": 0,
+ "alexNotifs": 50,
+ "mayaInvites": 0,
+ "mayaTogether": 0,
+ "mayaNotifs": 33,
+ "leoInvites": 0,
+ "leoTogether": 0,
+ "leoNotifs": 12,
+ "crews": 3,
+ "memories": 4,
+ "mayaWatchKeys": [
+  "reel-flea-market-finds",
+  "reel-thrift-outfit-40",
+  "reel-denim-5-ways"
+ ],
+ "mayaSaved": true
+}
